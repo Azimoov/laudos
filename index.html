@@ -490,11 +490,11 @@ async function processar(){
       log('Transcrevendo '+f.name+' ...');
       try{
         const resp = await transcreverAudio(f);
-        audios.push({idx:i, nome:f.name, transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', exameId:null});
+        audios.push({idx:i, nome:f.name, url:URL.createObjectURL(f), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', exameId:null});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
         log('Falha no áudio '+f.name+': '+e.message, true);
-        audios.push({idx:i, nome:f.name, transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
+        audios.push({idx:i, nome:f.name, url:URL.createObjectURL(f), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
       }
     }
     // 3. associação automática
@@ -522,18 +522,33 @@ function renderExames(){
       const sel = a.exameId===ex.id?' checked':'';
       return '<label style="font-weight:400;display:flex;gap:6px;align-items:center"><input type="checkbox" onchange="ligarAudio('+a.idx+','+ex.id+',this.checked)"'+sel+'> '+a.nome+(a.nomePaciente?' — <i>'+a.nomePaciente+'</i>':'')+'</label>';
     }).join('');
+    const detalhes = '<div id="det'+ex.id+'" style="display:none;margin-top:10px;background:#f4f7fa;border-radius:10px;padding:10px">'
+      +'<b style="font-size:13px">Fotos ('+ex.imagens.length+') — toque para ampliar:</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">'
+      + ex.imagens.map(function(im){return '<img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)">';}).join('')
+      +'</div><b style="font-size:13px">Gravações ('+audiosDoExame.length+'):</b>'
+      + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="font-size:13px;font-weight:600">🎙 '+a.nome+'</div>'+(a.url?'<audio controls src="'+a.url+'" style="width:100%;height:34px"></audio>':'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
+      +'</div>';
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+' <span class="tag">'+ex.imagens.length+' pág.</span>'
       +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')+'</div>'
       +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
       +(audios.length?'<label>Áudios deste paciente</label>'+listaAudios:'')
-      +'<div style="margin-top:10px;display:flex;gap:8px">'
+      +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
       +'<button class="btn peq" id="btnGerar'+ex.id+'" onclick="gerarLaudo('+ex.id+')">Gerar laudo</button>'
       +(ex.laudo?'<button class="btn peq sec" onclick="abrirRevisao('+ex.id+')">Ver / imprimir</button>':'')
+      +'<button class="btn peq sec" onclick="alternarDetalhes('+ex.id+')">📂 Fotos e áudios</button>'
       +'<button class="btn peq sec" style="color:#b3261e" onclick="excluirExame('+ex.id+')">🗑 Excluir</button>'
-      +'</div></div>';
+      +'</div>'+detalhes+'</div>';
   }
   div.innerHTML = html;
+}
+function alternarDetalhes(id){
+  const d = document.getElementById('det'+id);
+  d.style.display = d.style.display==='none' ? 'block' : 'none';
+}
+function ampliarImg(el){
+  if(el.dataset.amp==='1'){ el.dataset.amp=''; el.style.height='90px'; el.style.width=''; }
+  else { el.dataset.amp='1'; el.style.height='auto'; el.style.width='100%'; }
 }
 function mudarTipo(id, v){ exames.find(function(e){return e.id===id;}).tipo = v; }
 function excluirExame(id){
@@ -640,10 +655,11 @@ async function gerarInLoco(){
     const id = exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
     const ex = {id:id, nomeArquivo:'in-loco', paciente:'Exame in loco', imagens:lokoImgs.slice(), tipo:'', audios:[], laudo:null};
     exames.push(ex);
-    for(const blob of lokoAudios){
+    for(let bi=0; bi<lokoAudios.length; bi++){
+      const blob = lokoAudios[bi];
       log('Transcrevendo gravação...');
       const r = await transcreverAudio(blob);
-      const a = {idx:audios.length, nome:'Gravação in loco', transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
+      const a = {idx:audios.length, nome:'Gravação in loco '+(bi+1), url:lokoUrls[bi], transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
       audios.push(a); ex.audios.push(a.idx);
       if(!ex.tipo && a.tipoExame) ex.tipo = a.tipoExame;
       if(a.nomePaciente) ex.paciente = a.nomePaciente;
@@ -651,7 +667,7 @@ async function gerarInLoco(){
     if(!ex.tipo) ex.tipo='outro';
     renderExames();
     await gerarLaudo(id);
-    lokoUrls.forEach(function(u){URL.revokeObjectURL(u);}); lokoImgs=[]; lokoAudios=[]; lokoUrls=[]; renderLoko();
+    lokoImgs=[]; lokoAudios=[]; lokoUrls=[]; renderLoko();
   }catch(e){ log('Erro no exame in loco: '+e.message, true); }
   btn.disabled=false; btn.textContent='⚡ Gerar laudo agora';
 }

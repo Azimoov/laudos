@@ -132,97 +132,178 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 <script>
 /* ============ MODELOS DE LAUDO (transcritos dos arquivos .pages do Dr. Daniel) ============ */
 const MODELOS = {
- abdominal: {
-  nome:"Abdominal total",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO ABDOMINAL",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor convexo, multifrequêncial, acesso trans-abdominal.",
-  corpo:"**Fígado** com dimensões normais, contornos regulares, ecotextura homogênea, vascularização preservada com ecogênicidade do parênquima homogêneo.\nLobo direito mede ............ e o esquerdo mede .............. Tronco da veia porta mede ............\n\n**Vesícula biliar** tópica, forma e dimensões normais, conteúdo anecogênico, sem presença de cálculo em seu interior.\n\n**Vias biliares** intra e extra-hepáticas sem dilatações.\n\n**Pâncreas** tópico, com forma, dimensões e ecotextura normais.\n\n**Rim direito** tópico, com forma, contornos e dimensões normais. Parênquima normal. Sistema pielocalicial sem dilatações. Medindo em seus maiores eixos ........x.........x.......cm, com volume de ........cm³.\n\n**Rim esquerdo** tópico, com forma, contornos e dimensões normais. Parênquima normal. Sistema pielocalicial sem dilatações. Medindo em seus maiores eixos ........x.........x.......cm, com volume de ........cm³.\n\n**Baço** com dimensões, contornos e ecogênicidade normais, medindo ..........cm.\n\n**Grandes vasos** do abdome superior normais. Não há sinais de adenopatia para-aórtica ou ao redor dos grandes vasos.\n\nBexiga com conteúdo anecogênico habitual, avaliada com ..........ml.\n\nAusência de coleção de líquido retro-peritoneal.",
-  conclusao:"1- Órgãos abdominais de aspectos ecográficos habituais."
+ "abdominal": {
+  "nome": "Abdominal total",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO ABDOMINAL",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "**Fígado** com dimensões normais, contornos regulares, ecotextura homogênea, vascularização preservada com ecogênicidade do parênquima normal.\nLobo direito mede ..... cm e o esquerdo mede ..... cm. Tronco da veia porta mede ..... cm.\n\n**Vesícula biliar** tópica, forma e dimensões normais, conteúdo anecogênico, ausência de cálculos em seu interior.\n\n**Vias biliares** intra e extra-hepáticas sem dilatações.\n\n**Pâncreas** tópico, com forma, dimensões e ecotextura normais.\n\n**Rim direito** tópico, com forma, contornos e dimensões normais. Parênquima normal. Sistema pielocalicial sem dilatações.\nMedida renal em seu maior eixo ..... cm.\n\n**Rim esquerdo** tópico, com forma, contornos e dimensões normais. Parênquima normal. Sistema pielocalicial sem dilatações.\nMedida renal em seu maior eixo ..... cm.\n\n**Baço** com dimensões, contornos e ecogênicidade normais, medindo ..... cm. (Normal até 13 cm)\n\n**Grandes vasos** do abdome superior normais. Não há sinais de adenopatia para-aórtica ou ao redor dos grandes vasos.\n\nBexiga com conteúdo anecogênico habitual.\n\nAusência de coleção de líquido retro-peritoneal.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
  },
- rins:{
-  nome:"Rins e vias urinárias",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO RINS E VIAS URINÁRIAS",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor convexo, multifrequêncial, acesso trans-abdominal.",
-  corpo:"**RIM DIREITO:**\nTópico, com forma e dimensões normais, parênquima preservado. Espessura preservada, parênquima renal medindo ..... cm. Sistema Pielocalicial sem dilatações.\nDimensões: ..... x ...... x ...... cm.\nVolume: ....... cm³.\n\n**RIM ESQUERDO:**\nTópico, com forma e dimensões normais, parênquima preservado. Espessura preservada, parênquima renal medindo ...... cm. Sistema Pielocalicial sem dilatações.\nDimensões: ...... x ...... x ...... cm.\nVolume: ....... cm³.\n\nBexiga urinária com distensibilidade, contornos regulares, paredes com espessura normal, conteúdo anecóico. Não há litíases no interior.",
-  conclusao:"Exame ecográfico sem alterações a analise realizada."
+ "abdomen_superior": {
+  "nome": "Abdome superior",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO ABDOME SUPERIOR",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "**Fígado** com dimensões normais, contornos regulares, ecotextura homogênea, vascularização preservada com ecogênicidade do parênquima normal.\n**Lobo direito** mede ..... cm e o esquerdo mede ..... cm. Tronco da veia porta mede ..... cm.\n\n**Vesícula biliar** tópica, forma e dimensões normais, conteúdo anecogênico, ausência de cálculos em seu interior.\n\n**Vias biliares** intra e extra-hepáticas sem dilatações.\n\n**Pâncreas** tópico, com forma, dimensões e ecotextura normais.\n\n**Baço** com dimensões, contornos e ecogênicidade normais, medindo ..... cm. (Normal até 13 cm)\n\n**Grandes vasos** do abdome superior normais. Não há sinais de adenopatia para-aórtica ou ao redor dos grandes vasos.\n\nAusência de coleção de líquido retro-peritoneal.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
  },
- prostata:{
-  nome:"Próstata",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO PROSTÁTICO",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor convexo, multifrequêncial, acesso pélvico.",
-  corpo:"**Bexiga urinária**: De forma habitual, com conteúdo anecóico, boa distensibilidade, de contornos regulares, paredes com espessura normal.\n\n**Volume pré-miccional:** ........ ml.\n**Volume pós-miccional:** ........ ml.\n\n**Vesículas seminais**: Simétricas de ecotextura homogêneas, hipoecóicas de aspecto habitual à análise ecográfica.\n\n**Próstata**: Com parênquima de ecos internos homogêneos, simétrica, formato elíptica, bordos livres, contornos regulares sem calcificações e áreas suspeitas também ausentes. O espectro doppler colorido da vascularização foi visualizado de aspecto habitual.\n\nDimensões: ..... x ..... x ..... cm (Nos seus diâmetros transversal, longitudinal e anteroposterior.)\n\nPeso: ..... gramas (normal até 30 g).",
-  conclusao:"Próstata de volume habitual."
+ "rins": {
+  "nome": "Rins e vias urinárias",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO RINS E VIAS URINÁRIAS",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "**RIM DIREITO:**\nTópico, com forma e dimensões normais, parênquima com espessura preservada, com boa diferenciação córtico-medular. Sistema Pielocalicial sem dilatações.\nMedida do parênquima: ..... cm.\nDimensões: ..... x ..... x ..... cm.\nVolume: ..... cm³.\n\n**RIM ESQUERDO:**\nTópico, com forma e dimensões normais, parênquima com espessura preservada, com boa diferenciação córtico-medular. Sistema Pielocalicial sem dilatações.\nMedida do parênquima: ..... cm.\nDimensões: ..... x ..... x ..... cm.\nVolume: ..... cm³.\n\nNão se detectam massas ou ectasias.\n\nBexiga urinária com distensibilidade, contornos regulares, paredes com espessura normal, conteúdo anecóico. Não há litíases no interior.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
  },
- tireoide:{
-  nome:"Tireóide",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO TIREÓIDE",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor linear, multifrequêncial, acesso externo.",
-  corpo:"**Pele e tecido celular subcutâneo:**\nLisa, regular e de espessura normal.\n\n**Músculos Pré-tireoidianos:**\nDe textura homogênea sem alterações acústicas.\n\n**Carótidas:**\nCom calibre e pulsatilidade normais com paredes ecogênicas, lisas e conteúdo anecóico.\n\n**Tireóide:**\nGlândula apresentando tecido tireoidiano de volume habitual, assimétrica, móvel á deglutição, com contornos regulares, ecotextura heterogênea.\n\n**Lobo direito**\nMedida: ..... x ..... x ....... cm. Volume: ....... cm³.\nTecido tireoidiano com ecotextura e ecogênicidade normais.\n\n**Lobo esquerdo**\nMedida: ....... x ....... x ...... cm. Volume: ....... cm³.\nTecido tireoidiano com ecotextura e ecogênicidade normais.\n\n**Istmo:**\nEspessura ...... cm.\n\nTecido tireoidiano normal, ecotextura heterogênea.\n\n**Volume total da glândula:** ....... cm³.\n\nEstruturas vasculares cervicais com anatomia e fluxos preservados.\n\nAusência de linfonodomegalia, massas ou coleções cervicais.\n\nGlândulas parótidas, submandibulares e sublinguais com aspecto ecográfico preservados.",
-  conclusao:"Glândula tireóide de volume habitual."
+ "prostata": {
+  "nome": "Próstata",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO PROSTÁTICO",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "**Bexiga urinária:** De forma habitual, com conteúdo anecóico, boa distensibilidade, de contornos regulares, paredes com espessura normal.\n\n**Volume pré miccional: ..... ml**\n\n**Volume pós miccional: ..... ml**\n\nVesículas seminais: Simétricas de ecotextura homogêneas, hipoecóicas de aspecto habitual à análise ecográfica.\n\n**Próstata:** Com parênquima de ecos internos homogêneos, simétrica, forma triangular, bordos livres, contornos regulares sem calcificação. O espectro Doppler colorido da vascularização foi visualizado de aspecto habitual.\n\n**Dimensões: ..... x ..... x ..... cm (em seus diâmetros transversal, longitudinal e anteroposterior).**\n\n**Peso: ..... g (Normal até 30 g)**",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
  },
- tireoide_doppler:{
-  nome:"Tireóide com Doppler",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO TIREÓIDE COM DOPPLER",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor linear, multifrequêncial, acesso externo. Estudo complementado com Doppler colorido.",
-  corpo:"**Pele e tecido celular subcutâneo:**\nLisa, regular e de espessura normal.\n\n**Músculos Pré-tireoidianos:**\nDe textura homogênea sem alterações acústicas.\n\n**Carótidas:**\nCom calibre e pulsatilidade normais com paredes ecogênicas, lisas e conteúdo anecóico.\n\n**Tireóide:**\nGlândula apresentando tecido tireoidiano de volume habitual, assimétrica, móvel á deglutição, com contornos regulares, ecotextura heterogênea.\n\n**Lobo direito**\nMedida: ..... x ..... x ....... cm. Volume: ....... cm³.\nTecido tireoidiano com ecotextura e ecogênicidade normais.\n\n**Lobo esquerdo**\nMedida: ....... x ....... x ...... cm. Volume: ....... cm³.\nTecido tireoidiano com ecotextura e ecogênicidade normais.\n\n**Istmo:**\nEspessura ...... cm.\n\nTecido tireoidiano normal, ecotextura heterogênea.\n\n**Volume total da glândula:** ....... cm³.\n\nAo estudo Doppler colorido, vascularização do parênquima tireoidiano de aspecto habitual.\n\nEstruturas vasculares cervicais com anatomia e fluxos preservados.\n\nAusência de linfonodomegalia, massas ou coleções cervicais.\n\nGlândulas parótidas, submandibulares e sublinguais com aspecto ecográfico preservados.",
-  conclusao:"Glândula tireóide de volume habitual."
+ "tireoide": {
+  "nome": "Tireoide",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO TIREOIDE",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "**Pele e tecido celular subcutâneo:**\nLisa, regular e de espessura normal.\n\n**Músculos Pré-tireoidianos:**\nDe textura homogênea sem alterações acústicas.\n\n**Carótidas:**\nCom calibre e pulsatilidade normais com paredes ecogênicas, lisas e conteúdo anecóico.\n\n**Tireóide:**\n\n**Lobo direito**\nMedida: **..... x ..... x ..... cm. Volume: ..... cm³.**\nTecido tireoidiano com ecotextura e ecogênicidade normais.\n\n**Lobo esquerdo**\nMedida: **..... x ..... x ..... cm. Volume: ..... cm³.**\nTecido tireoidiano com ecotextura e ecogênicidade normais.\n\n**Istmo:**\nEspessura ..... cm.\n\n**Volume total da glândula: ..... cm³.**",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
  },
- mama:{
-  nome:"Mama",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO MAMA",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor linear, multifrequêncial, acesso externo.",
-  corpo:"**MAMA DIREITA**\n**DESCRIÇÃO:**\n\nMama assimétrica.\nPele e tecido celular subcutâneo sem alterações.\nMamilo e aréola sem alterações.\nParênquima mamário com ecogênicidade habituais de padrão heterogêneo.\nTecido retro-mamário sem dilatação ductal.\nRegião axilar livre.\n\n**MAMA ESQUERDA**\n**DESCRIÇÃO:**\n\nMama assimétrica.\nPele e tecido celular subcutâneo sem alterações.\nMamilo e aréola sem alterações.\nParênquima mamário com ecogênicidade habituais de padrão heterogêneo.\nTecido retro-mamário sem dilatação ductal.\nRegião axilar livre.",
-  conclusao:"Mamas de aspectos habituais e padrão BI-RADS I.",
-  extra:"Sugestão: EXAME ECOGRÁFICO SEMESTRAL.\n\nAdotamos a normatização do Colégio Brasileiro de Radiologia, Sociedade Brasileira de Ultrassonografia e Federação das Sociedades Brasileiras de Ginecologia e Obstetrícia. Baseado no \"BI-RADS\".\n\nClassificação de BI-RADS:\nCategoria 0 : Necessário avaliação complementar.\nCategoria I : Achados negativos.\nCategoria II: Achados Benignos.\nCategoria III: Achados provavelmente benignos.\nCategoria IV: Achados suspeitos.\nCategoria V: Achados altamente suspeitos.\nCategoria VI: Malignidade já comprovada por biopsia."
+ "mama": {
+  "nome": "Mama",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO MAMA",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "**MAMA DIREITA**\n**DESCRIÇÃO:**\n\nMama simétrica.\nPele e tecido celular subcutâneo sem alterações.\nMamilo e aréola sem alterações.\nParênquima mamário com ecogênicidade habituais de padrão heterogêneo.\nTecido retro-mamário sem dilatação ductal.\nRegião axilar livre.\n\n**MAMA ESQUERDA**\n**DESCRIÇÃO:**\n\nMama simétrica.\nPele e tecido celular subcutâneo sem alterações.\nMamilo e aréola sem alterações.\nParênquima mamário com ecogênicidade habituais de padrão heterogêneo.\nTecido retro-mamário sem dilatação ductal.\nRegião axilar livre.",
+  "conclusao": "Exame ecográfico compatível com a normalidade.\nCategoria: BI-RADS I.",
+  "extra": "Sugestão: Exame ecográfico semestral.\n\nAdotamos a normatização do Colégio Brasileiro de Radiologia, Sociedade Brasileira de Ultrassonografia e Federação das Sociedades Brasileiras de Ginecologia e Obstetrícia. Baseado no “BI-RADS”.\n\nO exame realizado na ausência da mamografia, diminui sua acurácia na identificação de lesões focais no parênquima mamário.\n\nA avaliação mamográfica é indispensável, mesmo em pacientes com exame ultrassonográfico normal."
  },
- obst1:{
-  nome:"Obstétrico 1º trimestre",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO OBSTÉTRICO",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
-  corpo:"**Bexiga**: Com conteúdo adequado para o exame com paredes lisas e conteúdo anecóico.\n\n**Útero**: Em anteverso-flexão, com forma globosa, contornos regulares e bem definidos, volume compatível com período gestacional. O miométrio apresenta ecotextura e estratificação habitual.\n\n**Colo uterino**: Com ecotextura habitual, medindo ........... cm de comprimento, canal endocervical fechado.\n\n**Saco Gestacional**: Presente em cavidade uterina tópico, único, de contornos regulares, sem evidências de descolamento do córion.\n\n**Trofoblasto**: Com inserção corporal, posterior, sem área de deslocamento.\n\n**Embrião**: Visível tópico e único, com freqüência cardíaca rítmica de ..... bpm e movimentos corporais presentes. A Morfologia fetal se apresenta sem anormalidades evidentes para essa fase de desenvolvimento embrionário.\n\n**Comprimento crânio - caudal (CCN):** medindo .........cm.\n\n**Vesícula vitelina:** Não visualizada.\n\n**Fundo de Saco de Douglas:** Apresentando líquido livre.\n\n**Líquido Amniótico**: habitual para a idade gestacional.",
-  conclusao:"Ecografia evidência útero grávido com presença de um feto único. Não observando-se ao exame atividade cardíaca. CCN de .........cm estimando idade gestacional de ...... semanas e ....... dias. (Tempo de amenorréia - ......semanas e ....... dias)"
+ "transvaginal": {
+  "nome": "Transvaginal (endovaginal)",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO ENDOVAGINAL",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor endocavitário, multifrequêncial, acesso vaginal.",
+  "corpo": "**Bexiga:** Conteúdo anecóico, paredes lisas e bem delimitadas.\n\n**Vagina:** Acusticamente normal.\n\n**Útero:** Forma piriforme, contornos regulares, em anteversoflexão, e centralizado.\nTextura miometrial homogênea.\nEndométrio homogêneo, medindo **..... mm.**\nO colo uterino de textura homogênea.\nVolume total: **..... cm³.** (Valor de referência: 25 a 180 cm³).\n\n**Ovário direito:**\nPara-uterino.\nForma elíptica e contornos regulares.\nEcotextura heterogênea.\nVolume: **..... cm³.** (Normal - 3 à 12 cm³)\n\n**Ovário esquerdo:**\nPara-uterino.\nForma elíptica e contornos regulares.\nEcotextura heterogênea.\nVolume: **..... cm³.** (Normal - 3 à 12 cm³)\n\n**F.S.D:** Livre.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
  },
- obst23:{
-  nome:"Obstétrico 2º-3º trimestre",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO OBSTÉTRICO",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
-  corpo:"Útero aumentado de volume de paredes finas e integras com miométrio de ecotextura normal, contendo feto único, em situação longitudinal apresentação .......... (CEFÁLICA/PÉLVICA) em situação ............ (TRANSVERSAL/longitudinal) dorso á ............ (DIREITA/esquerda).\n\nMorfologia fetal sem anormalidades evidentes.\n\nMovimentos corporais e respiratórios presentes.\n\nBatimento cardio-fetal rítmico, com freqüência calculada em ........ bpm.\n\nPlacenta com posição ..........., textura homogênea, não atingindo o segmento inferior. Espessura placentária de ..........cm (Referência: 2,5 a 7,9 cm). Grau........ de maturidade (numa escala de 0 a III – GRANNUM).\n\nCordão umbilical com inserção normal contendo três vasos de aspecto sonográfico normal.\n\nLíquido amniótico de aspecto normal. Maior bolsão de ......... cm (referência: 2 - 8 cm).\n\n**BIOMETRIA FETAL:**\nDiâmetro bi-parietal (DBP): ......cm\nCircunferência Abdominal (CA): ......cm\nCircunferência cefálica (CC): .......cm\nComprimento do Fêmur (CF): .......cm\nPeso fetal: .......g",
-  conclusao:"Foi observado Gravidez de feto único, com morfologia e vitalidade normais; A biometria fetal estima que a idade gestacional média seja de ....... semanas e ....... dias. A data ecográfica média provável do parto é aproximada para: ......... (com variação de até +/- 21 dias)."
+ "pelvica": {
+  "nome": "Pélvica",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO PÉLVICO",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso pélvico.",
+  "corpo": "**Bexiga:** Conteúdo anecóico, paredes lisas e bem delimitadas.\n\n**Vagina:** Acusticamente normal.\n\n**Útero:** Forma piriforme, contornos regulares, em anteversoflexão, e centralizado.\nTextura miometrial homogênea.\nO colo uterino de textura homogênea.\nVolume total: **..... cm³.** (Valor de referência: 25 a 180 cm³).\n\n**Ovário direito:**\nPara-uterino.\nForma elíptica e contornos regulares.\nEcotextura heterogênea.\nVolume: **..... cm³.** (Normal - 3 à 12 cm³)\n\n**Ovário esquerdo:**\nPara-uterino.\nForma elíptica e contornos regulares.\nEcotextura heterogênea.\nVolume: **..... cm³.** (Normal - 3 à 12 cm³)\n\n**F.S.D:** Livre.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
  },
- endovaginal:{
-  nome:"Endovaginal / Pélvico",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO ENDOVAGINAL/PÉLVICO",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor endocavitário, multifrequêncial, acesso endovaginal.",
-  corpo:"**Bexiga:** Conteúdo anecóico, paredes lisas e bem delimitadas.\n\n**Vagina:** Acusticamente normal.\n\n**Útero:** Forma piriforme, contornos regulares, em anteversoflexão, e centralizado.\nTextura miometrial homogênea.\nEndométrio homogêneo, medindo ....... mm.\nO colo uterino de textura homogênea.\nDimensões: (Volume)\n   - corpo - ....... cm³\n   - colo - ...... cm³.\nVolume total: ......... cm³. (Valor de referência: 25 a 120 cm³).\n\n**Ovário direito:**\nPara-uterino.\nForma elíptica e contornos regulares.\nEcotextura heterogênea.\nDimensões: ..... x ..... x ..... cm.\nVolume: ...... cm³. (Normal - 3 à 12 cm³)\n\n**Ovário esquerdo:**\nPara-uterino.\nForma elíptica e contornos regulares.\nEcotextura heterogênea.\nDimensões: ..... x ..... x ..... cm.\nVolume: ...... cm³. (Normal - 3 à 12 cm³)\n\n**F.S.D:** Livre.",
-  conclusao:"Exame ecográfico dentro dos limites da normalidade."
+ "obst1": {
+  "nome": "Obstétrico 1º trimestre",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO OBSTÉTRICO INICIAL",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "**Bexiga:** Com conteúdo adequado para o exame com paredes lisas e conteúdo anecóico.\n\n**Útero:** Em anteverso-flexão, com forma globosa, contornos regulares e bem definidos, volume compatível com período gestacional. O miométrio apresenta ecotextura e estratificação habitual.\n\n**Colo uterino:** Com ecotextura habitual, canal endo-cervical fechado.\n\n**Saco Gestacional:** Presente em cavidade uterina tópico, único, de contornos regulares, não foi observado descolamento retrocoriônico.\n\n**Trofoblasto:** Com inserção corporal, posterior, sem área de deslocamento.\n\n**Embrião:** Visível tópico e único, com freqüência cardíaca rítmica de ..... bpm e movimentos corporais presentes. A Morfologia fetal se apresenta sem anormalidades evidentes para essa fase de desenvolvimento embrionário.\n\n**Comprimento crânio - caudal (CCN): medindo ..... cm.**\n\n**Vesícula vitelina:** Visualizada.\n\n**Fundo de Saco de Douglas:** Normal.\n\n**Líquido Amniótico:** habitual para a idade gestacional.",
+  "conclusao": "Ecografia evidencia útero grávido com presença de um feto único, com idade gestacional estimada pelo CCN de ..... semanas e ..... dias.\nData provável do parto – ..........",
+  "extra": "Obs: A biometria fetal torna-se previsor progressivamente menos preciso da idade gestacional com o avançar da gestação. A idade gestacional atribuída em exame prévio não deve ser mudada pelo exame subsequente. Exames subsequentes devem ser comparados ao exame inicial para se avaliar o crescimento fetal."
  },
- bolsa_escrotal:{
-  nome:"Bolsa escrotal",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO BOLSA ESCROTAL",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor linear, multifrequêncial, acesso externo.",
-  corpo:"**Testículo Direito** apresenta forma ovalada, contornos regulares, ecotextura e volume dentro dos padrões de normalidade.\n**Medidas:** .......x........x...... cm.\nO epidídimo apresenta forma e ecogênicidade normais.\n\n**Testículo Esquerdo** apresenta forma ovalada, contornos regulares, ecotextura e volume dentro dos padrões de normalidade.\n**Medidas:** .......x........x...... cm.\nO epidídimo apresenta forma e ecogênicidade normais.\n\nNão há comprometimento do septo da bolsa escrotal.\n\nSem sinais de herniação.",
-  conclusao:"Exame ecográfico sem alterações á analise realizada."
+ "obst1_descolamento": {
+  "nome": "Obstétrico 1º trim. — descolamento",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO OBSTÉTRICO INICIAL",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "**Bexiga:** Com conteúdo adequado para o exame com paredes lisas e conteúdo anecóico.\n\n**Colo uterino:** Com ecotextura habitual, canal endo-cervical fechado.\n\n**Útero:** Em anteverso-flexão, com forma globosa, contornos regulares e bem definidos, volume compatível com período gestacional. O miométrio apresenta ecotextura e estratificação habitual.\n\n**Saco Gestacional:** Presente em cavidade uterina tópico, único, de contornos regulares, notou-se pequeno descolamento de menos que 10% da área total.\n\n**Trofoblasto:** Com inserção corporal, posterior, sem área de deslocamento.\n\n**Embrião:** Visível tópico e único, com freqüência cardíaca rítmica de ..... bpm e movimentos corporais presentes. A Morfologia fetal se apresenta sem anormalidades evidentes para essa fase de desenvolvimento embrionário.\n\n**Comprimento crânio - caudal (CCN): medindo ..... cm.**\n\n**Vesícula vitelina:** Visualizada e normal.\n\n**Fundo de Saco de Douglas:** Apresentando líquido livre.\n\n**Líquido Amniótico:** habitual para a idade gestacional.",
+  "conclusao": "Ecografia evidencia útero grávido com presença de um feto único, com idade gestacional estimada pelo CCN de ..... semanas e ..... dias.\nData provável do parto – ..........\n\nNotou-se pequeno descolamento do saco gestacional de menos que 10% da área total.",
+  "extra": "Obs: A biometria fetal torna-se previsor progressivamente menos preciso da idade gestacional com o avançar da gestação. A idade gestacional atribuída em exame prévio não deve ser mudada pelo exame subsequente. Exames subsequentes devem ser comparados ao exame inicial para se avaliar o crescimento fetal."
  },
- ombro:{
-  nome:"Ombro",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO OMBRO",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor linear, multifrequêncial, acesso externo.",
-  corpo:"**Pele e subcutâneo normais.**\n\n**Tendão do supraespinhal sem alterações.**\n\n**Tendão subescapular sem alterações.**\n\n**Tendão do infraespinhal sem alterações.**\n\n**Tendão do cabo longo do bíceps braquial centrado no sulco bicipital, apresentando-se integro em seu trajeto extra-articular.**\n\n**Bursa subacromial e subdeltóidea sem espessamento ou distensão liquida.**\n\n**Articulação acromioclavicular de contornos regulares.**\n\n**Não há sinais de derrame articular glenoumeral.**\n\n**Ventres musculares e infraespinhais com trofismo conservado.**",
-  conclusao:"Exame ecográfico sem alterações à analise realizada."
+ "obst23": {
+  "nome": "Obstétrico 2º-3º trimestre",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO OBSTÉTRICO",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "Útero aumentado de volume de paredes finas e íntegras com miométrio de ecotextura normal, contendo feto único, em situação **.....** apresentação **.....** e dorso à **.....**.\n\nMovimentos corporais e respiratórios presentes.\n\nBatimento cardio-fetal rítmico, com freqüência calculada em **..... bpm.**\n\nPlacenta com posição **.....**, textura homogênea, não atingindo o segmento inferior.\nEspessura placentária de **..... cm. Grau .....** de maturidade (numa escala de 0 a III – GRANNUM).\n\nCordão umbilical com inserção normal contendo três vasos de aspecto sonográfico normal.\n\nLíquido amniótico de aspecto normal. Maior bolsão de **..... cm** (referência: 2 - 8 cm).\n\n**BIOMETRIA FETAL:**\n**Diâmetro bi-parietal (DBP): ..... cm**\n**Circunferência cefálica (CC): ..... cm**\n**Circunferência Abdominal (CA): ..... cm**\n**Comprimento do Fêmur (CF): ..... cm**\n**Peso fetal: ..... g**",
+  "conclusao": "Foi observado Gravidez de feto único, com vitalidade normal.\nA biometria fetal estima que a idade gestacional média seja de ..... semanas e ..... dias.\nA data ecográfica média provável do parto é aproximada para: .......... (com variação de até +/- ..... dias).\nPeso no percentil ..... (Hadlock).",
+  "extra": "Obs: A biometria fetal torna-se previsor progressivamente menos preciso da idade gestacional com o avançar da gestação. A idade gestacional atribuída em exame prévio não deve ser mudada pelo exame subsequente. Exames subsequentes devem ser comparados ao exame inicial para se avaliar o crescimento fetal."
  },
- outro:{
-  nome:"Outro (sem modelo — montar do ditado)",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor multifrequêncial.",
-  corpo:"(SEM MODELO PRÉVIO: monte o laudo completo com base no ditado, nas medidas legíveis nas imagens e no seu conhecimento médico de ultrassonografia — use a estrutura consagrada de laudo para a região examinada, com os parágrafos habituais de normalidade para as estruturas avaliadas, no estilo dos demais modelos: nome da estrutura em negrito, um parágrafo por estrutura, pontilhados onde faltar medida. Complete o título com a região examinada. OBRIGATÓRIO: declare em observacoes_para_o_medico que o laudo foi montado sem modelo prévio, a partir do conhecimento da IA.)",
-  conclusao:"(conforme o ditado)"
+ "obst_gemelar": {
+  "nome": "Obstétrico gemelar 2º-3º trim.",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO OBSTÉTRICO",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor convexo, multifrequêncial, acesso externo.",
+  "corpo": "Útero aumentado de volume de paredes finas e íntegras com miométrio de ecotextura normal, contendo feto gemelar, com apresentação ..... para feto (1) e ..... para feto (2).\n\nMorfologia fetal sem anormalidades evidentes.\n\nMovimentos corporais e respiratórios presentes.\n\nBatimento cardio-fetal rítmico, com freqüência calculada em ..... bpm (1) e ..... bpm (2).\n\nPlacenta ..... com posição ..... para feto 1 e ..... para o feto 2, textura homogênea, não atingindo o segmento inferior. Espessura placentária adequada, Grau ..... de maturidade para ambos os fetos (numa escala de 0 a III – GRANNUM).\n\nCordão umbilical com inserção normal contendo três vasos de aspecto sonográfico normal.\n\nLíquido amniótico de aspecto normal. Maior bolsão de ..... cm (referência: 2 - 8 cm).\n\n**BIOMETRIA FETAL (FETO 1)**\nDiâmetro bi-parietal (DBP): ..... cm\nCircunferência cefálica (CC): ..... cm\nCircunferência Abdominal (CA): ..... cm\nComprimento do Fêmur (CF): ..... cm\nPeso fetal: ..... g\n\n**BIOMETRIA FETAL (FETO 2)**\nDiâmetro bi-parietal (DBP): ..... cm\nCircunferência cefálica (CC): ..... cm\nCircunferência Abdominal (CA): ..... cm\nComprimento do Fêmur (CF): ..... cm\nPeso fetal: ..... g",
+  "conclusao": "Foi observado Gravidez de fetos gemelares, com morfologia e vitalidades normais.\nA idade gestacional estimada é de ..... semanas e ..... dias.\nA data ecográfica média provável do parto é aproximada para: .......... (com variação de até +/- ..... dias).\nFeto 1 com peso no percentil ..... (Hadlock).\nFeto 2 com peso no percentil ..... (Hadlock).",
+  "extra": "Obs: A biometria fetal torna-se previsor progressivamente menos preciso da idade gestacional com o avançar da gestação. A idade gestacional atribuída em exame prévio não deve ser mudada pelo exame subsequente. Exames subsequentes devem ser comparados ao exame inicial para se avaliar o crescimento fetal."
  },
- partes_moles:{
-  nome:"Partes moles",
-  titulo:"RELATÓRIO ULTRASSONOGRÁFICO PARTES MOLES",
-  tecnica:"Exame realizado em modo bidimensional, com equipamento dinâmico marca MINDRAY modelo Z5. Varredura com transdutor linear, multifrequêncial, acesso externo.",
-  corpo:"Pele com espessura normal.\n\nTecido celular subcutâneo sem alterações.\n\nCamada muscular sem alterações.\n\nFáscia muscular sem alterações.",
-  conclusao:"Exame ecográfico sem alterações à analise realizada."
+ "bolsa_escrotal": {
+  "nome": "Bolsa escrotal",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO BOLSA ESCROTAL",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "**Testículo Direito** apresenta forma ovalada, contornos, ecotextura e volume dentro dos padrões da normalidade.\nMedidas: **..... x ..... x ..... cm.**\nO epidídimo apresenta forma e ecogenicidade normais.\n\n**Testículo Esquerdo** apresenta forma ovalada, contornos, ecotextura e volume dentro dos padrões da normalidade.\nMedidas: **..... x ..... x ..... cm.**\nO epidídimo apresenta forma e ecogenicidade normais.\n\nNão há comprometimento do septo da bolsa escrotal.\n\nSem sinais de herniação.",
+  "conclusao": "Exame ecográfico dentro dos limites da normalidade."
+ },
+ "penis": {
+  "nome": "Peniano",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO PENIANO",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "**Pele e subcutâneo:** conservados, sem espessamentos ou alterações significativas.\n\n**Corpos cavernosos:** apresentam morfologia preservada, com ecotextura habitual.\n\n**Corpo esponjoso:** anatômico, sem alterações evidentes.\n\n**Túnica albugínea:** sem alterações identificáveis.\n\n**Septo intercavernoso:** sem alterações identificáveis.\n\n**Vascularização:** estruturas vasculares visualizadas preservadas.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "parede_abdominal": {
+  "nome": "Parede abdominal",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO PAREDE ABDOMINAL",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "**Pele** sem alterações significativas.\n\n**Tecido celular subcutâneo** sem alterações significativas.\n\n**Fáscia muscular** sem alterações significativas.\n\n**Musculatura eutrófica**, sem alterações significativas.\n\n**Estrutura Vascular:** sem alterações significativas.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "partes_moles": {
+  "nome": "Partes moles",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO PARTES MOLES",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "**Pele** sem alterações significativas.\n\n**Tecido celular subcutâneo** sem alterações significativas.\n\n**Musculatura eutrófica**, sem alterações significativas.\n\n**Estrutura Vascular:** sem alterações significativas.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "ombro": {
+  "nome": "Ombro",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO OMBRO .....",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "Pele sem alterações significativas.\n\nTecido celular subcutâneo, sem alterações significativas.\n\nTendão supra espinhal sem alterações.\n\nTendão subescapular sem alterações.\n\nTendão do infraespinhal sem alterações.\n\nTendão do cabo longo do bíceps braquial centrado no sulco bicipital, apresentando-se íntegro em seu trajeto extra articular.\n\nBursa sub-acromial e subdeltoidea sem espessamento ou distensão líquida.\n\nArticulação acrômio-clavicular de contornos regulares.\n\nNão há sinais de derrame articular glenoumeral.\n\nVentres musculares com trofismo conservado.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "cotovelo": {
+  "nome": "Cotovelo",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO COTOVELO .....",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "Tendões epicondilianos laterais sem alterações.\n\nTendões epicondilianos mediais sem alterações.\n\nTendão comum dos extensores do antebraço íntegro, com contornos e ecogenicidade preservadas.\n\nTendões bíceps e tríceps braquiais sem alterações.\n\nSuperfície óssea epicondileana sem alterações.\n\nNão há derrame articular ou líquido peritendíneo.\n\nNervos radial, interósseo posterior e ulnar com trajeto e ecogenicidade normais.\n\nBursa do olécrano sem alterações.\n\nVentres musculares periarticulares com ecotextura preservada.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "punho": {
+  "nome": "Punho",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO PUNHO .....",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "Pele de espessura normal.\n\nTecido celular sub-cutâneo normal.\n\nEstruturas ósseas sem alteração.\n\nTendões componentes dos compartimentos flexores sem alterações.\n\nTendões componentes dos compartimentos extensores sem alterações.\n\nNervo ulnar sem presença de espessamento.\n\nÁrea do nervo mediano com ..... cm² (normal < 0,12 cm²).\n\nNervo radial sem alterações.\n\nColeções, calcificações ou lesões expansivas ausentes.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "mao": {
+  "nome": "Mão",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO MÃO .....",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "Pele sem alterações significativas.\n\nTecido celular subcutâneo, sem alterações significativas.\n\nEstrutura óssea, sem alterações significativas.\n\nTendões componentes do compartimento flexor sem alterações.\n\nTendões componentes do compartimento extensor sem alterações.\n\nÁrea do nervo mediano normal.\n\nPolias anulares dos tendões dos flexores de aspecto normal.\n\nAusência de líquido peritendíneo ou intra-articular.\n\nVentres musculares com trofismo e ecotextura normais.\n\nColeções, calcificações ou lesões expansivas ausentes.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "joelho": {
+  "nome": "Joelho",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO JOELHO .....",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "Pele e tecido celular subcutâneo sem alterações.\n\n**Face anterior do joelho:**\n\nTendões patelar e quadríceps femoral de espessura, contornos e ecotextura normais.\n\nSuperfície articular da tróclea femoral de aspecto habitual.\n\nRecesso articular com ausência de derrame.\n\n**Face medial:**\n\nLigamentos colaterais mediais e “pata anserina” de espessura, contornos e ecotextura normais.\n\n**Face lateral:**\n\nTendões do trato iliotibial, tendão conjunto formado pelas inserções do colateral lateral e bíceps femoral e tendão do poplíteo de espessura, contornos e ecotextura conservados.\n\n**Face posterior:**\n\nVasos de aspectos habituais.\n\nNão foi observado formações císticas.",
+  "conclusao": "Exame ecográfico sem alterações à analise realizada."
+ },
+ "tornozelo": {
+  "nome": "Tornozelo",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO TORNOZELO .....",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "Tendão tibial anterior com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendão tibial posterior com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendão flexor comum com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendão flexor longo com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendões fibulares curto e longo com forma, contornos e ecotextura normais.\n\nTendão calcâneo de espessura e ecogenicidade preservadas. Não há sinais de bursite retrocalcaneana.\n\nLigamentos talofibular anterior, fibulocalcâneo e tibiofibular anterior preservados.\n\nFáscia plantar de espessura normal.\n\nTransição músculo-tendinosa sem alterações.\n\nEstruturas neurovasculares do túnel do tarso sem alterações ecográficas.\n\nNão há evidências de coleções ou tumorações na região examinada.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "pe": {
+  "nome": "Pé",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO DO PÉ .....",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "Tendão tibial anterior com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendão tibial posterior com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendão flexor comum com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendão flexor longo com forma, contornos, ecotextura e espessura de aspectos habituais.\n\nTendões fibulares curto e longo com forma, contornos e ecotextura normais.\n\nTendão calcâneo de espessura e ecogenicidade preservadas. Não há sinais de bursite retrocalcaneana.\n\nLigamentos fibulotalar anterior, fibulocalcâneo e tibiofibular anterior preservados.\n\nFáscia plantar de espessura normal.\n\nTransição músculo-tendinosa sem alterações.\n\nEstruturas neurovasculares do túnel do tarso sem alterações ecográficas.\n\nNão há evidências de coleções ou tumorações na região examinada.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
+ "outro": {
+  "nome": "Outro (sem modelo — montar do ditado)",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor multifrequêncial.",
+  "corpo": "(SEM MODELO PRÉVIO: monte o laudo completo com base no ditado, nas medidas legíveis nas imagens e no seu conhecimento médico de ultrassonografia — use a estrutura consagrada de laudo para a região examinada, com os parágrafos habituais de normalidade para as estruturas avaliadas, no estilo dos demais modelos: nome da estrutura em negrito, um parágrafo por estrutura, pontilhados onde faltar medida. Complete o título com a região examinada. OBRIGATÓRIO: declare em observacoes_para_o_medico que o laudo foi montado sem modelo prévio, a partir do conhecimento da IA.)",
+  "conclusao": "(conforme o ditado)"
  }
 };
 
@@ -304,7 +385,7 @@ async function transcreverAudio(arquivoOuBlob){
     if(r.status!==404 && r.status!==400) break;
   }
   if(texto===null) throw new Error('Transcrição falhou: '+ultimoErro);
-  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: o NOME DO PACIENTE citado (ou \"\" se não citado) e o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, rins, prostata, tireoide, tireoide_doppler, mama, obst1, obst23, endovaginal, bolsa_escrotal, ombro, partes_moles, outro. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\"}\n\nDITADO:\n"+texto}]);
+  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: o NOME DO PACIENTE citado (ou \"\" se não citado) e o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, abdomen_superior, rins, prostata, tireoide, mama, transvaginal, pelvica, obst1, obst1_descolamento, obst23, obst_gemelar, bolsa_escrotal, penis, parede_abdominal, partes_moles, ombro, cotovelo, punho, mao, joelho, tornozelo, pe, outro. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\"}\n\nDITADO:\n"+texto}]);
   return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: resp.tipo_exame||''};
 }
 
@@ -444,14 +525,22 @@ function renderExames(){
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+' <span class="tag">'+ex.imagens.length+' pág.</span>'
       +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')+'</div>'
-      +'<label>Tipo de exame</label><select onchange="exames['+ex.id+'].tipo=this.value"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
+      +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
       +(audios.length?'<label>Áudios deste paciente</label>'+listaAudios:'')
       +'<div style="margin-top:10px;display:flex;gap:8px">'
       +'<button class="btn peq" id="btnGerar'+ex.id+'" onclick="gerarLaudo('+ex.id+')">Gerar laudo</button>'
       +(ex.laudo?'<button class="btn peq sec" onclick="abrirRevisao('+ex.id+')">Ver / imprimir</button>':'')
+      +'<button class="btn peq sec" style="color:#b3261e" onclick="excluirExame('+ex.id+')">🗑 Excluir</button>'
       +'</div></div>';
   }
   div.innerHTML = html;
+}
+function mudarTipo(id, v){ exames.find(function(e){return e.id===id;}).tipo = v; }
+function excluirExame(id){
+  if(!confirm('Excluir este exame e seu laudo? (não afeta seus arquivos)')) return;
+  audios.forEach(function(a){ if(a.exameId===id) a.exameId=null; });
+  exames = exames.filter(function(e){ return e.id!==id; });
+  renderExames();
 }
 function ligarAudio(aIdx, exId, marcado){
   const a = audios.find(x=>x.idx===aIdx);
@@ -476,7 +565,7 @@ async function gerarLaudo(exId){
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), substitua/adapte os parágrafos correspondentes do modelo usando EXATAMENTE o texto padrão do médico listado nos DIZERES PADRÃO, preenchendo as medidas ditas. Ajuste a CONCLUSÃO de acordo.\n\n"+
-"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
+"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
 "MODELO DE LAUDO ('**' = negrito):\nTÍTULO: "+mod.titulo+"\nTÉCNICA: "+mod.tecnica+"\nCORPO:\n"+mod.corpo+"\nCONCLUSÃO: "+mod.conclusao+(mod.extra?"\nTEXTO FIXO APÓS A CONCLUSÃO:\n"+mod.extra:"")+"\n\n"+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico):\n"+BIZUS+"\n\n"+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
@@ -548,7 +637,7 @@ async function gerarInLoco(){
   if(!cfg.chave){ alternarConfig(); log('Cole sua chave da API em Configurações.', true); return; }
   const btn=document.getElementById('btnLoko'); btn.disabled=true; btn.textContent='Gerando...';
   try{
-    const id = exames.length;
+    const id = exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
     const ex = {id:id, nomeArquivo:'in-loco', paciente:'Exame in loco', imagens:lokoImgs.slice(), tipo:'', audios:[], laudo:null};
     exames.push(ex);
     for(const blob of lokoAudios){

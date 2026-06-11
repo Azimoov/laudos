@@ -96,6 +96,18 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div class="log" id="log"></div>
 </div>
 
+<div class="card">
+  <h2>Exame na hora (in loco)</h2>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn" onclick="document.getElementById('inpCamera').click()">📷 Capturar imagem</button>
+    <button class="btn" id="btnGravar" onclick="alternarGravacao()">🎙 Gravar áudio</button>
+    <button class="btn" id="btnLoko" onclick="gerarInLoco()">⚡ Gerar laudo agora</button>
+  </div>
+  <input type="file" id="inpCamera" accept="image/*" capture="environment" style="display:none">
+  <div id="lokoInfo" class="aviso">Capture as imagens do exame, grave o ditado e toque em ⚡.</div>
+  <div id="lokoThumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+</div>
+
 <div class="card" id="cardExames" style="display:none">
   <h2>3 · Exames identificados — confira e gere os laudos</h2>
   <div id="listaExames"></div>
@@ -278,6 +290,12 @@ async function gemini(parts, querJson=true){
   return JSON.parse(limpo);
 }
 
+const PROMPT_TRANSCRICAO = "Você é assistente de um médico ultrassonografista brasileiro. Transcreva fielmente o áudio ditado (português). Depois identifique: o NOME DO PACIENTE citado (ou \"\" se não citado) e o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, rins, prostata, tireoide, tireoide_doppler, mama, obst1, obst23, endovaginal, bolsa_escrotal, ombro, partes_moles, outro. Responda em JSON: {\"transcricao\":\"...\",\"nome_paciente\":\"...\",\"tipo_exame\":\"...\"}";
+async function transcreverAudio(arquivoOuBlob){
+  const b64 = await audioParaWavBase64(arquivoOuBlob);
+  return await gemini([{text:PROMPT_TRANSCRICAO},{inline_data:{mime_type:'audio/wav', data:b64}}]);
+}
+
 /* ============ Áudio: m4a → WAV 16 kHz mono ============ */
 function codificarWav(amostras, taxa){
   const buf = new ArrayBuffer(44 + amostras.length*2);
@@ -380,11 +398,7 @@ async function processar(){
       const f = fAu[i];
       log('Transcrevendo '+f.name+' ...');
       try{
-        const b64 = await audioParaWavBase64(f);
-        const resp = await gemini([
-          {text:"Você é assistente de um médico ultrassonografista brasileiro. Transcreva fielmente o áudio ditado (português). Depois identifique: o NOME DO PACIENTE citado (ou \"\" se não citado) e o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, rins, prostata, tireoide, tireoide_doppler, mama, obst1, obst23, endovaginal, bolsa_escrotal, ombro, partes_moles, outro. Responda em JSON: {\"transcricao\":\"...\",\"nome_paciente\":\"...\",\"tipo_exame\":\"...\"}"},
-          {inline_data:{mime_type:'audio/wav', data:b64}}
-        ]);
+        const resp = await transcreverAudio(f);
         audios.push({idx:i, nome:f.name, transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', exameId:null});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
@@ -468,6 +482,69 @@ async function gerarLaudo(exId){
     log('Erro ao gerar laudo de '+ex.paciente+': '+e.message, true);
   }
   btn.disabled = false; btn.textContent = 'Gerar laudo';
+}
+
+/* ============ Exame in loco: câmera + gravação ============ */
+let lokoImgs=[], lokoAudios=[];
+let mediaRec=null, recChunks=[], recStream=null, recTimer=null, recSeg=0;
+document.getElementById('inpCamera').addEventListener('change', async function(e){
+  for(const f of e.target.files){
+    try{ const imgs = await arquivoParaImagens(f); lokoImgs.push.apply(lokoImgs, imgs); }
+    catch(err){ log('Falha ao ler imagem: '+err.message, true); }
+  }
+  e.target.value='';
+  renderLoko();
+});
+function renderLoko(){
+  document.getElementById('lokoThumbs').innerHTML = lokoImgs.map(function(d){return '<img src="'+d+'" style="height:70px;border-radius:6px;border:1px solid #c8d0da">';}).join('');
+  document.getElementById('lokoInfo').textContent = lokoImgs.length+' imagem(ns) · '+lokoAudios.length+' gravação(ões)'+((lokoImgs.length||lokoAudios.length)?' — toque ⚡ para gerar o laudo':'');
+}
+async function alternarGravacao(){
+  const btn = document.getElementById('btnGravar');
+  if(mediaRec && mediaRec.state==='recording'){ mediaRec.stop(); return; }
+  if(!navigator.mediaDevices || !window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
+  try{ recStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ log('Acesso ao microfone negado: '+e.message, true); return; }
+  let mime='';
+  if(MediaRecorder.isTypeSupported('audio/mp4')) mime='audio/mp4';
+  else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
+  mediaRec = new MediaRecorder(recStream, mime?{mimeType:mime}:undefined);
+  recChunks=[];
+  mediaRec.ondataavailable = function(e){ if(e.data && e.data.size>0) recChunks.push(e.data); };
+  mediaRec.onstop = function(){
+    lokoAudios.push(new Blob(recChunks,{type:mediaRec.mimeType||'audio/mp4'}));
+    recStream.getTracks().forEach(function(t){t.stop();});
+    clearInterval(recTimer);
+    btn.textContent='🎙 Gravar áudio'; btn.style.background='';
+    renderLoko();
+  };
+  mediaRec.start();
+  recSeg=0; btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
+  recTimer=setInterval(function(){ recSeg++; btn.textContent='⏹ Parar ('+recSeg+'s)'; },1000);
+}
+async function gerarInLoco(){
+  if(mediaRec && mediaRec.state==='recording'){ log('Pare a gravação antes de gerar.', true); return; }
+  if(lokoImgs.length===0 && lokoAudios.length===0){ log('Capture uma imagem ou grave o ditado primeiro.', true); return; }
+  if(!cfg.chave){ alternarConfig(); log('Cole sua chave da API em Configurações.', true); return; }
+  const btn=document.getElementById('btnLoko'); btn.disabled=true; btn.textContent='Gerando...';
+  try{
+    const id = exames.length;
+    const ex = {id:id, nomeArquivo:'in-loco', paciente:'Exame in loco', imagens:lokoImgs.slice(), tipo:'', audios:[], laudo:null};
+    exames.push(ex);
+    for(const blob of lokoAudios){
+      log('Transcrevendo gravação...');
+      const r = await transcreverAudio(blob);
+      const a = {idx:audios.length, nome:'Gravação in loco', transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
+      audios.push(a); ex.audios.push(a.idx);
+      if(!ex.tipo && a.tipoExame) ex.tipo = a.tipoExame;
+      if(a.nomePaciente) ex.paciente = a.nomePaciente;
+    }
+    if(!ex.tipo) ex.tipo='outro';
+    renderExames();
+    await gerarLaudo(id);
+    lokoImgs=[]; lokoAudios=[]; renderLoko();
+  }catch(e){ log('Erro no exame in loco: '+e.message, true); }
+  btn.disabled=false; btn.textContent='⚡ Gerar laudo agora';
 }
 
 /* ============ Revisão e impressão ============ */

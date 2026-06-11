@@ -81,7 +81,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 </div>
 
 <div class="card">
-  <h2>1 · Arquivos do dia</h2>
+  <h2>1 · Arquivos acumulados</h2>
   <div class="filebox">
     <b>Fotos dos exames</b> (PDF ou foto — pode selecionar vários)
     <input type="file" id="inpExames" accept="application/pdf,image/*" multiple>
@@ -89,6 +89,12 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div class="filebox">
     <b>Áudios ditados</b> (m4a, mp3, wav — pode selecionar vários)
     <input type="file" id="inpAudios" accept="audio/*,.m4a" multiple>
+  </div>
+  <div class="filebox">
+    <b>Ou grave os ditados aqui mesmo, ao longo do dia</b><br>
+    <span class="aviso">Ficam guardados neste aparelho e entram automaticamente no Processar. Toque 💾 para salvar uma cópia no Arquivos/iCloud.</span>
+    <div style="margin-top:8px"><button class="btn" id="btnGravarAcum" onclick="gravarAcumulado()">🎙 Gravar ditado</button></div>
+    <div id="listaAcum" style="margin-top:8px;text-align:left"></div>
   </div>
   <div style="margin-top:14px">
     <button class="btn" id="btnProcessar" onclick="processar()">2 · Processar (transcrever e associar)</button>
@@ -497,6 +503,22 @@ async function processar(){
         audios.push({idx:i, nome:f.name, url:URL.createObjectURL(f), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
       }
     }
+    // 2b. ditados guardados no aparelho
+    let acum = [];
+    try{ acum = await gravListar(); }catch(e){ log('Falha ao ler ditados guardados: '+e.message, true); }
+    for(const g of acum){
+      const dtg = new Date(g.quando);
+      const rotulo = 'Ditado '+dtg.toLocaleDateString('pt-BR').slice(0,5)+' '+dtg.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      log('Transcrevendo '+rotulo+' ...');
+      try{
+        const resp = await transcreverAudio(g.blob);
+        audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', exameId:null});
+        log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
+      }catch(e){
+        log('Falha em '+rotulo+': '+e.message, true);
+        audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
+      }
+    }
     // 3. associação automática
     for(const a of audios){
       if(!a.nomePaciente) continue;
@@ -597,6 +619,50 @@ async function gerarLaudo(exId){
   }
   btn.disabled = false; btn.textContent = 'Gerar laudo';
 }
+
+/* ============ Ditados acumulados (guardados no aparelho) ============ */
+function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',1);r.onupgradeneeded=function(){r.result.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+async function gravSalvar(blob){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').add({blob:blob,quando:Date.now()});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
+async function gravListar(){const db=await dbOpen();return new Promise(function(res,rej){const rq=db.transaction('gravacoes').objectStore('gravacoes').getAll();rq.onsuccess=function(){res(rq.result||[]);};rq.onerror=function(){rej(rq.error);};});}
+async function gravApagar(id){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').delete(id);tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
+let mediaRecA=null, recChunksA=[], recStreamA=null, recTimerA=null, recSegA=0;
+async function gravarAcumulado(){
+  const btn=document.getElementById('btnGravarAcum');
+  if(mediaRecA && mediaRecA.state==='recording'){ mediaRecA.stop(); return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
+  try{ recStreamA = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ log('Acesso ao microfone negado: '+e.message, true); return; }
+  let mime=''; if(MediaRecorder.isTypeSupported('audio/mp4')) mime='audio/mp4'; else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
+  mediaRecA = new MediaRecorder(recStreamA, mime?{mimeType:mime}:undefined);
+  recChunksA=[];
+  mediaRecA.ondataavailable=function(e){ if(e.data&&e.data.size>0) recChunksA.push(e.data); };
+  mediaRecA.onstop=async function(){
+    const blob=new Blob(recChunksA,{type:mediaRecA.mimeType||'audio/mp4'});
+    recStreamA.getTracks().forEach(function(t){t.stop();});
+    clearInterval(recTimerA);
+    btn.textContent='🎙 Gravar ditado'; btn.style.background='';
+    try{ await gravSalvar(blob); }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
+    renderAcum();
+  };
+  mediaRecA.start(); recSegA=0;
+  btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
+  recTimerA=setInterval(function(){recSegA++;btn.textContent='⏹ Parar ('+recSegA+'s)';},1000);
+}
+async function renderAcum(){
+  const div=document.getElementById('listaAcum'); if(!div) return;
+  let lista=[];
+  try{ lista=await gravListar(); }catch(e){ div.innerHTML='<span class="aviso">não foi possível ler as gravações guardadas</span>'; return; }
+  if(!lista.length){ div.innerHTML='<span class="aviso">Nenhum ditado guardado neste aparelho.</span>'; return; }
+  div.innerHTML = lista.map(function(g){
+    const dt=new Date(g.quando);
+    const rot=dt.toLocaleDateString('pt-BR').slice(0,5)+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const u=URL.createObjectURL(g.blob);
+    const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a';
+    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;white-space:nowrap">🎙 '+rot+'</span><audio controls src="'+u+'" style="height:34px;flex:1;min-width:140px"></audio><a class="btn peq sec" style="text-decoration:none" download="ditado-'+g.id+'.'+ext+'" href="'+u+'">💾</a><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">✕</button></div>';
+  }).join('') + '<div style="margin-top:8px"><button class="btn peq sec" style="color:#b3261e" onclick="limparAcum()">Apagar todos os ditados guardados</button></div>';
+}
+async function apagarAcum(id){ if(!confirm('Apagar este ditado guardado?')) return; await gravApagar(id); renderAcum(); }
+async function limparAcum(){ if(!confirm('Apagar TODOS os ditados guardados neste aparelho?')) return; const l=await gravListar(); for(const g of l) await gravApagar(g.id); renderAcum(); }
 
 /* ============ Exame in loco: câmera + gravação ============ */
 let lokoImgs=[], lokoAudios=[], lokoUrls=[];
@@ -705,6 +771,7 @@ function fecharRevisao(){
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{
   if(!cfg.chave) alternarConfig();
+  renderAcum();
 });
 </script>
 </body>

@@ -64,20 +64,20 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 
 <div class="card" id="cardConfig" style="display:none">
   <h2>Configurações</h2>
-  <label>Chave da API do Google Gemini</label>
-  <input type="password" id="cfgChave" placeholder="Cole aqui sua chave (AIza...)">
+  <label>Chave da API da OpenAI</label>
+  <input type="password" id="cfgChave" placeholder="Cole aqui sua chave (sk-...)">
   <label>Modelo</label>
   <select id="cfgModelo">
-    <option value="gemini-3.5-flash">gemini-3.5-flash (recomendado)</option>
-    <option value="gemini-3.1-pro">gemini-3.1-pro (mais caro, casos difíceis)</option>
-    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+    <option value="chat-latest">chat-latest (recomendado)</option>
+    <option value="gpt-5.5">gpt-5.5 (mais capaz, mais caro)</option>
+    <option value="gpt-4o">gpt-4o (antigo)</option>
   </select>
   <label>Médico (assinatura)</label>
   <input type="text" id="cfgMedico" value="Dr. Daniel Serruya">
   <label>CRM</label>
   <input type="text" id="cfgCrm" value="Crm-Pa - 9962">
   <div style="margin-top:12px"><button class="btn" onclick="salvarConfig()">Salvar</button></div>
-  <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API do Google para análise.</p>
+  <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API da OpenAI para análise.</p>
 </div>
 
 <div class="card">
@@ -232,10 +232,12 @@ const BIZUS = "  Bizus\n  -------\n\nMAMA:\n\nDois nódulos BR3:\n\nMama simétr
 /* ============ Estado e configuração ============ */
 const cfg = {
   chave: localStorage.getItem('gmk')||'',
-  modelo: localStorage.getItem('gmodelo')||'gemini-3.5-flash',
+  modelo: localStorage.getItem('gmodelo')||'chat-latest',
   medico: localStorage.getItem('gmedico')||'Dr. Daniel Serruya',
   crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962'
 };
+if(/^gemini/.test(cfg.modelo)){ cfg.modelo='chat-latest'; localStorage.setItem('gmodelo',cfg.modelo); }
+if(/^AIza/.test(cfg.chave)){ cfg.chave=''; localStorage.setItem('gmk',''); }
 let exames = [];   // {id, arquivo, nomeArquivo, paciente, imagens:[dataUrl], tipo, audios:[idx], laudo}
 let audios = [];   // {idx, file, nome, transcricao, nomePaciente, tipoExame, exameId}
 
@@ -264,17 +266,14 @@ function log(m, erro){
   el.scrollTop = el.scrollHeight;
 }
 
-/* ============ Chamada à API Gemini ============ */
-async function gemini(parts, querJson=true){
+/* ============ Chamada à API OpenAI ============ */
+async function openai(conteudo, querJson=true){
   if(!cfg.chave) throw new Error('Configure sua chave da API em ⚙︎ Configurações.');
-  const body = {
-    contents:[{role:'user',parts}],
-    generationConfig:{temperature:0.2, maxOutputTokens:8192}
-  };
-  if(querJson) body.generationConfig.responseMimeType = 'application/json';
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+cfg.modelo+':generateContent',{
+  const body = {model: cfg.modelo, messages:[{role:'user', content: conteudo}]};
+  if(querJson) body.response_format = {type:'json_object'};
+  const r = await fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-goog-api-key':cfg.chave},
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.chave},
     body: JSON.stringify(body)
   });
   if(!r.ok){
@@ -282,18 +281,31 @@ async function gemini(parts, querJson=true){
     throw new Error('API '+r.status+': '+t.slice(0,300));
   }
   const j = await r.json();
-  const texto = j.candidates && j.candidates[0] && j.candidates[0].content
-    && j.candidates[0].content.parts && j.candidates[0].content.parts.map(p=>p.text||'').join('');
+  const texto = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
   if(!texto) throw new Error('Resposta vazia da API.');
   if(!querJson) return texto;
   const limpo = texto.replace(/^```json\s*/i,'').replace(/```\s*$/,'');
   return JSON.parse(limpo);
 }
 
-const PROMPT_TRANSCRICAO = "Você é assistente de um médico ultrassonografista brasileiro. Transcreva fielmente o áudio ditado (português). Depois identifique: o NOME DO PACIENTE citado (ou \"\" se não citado) e o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, rins, prostata, tireoide, tireoide_doppler, mama, obst1, obst23, endovaginal, bolsa_escrotal, ombro, partes_moles, outro. Responda em JSON: {\"transcricao\":\"...\",\"nome_paciente\":\"...\",\"tipo_exame\":\"...\"}";
+const MODELOS_TRANSCRICAO = ['gpt-4o-transcribe','gpt-4o-mini-transcribe','whisper-1'];
 async function transcreverAudio(arquivoOuBlob){
-  const b64 = await audioParaWavBase64(arquivoOuBlob);
-  return await gemini([{text:PROMPT_TRANSCRICAO},{inline_data:{mime_type:'audio/wav', data:b64}}]);
+  const wav = await audioParaWavBlob(arquivoOuBlob);
+  let texto=null, ultimoErro=null;
+  for(const m of MODELOS_TRANSCRICAO){
+    const fd = new FormData();
+    fd.append('file', wav, 'audio.wav');
+    fd.append('model', m);
+    fd.append('language', 'pt');
+    fd.append('response_format', 'json');
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+cfg.chave}, body:fd});
+    if(r.ok){ const j = await r.json(); texto = j.text||''; break; }
+    ultimoErro = 'API '+r.status+': '+(await r.text()).slice(0,200);
+    if(r.status!==404 && r.status!==400) break;
+  }
+  if(texto===null) throw new Error('Transcrição falhou: '+ultimoErro);
+  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: o NOME DO PACIENTE citado (ou \"\" se não citado) e o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, rins, prostata, tireoide, tireoide_doppler, mama, obst1, obst23, endovaginal, bolsa_escrotal, ombro, partes_moles, outro. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\"}\n\nDITADO:\n"+texto}]);
+  return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: resp.tipo_exame||''};
 }
 
 /* ============ Áudio: m4a → WAV 16 kHz mono ============ */
@@ -312,7 +324,7 @@ function codificarWav(amostras, taxa){
   }
   return buf;
 }
-async function audioParaWavBase64(file){
+async function audioParaWavBlob(file){
   const dados = await file.arrayBuffer();
   const AC = window.AudioContext||window.webkitAudioContext;
   const ac = new AC();
@@ -323,9 +335,7 @@ async function audioParaWavBase64(file){
   const src = off.createBufferSource(); src.buffer = dec; src.connect(off.destination); src.start();
   const rend = await off.startRendering();
   const wav = codificarWav(rend.getChannelData(0), taxa);
-  let bin=''; const bytes = new Uint8Array(wav);
-  for(let i=0;i<bytes.length;i+=32768) bin += String.fromCharCode.apply(null, bytes.subarray(i,i+32768));
-  return btoa(bin);
+  return new Blob([wav], {type:'audio/wav'});
 }
 
 /* ============ PDF/Imagem → JPEGs ============ */
@@ -364,7 +374,7 @@ async function arquivoParaImagens(file){
   return imgs;
 }
 function dataUrlParaParte(d){
-  return {inline_data:{mime_type:'image/jpeg', data:d.split(',')[1]}};
+  return {type:'image_url', image_url:{url:d}};
 }
 
 /* ============ Normalização de nomes ============ */
@@ -463,7 +473,7 @@ async function gerarLaudo(exId){
   try{
     const mod = MODELOS[ex.tipo];
     const trans = audios.filter(a=>a.exameId===exId).map(a=>a.transcricao).filter(Boolean).join('\n---\n');
-    const partes = [{text:
+    const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), substitua/adapte os parágrafos correspondentes do modelo usando EXATAMENTE o texto padrão do médico listado nos DIZERES PADRÃO, preenchendo as medidas ditas. Ajuste a CONCLUSÃO de acordo.\n\n"+
 "REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
@@ -473,7 +483,7 @@ async function gerarLaudo(exId){
 "Responda SOMENTE em JSON válido:\n{\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"solicitante\":\"\",\"realizado_em\":\"\",\"convenio\":\"\",\"motivo\":\"Solicitação medica.\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
-    const resp = await gemini(partes);
+    const resp = await openai(partes);
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:resp.conclusao||mod.conclusao, extra:mod.extra||'', titulo:mod.titulo, tecnica:mod.tecnica, obs:resp.observacoes_para_o_medico||''};
     renderExames();
     abrirRevisao(exId);
@@ -485,7 +495,7 @@ async function gerarLaudo(exId){
 }
 
 /* ============ Exame in loco: câmera + gravação ============ */
-let lokoImgs=[], lokoAudios=[];
+let lokoImgs=[], lokoAudios=[], lokoUrls=[];
 let mediaRec=null, recChunks=[], recStream=null, recTimer=null, recSeg=0;
 document.getElementById('inpCamera').addEventListener('change', async function(e){
   for(const f of e.target.files){
@@ -496,9 +506,18 @@ document.getElementById('inpCamera').addEventListener('change', async function(e
   renderLoko();
 });
 function renderLoko(){
-  document.getElementById('lokoThumbs').innerHTML = lokoImgs.map(function(d){return '<img src="'+d+'" style="height:70px;border-radius:6px;border:1px solid #c8d0da">';}).join('');
+  const x = '<button onclick="APAGAR" style="background:#b3261e;color:#fff;border:0;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;flex-shrink:0">✕</button>';
+  let html = lokoImgs.map(function(d,i){
+    return '<div style="position:relative;display:inline-block;margin-top:6px"><img src="'+d+'" style="height:70px;border-radius:6px;border:1px solid #c8d0da"><span style="position:absolute;top:-8px;right:-8px">'+x.replace('APAGAR','apagarLokoImg('+i+')')+'</span></div>';
+  }).join('');
+  html += lokoAudios.map(function(b,i){
+    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;width:100%"><span style="font-size:13px;font-weight:600">🎙 Gravação '+(i+1)+'</span><audio controls src="'+lokoUrls[i]+'" style="height:34px;flex:1;min-width:0"></audio>'+x.replace('APAGAR','apagarLokoAudio('+i+')')+'</div>';
+  }).join('');
+  document.getElementById('lokoThumbs').innerHTML = html;
   document.getElementById('lokoInfo').textContent = lokoImgs.length+' imagem(ns) · '+lokoAudios.length+' gravação(ões)'+((lokoImgs.length||lokoAudios.length)?' — toque ⚡ para gerar o laudo':'');
 }
+function apagarLokoImg(i){ lokoImgs.splice(i,1); renderLoko(); }
+function apagarLokoAudio(i){ URL.revokeObjectURL(lokoUrls[i]); lokoAudios.splice(i,1); lokoUrls.splice(i,1); renderLoko(); }
 async function alternarGravacao(){
   const btn = document.getElementById('btnGravar');
   if(mediaRec && mediaRec.state==='recording'){ mediaRec.stop(); return; }
@@ -512,7 +531,8 @@ async function alternarGravacao(){
   recChunks=[];
   mediaRec.ondataavailable = function(e){ if(e.data && e.data.size>0) recChunks.push(e.data); };
   mediaRec.onstop = function(){
-    lokoAudios.push(new Blob(recChunks,{type:mediaRec.mimeType||'audio/mp4'}));
+    const blobG = new Blob(recChunks,{type:mediaRec.mimeType||'audio/mp4'});
+    lokoAudios.push(blobG); lokoUrls.push(URL.createObjectURL(blobG));
     recStream.getTracks().forEach(function(t){t.stop();});
     clearInterval(recTimer);
     btn.textContent='🎙 Gravar áudio'; btn.style.background='';
@@ -542,7 +562,7 @@ async function gerarInLoco(){
     if(!ex.tipo) ex.tipo='outro';
     renderExames();
     await gerarLaudo(id);
-    lokoImgs=[]; lokoAudios=[]; renderLoko();
+    lokoUrls.forEach(function(u){URL.revokeObjectURL(u);}); lokoImgs=[]; lokoAudios=[]; lokoUrls=[]; renderLoko();
   }catch(e){ log('Erro no exame in loco: '+e.message, true); }
   btn.disabled=false; btn.textContent='⚡ Gerar laudo agora';
 }

@@ -33,23 +33,24 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 #telaRevisao{display:none;}
 .barraRev{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
 /* ===== página do laudo (espelha o modelo do Pages) ===== */
-.laudoFolha{background:#fff;width:100%;max-width:760px;margin:0 auto;padding:28px 30px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;line-height:1.35;color:#000;}
+.laudoFolha{background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.3;color:#000;}
 .laudoCab{border:1.5px solid #000;padding:8px 10px;display:flex;gap:14px;font-size:13px;}
 .laudoCab>div{flex:1;}
 .laudoCab b{font-weight:700;}
-.laudoCorpoBox{border:1.5px solid #000;margin-top:18px;padding:14px 16px;min-height:640px;}
+.laudoCorpoBox{border:1.5px solid #000;margin-top:14px;padding:12px 14px;min-height:620px;}
 .laudoTitulo{text-align:center;font-weight:600;margin:2px 0 12px;font-size:14px;}
 .laudoTexto{white-space:pre-wrap;text-align:justify;outline:none;}
 .laudoTexto:focus{background:#fffbe8;}
-.assin{text-align:center;margin-top:26px;font-size:13px;}
+.assin{text-align:center;margin-top:14px;font-size:12.5px;}
 .assin .linha{display:inline-block;border-top:1px solid #000;padding-top:3px;min-width:330px;}
-.rodapeLaudo{border:1px solid #000;margin-top:18px;padding:6px 8px;font-size:11px;text-align:justify;}
+.rodapeLaudo{border:1px solid #000;margin-top:10px;padding:5px 8px;font-size:10px;text-align:justify;}
 @media print{
   body{background:#fff;}
   body *{visibility:hidden;}
   #areaImpressao,#areaImpressao *{visibility:visible;}
   #areaImpressao{position:absolute;left:0;top:0;width:100%;}
-  .laudoFolha{border:0;max-width:none;padding:10mm 12mm;}
+  .laudoFolha{border:0;max-width:none;padding:6mm 10mm;}
+  .laudoCorpoBox{min-height:0;}
   .laudoTexto:focus{background:none;}
   @page{size:A4;margin:8mm;}
 }
@@ -76,6 +77,9 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <input type="text" id="cfgMedico" value="Dr. Daniel Serruya">
   <label>CRM</label>
   <input type="text" id="cfgCrm" value="Crm-Pa - 9962">
+  <label>Assinatura (foto — fica guardada só neste aparelho)</label>
+  <input type="file" id="cfgAss" accept="image/*">
+  <div id="assPrev" style="margin-top:6px"></div>
   <div style="margin-top:12px"><button class="btn" onclick="salvarConfig()">Salvar</button></div>
   <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API da OpenAI para análise.</p>
 </div>
@@ -321,7 +325,8 @@ const cfg = {
   chave: localStorage.getItem('gmk')||'',
   modelo: localStorage.getItem('gmodelo')||'chat-latest',
   medico: localStorage.getItem('gmedico')||'Dr. Daniel Serruya',
-  crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962'
+  crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962',
+  assinatura: localStorage.getItem('gass')||''
 };
 if(/^gemini/.test(cfg.modelo)){ cfg.modelo='chat-latest'; localStorage.setItem('gmodelo',cfg.modelo); }
 if(/^AIza/.test(cfg.chave)){ cfg.chave=''; localStorage.setItem('gmk',''); }
@@ -331,11 +336,45 @@ let audios = [];   // {idx, file, nome, transcricao, nomePaciente, tipoExame, ex
 function alternarConfig(){
   const c = document.getElementById('cardConfig');
   c.style.display = c.style.display==='none'?'block':'none';
+  mostrarAssPrev();
   document.getElementById('cfgChave').value = cfg.chave;
   document.getElementById('cfgModelo').value = cfg.modelo;
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
 }
+document.getElementById('cfgAss').addEventListener('change', function(e){
+  const f = e.target.files[0]; if(!f) return;
+  const fr = new FileReader();
+  fr.onload = function(){
+    const img = new Image();
+    img.onload = function(){
+      const esc = Math.min(1, 600/img.width);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width*esc); c.height = Math.round(img.height*esc);
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0, c.width, c.height);
+      const d = x.getImageData(0, 0, c.width, c.height);
+      for(let i=0; i<d.data.length; i+=4){
+        if(d.data[i]>225 && d.data[i+1]>225 && d.data[i+2]>225) d.data[i+3]=0;
+      }
+      x.putImageData(d, 0, 0);
+      cfg.assinatura = c.toDataURL('image/png');
+      try{ localStorage.setItem('gass', cfg.assinatura); }
+      catch(err){ log('Imagem grande demais para guardar — use uma foto menor.', true); cfg.assinatura=''; }
+      mostrarAssPrev();
+    };
+    img.src = fr.result;
+  };
+  fr.readAsDataURL(f);
+  e.target.value = '';
+});
+function mostrarAssPrev(){
+  const p = document.getElementById('assPrev'); if(!p) return;
+  p.innerHTML = cfg.assinatura
+    ? '<img src="'+cfg.assinatura+'" style="height:50px;background:#fff;border:1px solid #c8d0da;border-radius:6px;padding:2px"> <button class="btn peq sec" onclick="removerAss()">remover</button>'
+    : '<span class="aviso">Nenhuma assinatura guardada — o laudo sai só com a linha.</span>';
+}
+function removerAss(){ cfg.assinatura=''; localStorage.removeItem('gass'); mostrarAssPrev(); }
 function salvarConfig(){
   cfg.chave = document.getElementById('cfgChave').value.trim();
   cfg.modelo = document.getElementById('cfgModelo').value;
@@ -602,7 +641,7 @@ async function gerarLaudo(exId){
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), use o texto padrão correspondente do médico como BASE do vocabulário, mas NÃO o cole mecanicamente: integre-o reescrevendo o parágrafo do órgão como um texto único, fluido e gramaticalmente correto, como um médico redigiria. Ajuste a CONCLUSÃO de acordo.\n\n"+
-"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
+"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. O laudo deve caber em uma única página A4.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
 "MODELO DE LAUDO ('**' = negrito):\nTÍTULO: "+mod.titulo+"\nTÉCNICA: "+mod.tecnica+"\nCORPO:\n"+mod.corpo+"\nCONCLUSÃO: "+mod.conclusao+(mod.extra?"\nTEXTO FIXO APÓS A CONCLUSÃO:\n"+mod.extra:"")+"\n\n"+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico):\n"+BIZUS+"\n\n"+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
@@ -789,11 +828,11 @@ function abrirRevisao(exId){
   +'<div class="laudoCab"><div contenteditable="true"><b>Nome do Paciente:</b> '+(c.nome||'')+'<br><b>Idade:</b> '+(c.idade||'')+'<br><b>Médico(a) Solicitante:</b> '+(c.solicitante||'')+'<br><b>Realizado em:</b> '+(c.realizado_em||'')+'<br><b>Convênio:</b> '+(c.convenio||'')+'</div>'
   +'<div contenteditable="true"><b>Motivo do Pedido:</b> '+(c.motivo||'Solicitação medica.')+'<br><b>Dados Clínicos:</b> '+(c.dados_clinicos||'')+'</div></div>'
   +'<div class="laudoCorpoBox"><div class="laudoTitulo">'+L.titulo+'</div>'
-  +'<div class="laudoTexto" contenteditable="true">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito(L.corpo)
+  +'<div class="laudoTexto" contenteditable="true">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n'))
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')
   +'</div></div>'
-  +'<div class="assin"><span class="linha">'+cfg.medico+'<br>'+cfg.crm+'</span></div>'
+  +'<div class="assin">'+(cfg.assinatura?'<img src="'+cfg.assinatura+'" style="height:62px;display:block;margin:0 auto -16px">':'')+'<span class="linha">'+cfg.medico+'<br>'+cfg.crm+'</span></div>'
   +'<div class="rodapeLaudo">Esclarecemos que a impressão diagnóstica em exames de imagem não é absoluta, devendo ser feita a correlação clínico laboratorial, além de outros exames de imagem. Somente o seu médico tem condições de interpretar corretamente o conjunto de todas essas informações.</div>'
   +'</div>';
   const ob = document.getElementById('obsBanner');

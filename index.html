@@ -93,7 +93,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div class="filebox">
     <b>Ou grave os ditados aqui mesmo, ao longo do dia</b><br>
     <span class="aviso">Ficam guardados neste aparelho e entram automaticamente no Processar. Toque 💾 para salvar uma cópia no Arquivos/iCloud.</span>
-    <div style="margin-top:8px"><button class="btn" id="btnGravarAcum" onclick="gravarAcumulado()">🎙 Gravar ditado</button></div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn" id="btnGravarAcum" onclick="gravarAcumulado()">🎙 Gravar ditado</button><canvas id="vuAcum" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>
     <div id="listaAcum" style="margin-top:8px;text-align:left"></div>
   </div>
   <div style="margin-top:14px">
@@ -106,7 +106,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <h2>Exame na hora (in loco)</h2>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button class="btn" onclick="document.getElementById('inpCamera').click()">📷 Capturar imagem</button>
-    <button class="btn" id="btnGravar" onclick="alternarGravacao()">🎙 Gravar áudio</button>
+    <button class="btn" id="btnGravar" onclick="alternarGravacao()">🎙 Gravar áudio</button><canvas id="vuLoko" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px;align-self:center"></canvas>
     <button class="btn" id="btnLoko" onclick="gerarInLoco()">⚡ Gerar laudo agora</button>
   </div>
   <input type="file" id="inpCamera" accept="image/*" capture="environment" style="display:none">
@@ -620,6 +620,40 @@ async function gerarLaudo(exId){
   btn.disabled = false; btn.textContent = 'Gerar laudo';
 }
 
+/* ============ Medidor de microfone (barras ao vivo) ============ */
+let vuRAF=null, vuAC=null;
+function vuIniciar(stream, canvasId){
+  try{
+    const cv=document.getElementById(canvasId); if(!cv) return;
+    cv.style.display='block';
+    const AC=window.AudioContext||window.webkitAudioContext;
+    vuAC=new AC(); if(vuAC.state==='suspended') vuAC.resume();
+    const src=vuAC.createMediaStreamSource(stream);
+    const an=vuAC.createAnalyser(); an.fftSize=256; src.connect(an);
+    const ctx=cv.getContext('2d');
+    const dados=new Uint8Array(an.frequencyBinCount);
+    function desenhar(){
+      vuRAF=requestAnimationFrame(desenhar);
+      an.getByteFrequencyData(dados);
+      ctx.clearRect(0,0,cv.width,cv.height);
+      const n=16, w=cv.width/n;
+      for(let i=0;i<n;i++){
+        const v=dados[Math.floor(i*dados.length/(n*2))]/255;
+        const alt=Math.max(3, v*(cv.height-6));
+        ctx.fillStyle = v>0.65 ? '#ffb02e' : '#35c46a';
+        ctx.fillRect(i*w+2, (cv.height-alt)/2, w-4, alt);
+      }
+    }
+    desenhar();
+  }catch(e){ /* medidor é opcional; gravação segue normal */ }
+}
+function vuParar(canvasId){
+  if(vuRAF){ cancelAnimationFrame(vuRAF); vuRAF=null; }
+  if(vuAC){ try{vuAC.close();}catch(e){} vuAC=null; }
+  const cv=document.getElementById(canvasId);
+  if(cv){ cv.style.display='none'; }
+}
+
 /* ============ Ditados acumulados (guardados no aparelho) ============ */
 function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',1);r.onupgradeneeded=function(){r.result.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
 async function gravSalvar(blob){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').add({blob:blob,quando:Date.now()});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
@@ -639,12 +673,14 @@ async function gravarAcumulado(){
   mediaRecA.onstop=async function(){
     const blob=new Blob(recChunksA,{type:mediaRecA.mimeType||'audio/mp4'});
     recStreamA.getTracks().forEach(function(t){t.stop();});
+    vuParar('vuAcum');
     clearInterval(recTimerA);
     btn.textContent='🎙 Gravar ditado'; btn.style.background='';
     try{ await gravSalvar(blob); }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
     renderAcum();
   };
   mediaRecA.start(); recSegA=0;
+  vuIniciar(recStreamA, 'vuAcum');
   btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
   recTimerA=setInterval(function(){recSegA++;btn.textContent='⏹ Parar ('+recSegA+'s)';},1000);
 }
@@ -704,11 +740,13 @@ async function alternarGravacao(){
     const blobG = new Blob(recChunks,{type:mediaRec.mimeType||'audio/mp4'});
     lokoAudios.push(blobG); lokoUrls.push(URL.createObjectURL(blobG));
     recStream.getTracks().forEach(function(t){t.stop();});
+    vuParar('vuLoko');
     clearInterval(recTimer);
     btn.textContent='🎙 Gravar áudio'; btn.style.background='';
     renderLoko();
   };
   mediaRec.start();
+  vuIniciar(recStream, 'vuLoko');
   recSeg=0; btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
   recTimer=setInterval(function(){ recSeg++; btn.textContent='⏹ Parar ('+recSeg+'s)'; },1000);
 }

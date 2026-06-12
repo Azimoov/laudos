@@ -33,7 +33,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 #telaRevisao{display:none;}
 .barraRev{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
 /* ===== página do laudo (espelha o modelo do Pages) ===== */
-.laudoFolha{background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.3;color:#000;}
+.laudoFolha{background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.32;color:#000;}
 .laudoCab{border:1.5px solid #000;padding:8px 10px;display:flex;gap:14px;font-size:13px;}
 .laudoCab>div{flex:1;}
 .laudoCab b{font-weight:700;}
@@ -114,6 +114,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
     <button class="btn" id="btnLoko" onclick="gerarInLoco()">⚡ Gerar laudo agora</button>
   </div>
   <input type="file" id="inpCamera" accept="image/*" capture="environment" style="display:none">
+  <input type="file" id="inpCameraExame" accept="image/*" capture="environment" style="display:none">
   <div id="lokoInfo" class="aviso">Capture as imagens do exame, grave o ditado e toque em ⚡.</div>
   <div id="lokoThumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
 </div>
@@ -584,10 +585,12 @@ function renderExames(){
       return '<label style="font-weight:400;display:flex;gap:6px;align-items:center"><input type="checkbox" onchange="ligarAudio('+a.idx+','+ex.id+',this.checked)"'+sel+'> '+a.nome+(a.nomePaciente?' — <i>'+a.nomePaciente+'</i>':'')+'</label>';
     }).join('');
     const detalhes = '<div id="det'+ex.id+'" style="display:none;margin-top:10px;background:#f4f7fa;border-radius:10px;padding:10px">'
-      +'<b style="font-size:13px">Fotos ('+ex.imagens.length+') — toque para ampliar:</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">'
-      + ex.imagens.map(function(im){return '<img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)">';}).join('')
+      +'<b style="font-size:13px">Fotos ('+ex.imagens.length+') — toque para ampliar:</b><div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0">'
+      + ex.imagens.map(function(im,i){return '<span style="position:relative;display:inline-block;margin-top:6px"><img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)"><button onclick="removerFotoExame('+ex.id+','+i+')" style="position:absolute;top:-8px;right:-8px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer">✕</button></span>';}).join('')
       +'</div><b style="font-size:13px">Gravações ('+audiosDoExame.length+'):</b>'
-      + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="font-size:13px;font-weight:600">🎙 '+a.nome+'</div>'+(a.url?'<audio controls src="'+a.url+'" style="width:100%;height:34px"></audio>':'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
+      + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?'<audio controls src="'+a.url+'" style="width:100%;height:34px"></audio>':'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
+      +'<div class="aviso" style="margin-top:6px">Depois de trocar foto ou gravação, toque "Gerar laudo" de novo para refazer o laudo.</div>'
       +'</div>';
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+' <span class="tag">'+ex.imagens.length+' pág.</span>'
@@ -602,6 +605,69 @@ function renderExames(){
       +'</div>'+detalhes+'</div>';
   }
   div.innerHTML = html;
+}
+document.getElementById('inpCameraExame').addEventListener('change', async function(e){
+  const ex = exames.find(function(x){return x.id===window.__fotoAlvo;});
+  if(ex){
+    for(const f of e.target.files){
+      try{ const imgs = await arquivoParaImagens(f); ex.imagens.push.apply(ex.imagens, imgs); }
+      catch(err){ log('Falha ao ler imagem: '+err.message, true); }
+    }
+    renderExames();
+    const d=document.getElementById('det'+ex.id); if(d) d.style.display='block';
+  }
+  e.target.value='';
+});
+function novaFotoExame(id){ window.__fotoAlvo=id; document.getElementById('inpCameraExame').click(); }
+function removerFotoExame(id, i){
+  const ex = exames.find(function(x){return x.id===id;}); if(!ex) return;
+  if(!confirm('Apagar esta foto do exame?')) return;
+  ex.imagens.splice(i,1); renderExames();
+  const d=document.getElementById('det'+id); if(d) d.style.display='block';
+}
+function removerAudioExame(aIdx){
+  if(!confirm('Apagar esta gravação deste exame?')) return;
+  const a = audios.find(function(x){return x.idx===aIdx;});
+  let exId = a ? a.exameId : null;
+  if(a && exId!==null){ const ex=exames.find(function(e){return e.id===exId;}); if(ex) ex.audios=ex.audios.filter(function(i){return i!==aIdx;}); }
+  audios = audios.filter(function(x){return x.idx!==aIdx;});
+  renderExames();
+  if(exId!==null){ const d=document.getElementById('det'+exId); if(d) d.style.display='block'; }
+}
+let mediaRecE=null, recChunksE=[], recStreamE=null, recTimerE=null, recSegE=0, recExAlvo=null;
+async function gravarParaExame(id){
+  const btn=document.getElementById('btnRegrav'+id);
+  if(mediaRecE && mediaRecE.state==='recording'){ if(recExAlvo===id) mediaRecE.stop(); return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
+  try{ recStreamE = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ log('Acesso ao microfone negado: '+e.message, true); return; }
+  recExAlvo=id;
+  let mime=''; if(MediaRecorder.isTypeSupported('audio/mp4')) mime='audio/mp4'; else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
+  mediaRecE = new MediaRecorder(recStreamE, mime?{mimeType:mime}:undefined);
+  recChunksE=[];
+  mediaRecE.ondataavailable=function(e){ if(e.data&&e.data.size>0) recChunksE.push(e.data); };
+  mediaRecE.onstop=async function(){
+    const blob=new Blob(recChunksE,{type:mediaRecE.mimeType||'audio/mp4'});
+    recStreamE.getTracks().forEach(function(t){t.stop();});
+    vuParar('vuEx'+id);
+    clearInterval(recTimerE);
+    log('Transcrevendo nova gravação...');
+    try{
+      const r = await transcreverAudio(blob);
+      const novoIdx = audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
+      const a = {idx:novoIdx, nome:'Regravação', url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
+      audios.push(a);
+      const ex=exames.find(function(x){return x.id===id;});
+      if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
+      log('Nova gravação pronta — toque "Gerar laudo" para refazer o laudo.');
+    }catch(e){ log('Falha na transcrição da regravação: '+e.message, true); }
+    renderExames();
+    const d=document.getElementById('det'+id); if(d) d.style.display='block';
+  };
+  mediaRecE.start(); recSegE=0;
+  vuIniciar(recStreamE, 'vuEx'+id);
+  if(btn){ btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e'; }
+  recTimerE=setInterval(function(){ recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
 }
 function alternarDetalhes(id){
   const d = document.getElementById('det'+id);
@@ -641,7 +707,7 @@ async function gerarLaudo(exId){
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), use o texto padrão correspondente do médico como BASE do vocabulário, mas NÃO o cole mecanicamente: integre-o reescrevendo o parágrafo do órgão como um texto único, fluido e gramaticalmente correto, como um médico redigiria. Ajuste a CONCLUSÃO de acordo.\n\n"+
-"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. O laudo deve caber em uma única página A4.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
+"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. NÃO corte nem resuma conteúdo para caber em uma página: se o laudo for naturalmente longo, pode ocupar duas páginas.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
 "MODELO DE LAUDO ('**' = negrito):\nTÍTULO: "+mod.titulo+"\nTÉCNICA: "+mod.tecnica+"\nCORPO:\n"+mod.corpo+"\nCONCLUSÃO: "+mod.conclusao+(mod.extra?"\nTEXTO FIXO APÓS A CONCLUSÃO:\n"+mod.extra:"")+"\n\n"+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico):\n"+BIZUS+"\n\n"+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+

@@ -590,15 +590,15 @@ function renderExames(){
       +'</div><b style="font-size:13px">Gravações ('+audiosDoExame.length+'):</b>'
       + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?'<audio controls src="'+a.url+'" style="width:100%;height:34px"></audio>':'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
-      +'<div class="aviso" style="margin-top:6px">Depois de trocar foto ou gravação, toque "Gerar laudo" de novo para refazer o laudo.</div>'
+      +'<div class="aviso" style="margin-top:6px">Adicione fotos ou grave instruções a qualquer momento, mesmo com o laudo pronto. Ao tocar "Refazer laudo", a IA aplica as alterações ditadas sobre o laudo existente.</div>'
       +'</div>';
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+' <span class="tag">'+ex.imagens.length+' pág.</span>'
       +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')+'</div>'
       +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
-      +(audios.length?'<label>Áudios deste paciente</label>'+listaAudios:'')
+      +(audios.length?'<div style="margin-top:8px"><button class="btn peq sec" onclick="alternarAudios('+ex.id+')">🔗 Áudios deste paciente ('+audiosDoExame.length+' marcado'+(audiosDoExame.length===1?'':'s')+') ▾</button><div id="auds'+ex.id+'" style="display:'+(audsAbertos[ex.id]?'block':'none')+';margin-top:6px;background:#f4f7fa;border-radius:10px;padding:8px">'+listaAudios+'</div></div>':'')
       +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
-      +'<button class="btn peq" id="btnGerar'+ex.id+'" onclick="gerarLaudo('+ex.id+')">Gerar laudo</button>'
+      +'<button class="btn peq" id="btnGerar'+ex.id+'" onclick="gerarLaudo('+ex.id+')">'+(ex.laudo?'Refazer laudo':'Gerar laudo')+'</button>'
       +(ex.laudo?'<button class="btn peq sec" onclick="abrirRevisao('+ex.id+')">Ver / imprimir</button>':'')
       +'<button class="btn peq sec" onclick="alternarDetalhes('+ex.id+')">📂 Fotos e áudios</button>'
       +'<button class="btn peq sec" style="color:#b3261e" onclick="excluirExame('+ex.id+')">🗑 Excluir</button>'
@@ -669,6 +669,12 @@ async function gravarParaExame(id){
   if(btn){ btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e'; }
   recTimerE=setInterval(function(){ recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
 }
+const audsAbertos = {};
+function alternarAudios(id){
+  audsAbertos[id] = !audsAbertos[id];
+  const d = document.getElementById('auds'+id);
+  if(d) d.style.display = audsAbertos[id] ? 'block' : 'none';
+}
 function alternarDetalhes(id){
   const d = document.getElementById('det'+id);
   d.style.display = d.style.display==='none' ? 'block' : 'none';
@@ -711,6 +717,7 @@ async function gerarLaudo(exId){
 "MODELO DE LAUDO ('**' = negrito):\nTÍTULO: "+mod.titulo+"\nTÉCNICA: "+mod.tecnica+"\nCORPO:\n"+mod.corpo+"\nCONCLUSÃO: "+mod.conclusao+(mod.extra?"\nTEXTO FIXO APÓS A CONCLUSÃO:\n"+mod.extra:"")+"\n\n"+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico):\n"+BIZUS+"\n\n"+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
+(ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
 "Responda SOMENTE em JSON válido:\n{\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"solicitante\":\"\",\"realizado_em\":\"\",\"convenio\":\"\",\"motivo\":\"Solicitação medica.\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
@@ -722,7 +729,7 @@ async function gerarLaudo(exId){
   }catch(e){
     log('Erro ao gerar laudo de '+ex.paciente+': '+e.message, true);
   }
-  btn.disabled = false; btn.textContent = 'Gerar laudo';
+  btn.disabled = false; btn.textContent = ex.laudo ? 'Refazer laudo' : 'Gerar laudo';
 }
 
 /* ============ Medidor de microfone (barras ao vivo) ============ */

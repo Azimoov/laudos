@@ -116,7 +116,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 <div class="card">
   <h2>Exame na hora (in loco)</h2>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button class="btn" onclick="document.getElementById('inpCamera').click()">📷 Capturar imagem</button>
+    <button class="btn" onclick="abrirCamera('loko')">📷 Capturar imagem</button>
     <button class="btn" id="btnGravar" onclick="alternarGravacao()">🎙 Gravar áudio</button><canvas id="vuLoko" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px;align-self:center"></canvas>
     <button class="btn" id="btnLoko" onclick="gerarInLoco()">⚡ Gerar laudo agora</button>
   </div>
@@ -625,7 +625,7 @@ document.getElementById('inpCameraExame').addEventListener('change', async funct
   }
   e.target.value='';
 });
-function novaFotoExame(id){ window.__fotoAlvo=id; document.getElementById('inpCameraExame').click(); }
+function novaFotoExame(id){ abrirCamera('exame', id); }
 function removerFotoExame(id, i){
   const ex = exames.find(function(x){return x.id===id;}); if(!ex) return;
   if(!confirm('Apagar esta foto do exame?')) return;
@@ -720,16 +720,16 @@ async function gerarLaudo(exId){
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), use o texto padrão correspondente do médico como BASE do vocabulário, mas NÃO o cole mecanicamente: integre-o reescrevendo o parágrafo do órgão como um texto único, fluido e gramaticalmente correto, como um médico redigiria. Ajuste a CONCLUSÃO de acordo.\n\n"+
-"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. NÃO corte nem resuma conteúdo para caber em uma página: se o laudo for naturalmente longo, pode ocupar duas páginas.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n\n"+
+"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. NÃO corte nem resuma conteúdo para caber em uma página: se o laudo for naturalmente longo, pode ocupar duas páginas.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade/médico solicitante/convênio apenas se constarem no ditado ou nas imagens; caso contrário deixe em branco.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n- TÍTULO DO EXAME (campo 'titulo' do JSON): comece pelo título do modelo e ajuste conforme o ditado. (a) PARTES MOLES: acrescente entre parênteses o LOCAL/região ditado — ex.: 'Exame de partes moles (região escapular)', 'Exame de partes moles (membro superior direito)', 'Exame de partes moles (ombro esquerdo)'. (b) Exames com lateralidade (ombro, joelho, mama, bolsa escrotal, punho, etc.): inclua o lado ditado — ex.: 'Exame do ombro direito', 'Exame do joelho esquerdo'. Se o local/lado não for ditado, mantenha o título do modelo, sem parênteses. NUNCA invente o lado/local: use apenas o que o médico ditou ou o que estiver legível nas imagens.\n- FORMATO DA CONCLUSÃO (campo 'conclusao'): com DOIS OU MAIS diagnósticos, escreva 'Exame ecográfico compatível com:' e, em seguida, cada diagnóstico em sua própria linha, numerado com '1- ', '2- ', '3- ' e assim por diante. Com APENAS UM diagnóstico, escreva em linha única: 'Exame ecográfico compatível com <diagnóstico>.' (sem lista numerada). Não inclua a palavra 'Conclusão' no campo — ela já é inserida automaticamente.\n\n"+
 "MODELO DE LAUDO ('**' = negrito):\nTÍTULO: "+mod.titulo+"\nTÉCNICA: "+mod.tecnica+"\nCORPO:\n"+mod.corpo+"\nCONCLUSÃO: "+mod.conclusao+(mod.extra?"\nTEXTO FIXO APÓS A CONCLUSÃO:\n"+mod.extra:"")+"\n\n"+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico):\n"+BIZUS+"\n\n"+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
-"Responda SOMENTE em JSON válido:\n{\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"solicitante\":\"\",\"realizado_em\":\"\",\"convenio\":\"\",\"motivo\":\"Solicitação medica.\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}"
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"solicitante\":\"\",\"realizado_em\":\"\",\"convenio\":\"\",\"motivo\":\"Solicitação medica.\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
     const resp = await openai(partes);
-    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:resp.conclusao||mod.conclusao, extra:mod.extra||'', titulo:mod.titulo, tecnica:mod.tecnica, obs:resp.observacoes_para_o_medico||''};
+    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:resp.conclusao||mod.conclusao, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:resp.observacoes_para_o_medico||''};
     renderExames();
     abrirRevisao(exId);
     try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
@@ -822,6 +822,43 @@ async function limparAcum(){ if(!confirm('Apagar TODOS os ditados guardados nest
 
 /* ============ Exame in loco: câmera + gravação ============ */
 let lokoImgs=[], lokoAudios=[], lokoUrls=[];
+
+let camStream=null, camPend=[], camModo=null, camExId=null;
+function abrirCamera(modo, exId){
+  camModo=modo; camExId=(exId===undefined?null:exId); camPend=[];
+  const ov=document.getElementById('camOverlay');
+  ov.style.display='flex'; atualizarCamThumbs();
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ camFallback(); return; }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:3840}, height:{ideal:2160}}, audio:false})
+    .then(function(st){ camStream=st; const v=document.getElementById('camVideo'); v.srcObject=st; v.setAttribute('playsinline',''); v.play().catch(function(){}); })
+    .catch(function(err){ ov.style.display='none'; log('Câmera do app indisponível ('+err.message+'). Usando a câmera do sistema.', true); camFallback(); });
+}
+function camFallback(){ if(camModo==='exame'){ window.__fotoAlvo=camExId; document.getElementById('inpCameraExame').click(); } else { document.getElementById('inpCamera').click(); } }
+function camCapturar(){
+  const v=document.getElementById('camVideo');
+  if(!v.videoWidth){ return; }
+  const cv=document.createElement('canvas'); cv.width=v.videoWidth; cv.height=v.videoHeight;
+  cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
+  camPend.push(cv.toDataURL('image/jpeg',0.92));
+  atualizarCamThumbs();
+}
+function camDesfazer(i){ camPend.splice(i,1); atualizarCamThumbs(); }
+function atualizarCamThumbs(){
+  const t=document.getElementById('camThumbs'); if(!t) return;
+  t.innerHTML=camPend.map(function(d,i){ return '<div style="position:relative;flex:0 0 auto"><img src="'+d+'" style="height:58px;border-radius:6px"><button onclick="camDesfazer('+i+')" style="position:absolute;top:-6px;right:-6px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:20px;height:20px;font-size:11px">x</button></div>'; }).join('');
+  const ok=document.getElementById('camOkBtn'); if(ok) ok.textContent='OK ('+camPend.length+')';
+}
+function pararCam(){ if(camStream){ camStream.getTracks().forEach(function(tr){ tr.stop(); }); camStream=null; } const v=document.getElementById('camVideo'); if(v) v.srcObject=null; const ov=document.getElementById('camOverlay'); if(ov) ov.style.display='none'; }
+function camCancelar(){ camPend=[]; pararCam(); }
+function camOk(){
+  const imgs=camPend.slice();
+  if(camModo==='exame'){
+    const ex=exames.find(function(x){return x.id===camExId;});
+    if(ex){ ex.imagens.push.apply(ex.imagens, imgs); renderExames(); const d=document.getElementById('det'+ex.id); if(d) d.style.display='block'; }
+  } else { lokoImgs.push.apply(lokoImgs, imgs); renderLoko(); }
+  camPend=[]; pararCam();
+}
+
 let mediaRec=null, recChunks=[], recStream=null, recTimer=null, recSeg=0;
 document.getElementById('inpCamera').addEventListener('change', async function(e){
   for(const f of e.target.files){
@@ -992,5 +1029,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderAcum();
 });
 </script>
+<div id="camOverlay" style="position:fixed;inset:0;z-index:99999;background:#000;display:none;flex-direction:column">
+  <video id="camVideo" autoplay muted playsinline webkit-playsinline style="flex:1;width:100%;min-height:0;object-fit:contain;background:#000"></video>
+  <div id="camThumbs" style="display:flex;gap:6px;overflow-x:auto;padding:6px;background:#0d0d0d"></div>
+  <div style="display:flex;gap:10px;padding:12px;background:#111;align-items:center;justify-content:center">
+    <button onclick="camCancelar()" style="background:#444;color:#fff;border:0;border-radius:10px;padding:14px 16px;font-size:15px;cursor:pointer">Cancelar</button>
+    <button onclick="camCapturar()" style="background:#35c46a;color:#fff;border:0;border-radius:10px;padding:16px 26px;font-size:18px;font-weight:600;cursor:pointer">Capturar</button>
+    <button id="camOkBtn" onclick="camOk()" style="background:#1e5b8a;color:#fff;border:0;border-radius:10px;padding:14px 18px;font-size:16px;font-weight:600;cursor:pointer">OK (0)</button>
+  </div>
+</div>
 </body>
 </html>

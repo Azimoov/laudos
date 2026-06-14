@@ -60,8 +60,15 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 <header>
   <h1>Laudos USG</h1>
   <button class="btn peq sec" onclick="alternarConfig()">⚙︎ Configurações</button>
+  <button class="btn peq sec" onclick="alternarHistorico()">📁 Histórico</button>
 </header>
 <main>
+
+<div class="card" id="cardHistorico" style="display:none">
+  <h2>📁 Histórico de laudos</h2>
+  <p class="aviso">Laudos salvos neste aparelho. Toque em "Abrir" para ver ou imprimir de novo — funciona mesmo depois de fechar o app.</p>
+  <div id="listaHistorico"></div>
+</div>
 
 <div class="card" id="cardConfig" style="display:none">
   <h2>Configurações</h2>
@@ -599,7 +606,7 @@ function renderExames(){
       +(audios.length?'<div style="margin-top:8px"><button class="btn peq sec" onclick="alternarAudios('+ex.id+')">🔗 Áudios deste paciente ('+audiosDoExame.length+' marcado'+(audiosDoExame.length===1?'':'s')+') ▾</button><div id="auds'+ex.id+'" style="display:'+(audsAbertos[ex.id]?'block':'none')+';margin-top:6px;background:#f4f7fa;border-radius:10px;padding:8px">'+listaAudios+'</div></div>':'')
       +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
       +'<button class="btn peq" id="btnGerar'+ex.id+'" onclick="gerarLaudo('+ex.id+')">'+(ex.laudo?'Refazer laudo':'Gerar laudo')+'</button>'
-      +(ex.laudo?'<button class="btn peq sec" onclick="abrirRevisao('+ex.id+')">Ver / imprimir</button>':'')
+      +(ex.laudo?'<button class="btn peq sec" onclick="abrirRevisao('+ex.id+')">📄 Ver / imprimir</button>':'')
       +'<button class="btn peq sec" onclick="alternarDetalhes('+ex.id+')">📂 Fotos e áudios</button>'
       +'<button class="btn peq sec" style="color:#b3261e" onclick="excluirExame('+ex.id+')">🗑 Excluir</button>'
       +'</div>'+detalhes+'</div>';
@@ -725,6 +732,7 @@ async function gerarLaudo(exId){
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:resp.conclusao||mod.conclusao, extra:mod.extra||'', titulo:mod.titulo, tecnica:mod.tecnica, obs:resp.observacoes_para_o_medico||''};
     renderExames();
     abrirRevisao(exId);
+    try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
     if(ex.laudo.obs) log('Observações da IA sobre '+ex.paciente+': '+ex.laudo.obs, true);
   }catch(e){
     log('Erro ao gerar laudo de '+ex.paciente+': '+e.message, true);
@@ -893,9 +901,66 @@ function negrito(t){
   const esc = (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return esc.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
 }
+/* ============ Histórico de laudos (localStorage) ============ */
+function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')||'[]'); }catch(e){ return []; } }
+function gravarHistorico(arr){ try{ localStorage.setItem('glaudos', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar o histórico (armazenamento cheio?): '+e.message, true); } }
+function salvarLaudoHistorico(meta){
+  if(!meta) return;
+  const html = document.getElementById('areaImpressao').innerHTML;
+  if(!html) return;
+  const arr = lerHistorico();
+  const i = arr.findIndex(function(x){return x.id===meta.id;});
+  const reg = {id:meta.id, paciente:meta.paciente||'(sem nome)', tipo:meta.tipo||'', data:meta.data||'', obs:meta.obs||'', html:html, ts:Date.now()};
+  if(i>=0) arr[i]=reg; else arr.push(reg);
+  gravarHistorico(arr);
+}
+function alternarHistorico(){
+  const c=document.getElementById('cardHistorico');
+  const mostrar = c.style.display==='none';
+  c.style.display = mostrar?'block':'none';
+  if(mostrar) renderHistorico();
+}
+function renderHistorico(){
+  const arr = lerHistorico().sort(function(a,b){return b.ts-a.ts;});
+  const div = document.getElementById('listaHistorico');
+  if(!arr.length){ div.innerHTML='<p class="aviso">Nenhum laudo salvo ainda.</p>'; return; }
+  div.innerHTML = arr.map(function(r){
+    const d = new Date(r.ts);
+    const quando = ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid #c8d0da;border-radius:9px;padding:8px 10px;margin-top:6px">'
+      +'<div style="flex:1"><b>'+r.paciente+'</b>'+(r.tipo?' <span class="tag">'+r.tipo+'</span>':'')+'<br><span class="aviso">'+(r.data?r.data+' · ':'')+'salvo em '+quando+'</span></div>'
+      +'<button class="btn peq" data-act="abrir" data-id="'+r.id+'">Abrir</button>'
+      +'<button class="btn peq sec" style="color:#b3261e" data-act="excluir" data-id="'+r.id+'">🗑</button>'
+      +'</div>';
+  }).join('');
+  div.onclick=function(e){
+    const b=e.target.closest('button[data-act]'); if(!b) return;
+    const id=b.getAttribute('data-id');
+    if(b.getAttribute('data-act')==='abrir') abrirHistorico(id); else excluirHistorico(id);
+  };
+}
+function abrirHistorico(id){
+  const r = lerHistorico().find(function(x){return x.id===id;});
+  if(!r){ log('Laudo não encontrado no histórico.', true); return; }
+  document.getElementById('areaImpressao').innerHTML = r.html;
+  const ob = document.getElementById('obsBanner');
+  if(r.obs){ ob.style.display='block'; ob.textContent='⚠️ Aviso da IA — revise com atenção: '+r.obs; } else { ob.style.display='none'; }
+  window.__revAtual = {id:r.id, paciente:r.paciente, tipo:r.tipo, data:r.data, obs:r.obs};
+  document.title = 'Laudo - '+(r.paciente||'paciente');
+  document.querySelector('main').style.display='none';
+  document.getElementById('telaRevisao').style.display='block';
+  window.scrollTo(0,0);
+}
+function excluirHistorico(id){
+  if(!confirm('Excluir este laudo do histórico salvo?')) return;
+  gravarHistorico(lerHistorico().filter(function(x){return x.id!==id;}));
+  renderHistorico();
+}
 function abrirRevisao(exId){
   const ex = exames.find(e=>e.id===exId);
   const L = ex.laudo; const c = L.cab;
+  if(!ex.histKey) ex.histKey='L'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  window.__revAtual = {id:ex.histKey, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||''};
   document.getElementById('areaImpressao').innerHTML =
   '<div class="laudoFolha">'
   +'<div class="laudoCab"><div contenteditable="true"><b>Nome do Paciente:</b> '+(c.nome||'')+'<br><b>Idade:</b> '+(c.idade||'')+'<br><b>Médico(a) Solicitante:</b> '+(c.solicitante||'')+'<br><b>Realizado em:</b> '+(c.realizado_em||'')+'<br><b>Convênio:</b> '+(c.convenio||'')+'</div>'
@@ -916,6 +981,7 @@ function abrirRevisao(exId){
   window.scrollTo(0,0);
 }
 function fecharRevisao(){
+  try{ if(window.__revAtual) salvarLaudoHistorico(window.__revAtual); }catch(e){}
   document.title = 'Laudos USG — Dr. Daniel Serruya';
   document.getElementById('telaRevisao').style.display='none';
   document.querySelector('main').style.display='block';

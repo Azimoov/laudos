@@ -522,6 +522,105 @@ function casa(nomeAudio, nomeArquivo){
 }
 
 /* ============ Fluxo principal ============ */
+/* ============ Agrupamento por imagem (visão) + vínculo de áudios ============ */
+const LIMIAR_VINCULO = 0.8;   // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual
+const MERGE_LEV = 2;          // tolerância (edições) p/ fundir nomes quase iguais no agrupamento
+const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edite à vontade)
+  abdominal:['abdome total','abdomen total','abd total','abdominal total','abdominal','abdome'],
+  abdomen_superior:['abdome superior','abdomen superior','abd superior'],
+  rins:['rins','rins e vias urinarias','vias urinarias','aparelho urinario','renal'],
+  prostata:['prostata','prostatico'],
+  tireoide:['tireoide','tiroide'],
+  mama:['mama','mamas','mamaria','mamario'],
+  transvaginal:['transvaginal','endovaginal','utero e anexos transvaginal'],
+  pelvica:['pelvica','pelve','suprapubica','utero e anexos'],
+  obst1:['obstetrico primeiro trimestre','primeiro trimestre','obstetrico 1'],
+  obst23:['obstetrico segundo trimestre','obstetrico terceiro trimestre','obstetrico 2','obstetrico 3','morfologica'],
+  obst_gemelar:['gemelar'],
+  bolsa_escrotal:['bolsa escrotal','escrotal','escroto','testiculo','testicular'],
+  penis:['peniano','penis'],
+  parede_abdominal:['parede abdominal','hernia','parede'],
+  partes_moles:['partes moles','parte mole','tecido subcutaneo','nodulo subcutaneo'],
+  ombro:['ombro'], cotovelo:['cotovelo'], punho:['punho'], mao:['mao','quirodactilo'],
+  joelho:['joelho'], tornozelo:['tornozelo'], pe:['pe','pododactilo']
+};
+function mapTipo(texto){
+  const t=norm(texto); if(!t) return '';
+  for(const chave in SINONIMOS_TIPO){ if(SINONIMOS_TIPO[chave].some(function(s){return t.indexOf(norm(s))>=0;})) return chave; }
+  for(const k in MODELOS){ const n=norm(MODELOS[k].nome); if(n && (t.indexOf(n)>=0 || n.indexOf(t)>=0)) return k; }
+  return '';
+}
+function levenshtein(x,y){ x=x||''; y=y||''; const m=x.length,n=y.length; if(!m) return n; if(!n) return m;
+  let prev=[]; for(let j=0;j<=n;j++) prev[j]=j;
+  for(let i=1;i<=m;i++){ let cur=[i]; for(let j=1;j<=n;j++){ const c=x[i-1]===y[j-1]?0:1; cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+c); } prev=cur; }
+  return prev[n];
+}
+function reduzImagem(dataUrl, maxW){ return new Promise(function(res){ const img=new Image();
+  img.onload=function(){ const esc=Math.min(1, maxW/img.width); const c=document.createElement('canvas'); c.width=Math.round(img.width*esc); c.height=Math.round(img.height*esc); c.getContext('2d').drawImage(img,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',0.6)); };
+  img.onerror=function(){ res(dataUrl); }; img.src=dataUrl; }); }
+async function extrairMetaImagem(dataUrl){
+  const p='Leia APENAS o texto impresso pelo aparelho de ultrassom nesta imagem (cabecalho/legenda do equipamento). Extraia o nome do paciente exatamente como impresso e o tipo de exame, se visiveis. Nao infira nem invente: se nao conseguir ler, devolva vazio com confianca baixa. Responda apenas com um objeto JSON com as chaves paciente (texto), tipoExame (texto) e confianca (numero de 0 a 1).';
+  let r=null;
+  try{ r=await openai([{type:'text',text:p}, dataUrlParaParte(await reduzImagem(dataUrl,900))]); }catch(e){ r=null; }
+  let meta={paciente:(r&&r.paciente)||'', tipoExame:(r&&r.tipoExame)||'', confianca:(r&&typeof r.confianca==='number')?r.confianca:0};
+  if(!meta.paciente || meta.confianca<0.4){
+    try{ const r2=await openai([{type:'text',text:p}, dataUrlParaParte(dataUrl)]); if(r2&&r2.paciente){ meta={paciente:r2.paciente, tipoExame:r2.tipoExame||meta.tipoExame, confianca:(typeof r2.confianca==='number')?r2.confianca:0.5}; } }catch(e){}
+  }
+  return meta;
+}
+function agruparItens(itens){
+  const grupos=[];
+  for(const it of itens){
+    const tipoChave=mapTipo(it.tipoExame); const pNorm=norm(it.paciente);
+    let g = pNorm ? grupos.find(function(x){ const mt=(x.tipo===tipoChave)||(!x.tipo&&!tipoChave); if(!mt||!x.chaveP) return false; return x.chaveP===pNorm||levenshtein(x.chaveP,pNorm)<=MERGE_LEV; }) : null;
+    if(!g){ const base=it.nomeArquivo&&it.nomeArquivo.indexOf('.')>=0 ? it.nomeArquivo.split('.').slice(0,-1).join('.') : (it.nomeArquivo||''); g={chaveP:pNorm, tipo:tipoChave, paciente:it.paciente||base, imagens:[], confs:[]}; grupos.push(g); }
+    g.imagens=g.imagens.concat(it.imgs); g.confs.push(it.conf||0);
+    if((!g.paciente||g.paciente.length<2)&&it.paciente) g.paciente=it.paciente;
+    if(!g.tipo&&tipoChave) g.tipo=tipoChave;
+  }
+  return grupos.map(function(g,i){ return {id:i, nomeArquivo:'', paciente:g.paciente, imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:(g.confs.reduce(function(s,c){return s+c;},0)/(g.confs.length||1))}; });
+}
+function simPaciente(an,bn){ if(!an||!bn) return 0; if(an===bn) return 1;
+  const at=an.split(' ').filter(function(x){return x.length>2;}), bt=bn.split(' ').filter(function(x){return x.length>2;});
+  if(!at.length||!bt.length) return 0; let hit=0;
+  for(const t of at){ if(bt.some(function(u){return u===t||levenshtein(u,t)<=1;})) hit++; }
+  return hit/Math.max(at.length,bt.length);
+}
+function vincularAudios(){
+  for(const a of audios){ a.exameId=null; a.score=0; a.pendente=true;
+    if(!a.nomePaciente) continue;
+    const pNorm=norm(a.nomePaciente); const tipoAudio=mapTipo(a.tipoExame);
+    const cands=exames.map(function(ex){ return {ex:ex, sp:simPaciente(pNorm, norm(ex.paciente))}; }).filter(function(c){return c.sp>0;});
+    if(!cands.length) continue;
+    let best=null; for(const c of cands){ let s=c.sp; if(tipoAudio&&c.ex.tipo&&tipoAudio===c.ex.tipo) s+=0.25; if(!best||s>best.s) best={ex:c.ex,s:s,sp:c.sp}; }
+    const fortes=cands.filter(function(c){return c.sp>=0.9;});
+    const ambiguo = fortes.length>1 && !(tipoAudio&&best.ex.tipo===tipoAudio);
+    a.score=best.s;
+    if(best.s>=LIMIAR_VINCULO && !ambiguo){ a.exameId=best.ex.id; a.pendente=false; best.ex.audios.push(a.idx); if(!best.ex.tipo&&tipoAudio) best.ex.tipo=tipoAudio; }
+  }
+}
+function vincularManual(idx, exId){
+  const a=audios.find(function(x){return x.idx===idx;}); if(!a) return;
+  exames.forEach(function(e){ e.audios=e.audios.filter(function(k){return k!==idx;}); });
+  if(exId===''||exId==null){ a.exameId=null; a.pendente=true; }
+  else { const ex=exames.find(function(e){return e.id===Number(exId);}); if(ex){ a.exameId=ex.id; a.pendente=false; ex.audios.push(idx); if(!ex.tipo){ const tt=mapTipo(a.tipoExame); if(tt) ex.tipo=tt; } } }
+  renderExames();
+}
+function renderPendentes(){
+  const pend=audios.filter(function(a){return a.exameId==null;});
+  if(!pend.length) return '';
+  const opts=exames.map(function(e){ return '<option value="'+e.id+'">'+(e.paciente||'(sem nome)')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+'</option>'; }).join('');
+  return '<div class="card" style="border:2px solid #d99a26;background:#fdf6e9">'
+    +'<h2 style="color:#9a6b14">⚠️ '+pend.length+' áudio(s) sem vínculo seguro — revise</h2>'
+    +'<p class="aviso">Por segurança, só vinculei automaticamente os áudios de alta certeza. Escolha o exame de cada áudio abaixo (ou deixe em branco para ignorar).</p>'
+    +pend.map(function(a){ return '<div style="border:1px solid #e3cda0;border-radius:9px;padding:8px 10px;margin-top:6px">'
+        +'<div style="font-size:13px"><b>🎙 '+a.nome+'</b> — disse: <i>'+(a.nomePaciente||'(paciente não citado)')+(a.tipoExame?' / '+a.tipoExame:'')+'</i></div>'
+        +'<div class="aviso" style="margin:3px 0">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;').slice(0,160))+'</div>'
+        +'<select onchange="vincularManual('+a.idx+', this.value)"><option value="">— escolher exame —</option>'+opts+'</select>'
+        +'</div>'; }).join('')
+    +'</div>';
+}
+
 async function processar(){
   const fEx = document.getElementById('inpExames').files;
   const fAu = document.getElementById('inpAudios').files;
@@ -530,13 +629,19 @@ async function processar(){
   document.getElementById('btnProcessar').disabled = true;
   exames = []; audios = [];
   try{
-    // 1. preparar exames
+    // 1. preparar exames — ler metadados (visão) de cada imagem e agrupar por paciente+tipo
+    const itens = [];
     for(let i=0;i<fEx.length;i++){
       const f = fEx[i];
       log('Lendo '+f.name+' ...');
       const imgs = await arquivoParaImagens(f);
-      exames.push({id:i, nomeArquivo:f.name, paciente:f.name.replace(/\.[^.]+$/,''), imagens:imgs, tipo:'', audios:[], laudo:null});
+      let meta = {paciente:'', tipoExame:'', confianca:0};
+      try{ meta = await extrairMetaImagem(imgs[0]); }catch(e){ log('  leitura da legenda falhou em '+f.name+': '+e.message, true); }
+      itens.push({imgs:imgs, nomeArquivo:f.name, paciente:meta.paciente, tipoExame:meta.tipoExame, conf:meta.confianca});
+      log('  → '+(meta.paciente||'(nome ilegível)')+' | '+(meta.tipoExame||'tipo?')+' ['+Math.round((meta.confianca||0)*100)+'%]');
     }
+    exames = agruparItens(itens);
+    log('Agrupei '+fEx.length+' arquivo(s) em '+exames.length+' exame(s).');
     // 2. transcrever áudios
     for(let i=0;i<fAu.length;i++){
       const f = fAu[i];
@@ -566,12 +671,10 @@ async function processar(){
         audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
       }
     }
-    // 3. associação automática
-    for(const a of audios){
-      if(!a.nomePaciente) continue;
-      const ex = exames.find(e=>casa(a.nomePaciente, e.nomeArquivo));
-      if(ex){ a.exameId = ex.id; ex.audios.push(a.idx); if(!ex.tipo) ex.tipo = a.tipoExame; }
-    }
+    // 3. associação automática (com score; baixa confiança vai p/ revisão manual)
+    vincularAudios();
+    const _pend = audios.filter(function(a){return a.exameId==null;}).length;
+    log('Áudios: '+(audios.length-_pend)+' vinculado(s) com segurança, '+_pend+' p/ revisão manual.');
     renderExames();
     log('Pronto. Confira as associações abaixo e gere os laudos.');
   }catch(e){
@@ -584,6 +687,7 @@ function renderExames(){
   const div = document.getElementById('listaExames');
   document.getElementById('cardExames').style.display='block';
   let html='';
+    html += renderPendentes();
   for(const ex of exames){
     const opcoesTipo = Object.keys(MODELOS).map(k=>'<option value="'+k+'"'+(ex.tipo===k?' selected':'')+'>'+MODELOS[k].nome+'</option>').join('');
     const audiosDoExame = audios.filter(a=>a.exameId===ex.id);

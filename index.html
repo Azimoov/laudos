@@ -624,15 +624,39 @@ function renderPendentes(){
     +'</div>';
 }
 
+let fotosSel=[];
 function renderPrevExames(){
-  const inp=document.getElementById('inpExames'); const div=document.getElementById('prevExames'); if(!div) return;
-  if(!inp||!inp.files||!inp.files.length){ div.innerHTML=''; return; }
-  const fs=inp.files; let html='<div class="aviso" style="width:100%;font-weight:600">📷 '+fs.length+' arquivo(s) selecionado(s) — toque numa imagem para ampliar:</div>';
+  const div=document.getElementById('prevExames'); if(!div) return;
+  const fs=fotosSel||[];
+  if(!fs.length){ div.innerHTML=''; return; }
+  let html='<div class="aviso" style="width:100%;font-weight:600">📷 '+fs.length+' arquivo(s) — toque para ampliar, ✕ para remover:</div>';
   for(let i=0;i<fs.length;i++){ const f=fs[i];
-    if(f.type&&f.type.indexOf('image')===0){ const u=URL.createObjectURL(f); html+='<img src="'+u+'" title="'+f.name+'" style="height:84px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)">'; }
-    else { html+='<span class="aviso" style="display:inline-flex;align-items:center;border:1px solid #c8d0da;border-radius:6px;padding:6px 8px;background:#eef3f8">📄 '+f.name+'</span>'; }
+    if(f.type&&f.type.indexOf('image')===0){ const u=URL.createObjectURL(f); html+='<span style="position:relative;display:inline-block;margin-top:6px"><img src="'+u+'" title="'+f.name+'" style="height:84px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)"><button onclick="removerFotoSel('+i+')" style="position:absolute;top:-8px;right:-8px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer">✕</button></span>'; }
+    else { html+='<span class="aviso" style="position:relative;display:inline-flex;align-items:center;border:1px solid #c8d0da;border-radius:6px;padding:6px 24px 6px 8px;background:#eef3f8;margin-top:6px">📄 '+f.name+'<button onclick="removerFotoSel('+i+')" style="position:absolute;top:-8px;right:-8px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer">✕</button></span>'; }
   }
   div.innerHTML=html;
+}
+function removerFotoSel(i){
+  fotosSel.splice(i,1);
+  const inp=document.getElementById('inpExames');
+  if(inp){ try{ const dt=new DataTransfer(); for(let k=0;k<fotosSel.length;k++) dt.items.add(fotosSel[k]); inp.files=dt.files; }catch(e){} }
+  renderPrevExames();
+}
+
+async function salvarTodosDitados(){
+  const lista = window.__ditadosCache || (await gravListar());
+  if(!lista || !lista.length){ log('Nenhum ditado guardado.', true); return; }
+  const files = lista.map(function(g){ const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a'; return new File([g.blob], nomeArquivoSeguro(g.nome||('ditado-'+g.id))+'.'+ext, {type:g.blob.type||'audio/mp4'}); });
+  if(suportaFS()){
+    const h=await fsGetHandle('audio');
+    if(h && (await fsPermissao(h))){
+      try{ for(let i=0;i<files.length;i++){ await fsEscrever(h, files[i].name, files[i]); } log('Salvos '+files.length+' ditado(s) na pasta de áudios.'); return; }
+      catch(e){ log('Falha ao salvar na pasta ('+e.message+'). Compartilhando...', true); }
+    }
+  }
+  try{ if(navigator.canShare && navigator.canShare({files:files})){ await navigator.share({files:files, title:'Ditados guardados'}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  for(let i=0;i<files.length;i++){ const u=URL.createObjectURL(files[i]); const an=document.createElement('a'); an.href=u; an.download=files[i].name; document.body.appendChild(an); an.click(); setTimeout(function(){URL.revokeObjectURL(u);an.remove();},2500); }
+  log('Baixados '+files.length+' ditado(s).');
 }
 
 async function processar(){
@@ -1011,7 +1035,7 @@ async function gravarAcumulado(){
 async function renderAcum(){
   const div=document.getElementById('listaAcum'); if(!div) return;
   let lista=[];
-  try{ lista=await gravListar(); }catch(e){ div.innerHTML='<span class="aviso">não foi possível ler as gravações guardadas</span>'; return; }
+  try{ lista=await gravListar(); window.__ditadosCache=lista; }catch(e){ div.innerHTML='<span class="aviso">não foi possível ler as gravações guardadas</span>'; return; }
   if(!lista.length){ div.innerHTML='<span class="aviso">Nenhum ditado guardado neste aparelho.</span>'; return; }
   div.innerHTML = '<div class="aviso" style="font-weight:600;margin-bottom:4px">📼 '+lista.length+' gravação'+(lista.length===1?'':'ões')+' guardada'+(lista.length===1?'':'s')+' neste aparelho</div>' + lista.map(function(g){
     const dt=new Date(g.quando);
@@ -1019,7 +1043,7 @@ async function renderAcum(){
     const u=URL.createObjectURL(g.blob);
     const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a';
     return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;white-space:nowrap">🎙 '+(g.nome||rot)+'</span>'+playerLinha(u)+'<button class="btn peq sec" onclick="salvarDitado('+g.id+')">💾 Salvar</button><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">✕</button></div>';
-  }).join('') + '<div style="margin-top:8px"><button class="btn peq sec" style="color:#b3261e" onclick="limparAcum()">Apagar todos os ditados guardados</button></div>';
+  }).join('') + '<div style="margin-top:8px"><button class="btn peq sec" onclick="salvarTodosDitados()">💾 Salvar todos os ditados guardados</button> <button class="btn peq sec" style="color:#b3261e" onclick="limparAcum()">Apagar todos os ditados guardados</button></div>';
 }
 async function apagarAcum(id){ if(!confirm('Apagar este ditado guardado?')) return; await gravApagar(id); renderAcum(); }
 async function limparAcum(){ if(!confirm('Apagar TODOS os ditados guardados neste aparelho?')) return; const l=await gravListar(); for(const g of l) await gravApagar(g.id); renderAcum(); }
@@ -1229,7 +1253,7 @@ function fecharRevisao(){
 }
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{
-  if(!cfg.chave) alternarConfig(); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', renderPrevExames); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
+  if(!cfg.chave) alternarConfig(); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
   renderAcum();
 });
 </script>

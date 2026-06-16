@@ -87,6 +87,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <label>Assinatura (foto — fica guardada só neste aparelho)</label>
   <input type="file" id="cfgAss" accept="image/*">
   <div id="assPrev" style="margin-top:6px"></div>
+  <div id="cfgPastas" style="margin-top:10px;display:none"><label>Pastas no computador (Chrome/Edge)</label><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" onclick="definirPasta('audio')">📁 Pasta de áudios</button><button class="btn sec" onclick="definirPasta('laudo')">📁 Pasta de laudos</button></div><span class="aviso">No iPad, o botão Salvar abre a folha de compartilhamento do iOS.</span></div>
   <div style="margin-top:12px"><button class="btn" onclick="salvarConfig()">Salvar</button></div>
   <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API da OpenAI para análise.</p>
 </div>
@@ -140,6 +141,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
     <div class="barraRev">
       <button class="btn sec" onclick="fecharRevisao()">← Voltar</button>
       <button class="btn" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+      <button class="btn" onclick="salvarLaudoPasta()">💾 Salvar na pasta</button>
       <span class="aviso" style="align-self:center">Toque no texto para editar. No iPad: Imprimir → pinçar a pré-visualização → Compartilhar → Salvar em Arquivos (PDF).</span>
     </div>
     <div id="obsBanner" style="display:none;background:#fdf3e3;border-left:5px solid #d99a26;border-radius:8px;padding:12px 14px;margin:0 auto 14px;max-width:760px;font-size:14px;font-weight:600;"></div>
@@ -699,7 +701,7 @@ function renderExames(){
       +'<b style="font-size:13px">Fotos ('+ex.imagens.length+') — toque para ampliar:</b><div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0">'
       + ex.imagens.map(function(im,i){return '<span style="position:relative;display:inline-block;margin-top:6px"><img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)"><button onclick="removerFotoExame('+ex.id+','+i+')" style="position:absolute;top:-8px;right:-8px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer">✕</button></span>';}).join('')
       +'</div><b style="font-size:13px">Gravações ('+audiosDoExame.length+'):</b>'
-      + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?playerLinha(a.url):'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
+      + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" onclick="salvarAudioIdx('+a.idx+')">💾</button><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?playerLinha(a.url):'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
       +'<div class="aviso" style="margin-top:6px">Adicione fotos ou grave instruções a qualquer momento, mesmo com o laudo pronto. Ao tocar "Refazer laudo", a IA aplica as alterações ditadas sobre o laudo existente.</div>'
       +'</div>';
@@ -779,6 +781,29 @@ function plDraw(id){
 }
 function plSeek(id,e){ const au=document.getElementById('a'+id), cv=document.getElementById('c'+id); if(!au||!cv) return; const dur=(au.duration&&isFinite(au.duration))?au.duration:0; if(!dur) return; const r=cv.getBoundingClientRect(); const frac=Math.min(1,Math.max(0,(e.clientX-r.left-7)/(r.width-14))); au.currentTime=frac*dur; plDraw(id); }
 
+/* ============ Salvar em pasta (computador: File System Access; iPad: compartilhar) ============ */
+function suportaFS(){ return typeof window.showDirectoryPicker==='function'; }
+function fsDbOpen(){ return new Promise(function(res,rej){ const r=indexedDB.open('laudosFS',1); r.onupgradeneeded=function(){ r.result.createObjectStore('handles'); }; r.onsuccess=function(){res(r.result);}; r.onerror=function(){rej(r.error);}; }); }
+async function fsGetHandle(key){ try{ const db=await fsDbOpen(); return await new Promise(function(res){ const rq=db.transaction('handles').objectStore('handles').get(key); rq.onsuccess=function(){res(rq.result||null);}; rq.onerror=function(){res(null);}; }); }catch(e){ return null; } }
+async function fsSetHandle(key,h){ try{ const db=await fsDbOpen(); await new Promise(function(res,rej){ const tx=db.transaction('handles','readwrite'); tx.objectStore('handles').put(h,key); tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }catch(e){} }
+async function fsPermissao(h){ if(!h||!h.queryPermission) return true; try{ if((await h.queryPermission({mode:'readwrite'}))==='granted') return true; return (await h.requestPermission({mode:'readwrite'}))==='granted'; }catch(e){ return false; } }
+async function definirPasta(tipo){ if(!suportaFS()){ log('No iPad o salvar usa a folha de compartilhamento do iOS (botão Salvar).', true); return; } let h; try{ h=await window.showDirectoryPicker(); }catch(e){ return; } await fsSetHandle(tipo,h); log('Pasta de '+(tipo==='audio'?'áudios':'laudos')+' definida neste computador.'); }
+async function fsEscrever(h, filename, blob){ const fh=await h.getFileHandle(filename,{create:true}); const w=await fh.createWritable(); await w.write(blob); await w.close(); }
+async function compartilharOuBaixar(filename, blob, mime){
+  try{ const file=new File([blob], filename, {type:mime||blob.type||'application/octet-stream'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:filename}); return true; } }catch(e){ if(e&&e.name==='AbortError') return false; }
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(url); a.remove();},3000); return true;
+}
+async function salvarAlvo(tipo, filename, blob, mime){
+  if(suportaFS()){ const h=await fsGetHandle(tipo); if(h && (await fsPermissao(h))){ try{ await fsEscrever(h, filename, blob); log('Salvo na pasta: '+filename); return true; }catch(e){ log('Falha ao salvar na pasta ('+e.message+'). Baixando...', true); } } }
+  return await compartilharOuBaixar(filename, blob, mime);
+}
+async function salvarAudioAuto(blob, nomeBase, ext){ if(!suportaFS()) return; try{ const h=await fsGetHandle('audio'); if(h && (await fsPermissao(h))){ await fsEscrever(h, nomeArquivoSeguro(nomeBase||'audio')+'.'+(ext||'m4a'), blob); log('Áudio salvo na pasta: '+(nomeBase||'')); } }catch(e){} }
+async function salvarAudioIdx(idx){ const a=audios.find(function(x){return x.idx===idx;}); if(!a||!a.url){ log('Áudio indisponível.', true); return; } try{ const blob=await fetch(a.url).then(function(r){return r.blob();}); const ext=(blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro(a.nome||'audio')+'.'+ext, blob, blob.type); }catch(e){ log('Falha ao salvar áudio: '+e.message, true); } }
+async function salvarLokoIdx(i){ try{ const blob=lokoAudios[i]; if(!blob) return; const ext=(blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro('Gravacao in loco '+(i+1))+'.'+ext, blob, blob.type); }catch(e){ log('Falha ao salvar áudio: '+e.message, true); } }
+async function salvarDitado(id){ try{ const l=await gravListar(); const g=l.find(function(x){return x.id===id;}); if(!g) return; const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro(g.nome||('ditado-'+id))+'.'+ext, g.blob, g.blob.type); }catch(e){ log('Falha ao salvar ditado: '+e.message, true); } }
+function laudoCssText(){ let css=''; try{ const sh=document.styleSheets; for(let i=0;i<sh.length;i++){ let rules; try{ rules=sh[i].cssRules; }catch(e){ continue; } for(let j=0;j<rules.length;j++){ const r=rules[j]; if(r.selectorText && /laudo|assin|linha|rodape/i.test(r.selectorText)) css+=r.cssText+'\n'; } } }catch(e){} return css; }
+function salvarLaudoPasta(){ const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return; } const pac=(window.__revAtual&&window.__revAtual.paciente)?window.__revAtual.paciente:'laudo'; const fn=nomeArquivoSeguro('Laudo - '+pac)+'.html'; const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+'</style></head><body>'+area.innerHTML+'</body></html>'; salvarAlvo('laudo', fn, new Blob([html],{type:'text/html'}), 'text/html'); }
+
 async function gravarParaExame(id){
   const btn=document.getElementById('btnRegrav'+id);
   if(mediaRecE && mediaRecE.state==='recording'){ if(recExAlvo===id) mediaRecE.stop(); return; }
@@ -800,7 +825,7 @@ async function gravarParaExame(id){
       const r = await transcreverAudio(blob);
       const novoIdx = audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
       const a = {idx:novoIdx, nome:nomeAudio(r.nome_paciente,r.tipo_exame), url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
-      audios.push(a);
+      audios.push(a); try{ salvarAudioAuto(blob, a.nome, (blob.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){}
       const ex=exames.find(function(x){return x.id===id;});
       if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
       log('Nova gravação pronta — toque "Gerar laudo" para refazer o laudo.');
@@ -936,7 +961,7 @@ async function gravarAcumulado(){
     let metaG={};
     try{ const rr=await transcreverAudio(blob); metaG={transcricao:rr.transcricao||'', nome_paciente:rr.nome_paciente||'', tipo_exame:rr.tipo_exame||'', nome:nomeAudio(rr.nome_paciente, rr.tipo_exame)}; log('Ditado guardado: '+(metaG.nome||'(sem nome)')); }
     catch(e){ log('Não consegui transcrever o ditado agora (será transcrito no Processar): '+e.message, true); }
-    try{ await gravSalvar(blob, metaG); }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
+    try{ await gravSalvar(blob, metaG); try{ salvarAudioAuto(blob, metaG.nome||'ditado', (blob.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){} }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
     renderAcum();
   };
   mediaRecA.start(); recSegA=0;
@@ -954,7 +979,7 @@ async function renderAcum(){
     const rot=dt.toLocaleDateString('pt-BR').slice(0,5)+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const u=URL.createObjectURL(g.blob);
     const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a';
-    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;white-space:nowrap">🎙 '+(g.nome||rot)+'</span>'+playerLinha(u)+'<a class="btn peq sec" style="text-decoration:none" download="'+nomeArquivoSeguro(g.nome||('ditado-'+g.id))+'.'+ext+'" href="'+u+'">💾</a><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">✕</button></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;white-space:nowrap">🎙 '+(g.nome||rot)+'</span>'+playerLinha(u)+'<button class="btn peq sec" onclick="salvarDitado('+g.id+')">💾 Salvar</button><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">✕</button></div>';
   }).join('') + '<div style="margin-top:8px"><button class="btn peq sec" style="color:#b3261e" onclick="limparAcum()">Apagar todos os ditados guardados</button></div>';
 }
 async function apagarAcum(id){ if(!confirm('Apagar este ditado guardado?')) return; await gravApagar(id); renderAcum(); }
@@ -1014,7 +1039,7 @@ function renderLoko(){
     return '<div style="position:relative;display:inline-block;margin-top:6px"><img src="'+d+'" style="height:70px;border-radius:6px;border:1px solid #c8d0da"><span style="position:absolute;top:-8px;right:-8px">'+x.replace('APAGAR','apagarLokoImg('+i+')')+'</span></div>';
   }).join('');
   html += lokoAudios.map(function(b,i){
-    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;width:100%"><span style="font-size:13px;font-weight:600">🎙 Gravação '+(i+1)+'</span>'+playerLinha(lokoUrls[i])+''+x.replace('APAGAR','apagarLokoAudio('+i+')')+'</div>';
+    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;width:100%"><span style="font-size:13px;font-weight:600">🎙 Gravação '+(i+1)+'</span>'+playerLinha(lokoUrls[i])+'<button class="btn peq sec" onclick="salvarLokoIdx('+i+')">💾</button>'+x.replace('APAGAR','apagarLokoAudio('+i+')')+'</div>';
   }).join('');
   document.getElementById('lokoThumbs').innerHTML = html;
   document.getElementById('lokoInfo').textContent = lokoImgs.length+' imagem(ns) · '+lokoAudios.length+' gravação(ões)'+((lokoImgs.length||lokoAudios.length)?' — toque ⚡ para gerar o laudo':'');
@@ -1165,7 +1190,7 @@ function fecharRevisao(){
 }
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{
-  if(!cfg.chave) alternarConfig();
+  if(!cfg.chave) alternarConfig(); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
   renderAcum();
 });
 </script>

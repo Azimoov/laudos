@@ -97,6 +97,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div class="filebox">
     <b>Fotos dos exames</b> (PDF ou foto — pode selecionar vários)
     <input type="file" id="inpExames" accept="application/pdf,image/*" multiple>
+    <div id="prevExames" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
   </div>
   <div class="filebox">
     <b>Áudios ditados</b> (m4a, mp3, wav — pode selecionar vários)
@@ -621,6 +622,17 @@ function renderPendentes(){
         +'<select onchange="vincularManual('+a.idx+', this.value)"><option value="">— escolher exame —</option>'+opts+'</select>'
         +'</div>'; }).join('')
     +'</div>';
+}
+
+function renderPrevExames(){
+  const inp=document.getElementById('inpExames'); const div=document.getElementById('prevExames'); if(!div) return;
+  if(!inp||!inp.files||!inp.files.length){ div.innerHTML=''; return; }
+  const fs=inp.files; let html='<div class="aviso" style="width:100%;font-weight:600">📷 '+fs.length+' arquivo(s) selecionado(s) — toque numa imagem para ampliar:</div>';
+  for(let i=0;i<fs.length;i++){ const f=fs[i];
+    if(f.type&&f.type.indexOf('image')===0){ const u=URL.createObjectURL(f); html+='<img src="'+u+'" title="'+f.name+'" style="height:84px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)">'; }
+    else { html+='<span class="aviso" style="display:inline-flex;align-items:center;border:1px solid #c8d0da;border-radius:6px;padding:6px 8px;background:#eef3f8">📄 '+f.name+'</span>'; }
+  }
+  div.innerHTML=html;
 }
 
 async function processar(){
@@ -1217,7 +1229,7 @@ function fecharRevisao(){
 }
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{
-  if(!cfg.chave) alternarConfig(); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
+  if(!cfg.chave) alternarConfig(); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', renderPrevExames); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
   renderAcum();
 });
 </script>

@@ -802,7 +802,34 @@ async function salvarAudioIdx(idx){ const a=audios.find(function(x){return x.idx
 async function salvarLokoIdx(i){ try{ const blob=lokoAudios[i]; if(!blob) return; const ext=(blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro('Gravacao in loco '+(i+1))+'.'+ext, blob, blob.type); }catch(e){ log('Falha ao salvar áudio: '+e.message, true); } }
 async function salvarDitado(id){ try{ const l=await gravListar(); const g=l.find(function(x){return x.id===id;}); if(!g) return; const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro(g.nome||('ditado-'+id))+'.'+ext, g.blob, g.blob.type); }catch(e){ log('Falha ao salvar ditado: '+e.message, true); } }
 function laudoCssText(){ let css=''; try{ const sh=document.styleSheets; for(let i=0;i<sh.length;i++){ let rules; try{ rules=sh[i].cssRules; }catch(e){ continue; } for(let j=0;j<rules.length;j++){ const r=rules[j]; if(r.selectorText && /laudo|assin|linha|rodape/i.test(r.selectorText)) css+=r.cssText+'\n'; } } }catch(e){} return css; }
-function salvarLaudoPasta(){ const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return; } const pac=(window.__revAtual&&window.__revAtual.paciente)?window.__revAtual.paciente:'laudo'; const fn=nomeArquivoSeguro('Laudo - '+pac)+'.html'; const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+'</style></head><body>'+area.innerHTML+'</body></html>'; salvarAlvo('laudo', fn, new Blob([html],{type:'text/html'}), 'text/html'); }
+function dataURLtoBlob(d){ const p=d.split(','); const mime=(p[0].match(/:(.*?);/)||[])[1]||'image/jpeg'; const bin=atob(p[1]); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:mime}); }
+async function salvarLaudoPasta(){
+  const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return; }
+  const pac=(window.__revAtual&&window.__revAtual.paciente)?window.__revAtual.paciente:'laudo';
+  const base=nomeArquivoSeguro(pac);
+  const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+'</style></head><body>'+area.innerHTML+'</body></html>';
+  const laudoBlob=new Blob([html],{type:'text/html'});
+  const ex=(window.__revAtual&&window.__revAtual.exId!=null)?exames.find(function(e){return e.id===window.__revAtual.exId;}):null;
+  const imgs=(ex&&ex.imagens)?ex.imagens:[];
+  const imgBlobs=imgs.map(function(d){ try{ return dataURLtoBlob(d); }catch(e){ return null; } }).filter(function(b){return b;});
+  if(suportaFS()){
+    const h=await fsGetHandle('laudo');
+    if(h && (await fsPermissao(h))){
+      try{
+        const sub=await h.getDirectoryHandle(base,{create:true});
+        await fsEscrever(sub, 'Laudo - '+base+'.html', laudoBlob);
+        for(let i=0;i<imgBlobs.length;i++){ await fsEscrever(sub, 'foto-'+(i+1)+'.jpg', imgBlobs[i]); }
+        log('Salvo na pasta "'+base+'": laudo + '+imgBlobs.length+' foto(s).');
+        return;
+      }catch(e){ log('Falha ao salvar na pasta ('+e.message+'). Compartilhando...', true); }
+    }
+  }
+  const files=[new File([laudoBlob], 'Laudo - '+base+'.html', {type:'text/html'})];
+  for(let i=0;i<imgBlobs.length;i++){ files.push(new File([imgBlobs[i]], base+' - foto '+(i+1)+'.jpg', {type:imgBlobs[i].type||'image/jpeg'})); }
+  try{ if(navigator.canShare && navigator.canShare({files:files})){ await navigator.share({files:files, title:pac}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  for(let i=0;i<files.length;i++){ const u=URL.createObjectURL(files[i]); const an=document.createElement('a'); an.href=u; an.download=files[i].name; document.body.appendChild(an); an.click(); setTimeout(function(){URL.revokeObjectURL(u);an.remove();},2500); }
+  log('Baixados: laudo + '+imgBlobs.length+' foto(s).');
+}
 
 async function gravarParaExame(id){
   const btn=document.getElementById('btnRegrav'+id);
@@ -1162,7 +1189,7 @@ function abrirRevisao(exId){
   const ex = exames.find(e=>e.id===exId);
   const L = ex.laudo; const c = L.cab;
   if(!ex.histKey) ex.histKey='L'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-  window.__revAtual = {id:ex.histKey, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||''};
+  window.__revAtual = {id:ex.histKey, exId:ex.id, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||''};
   document.getElementById('areaImpressao').innerHTML =
   '<div class="laudoFolha">'
   +'<div class="laudoCab"><div contenteditable="true"><b>Nome do Paciente:</b> '+(c.nome||'')+'<br><b>Idade:</b> '+(c.idade||'')+'<br><b>Médico(a) Solicitante:</b> '+(c.solicitante||'')+'<br><b>Realizado em:</b> '+(c.realizado_em||'')+'<br><b>Convênio:</b> '+(c.convenio||'')+'</div>'

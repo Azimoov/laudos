@@ -552,6 +552,8 @@ const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edit
   ombro:['ombro'], cotovelo:['cotovelo'], punho:['punho'], mao:['mao','quirodactilo'],
   joelho:['joelho'], tornozelo:['tornozelo'], pe:['pe','pododactilo']
 };
+function limparPaciente(folder){ if(!folder) return ''; var nome=String(folder).split(/\d{8}/)[0]; nome=nome.replace(/[_\-\s]+$/,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim(); nome=nome.toLowerCase().replace(/(^|\s)([a-zà-ú])/g,function(m,a,b){return a+b.toUpperCase();}); return nome; }
+function limparExame(sub){ if(!sub) return ''; return String(sub).split(/\d{8}/)[0].replace(/[_\-\s]+$/,'').replace(/[_]+/g,' ').trim(); }
 function mapTipo(texto){
   const t=norm(texto); if(!t) return '';
   for(const chave in SINONIMOS_TIPO){ if(SINONIMOS_TIPO[chave].some(function(s){return t.indexOf(norm(s))>=0;})) return chave; }
@@ -617,7 +619,7 @@ function vincularManual(idx, exId){
 function renderPendentes(){
   const pend=audios.filter(function(a){return a.exameId==null;});
   if(!pend.length) return '';
-  const opts=exames.map(function(e){ return '<option value="'+e.id+'">'+(e.paciente||'(sem nome)')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+'</option>'; }).join('');
+  const opts=exames.map(function(e){ return '<option value="'+e.id+'">'+(e.paciente||'(sem nome)')+(e.subExame?' - '+e.subExame:'')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+'</option>'; }).join('');
   return '<div class="card" style="border:2px solid #d99a26;background:#fdf6e9">'
     +'<h2 style="color:#9a6b14">⚠️ '+pend.length+' áudio(s) sem vínculo seguro — revise</h2>'
     +'<p class="aviso">Por segurança, só vinculei automaticamente os áudios de alta certeza. Escolha o exame de cada áudio abaixo (ou deixe em branco para ignorar).</p>'
@@ -668,7 +670,7 @@ function renderPastaInfo(){
   const inp=document.getElementById('inpPasta'); const span=document.getElementById('pastaInfo'); if(!span) return;
   if(!inp||!inp.files||!inp.files.length){ span.textContent=''; return; }
   const fs=inp.files; const pastas={}; let nimg=0;
-  for(let i=0;i<fs.length;i++){ const tp=fs[i].type||''; if(tp.indexOf('image')!==0 && tp.indexOf('pdf')<0) continue; nimg++; const rel=fs[i].webkitRelativePath||''; const pp=rel.split('/'); const folder=pp.length>=2?pp[pp.length-2]:'(raiz)'; pastas[folder]=(pastas[folder]||0)+1; }
+  for(let i=0;i<fs.length;i++){ const tp=fs[i].type||''; if(tp.indexOf('image')!==0 && tp.indexOf('pdf')<0) continue; nimg++; const rel=fs[i].webkitRelativePath||''; const pp=rel.split('/'); const folder=pp.length>=3?limparPaciente(pp[pp.length-3]):(pp.length>=2?limparPaciente(pp[pp.length-2]):'(raiz)'); pastas[folder]=(pastas[folder]||0)+1; }
   const nomes=Object.keys(pastas);
   span.textContent=nimg+' arquivo(s) em '+nomes.length+' paciente(s): '+nomes.slice(0,8).join(', ')+(nomes.length>8?'…':'')+'. Toque em Processar.';
 }
@@ -696,16 +698,16 @@ async function processar(){
     const folderMap={}; const folderOrder=[];
     for(let i=0;i<fPasta.length;i++){
       const ff=fPasta[i]; const tp=ff.type||''; if(tp.indexOf('image')!==0 && tp.indexOf('pdf')<0) continue;
-      const rel=ff.webkitRelativePath||''; const pp=rel.split('/'); const folder=pp.length>=2?pp[pp.length-2]:ff.name;
+      const rel=ff.webkitRelativePath||''; const pp=rel.split('/'); const folder=(pp.slice(0,-1).join('/'))||ff.name; const __pac=pp.length>=3?pp[pp.length-3]:(pp.length>=2?pp[pp.length-2]:ff.name); const __sub=pp.length>=2?pp[pp.length-2]:'';
       log('Lendo '+folder+'/'+ff.name+' ...');
       const imgs = await arquivoParaImagens(ff);
-      if(!folderMap[folder]){ folderMap[folder]={imagens:[], tipo:''}; folderOrder.push(folder);
+      if(!folderMap[folder]){ folderMap[folder]={imagens:[], tipo:'', paciente:limparPaciente(__pac), subExame:limparExame(__sub)}; folderOrder.push(folder);
         try{ const m=await extrairMetaImagem(imgs[0]); if(m && m.tipoExame) folderMap[folder].tipo=mapTipo(m.tipoExame); }catch(e){}
       }
       folderMap[folder].imagens = folderMap[folder].imagens.concat(imgs);
     }
     exames = agruparItens(flatItens);
-    for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:fo, imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:1}); }
+    for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:(g.paciente||fo), subExame:(g.subExame||''), imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:1}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s) em '+exames.length+' exame(s).');
     // 2. transcrever áudios
@@ -770,7 +772,7 @@ function renderExames(){
       +'<div class="aviso" style="margin-top:6px">Adicione fotos ou grave instruções a qualquer momento, mesmo com o laudo pronto. Ao tocar "Refazer laudo", a IA aplica as alterações ditadas sobre o laudo existente.</div>'
       +'</div>';
     html += '<div class="exame">'
-      +'<div class="nome">'+ex.paciente+' <span class="tag">'+ex.imagens.length+' pág.</span>'
+      +'<div class="nome">'+ex.paciente+(ex.subExame?' - '+ex.subExame:'')+' <span class="tag">'+ex.imagens.length+' pág.</span>'
       +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')+'</div>'
       +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
       +(audios.length?'<div style="margin-top:8px"><button class="btn peq sec" onclick="alternarAudios('+ex.id+')">🔗 Áudios deste paciente ('+audiosDoExame.length+' marcado'+(audiosDoExame.length===1?'':'s')+') ▾</button><div id="auds'+ex.id+'" style="display:'+(audsAbertos[ex.id]?'block':'none')+';margin-top:6px;background:#f4f7fa;border-radius:10px;padding:8px">'+listaAudios+'</div></div>':'')

@@ -531,7 +531,7 @@ function casa(nomeAudio, nomeArquivo){
 
 /* ============ Fluxo principal ============ */
 /* ============ Agrupamento por imagem (visão) + vínculo de áudios ============ */
-const LIMIAR_VINCULO = 0.8;   // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual
+const LIMIAR_VINCULO = 0.7;   // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual
 const MERGE_LEV = 2;          // tolerância (edições) p/ fundir nomes quase iguais no agrupamento
 const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edite à vontade)
   abdominal:['abdome total','abdomen total','abd total','abdominal total','abdominal','abdome'],
@@ -596,15 +596,38 @@ function simPaciente(an,bn){ if(!an||!bn) return 0; if(an===bn) return 1;
   for(const t of at){ if(bt.some(function(u){return u===t||levenshtein(u,t)<=1;})) hit++; }
   return hit/Math.max(at.length,bt.length);
 }
+function tokensNome(s){ return norm(s).split(' ').filter(function(x){ return x.length>2 && !/^[0-9]+$/.test(x); }); }
+function nomeArquivoLimpo(nm){ return String(nm||'').replace(/\.[a-z0-9]{1,5}$/i,'').replace(/\d{8}[\d\-]*/g,' '); }
+function simNome(alvoToks, candStr){
+  var bt = tokensNome(candStr);
+  if(!alvoToks.length || !bt.length) return 0;
+  var hit = 0;
+  for(var i=0;i<alvoToks.length;i++){ var f=alvoToks[i];
+    if(bt.some(function(u){ return u===f || u.indexOf(f)===0 || f.indexOf(u)===0 || levenshtein(u,f)<=1; })) hit++;
+  }
+  return hit/alvoToks.length;   // contido no nome da pasta (truncado, menor)
+}
 function vincularAudios(){
   for(const a of audios){ a.exameId=null; a.score=0; a.pendente=true;
-    if(!a.nomePaciente) continue;
-    const pNorm=norm(a.nomePaciente); const tipoAudio=mapTipo(a.tipoExame);
-    const cands=exames.map(function(ex){ return {ex:ex, sp:simPaciente(pNorm, norm(ex.paciente))}; }).filter(function(c){return c.sp>0;});
+    var fontes=[a.nomePaciente, nomeArquivoLimpo(a.nome)].filter(function(x){ return x && tokensNome(x).length; });
+    if(!fontes.length) continue;
+    const tipoAudio=mapTipo(a.tipoExame);
+    const fonteToks=fontes.map(function(s){ return tokensNome(s); });
+    const cands=exames.map(function(ex){
+      var alvo=tokensNome(ex.paciente);
+      var sp=0; for(var i=0;i<fontes.length;i++){ var v=simNome(alvo, fontes[i]); if(v>sp) sp=v; }
+      var subTok=ex.subExame?tokensNome(ex.subExame):[];
+      var subHit=subTok.length>0 && fonteToks.some(function(ft){ return ft.some(function(u){ return subTok.some(function(st){ return u===st||u.indexOf(st)===0; }); }); });
+      return {ex:ex, sp:sp, subHit:subHit};
+    }).filter(function(c){return c.sp>0;});
     if(!cands.length) continue;
-    let best=null; for(const c of cands){ let s=c.sp; if(tipoAudio&&c.ex.tipo&&tipoAudio===c.ex.tipo) s+=0.25; if(!best||s>best.s) best={ex:c.ex,s:s,sp:c.sp}; }
-    const fortes=cands.filter(function(c){return c.sp>=0.9;});
-    const ambiguo = fortes.length>1 && !(tipoAudio&&best.ex.tipo===tipoAudio);
+    for(var i=0;i<cands.length;i++){ var c=cands[i]; c.s=c.sp;
+      if(tipoAudio && c.ex.tipo && tipoAudio===c.ex.tipo) c.s+=0.25;
+      if(c.subHit) c.s+=0.2;
+    }
+    cands.sort(function(x,y){ return y.s-x.s; });
+    const best=cands[0]; const second=cands[1];
+    const ambiguo = !!second && (best.s-second.s)<0.15;
     a.score=best.s;
     if(best.s>=LIMIAR_VINCULO && !ambiguo){ a.exameId=best.ex.id; a.pendente=false; best.ex.audios.push(a.idx); if(!best.ex.tipo&&tipoAudio) best.ex.tipo=tipoAudio; }
   }

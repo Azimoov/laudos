@@ -104,7 +104,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div class="filebox">
     <b>Ou grave os ditados aqui mesmo, ao longo do dia</b><br>
     <span class="aviso">Ficam guardados neste aparelho e entram automaticamente no Processar. Toque 💾 para salvar uma cópia no Arquivos/iCloud.</span>
-    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn" id="btnGravarAcum" onclick="gravarAcumulado()">🎙 Gravar ditado</button><canvas id="vuAcum" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn" id="btnGravarAcum" onclick="gravarAcumulado()">🎙 Gravar ditado</button><canvas id="vuAcum" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>
     <div id="listaAcum" style="margin-top:8px;text-align:left"></div>
   </div>
   <div style="margin-top:14px">
@@ -117,7 +117,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <h2>Exame na hora (in loco)</h2>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button class="btn" onclick="abrirCamera('loko')">📷 Capturar imagem</button>
-    <button class="btn" id="btnGravar" onclick="alternarGravacao()">🎙 Gravar áudio</button><canvas id="vuLoko" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px;align-self:center"></canvas>
+    <button class="btn sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn" id="btnGravar" onclick="alternarGravacao()">🎙 Gravar áudio</button><canvas id="vuLoko" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px;align-self:center"></canvas>
     <button class="btn" id="btnLoko" onclick="gerarInLoco()">⚡ Gerar laudo agora</button>
   </div>
   <input type="file" id="inpCamera" accept="image/*" capture="environment" style="display:none">
@@ -663,7 +663,7 @@ async function processar(){
       const rotulo = 'Ditado '+dtg.toLocaleDateString('pt-BR').slice(0,5)+' '+dtg.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
       log('Transcrevendo '+rotulo+' ...');
       try{
-        const resp = await transcreverAudio(g.blob);
+        const resp = (g.transcricao!==undefined) ? {transcricao:g.transcricao, nome_paciente:g.nome_paciente||'', tipo_exame:g.tipo_exame||''} : await transcreverAudio(g.blob);
         audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', exameId:null});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
@@ -699,8 +699,8 @@ function renderExames(){
       +'<b style="font-size:13px">Fotos ('+ex.imagens.length+') — toque para ampliar:</b><div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0">'
       + ex.imagens.map(function(im,i){return '<span style="position:relative;display:inline-block;margin-top:6px"><img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)"><button onclick="removerFotoExame('+ex.id+','+i+')" style="position:absolute;top:-8px;right:-8px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer">✕</button></span>';}).join('')
       +'</div><b style="font-size:13px">Gravações ('+audiosDoExame.length+'):</b>'
-      + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?'<audio controls src="'+a.url+'" style="width:100%;height:34px"></audio>':'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
+      + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?playerLinha(a.url):'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
       +'<div class="aviso" style="margin-top:6px">Adicione fotos ou grave instruções a qualquer momento, mesmo com o laudo pronto. Ao tocar "Refazer laudo", a IA aplica as alterações ditadas sobre o laudo existente.</div>'
       +'</div>';
     html += '<div class="exame">'
@@ -746,6 +746,39 @@ function removerAudioExame(aIdx){
   if(exId!==null){ const d=document.getElementById('det'+exId); if(d) d.style.display='block'; }
 }
 let mediaRecE=null, recChunksE=[], recStreamE=null, recTimerE=null, recSegE=0, recExAlvo=null;
+/* ============ Pausar gravação + player com bolinha + nome do arquivo ============ */
+function recAtivo(){ const r=[ (typeof mediaRec!=='undefined'?mediaRec:null), (typeof mediaRecE!=='undefined'?mediaRecE:null), (typeof mediaRecA!=='undefined'?mediaRecA:null) ]; for(const m of r){ if(m && (m.state==='recording'||m.state==='paused')) return m; } return null; }
+function pausarRec(){ const m=recAtivo(); if(!m) return; if(m.state==='recording') m.pause(); else if(m.state==='paused') m.resume(); atualizarPausa(); }
+function atualizarPausa(){ const m=recAtivo(); const els=document.querySelectorAll('.btnPausa'); for(let i=0;i<els.length;i++){ els[i].style.display = m?'inline-block':'none'; els[i].textContent = (m&&m.state==='paused')?'▶ Retomar':'⏸ Pausar'; } }
+setInterval(atualizarPausa, 400);
+function primeiroUltimo(nome){ const p=(nome||'').trim().split(' ').filter(function(x){return x;}); if(!p.length) return ''; if(p.length===1) return p[0]; return p[0]+' '+p[p.length-1]; }
+function nomeAudio(nomePac, tipoTexto){ const pn=primeiroUltimo(nomePac); const k=mapTipo(tipoTexto); const tn=(k&&MODELOS[k])?MODELOS[k].nome:(tipoTexto||''); return ((pn||'Sem nome')+(tn?' - '+tn:'')).trim(); }
+function nomeArquivoSeguro(s){ return ((s||'audio').replace(/[^A-Za-z0-9 ÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇÑáàâãéèêíïóôõöúüçñ_-]/g,' ').replace(/  +/g,' ').trim())||'audio'; }
+function playerLinha(url){
+  const id='pl'+(window.__plN=(window.__plN||0)+1);
+  return '<span class="plw" style="display:inline-flex;align-items:center;gap:6px;flex:1;min-width:150px">'
+    +'<button type="button" class="btn peq sec" id="b'+id+'" onclick="plToggle(\''+id+'\')" style="padding:4px 10px">▶</button>'
+    +'<canvas id="c'+id+'" height="28" onclick="plSeek(\''+id+'\',event)" style="flex:1;min-width:70px;height:28px;background:#dde6ef;border-radius:6px;cursor:pointer"></canvas>'
+    +'<span id="t'+id+'" class="aviso" style="min-width:34px">0:00</span>'
+    +'<audio id="a'+id+'" src="'+url+'" preload="metadata" onloadedmetadata="plDraw(\''+id+'\')" ontimeupdate="plDraw(\''+id+'\')" onplay="plState(\''+id+'\',1)" onpause="plState(\''+id+'\',0)" onended="plState(\''+id+'\',0)"></audio>'
+    +'</span>';
+}
+function plState(id, playing){ const b=document.getElementById('b'+id); if(b) b.textContent = playing?'⏸':'▶'; }
+function plToggle(id){ const au=document.getElementById('a'+id); if(!au) return; if(au.paused){ const all=document.querySelectorAll('audio'); for(let i=0;i<all.length;i++){ if(all[i]!==au) all[i].pause(); } au.play().catch(function(){}); } else au.pause(); }
+function plFmt(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
+function plDraw(id){
+  const au=document.getElementById('a'+id), cv=document.getElementById('c'+id), tl=document.getElementById('t'+id); if(!au||!cv) return;
+  const w=cv.clientWidth||200, h=28; if(cv.width!==w) cv.width=w; if(cv.height!==h) cv.height=h;
+  const ctx=cv.getContext('2d'); ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#9bb0c6'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(7,h/2); ctx.lineTo(w-7,h/2); ctx.stroke();
+  const dur=(au.duration&&isFinite(au.duration))?au.duration:0;
+  const frac=dur?Math.min(1,au.currentTime/dur):0; const x=7+(w-14)*frac;
+  ctx.strokeStyle='#1e5b8a'; ctx.beginPath(); ctx.moveTo(7,h/2); ctx.lineTo(x,h/2); ctx.stroke();
+  ctx.fillStyle='#1e5b8a'; ctx.beginPath(); ctx.arc(x,h/2,6,0,2*Math.PI); ctx.fill();
+  if(tl) tl.textContent=plFmt(au.currentTime)+(dur?(' / '+plFmt(dur)):'');
+}
+function plSeek(id,e){ const au=document.getElementById('a'+id), cv=document.getElementById('c'+id); if(!au||!cv) return; const dur=(au.duration&&isFinite(au.duration))?au.duration:0; if(!dur) return; const r=cv.getBoundingClientRect(); const frac=Math.min(1,Math.max(0,(e.clientX-r.left-7)/(r.width-14))); au.currentTime=frac*dur; plDraw(id); }
+
 async function gravarParaExame(id){
   const btn=document.getElementById('btnRegrav'+id);
   if(mediaRecE && mediaRecE.state==='recording'){ if(recExAlvo===id) mediaRecE.stop(); return; }
@@ -766,7 +799,7 @@ async function gravarParaExame(id){
     try{
       const r = await transcreverAudio(blob);
       const novoIdx = audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-      const a = {idx:novoIdx, nome:'Regravação', url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
+      const a = {idx:novoIdx, nome:nomeAudio(r.nome_paciente,r.tipo_exame), url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
       audios.push(a);
       const ex=exames.find(function(x){return x.id===id;});
       if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
@@ -778,7 +811,7 @@ async function gravarParaExame(id){
   mediaRecE.start(); recSegE=0;
   vuIniciar(recStreamE, 'vuEx'+id);
   if(btn){ btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e'; }
-  recTimerE=setInterval(function(){ recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
+  recTimerE=setInterval(function(){ if(mediaRecE&&mediaRecE.state==='paused')return; recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
 }
 const audsAbertos = {};
 function alternarAudios(id){
@@ -880,7 +913,7 @@ function vuParar(canvasId){
 
 /* ============ Ditados acumulados (guardados no aparelho) ============ */
 function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',1);r.onupgradeneeded=function(){r.result.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
-async function gravSalvar(blob){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').add({blob:blob,quando:Date.now()});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
+async function gravSalvar(blob, meta){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').add(Object.assign({blob:blob,quando:Date.now()}, meta||{}));tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
 async function gravListar(){const db=await dbOpen();return new Promise(function(res,rej){const rq=db.transaction('gravacoes').objectStore('gravacoes').getAll();rq.onsuccess=function(){res(rq.result||[]);};rq.onerror=function(){rej(rq.error);};});}
 async function gravApagar(id){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').delete(id);tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
 let mediaRecA=null, recChunksA=[], recStreamA=null, recTimerA=null, recSegA=0;
@@ -900,13 +933,16 @@ async function gravarAcumulado(){
     vuParar('vuAcum');
     clearInterval(recTimerA);
     btn.textContent='🎙 Gravar ditado'; btn.style.background='';
-    try{ await gravSalvar(blob); }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
+    let metaG={};
+    try{ const rr=await transcreverAudio(blob); metaG={transcricao:rr.transcricao||'', nome_paciente:rr.nome_paciente||'', tipo_exame:rr.tipo_exame||'', nome:nomeAudio(rr.nome_paciente, rr.tipo_exame)}; log('Ditado guardado: '+(metaG.nome||'(sem nome)')); }
+    catch(e){ log('Não consegui transcrever o ditado agora (será transcrito no Processar): '+e.message, true); }
+    try{ await gravSalvar(blob, metaG); }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
     renderAcum();
   };
   mediaRecA.start(); recSegA=0;
   vuIniciar(recStreamA, 'vuAcum');
   btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
-  recTimerA=setInterval(function(){recSegA++;btn.textContent='⏹ Parar ('+recSegA+'s)';},1000);
+  recTimerA=setInterval(function(){if(mediaRecA&&mediaRecA.state==='paused')return;recSegA++;btn.textContent='⏹ Parar ('+recSegA+'s)';},1000);
 }
 async function renderAcum(){
   const div=document.getElementById('listaAcum'); if(!div) return;
@@ -918,7 +954,7 @@ async function renderAcum(){
     const rot=dt.toLocaleDateString('pt-BR').slice(0,5)+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const u=URL.createObjectURL(g.blob);
     const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a';
-    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;white-space:nowrap">🎙 '+rot+'</span><audio controls src="'+u+'" style="height:34px;flex:1;min-width:140px"></audio><a class="btn peq sec" style="text-decoration:none" download="ditado-'+g.id+'.'+ext+'" href="'+u+'">💾</a><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">✕</button></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;white-space:nowrap">🎙 '+(g.nome||rot)+'</span>'+playerLinha(u)+'<a class="btn peq sec" style="text-decoration:none" download="'+nomeArquivoSeguro(g.nome||('ditado-'+g.id))+'.'+ext+'" href="'+u+'">💾</a><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">✕</button></div>';
   }).join('') + '<div style="margin-top:8px"><button class="btn peq sec" style="color:#b3261e" onclick="limparAcum()">Apagar todos os ditados guardados</button></div>';
 }
 async function apagarAcum(id){ if(!confirm('Apagar este ditado guardado?')) return; await gravApagar(id); renderAcum(); }
@@ -978,7 +1014,7 @@ function renderLoko(){
     return '<div style="position:relative;display:inline-block;margin-top:6px"><img src="'+d+'" style="height:70px;border-radius:6px;border:1px solid #c8d0da"><span style="position:absolute;top:-8px;right:-8px">'+x.replace('APAGAR','apagarLokoImg('+i+')')+'</span></div>';
   }).join('');
   html += lokoAudios.map(function(b,i){
-    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;width:100%"><span style="font-size:13px;font-weight:600">🎙 Gravação '+(i+1)+'</span><audio controls src="'+lokoUrls[i]+'" style="height:34px;flex:1;min-width:0"></audio>'+x.replace('APAGAR','apagarLokoAudio('+i+')')+'</div>';
+    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;width:100%"><span style="font-size:13px;font-weight:600">🎙 Gravação '+(i+1)+'</span>'+playerLinha(lokoUrls[i])+''+x.replace('APAGAR','apagarLokoAudio('+i+')')+'</div>';
   }).join('');
   document.getElementById('lokoThumbs').innerHTML = html;
   document.getElementById('lokoInfo').textContent = lokoImgs.length+' imagem(ns) · '+lokoAudios.length+' gravação(ões)'+((lokoImgs.length||lokoAudios.length)?' — toque ⚡ para gerar o laudo':'');
@@ -1009,7 +1045,7 @@ async function alternarGravacao(){
   mediaRec.start();
   vuIniciar(recStream, 'vuLoko');
   recSeg=0; btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
-  recTimer=setInterval(function(){ recSeg++; btn.textContent='⏹ Parar ('+recSeg+'s)'; },1000);
+  recTimer=setInterval(function(){ if(mediaRec&&mediaRec.state==='paused')return; recSeg++; btn.textContent='⏹ Parar ('+recSeg+'s)'; },1000);
 }
 async function gerarInLoco(){
   if(mediaRec && mediaRec.state==='recording'){ log('Pare a gravação antes de gerar.', true); return; }

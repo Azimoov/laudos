@@ -98,6 +98,11 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
     <b>Fotos dos exames</b> (PDF ou foto — pode selecionar vários)
     <input type="file" id="inpExames" accept="application/pdf,image/*" multiple>
     <div id="prevExames" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+    <div style="margin-top:10px;border-top:1px dashed #c8d0da;padding-top:8px">
+      <b>Ou carregue uma pasta (no computador)</b><br><span class="aviso">Cada subpasta com o nome do paciente; fotos e PDF juntos. No iPad/Safari não funciona.</span>
+      <div style="margin-top:6px"><button class="btn sec" type="button" onclick="document.getElementById('inpPasta').click()">📁 Selecionar pasta</button> <span id="pastaInfo" class="aviso"></span></div>
+      <input type="file" id="inpPasta" webkitdirectory directory multiple style="display:none">
+    </div>
   </div>
   <div class="filebox">
     <b>Áudios ditados</b> (m4a, mp3, wav — pode selecionar vários)
@@ -659,27 +664,50 @@ async function salvarTodosDitados(){
   log('Baixados '+files.length+' ditado(s).');
 }
 
+function renderPastaInfo(){
+  const inp=document.getElementById('inpPasta'); const span=document.getElementById('pastaInfo'); if(!span) return;
+  if(!inp||!inp.files||!inp.files.length){ span.textContent=''; return; }
+  const fs=inp.files; const pastas={}; let nimg=0;
+  for(let i=0;i<fs.length;i++){ const tp=fs[i].type||''; if(tp.indexOf('image')!==0 && tp.indexOf('pdf')<0) continue; nimg++; const rel=fs[i].webkitRelativePath||''; const pp=rel.split('/'); const folder=pp.length>=2?pp[pp.length-2]:'(raiz)'; pastas[folder]=(pastas[folder]||0)+1; }
+  const nomes=Object.keys(pastas);
+  span.textContent=nimg+' arquivo(s) em '+nomes.length+' paciente(s): '+nomes.slice(0,8).join(', ')+(nomes.length>8?'…':'')+'. Toque em Processar.';
+}
+
 async function processar(){
   const fEx = document.getElementById('inpExames').files;
   const fAu = document.getElementById('inpAudios').files;
-  if(fEx.length===0){ log('Selecione as fotos dos exames (PDF/foto).', true); return; }
+  const fPasta = (document.getElementById('inpPasta')||{}).files||[];
+  if(fEx.length===0 && fPasta.length===0){ log('Selecione as fotos dos exames ou uma pasta.', true); return; }
   if(!cfg.chave){ alternarConfig(); log('Antes de processar, cole sua chave da API em Configurações.', true); return; }
   document.getElementById('btnProcessar').disabled = true;
   exames = []; audios = [];
   try{
     // 1. preparar exames — ler metadados (visão) de cada imagem e agrupar por paciente+tipo
-    const itens = [];
+    const flatItens = [];
     for(let i=0;i<fEx.length;i++){
       const f = fEx[i];
       log('Lendo '+f.name+' ...');
       const imgs = await arquivoParaImagens(f);
       let meta = {paciente:'', tipoExame:'', confianca:0};
       try{ meta = await extrairMetaImagem(imgs[0]); }catch(e){ log('  leitura da legenda falhou em '+f.name+': '+e.message, true); }
-      itens.push({imgs:imgs, nomeArquivo:f.name, paciente:meta.paciente, tipoExame:meta.tipoExame, conf:meta.confianca});
+      flatItens.push({imgs:imgs, nomeArquivo:f.name, paciente:meta.paciente, tipoExame:meta.tipoExame, conf:meta.confianca});
       log('  → '+(meta.paciente||'(nome ilegível)')+' | '+(meta.tipoExame||'tipo?')+' ['+Math.round((meta.confianca||0)*100)+'%]');
     }
-    exames = agruparItens(itens);
-    log('Agrupei '+fEx.length+' arquivo(s) em '+exames.length+' exame(s).');
+    const folderMap={}; const folderOrder=[];
+    for(let i=0;i<fPasta.length;i++){
+      const ff=fPasta[i]; const tp=ff.type||''; if(tp.indexOf('image')!==0 && tp.indexOf('pdf')<0) continue;
+      const rel=ff.webkitRelativePath||''; const pp=rel.split('/'); const folder=pp.length>=2?pp[pp.length-2]:ff.name;
+      log('Lendo '+folder+'/'+ff.name+' ...');
+      const imgs = await arquivoParaImagens(ff);
+      if(!folderMap[folder]){ folderMap[folder]={imagens:[], tipo:''}; folderOrder.push(folder);
+        try{ const m=await extrairMetaImagem(imgs[0]); if(m && m.tipoExame) folderMap[folder].tipo=mapTipo(m.tipoExame); }catch(e){}
+      }
+      folderMap[folder].imagens = folderMap[folder].imagens.concat(imgs);
+    }
+    exames = agruparItens(flatItens);
+    for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:fo, imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:1}); }
+    exames.forEach(function(e,i){ e.id=i; });
+    log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s) em '+exames.length+' exame(s).');
     // 2. transcrever áudios
     for(let i=0;i<fAu.length;i++){
       const f = fAu[i];
@@ -1253,7 +1281,7 @@ function fecharRevisao(){
 }
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{
-  if(!cfg.chave) alternarConfig(); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
+  if(!cfg.chave) alternarConfig(); var _ip=document.getElementById('inpPasta'); if(_ip) _ip.addEventListener('change', renderPastaInfo); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
   renderAcum();
 });
 </script>

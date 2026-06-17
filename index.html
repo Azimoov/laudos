@@ -31,6 +31,8 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 .aviso{font-size:13px;color:#6b7785;margin-top:8px;}
 .erro{color:#b3261e;font-weight:600;}
 #telaRevisao{display:none;}
+.revImg{transition:transform .15s ease;cursor:zoom-in;}
+.revImg:hover{transform:scale(3);position:relative;z-index:50;box-shadow:0 4px 18px rgba(0,0,0,.35);}
 .barraRev{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
 /* ===== página do laudo (espelha o modelo do Pages) ===== */
 .laudoFolha{background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.32;color:#000;}
@@ -1318,7 +1320,7 @@ function renderRevisao(){
     const auds=audios.filter(function(a){return a.exameId===ex.id;});
     const nome=(ex.paciente||"(sem nome)")+(ex.subExame?" - "+ex.subExame:"");
     const players=auds.length?auds.map(function(a){return '<div style="margin-top:4px">'+(a.url?playerLinha(a.url):"(áudio indisponível)")+"</div>";}).join(""):'<p class="aviso">Sem áudio vinculado.</p>';
-    const imgs=(ex.imagens||[]).length?ex.imagens.map(function(d){return '<img src="'+d+'" style="max-width:120px;max-height:120px;margin:4px;border:1px solid #c8d0da;border-radius:6px">';}).join(""):'<p class="aviso">Sem imagens.</p>';
+    const imgs=(ex.imagens||[]).length?ex.imagens.map(function(d){return '<img class="revImg" src="'+d+'" style="max-width:120px;max-height:120px;margin:4px;border:1px solid #c8d0da;border-radius:6px">';}).join(""):'<p class="aviso">Sem imagens.</p>';
     return '<div style="border:1px solid #c8d0da;border-radius:10px;padding:10px;margin-top:8px">'
       +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:120px">'+nome+"</b>"
       +'<button class="btn peq sec" data-act="ver" data-ex="'+ex.id+'">📄 Ver / editar</button>'

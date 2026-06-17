@@ -136,9 +136,16 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 <div class="card" id="cardExames" style="display:none">
   <h2>3 · Exames identificados — confira e gere os laudos</h2>
   <div id="listaExames"></div>
+  <button class="btn" id="btnGerarTodos" onclick="gerarTodos()" style="margin-top:6px">⚙️ Gerar todos os laudos</button>
   <p class="aviso">Confira a associação áudio ↔ paciente e o tipo de exame antes de gerar. O laudo gerado é um rascunho: <b>revise sempre antes de assinar</b>.</p>
 </div>
 
+<div class="card" id="cardRevisao" style="display:none">
+  <h2>4 · Revisão dos laudos — ouça, veja e salve</h2>
+  <div style="margin-bottom:6px"><button class="btn" onclick="salvarTodosRev()">💾 Salvar todos na pasta</button></div>
+  <div id="listaRevisao"></div>
+  <p class="aviso">Ouça o áudio e veja as imagens antes de salvar. Ao salvar, é criada uma pasta com o nome do paciente contendo o laudo e as fotos.</p>
+</div>
 </main>
 
 <!-- ===== tela de revisão / impressão ===== -->
@@ -902,7 +909,7 @@ async function salvarLaudoPasta(){
   const imgs=(ex&&ex.imagens)?ex.imagens:[];
   const imgBlobs=imgs.map(function(d){ try{ return dataURLtoBlob(d); }catch(e){ return null; } }).filter(function(b){return b;});
   if(suportaFS()){
-    const h=await fsGetHandle('laudo');
+    let h=await fsGetHandle('laudo'); if(!h){ try{ h=await window.showDirectoryPicker(); await fsSetHandle('laudo',h); log('Pasta de laudos definida.'); }catch(e){ h=null; } }
     if(h && (await fsPermissao(h))){
       try{
         const sub=await h.getDirectoryHandle(base,{create:true});
@@ -1009,8 +1016,8 @@ async function gerarLaudo(exId){
     const resp = await openai(partes);
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:resp.conclusao||mod.conclusao, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:resp.observacoes_para_o_medico||''};
     renderExames();
-    abrirRevisao(exId);
-    try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
+    if(document.getElementById('cardRevisao')){ renderRevisao(); document.getElementById('cardRevisao').style.display='block'; }
+
     if(ex.laudo.obs) log('Observações da IA sobre '+ex.paciente+': '+ex.laudo.obs, true);
   }catch(e){
     log('Erro ao gerar laudo de '+ex.paciente+': '+e.message, true);
@@ -1274,7 +1281,7 @@ function excluirHistorico(id){
   gravarHistorico(lerHistorico().filter(function(x){return x.id!==id;}));
   renderHistorico();
 }
-function abrirRevisao(exId){
+function abrirRevisao(exId, semTela){
   const ex = exames.find(e=>e.id===exId);
   const L = ex.laudo; const c = L.cab;
   if(!ex.histKey) ex.histKey='L'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
@@ -1294,9 +1301,58 @@ function abrirRevisao(exId){
   const ob = document.getElementById('obsBanner');
   if(L.obs){ ob.style.display='block'; ob.textContent='⚠️ Aviso da IA — revise com atenção: '+L.obs; } else { ob.style.display='none'; }
   document.title = 'Laudo - '+((c.nome||ex.paciente||'paciente').trim());
-  document.querySelector('main').style.display='none';
+  if(!semTela){ document.querySelector('main').style.display='none';
   document.getElementById('telaRevisao').style.display='block';
-  window.scrollTo(0,0);
+  window.scrollTo(0,0); }
+}
+function renderRevisao(){
+  const div=document.getElementById("listaRevisao"); if(!div) return;
+  const lista=exames.filter(function(e){return e.laudo;});
+  if(!lista.length){ div.innerHTML='<p class="aviso">Gere os laudos para revisar aqui.</p>'; return; }
+  div.innerHTML=lista.map(function(ex){
+    const auds=audios.filter(function(a){return a.exameId===ex.id;});
+    const nome=(ex.paciente||"(sem nome)")+(ex.subExame?" - "+ex.subExame:"");
+    const players=auds.length?auds.map(function(a){return '<div style="margin-top:4px">'+(a.url?playerLinha(a.url):"(áudio indisponível)")+"</div>";}).join(""):'<p class="aviso">Sem áudio vinculado.</p>';
+    const imgs=(ex.imagens||[]).length?ex.imagens.map(function(d){return '<img src="'+d+'" style="max-width:120px;max-height:120px;margin:4px;border:1px solid #c8d0da;border-radius:6px">';}).join(""):'<p class="aviso">Sem imagens.</p>';
+    return '<div style="border:1px solid #c8d0da;border-radius:10px;padding:10px;margin-top:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:120px">'+nome+"</b>"
+      +'<button class="btn peq sec" data-act="ver" data-ex="'+ex.id+'">📄 Ver / editar</button>'
+      +'<button class="btn peq sec" data-act="aud" data-ex="'+ex.id+'">🎙 Áudio</button>'
+      +'<button class="btn peq sec" data-act="img" data-ex="'+ex.id+'">🖼 Imagens</button>'
+      +'<button class="btn peq" data-act="salvar" data-ex="'+ex.id+'">💾 Salvar</button></div>'
+      +'<div id="aud'+ex.id+'" style="display:none;margin-top:6px">'+players+"</div>"
+      +'<div id="img'+ex.id+'" style="display:none;margin-top:6px">'+imgs+"</div>"
+      +"</div>";
+  }).join("");
+  div.onclick=function(e){
+    const b=e.target.closest("button[data-act]"); if(!b) return;
+    const id=parseInt(b.getAttribute("data-ex"),10); const act=b.getAttribute("data-act");
+    if(act==="ver") abrirRevisao(id);
+    else if(act==="salvar") salvarExameRev(id);
+    else { const box=document.getElementById((act==="aud"?"aud":"img")+id); if(box) box.style.display=(box.style.display==="none"?"block":"none"); }
+  };
+}
+async function gerarTodos(){
+  const alvo=exames.slice();
+  if(!alvo.length){ log("Nenhum exame para gerar.", true); return; }
+  const btn=document.getElementById("btnGerarTodos"); if(btn){ btn.disabled=true; btn.textContent="Gerando..."; }
+  for(const ex of alvo){ try{ await gerarLaudo(ex.id); }catch(e){ log("Falha no laudo de "+(ex.paciente||ex.id)+": "+e.message, true); } }
+  if(btn){ btn.disabled=false; btn.textContent="⚙️ Gerar todos os laudos"; }
+  renderRevisao();
+  const c=document.getElementById("cardRevisao"); if(c){ c.style.display="block"; c.scrollIntoView({behavior:"smooth"}); }
+}
+async function salvarExameRev(exId){
+  const ex=exames.find(function(e){return e.id===exId;});
+  if(!ex||!ex.laudo){ log("Gere o laudo primeiro.", true); return; }
+  abrirRevisao(exId, true);
+  await salvarLaudoPasta();
+  try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
+}
+async function salvarTodosRev(){
+  const lista=exames.filter(function(e){return e.laudo;});
+  if(!lista.length){ log("Nenhum laudo para salvar.", true); return; }
+  for(const ex of lista){ await salvarExameRev(ex.id); }
+  log("Salvos "+lista.length+" laudo(s).");
 }
 function fecharRevisao(){
   try{ if(window.__revAtual) salvarLaudoHistorico(window.__revAtual); }catch(e){}

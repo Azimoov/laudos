@@ -142,7 +142,8 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 
 <div class="card" id="cardRevisao" style="display:none">
   <h2>4 · Revisão dos laudos — ouça, veja e salve</h2>
-  <div style="margin-bottom:6px"><button class="btn" onclick="salvarTodosRev()">💾 Salvar todos na pasta</button></div>
+  <div id="pastaDestInfo" class="aviso" style="margin-bottom:4px"></div>
+  <div style="margin-bottom:6px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" onclick="escolherPastaDestino()">📁 Escolher pasta de destino</button><button class="btn" onclick="salvarTodosRev()">💾 Salvar todos</button></div>
   <div id="listaRevisao"></div>
   <p class="aviso">Ouça o áudio e veja as imagens antes de salvar. Ao salvar, é criada uma pasta com o nome do paciente contendo o laudo e as fotos.</p>
 </div>
@@ -883,7 +884,11 @@ function fsDbOpen(){ return new Promise(function(res,rej){ const r=indexedDB.ope
 async function fsGetHandle(key){ try{ const db=await fsDbOpen(); return await new Promise(function(res){ const rq=db.transaction('handles').objectStore('handles').get(key); rq.onsuccess=function(){res(rq.result||null);}; rq.onerror=function(){res(null);}; }); }catch(e){ return null; } }
 async function fsSetHandle(key,h){ try{ const db=await fsDbOpen(); await new Promise(function(res,rej){ const tx=db.transaction('handles','readwrite'); tx.objectStore('handles').put(h,key); tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }catch(e){} }
 async function fsPermissao(h){ if(!h||!h.queryPermission) return true; try{ if((await h.queryPermission({mode:'readwrite'}))==='granted') return true; return (await h.requestPermission({mode:'readwrite'}))==='granted'; }catch(e){ return false; } }
-async function definirPasta(tipo){ if(!suportaFS()){ log('No iPad o salvar usa a folha de compartilhamento do iOS (botão Salvar).', true); return; } let h; try{ h=await window.showDirectoryPicker(); }catch(e){ return; } await fsSetHandle(tipo,h); log('Pasta de '+(tipo==='audio'?'áudios':'laudos')+' definida neste computador.'); }
+let pastaLaudoH=null;
+function atualizarPastaInfoRev(){ const el=document.getElementById('pastaDestInfo'); if(!el) return; el.innerHTML = pastaLaudoH ? ('📁 Pasta de destino: <b>'+(pastaLaudoH.name||'(definida)')+'</b>') : (suportaFS()?'⚠️ Nenhuma pasta de destino definida — escolha antes de salvar.':'No iPad o salvar usa a folha de compartilhamento.'); }
+async function escolherPastaDestino(){ if(!suportaFS()){ log('No iPad usa-se a folha de compartilhamento.', true); return null; } try{ const h=await window.showDirectoryPicker(); pastaLaudoH=h; await fsSetHandle('laudo',h); atualizarPastaInfoRev(); log('Pasta de destino: '+(h.name||'')); return h; }catch(e){ return null; } }
+async function garantirPasta(){ if(pastaLaudoH) return pastaLaudoH; return await escolherPastaDestino(); }
+async function definirPasta(tipo){ if(!suportaFS()){ log('No iPad o salvar usa a folha de compartilhamento do iOS (botão Salvar).', true); return; } let h; try{ h=await window.showDirectoryPicker(); }catch(e){ return; } await fsSetHandle(tipo,h); if(tipo==='laudo'){ pastaLaudoH=h; atualizarPastaInfoRev(); } log('Pasta de '+(tipo==='audio'?'áudios':'laudos')+' definida neste computador.'); }
 async function fsEscrever(h, filename, blob){ const fh=await h.getFileHandle(filename,{create:true}); const w=await fh.createWritable(); await w.write(blob); await w.close(); }
 async function compartilharOuBaixar(filename, blob, mime){
   try{ const file=new File([blob], filename, {type:mime||blob.type||'application/octet-stream'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:filename}); return true; } }catch(e){ if(e&&e.name==='AbortError') return false; }
@@ -909,7 +914,7 @@ async function salvarLaudoPasta(){
   const imgs=(ex&&ex.imagens)?ex.imagens:[];
   const imgBlobs=imgs.map(function(d){ try{ return dataURLtoBlob(d); }catch(e){ return null; } }).filter(function(b){return b;});
   if(suportaFS()){
-    let h=await fsGetHandle('laudo'); if(!h){ try{ h=await window.showDirectoryPicker(); await fsSetHandle('laudo',h); log('Pasta de laudos definida.'); }catch(e){ h=null; } }
+    const h=pastaLaudoH;
     if(h && (await fsPermissao(h))){
       try{
         const sub=await h.getDirectoryHandle(base,{create:true});
@@ -1319,7 +1324,7 @@ function renderRevisao(){
       +'<button class="btn peq sec" data-act="ver" data-ex="'+ex.id+'">📄 Ver / editar</button>'
       +'<button class="btn peq sec" data-act="aud" data-ex="'+ex.id+'">🎙 Áudio</button>'
       +'<button class="btn peq sec" data-act="img" data-ex="'+ex.id+'">🖼 Imagens</button>'
-      +'<button class="btn peq" data-act="salvar" data-ex="'+ex.id+'">💾 Salvar</button></div>'
+      +'<button class="btn peq" data-act="salvar" data-ex="'+ex.id+'">✅ Aprovar e salvar</button></div>'
       +'<div id="aud'+ex.id+'" style="display:none;margin-top:6px">'+players+"</div>"
       +'<div id="img'+ex.id+'" style="display:none;margin-top:6px">'+imgs+"</div>"
       +"</div>";
@@ -1344,6 +1349,7 @@ async function gerarTodos(){
 async function salvarExameRev(exId){
   const ex=exames.find(function(e){return e.id===exId;});
   if(!ex||!ex.laudo){ log("Gere o laudo primeiro.", true); return; }
+  if(suportaFS() && !pastaLaudoH){ await garantirPasta(); if(!pastaLaudoH){ log("Salvar cancelado: escolha a pasta de destino.", true); return; } }
   abrirRevisao(exId, true);
   await salvarLaudoPasta();
   try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
@@ -1351,6 +1357,7 @@ async function salvarExameRev(exId){
 async function salvarTodosRev(){
   const lista=exames.filter(function(e){return e.laudo;});
   if(!lista.length){ log("Nenhum laudo para salvar.", true); return; }
+  if(suportaFS() && !pastaLaudoH){ await garantirPasta(); if(!pastaLaudoH){ log("Cancelado: escolha a pasta de destino.", true); return; } }
   for(const ex of lista){ await salvarExameRev(ex.id); }
   log("Salvos "+lista.length+" laudo(s).");
 }
@@ -1361,7 +1368,7 @@ function fecharRevisao(){
   document.querySelector('main').style.display='block';
 }
 /* corrige \n no corpo vindo do JSON */
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded',()=>{ try{ fsGetHandle('laudo').then(function(h){ pastaLaudoH=h; atualizarPastaInfoRev(); }); }catch(e){}
   if(!cfg.chave) alternarConfig(); var _ip=document.getElementById('inpPasta'); if(_ip) _ip.addEventListener('change', renderPastaInfo); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
   renderAcum();
 });

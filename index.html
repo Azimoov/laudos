@@ -801,7 +801,7 @@ function renderExames(){
       + ex.imagens.map(function(im,i){return '<span style="position:relative;display:inline-block;margin-top:6px"><img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)"><button onclick="removerFotoExame('+ex.id+','+i+')" style="position:absolute;top:-8px;right:-8px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer">✕</button></span>';}).join('')
       +'</div><b style="font-size:13px">Gravações ('+audiosDoExame.length+'):</b>'
       + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" onclick="salvarAudioIdx('+a.idx+')">💾</button><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?playerLinha(a.url):'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><button class="btn peq" onclick="selecionarAudioExame('+ex.id+')">🎵 Adicionar áudio</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
       +'<div class="aviso" style="margin-top:6px">Adicione fotos ou grave instruções a qualquer momento, mesmo com o laudo pronto. Ao tocar "Refazer laudo", a IA aplica as alterações ditadas sobre o laudo existente.</div>'
       +'</div>';
     html += '<div class="exame">'
@@ -967,6 +967,27 @@ async function gravarParaExame(id){
   vuIniciar(recStreamE, 'vuEx'+id);
   if(btn){ btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e'; }
   recTimerE=setInterval(function(){ if(mediaRecE&&mediaRecE.state==='paused')return; recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
+}
+function selecionarAudioExame(exId){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='audio/*,.m4a,.mp3,.wav';
+  inp.onchange=function(){ const f=inp.files&&inp.files[0]; if(f) adicionarAudioArquivo(exId, f); };
+  inp.click();
+}
+async function adicionarAudioArquivo(exId, file){
+  if(!file) return;
+  log('Transcrevendo áudio selecionado...');
+  try{
+    const r=await transcreverAudio(file);
+    const novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
+    const a={idx:novoIdx, nome:(nomeAudio(r.nome_paciente,r.tipo_exame)||file.name||'áudio'), url:URL.createObjectURL(file), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:exId};
+    audios.push(a);
+    const ex=exames.find(function(x){return x.id===exId;});
+    if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
+    log('Áudio adicionado ao exame — toque "Refazer laudo" para aplicar.');
+  }catch(e){ log('Falha ao adicionar áudio: '+e.message, true); }
+  renderExames();
+  const d=document.getElementById('det'+exId); if(d) d.style.display='block';
 }
 const audsAbertos = {};
 function alternarAudios(id){

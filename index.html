@@ -1071,6 +1071,8 @@ function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('l
 async function gravSalvar(blob, meta){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').add(Object.assign({blob:blob,quando:Date.now()}, meta||{}));tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
 async function gravListar(){const db=await dbOpen();return new Promise(function(res,rej){const rq=db.transaction('gravacoes').objectStore('gravacoes').getAll();rq.onsuccess=function(){res(rq.result||[]);};rq.onerror=function(){rej(rq.error);};});}
 async function gravApagar(id){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').delete(id);tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
+async function gravRenomear(id,novo){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');const st=tx.objectStore('gravacoes');const rq=st.get(id);rq.onsuccess=function(){const r=rq.result;if(r){r.nome=novo;r.nome_paciente=novo;st.put(r);}};tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
+async function renomearDitado(el,id){const novo=(el.textContent||'').trim();if(!novo)return;try{await gravRenomear(id,novo);if(window.__ditadosCache){const it=window.__ditadosCache.find(function(x){return x.id===id;});if(it){it.nome=novo;it.nome_paciente=novo;}}}catch(e){log('Nao consegui salvar o nome: '+e.message,true);}}
 let mediaRecA=null, recChunksA=[], recStreamA=null, recTimerA=null, recSegA=0;
 async function gravarAcumulado(){
   const btn=document.getElementById('btnGravarAcum');
@@ -1102,14 +1104,14 @@ async function gravarAcumulado(){
 async function renderAcum(){
   const div=document.getElementById('listaAcum'); if(!div) return;
   let lista=[];
-  try{ lista=await gravListar(); window.__ditadosCache=lista; }catch(e){ div.innerHTML='<span class="aviso">não foi possível ler as gravações guardadas</span>'; return; }
+  try{ lista=await gravListar(); window.__ditadosCache=lista; lista.sort(function(a,b){return (b.quando||0)-(a.quando||0);}); }catch(e){ div.innerHTML='<span class="aviso">não foi possível ler as gravações guardadas</span>'; return; }
   if(!lista.length){ div.innerHTML='<span class="aviso">Nenhum ditado guardado neste aparelho.</span>'; return; }
-  div.innerHTML = '<div class="aviso" style="font-weight:600;margin-bottom:4px">📼 '+lista.length+' gravação'+(lista.length===1?'':'ões')+' guardada'+(lista.length===1?'':'s')+' neste aparelho</div>' + lista.map(function(g){
+  div.innerHTML = '<div class="aviso" style="font-weight:600;margin-bottom:4px">📼 '+lista.length+' gravaç'+(lista.length===1?'ão':'ões')+' guardada'+(lista.length===1?'':'s')+' neste aparelho</div>' + lista.map(function(g){
     const dt=new Date(g.quando);
     const rot=dt.toLocaleDateString('pt-BR').slice(0,5)+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const u=URL.createObjectURL(g.blob);
     const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a';
-    return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;white-space:nowrap">🎙 '+(g.nome||rot)+'</span>'+playerLinha(u)+'<button class="btn peq sec" onclick="salvarDitado('+g.id+')">💾 Salvar</button><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">✕</button></div>';
+    return '<div style="background:#eef3f8;border-radius:8px;padding:8px 10px;margin-top:6px"><div style="display:flex;align-items:center;gap:4px;margin-bottom:6px"><span>🎙</span><span contenteditable="true" onblur="renomearDitado(this,'+g.id+')" title="Toque para corrigir o nome" style="flex:1;min-width:0;font-size:13px;font-weight:600;border-bottom:1px dashed #9bb3c9;outline:none;padding:1px 2px">'+(g.nome||rot)+'</span></div><div style="display:flex;align-items:center;gap:8px"><span style="flex:1;min-width:0">'+playerLinha(u)+'</span><button class="btn peq sec" onclick="salvarDitado('+g.id+')">💾 Salvar</button><button class="btn peq sec" style="color:#b3261e" onclick="apagarAcum('+g.id+')">🗑</button></div></div>';
   }).join('') + '<div style="margin-top:8px"><button class="btn peq sec" onclick="salvarTodosDitados()">💾 Salvar todos os ditados guardados</button> <button class="btn peq sec" style="color:#b3261e" onclick="limparAcum()">Apagar todos os ditados guardados</button></div>';
 }
 async function apagarAcum(id){ if(!confirm('Apagar este ditado guardado?')) return; await gravApagar(id); renderAcum(); }

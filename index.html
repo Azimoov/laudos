@@ -906,6 +906,15 @@ async function salvarLokoIdx(i){ try{ const blob=lokoAudios[i]; if(!blob) return
 async function salvarDitado(id){ try{ const l=await gravListar(); const g=l.find(function(x){return x.id===id;}); if(!g) return; const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro(g.nome||('ditado-'+id))+'.'+ext, g.blob, g.blob.type); }catch(e){ log('Falha ao salvar ditado: '+e.message, true); } }
 function laudoCssText(){ let css=''; try{ const sh=document.styleSheets; for(let i=0;i<sh.length;i++){ let rules; try{ rules=sh[i].cssRules; }catch(e){ continue; } for(let j=0;j<rules.length;j++){ const r=rules[j]; if(r.selectorText && /laudo|assin|linha|rodape/i.test(r.selectorText)) css+=r.cssText+'\n'; } } }catch(e){} return css; }
 function dataURLtoBlob(d){ const p=d.split(','); const mime=(p[0].match(/:(.*?);/)||[])[1]||'image/jpeg'; const bin=atob(p[1]); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:mime}); }
+async function pastaLivre(parent, base){
+  var nome=base, n=2;
+  while(n<1000){
+    try{ await parent.getDirectoryHandle(nome, {create:false}); }
+    catch(e){ return nome; }
+    nome = base+' '+n; n++;
+  }
+  return base+' '+Date.now();
+}
 async function salvarLaudoPasta(){
   const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return; }
   const pac=(window.__revAtual&&window.__revAtual.paciente)?window.__revAtual.paciente:'laudo';
@@ -919,10 +928,10 @@ async function salvarLaudoPasta(){
     const h=pastaLaudoH;
     if(h && (await fsPermissao(h))){
       try{
-        const sub=await h.getDirectoryHandle(base,{create:true});
+        const nomePasta=await pastaLivre(h, base); const sub=await h.getDirectoryHandle(nomePasta,{create:true});
         await fsEscrever(sub, 'Laudo - '+base+'.html', laudoBlob);
         for(let i=0;i<imgBlobs.length;i++){ await fsEscrever(sub, 'foto-'+(i+1)+'.jpg', imgBlobs[i]); }
-        log('Salvo na pasta "'+base+'": laudo + '+imgBlobs.length+' foto(s).');
+        log('Salvo na pasta "'+nomePasta+'": laudo + '+imgBlobs.length+' foto(s).');
         return;
       }catch(e){ log('Falha ao salvar na pasta ('+e.message+'). Compartilhando...', true); }
     }

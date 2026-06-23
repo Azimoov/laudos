@@ -456,8 +456,8 @@ async function transcreverAudio(arquivoOuBlob){
     if(r.status!==404 && r.status!==400) break;
   }
   if(texto===null) throw new Error('Transcrição falhou: '+ultimoErro);
-  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: o NOME COMPLETO DO PACIENTE citado — transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se não citado) e o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, abdomen_superior, rins, prostata, tireoide, mama, transvaginal, pelvica, obst1, obst1_descolamento, obst23, obst_gemelar, bolsa_escrotal, penis, parede_abdominal, partes_moles, ombro, cotovelo, punho, mao, joelho, tornozelo, pe, outro. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\"}\n\nDITADO:\n"+texto}]);
-  return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: resp.tipo_exame||''};
+  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, abdomen_superior, rins, prostata, tireoide, mama, transvaginal, pelvica, obst1, obst1_descolamento, obst23, obst_gemelar, bolsa_escrotal, penis, parede_abdominal, partes_moles, ombro, cotovelo, punho, mao, joelho, tornozelo, pe, outro; (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio) se não for citada nem se aplicar. Exames de articulações e membros (ombro, cotovelo, punho, mao, joelho, tornozelo, pe) e partes moles costumam ser unilaterais — capte a lateralidade sempre que ela for dita. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
+  return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: resp.tipo_exame||'', lateralidade: resp.lateralidade||''};
 }
 
 /* ============ Áudio: m4a → WAV 16 kHz mono ============ */
@@ -801,8 +801,8 @@ function renderExames(){
       + ex.imagens.map(function(im,i){return '<span style="position:relative;display:inline-block;margin-top:6px"><img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)"><button onclick="removerFotoExame('+ex.id+','+i+')" style="position:absolute;top:-8px;right:-8px;background:#b3261e;color:#fff;border:0;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer">✕</button></span>';}).join('')
       +'</div><b style="font-size:13px">Gravações ('+audiosDoExame.length+'):</b>'
       + (audiosDoExame.length ? audiosDoExame.map(function(a){return '<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;flex:1">🎙 '+a.nome+'</span><button class="btn peq sec" onclick="salvarAudioIdx('+a.idx+')">💾</button><button class="btn peq sec" style="color:#b3261e" onclick="removerAudioExame('+a.idx+')">✕ apagar</button></div>'+(a.url?playerLinha(a.url):'')+'<div class="aviso" style="margin-top:2px">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;'))+'</div></div>';}).join('') : '<div class="aviso">nenhuma gravação associada a este exame</div>')
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><button class="btn peq" onclick="selecionarAudioExame('+ex.id+')">🎵 Adicionar áudio</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
-      +'<div class="aviso" style="margin-top:6px">Adicione fotos ou grave instruções a qualquer momento, mesmo com o laudo pronto. Ao tocar "Refazer laudo", a IA aplica as alterações ditadas sobre o laudo existente.</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><button class="btn peq" onclick="novaFotoExame('+ex.id+')">📷 Nova foto</button><button class="btn peq" id="btnRegrav'+ex.id+'" onclick="gravarParaExame('+ex.id+')">🎙 Nova gravação</button><button class="btn peq sec" id="btnRetomar'+ex.id+'" onclick="retomarRecEx('+ex.id+')" style="display:none">▶ Retomar</button><button class="btn peq" id="btnConcluir'+ex.id+'" onclick="concluirRecEx('+ex.id+')" style="display:none;background:#1f7a3d">✅ Finalizar e transcrever</button><button class="btn peq" onclick="selecionarAudioExame('+ex.id+')">🎵 Adicionar áudio</button><canvas id="vuEx'+ex.id+'" width="120" height="30" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>'
+      +'<div class="aviso" style="margin-top:6px">Comece o ditado pelo <b>nome completo do paciente</b> e, em exames de membros/articulações, diga a <b>lateralidade</b> (ex.: "ombro direito"). Toque <b>⏹ Parar</b> para pausar e <b>▶ Retomar</b> para continuar do ponto onde parou; <b>✅ Finalizar</b> transcreve. Você pode adicionar fotos ou gravar a qualquer momento, mesmo com o laudo pronto — ao tocar "Refazer laudo", a IA aplica as alterações ditadas.</div>'
       +'</div>';
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+(ex.subExame?' - '+ex.subExame:'')+' <span class="tag">'+ex.imagens.length+' pág.</span>'
@@ -817,6 +817,11 @@ function renderExames(){
       +'</div>'+detalhes+'</div>';
   }
   div.innerHTML = html;
+  // Se há gravação por exame em curso/pausada, restaura os controles após o re-render
+  if(mediaRecE && recExAlvo!=null && (mediaRecE.state==='recording'||mediaRecE.state==='paused')){
+    setRecExUI(recExAlvo, mediaRecE.state==='paused'?'pause':'rec');
+    const d=document.getElementById('det'+recExAlvo); if(d) d.style.display='block';
+  }
 }
 document.getElementById('inpCameraExame').addEventListener('change', async function(e){
   const ex = exames.find(function(x){return x.id===window.__fotoAlvo;});
@@ -853,7 +858,9 @@ function pausarRec(){ const m=recAtivo(); if(!m) return; try{ if(m.state==='reco
 function atualizarPausa(){ const m=recAtivo(); const els=document.querySelectorAll('.btnPausa'); for(let i=0;i<els.length;i++){ els[i].style.display = m?'inline-block':'none'; els[i].textContent = (m&&m.state==='paused')?'▶ Retomar':'⏸ Pausar'; } }
 setInterval(atualizarPausa, 400);
 function primeiroUltimo(nome){ const p=(nome||'').trim().split(' ').filter(function(x){return x;}); if(!p.length) return ''; return p.slice(0,3).join(' '); }
-function nomeAudio(nomePac, tipoTexto){ const pn=primeiroUltimo(nomePac); const k=mapTipo(tipoTexto); const tn=(k&&MODELOS[k])?MODELOS[k].nome:(tipoTexto||''); return ((pn||'Sem nome')+(tn?' - '+tn:'')).trim(); }
+function nomeCompleto(nome){ return String(nome||'').replace(/\s+/g,' ').trim(); }
+function normLateralidade(s){ const t=norm(s); if(/esquerd/.test(t)) return 'Esquerdo'; if(/direit/.test(t)) return 'Direito'; if(/bilater|ambos|os dois|dois lados/.test(t)) return 'Bilateral'; return ''; }
+function nomeAudio(nomePac, tipoTexto, lateralidade){ const pn=nomeCompleto(nomePac); const k=mapTipo(tipoTexto); const tn=(k&&MODELOS[k])?MODELOS[k].nome:(tipoTexto||''); const lat=normLateralidade(lateralidade); const tnLat=(tn?tn:'')+(lat?(tn?' '+lat:lat):''); return ((pn||'Sem nome')+(tnLat?' - '+tnLat:'')).trim(); }
 function nomeArquivoSeguro(s){ return ((s||'audio').replace(/[^A-Za-z0-9 ÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇÑáàâãéèêíïóôõöúüçñ_-]/g,' ').replace(/  +/g,' ').trim())||'audio'; }
 function playerLinha(url){
   const id='pl'+(window.__plN=(window.__plN||0)+1);
@@ -943,9 +950,20 @@ async function salvarLaudoPasta(){
   log('Baixados: laudo + '+imgBlobs.length+' foto(s).');
 }
 
+// Controle de UI do gravador por exame. estado: 'idle' | 'rec' | 'pause'
+function setRecExUI(id, estado){
+  const reg=document.getElementById('btnRegrav'+id);
+  const ret=document.getElementById('btnRetomar'+id);
+  const con=document.getElementById('btnConcluir'+id);
+  if(!reg) return;
+  if(estado==='rec'){ reg.style.display='inline-block'; reg.textContent='⏹ Parar ('+recSegE+'s)'; reg.style.background='#b3261e'; if(ret)ret.style.display='none'; if(con)con.style.display='none'; }
+  else if(estado==='pause'){ reg.style.display='none'; reg.style.background=''; if(ret)ret.style.display='inline-block'; if(con)con.style.display='inline-block'; }
+  else { reg.style.display='inline-block'; reg.textContent='🎙 Nova gravação'; reg.style.background=''; if(ret)ret.style.display='none'; if(con)con.style.display='none'; }
+}
 async function gravarParaExame(id){
-  const btn=document.getElementById('btnRegrav'+id);
-  if(mediaRecE && (mediaRecE.state==='recording'||mediaRecE.state==='paused')){ if(recExAlvo===id) mediaRecE.stop(); return; }
+  // Já gravando este exame: o botão vermelho agora PAUSA (permite retomar do ponto onde parou).
+  if(mediaRecE && recExAlvo===id && mediaRecE.state==='recording'){ pausarRecEx(id); return; }
+  if(mediaRecE && (mediaRecE.state==='recording'||mediaRecE.state==='paused')){ log('Conclua a gravação em andamento antes de iniciar outra.', true); return; }
   if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
   try{ recStreamE = await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(e){ log('Acesso ao microfone negado: '+e.message, true); return; }
@@ -963,7 +981,7 @@ async function gravarParaExame(id){
     try{
       const r = await transcreverAudio(blob);
       const novoIdx = audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-      const a = {idx:novoIdx, nome:nomeAudio(r.nome_paciente,r.tipo_exame), url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
+      const a = {idx:novoIdx, nome:nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade), url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:id};
       audios.push(a); try{ salvarAudioAuto(blob, a.nome, (blob.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){}
       const ex=exames.find(function(x){return x.id===id;});
       if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
@@ -974,8 +992,28 @@ async function gravarParaExame(id){
   };
   mediaRecE.start(); recSegE=0;
   vuIniciar(recStreamE, 'vuEx'+id);
-  if(btn){ btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e'; }
-  recTimerE=setInterval(function(){ if(mediaRecE&&mediaRecE.state==='paused')return; recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
+  setRecExUI(id,'rec');
+  recTimerE=setInterval(function(){ if(!mediaRecE||mediaRecE.state!=='recording')return; recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
+}
+function pausarRecEx(id){
+  if(!mediaRecE || mediaRecE.state!=='recording' || recExAlvo!==id) return;
+  if(typeof mediaRecE.pause==='function'){
+    try{ mediaRecE.pause(); }catch(e){ log('Falha ao pausar — finalizando: '+e.message, true); concluirRecEx(id); return; }
+    setRecExUI(id,'pause');
+    log('Gravação pausada. Toque "▶ Retomar" para continuar do ponto onde parou, ou "✅ Finalizar" para transcrever.');
+  } else {
+    log('Pausa não suportada neste navegador — finalizando a gravação.', true);
+    concluirRecEx(id);
+  }
+}
+function retomarRecEx(id){
+  if(!mediaRecE || mediaRecE.state!=='paused' || recExAlvo!==id) return;
+  try{ mediaRecE.resume(); }catch(e){ log('Falha ao retomar: '+e.message, true); return; }
+  setRecExUI(id,'rec');
+  log('Gravação retomada.');
+}
+function concluirRecEx(id){
+  if(mediaRecE && recExAlvo===id && (mediaRecE.state==='recording'||mediaRecE.state==='paused')){ try{ mediaRecE.stop(); }catch(e){ log('Falha ao finalizar: '+e.message, true); } }
 }
 function selecionarAudioExame(exId){
   const inp=document.createElement('input');
@@ -989,7 +1027,7 @@ async function adicionarAudioArquivo(exId, file){
   try{
     const r=await transcreverAudio(file);
     const novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-    const a={idx:novoIdx, nome:(nomeAudio(r.nome_paciente,r.tipo_exame)||file.name||'áudio'), url:URL.createObjectURL(file), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:exId};
+    const a={idx:novoIdx, nome:(nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||file.name||'áudio'), url:URL.createObjectURL(file), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:exId};
     audios.push(a);
     const ex=exames.find(function(x){return x.id===exId;});
     if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
@@ -1121,7 +1159,7 @@ async function gravarAcumulado(){
     clearInterval(recTimerA);
     btn.textContent='🎙 Gravar ditado'; btn.style.background='';
     let metaG={};
-    try{ const rr=await transcreverAudio(blob); metaG={transcricao:rr.transcricao||'', nome_paciente:rr.nome_paciente||'', tipo_exame:rr.tipo_exame||'', nome:nomeAudio(rr.nome_paciente, rr.tipo_exame)}; log('Ditado guardado: '+(metaG.nome||'(sem nome)')); }
+    try{ const rr=await transcreverAudio(blob); metaG={transcricao:rr.transcricao||'', nome_paciente:rr.nome_paciente||'', tipo_exame:rr.tipo_exame||'', lateralidade:rr.lateralidade||'', nome:nomeAudio(rr.nome_paciente, rr.tipo_exame, rr.lateralidade)}; log('Ditado guardado: '+(metaG.nome||'(sem nome)')); }
     catch(e){ log('Não consegui transcrever o ditado agora (será transcrito no Processar): '+e.message, true); }
     try{ await gravSalvar(blob, metaG); try{ salvarAudioAuto(blob, metaG.nome||'ditado', (blob.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){} }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
     renderAcum();

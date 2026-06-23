@@ -158,7 +158,15 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
       <button class="btn sec" onclick="fecharRevisao()">← Voltar</button>
       <button class="btn" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
       <button class="btn" onclick="salvarLaudoPasta()">💾 Salvar na pasta</button>
+      <button class="btn sec" id="btnRevAudio" onclick="toggleRevMidia('audio')" style="display:none">🎙 Ouvir gravação</button>
+      <button class="btn sec" id="btnRevImg" onclick="toggleRevMidia('img')" style="display:none">🖼 Ver imagens</button>
+      <button class="btn" id="btnLiberar" onclick="liberarEProximo()" style="display:none;background:#1f7a3d">✅ Liberar e próximo</button>
       <span class="aviso" style="align-self:center">Toque no texto para editar. No iPad: Imprimir → pinçar a pré-visualização → Compartilhar → Salvar em Arquivos (PDF).</span>
+    </div>
+    <!-- painel de mídia: fora do areaImpressao para não entrar no PDF/impressão -->
+    <div id="revMidia" style="display:none;max-width:760px;margin:0 auto 10px;padding:10px;background:#f4f7fa;border-radius:10px">
+      <div id="revMidiaAudio" style="display:none"></div>
+      <div id="revMidiaImg" style="display:none;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
     </div>
     <div id="obsBanner" style="display:none;background:#fdf3e3;border-left:5px solid #d99a26;border-radius:8px;padding:12px 14px;margin:0 auto 14px;max-width:760px;font-size:14px;font-weight:600;"></div>
     <div id="areaImpressao"></div>
@@ -1352,6 +1360,7 @@ function abrirHistorico(id){
   document.querySelector('main').style.display='none';
   document.getElementById('telaRevisao').style.display='block';
   window.scrollTo(0,0);
+  _mostrarBotoesRev(false);
 }
 function excluirHistorico(id){
   if(!confirm('Excluir este laudo do histórico salvo?')) return;
@@ -1379,7 +1388,10 @@ function abrirRevisao(exId, semTela){
   document.title = 'Laudo - '+((c.nome||ex.paciente||'paciente').trim());
   if(!semTela){ document.querySelector('main').style.display='none';
   document.getElementById('telaRevisao').style.display='block';
-  window.scrollTo(0,0); }
+  window.scrollTo(0,0);
+  montarRevMidia(exId);
+  _mostrarBotoesRev(true);
+  }
 }
 function revImgMove(e,img){ var r=img.getBoundingClientRect(); var w=r.width||1, h=r.height||1; var x=(e.clientX-r.left)/w, y=(e.clientY-r.top)/h; var m=0.2; if(x<m||x>1-m||y<m||y>1-m){ img.classList.remove('zoom'); } else { img.classList.add('zoom'); } }
 function revImgLeave(img){ img.classList.remove('zoom'); }
@@ -1413,6 +1425,7 @@ function renderRevisao(){
 async function gerarTodos(){
   const alvo=exames.slice();
   if(!alvo.length){ log("Nenhum exame para gerar.", true); return; }
+  exames.forEach(function(e){ e._liberado=false; }); // reseta flags ao gerar tudo de novo
   const btn=document.getElementById("btnGerarTodos"); if(btn){ btn.disabled=true; btn.textContent="Gerando..."; }
   for(const ex of alvo){ try{ await gerarLaudo(ex.id); }catch(e){ log("Falha no laudo de "+(ex.paciente||ex.id)+": "+e.message, true); } }
   if(btn){ btn.disabled=false; btn.textContent="⚙️ Gerar todos os laudos"; }
@@ -1439,6 +1452,52 @@ function fecharRevisao(){
   document.title = 'Laudos USG — Dr. Daniel Serruya';
   document.getElementById('telaRevisao').style.display='none';
   document.querySelector('main').style.display='block';
+}
+function _mostrarBotoesRev(visivel){
+  ['btnRevAudio','btnRevImg','btnLiberar'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display=visivel?'inline-block':'none'; });
+  var m=document.getElementById('revMidia'); if(m) m.style.display=visivel?'':'none';
+}
+function montarRevMidia(exId){
+  var ex=exames.find(function(e){return e.id===exId;});
+  var da=document.getElementById('revMidiaAudio'); var di=document.getElementById('revMidiaImg');
+  if(!da||!di) return;
+  // áudios
+  var auds=audios.filter(function(a){return a.exameId===exId;});
+  da.innerHTML=auds.length
+    ? auds.map(function(a){return '<div style="margin-bottom:4px"><span style="font-size:13px;font-weight:600">🎙 '+a.nome+'</span>'+(a.url?playerLinha(a.url):'')+'</div>';}).join('')
+    : '<p class="aviso">Sem gravação vinculada a este exame.</p>';
+  // imagens
+  var imgs=(ex&&ex.imagens)||[];
+  di.style.display='flex'; di.style.flexWrap='wrap'; di.style.gap='6px';
+  di.innerHTML=imgs.length
+    ? imgs.map(function(d){return '<img class="revImg" onmousemove="revImgMove(event,this)" onmouseleave="revImgLeave(this)" src="'+d+'" style="max-width:110px;max-height:110px;border:1px solid #c8d0da;border-radius:6px;cursor:zoom-in">';}).join('')
+    : '<p class="aviso">Sem imagens.</p>';
+  // reset: ambos fechados
+  da.style.display='none'; di.style.display='none';
+}
+function toggleRevMidia(tipo){
+  var el=document.getElementById(tipo==='audio'?'revMidiaAudio':'revMidiaImg');
+  var out=document.getElementById('revMidia');
+  if(!el) return;
+  var abrindo=el.style.display==='none';
+  if(tipo==='img') el.style.display=abrindo?'flex':'none';
+  else el.style.display=abrindo?'block':'none';
+  // garante que o container pai seja visível se qualquer filho estiver aberto
+  var da=document.getElementById('revMidiaAudio'); var di=document.getElementById('revMidiaImg');
+  if(out) out.style.display=(da&&da.style.display!=='none')||(di&&di.style.display!=='none')?'block':'none';
+}
+async function liberarEProximo(){
+  var exId=window.__revAtual&&window.__revAtual.exId!=null?window.__revAtual.exId:null;
+  if(exId==null){ log('Nenhum exame ativo para liberar.',true); return; }
+  // 1ª ação do gesto: garantir pasta se necessário (antes de qualquer await de longa duração)
+  if(suportaFS()&&!pastaLaudoH){ await garantirPasta(); if(!pastaLaudoH){ log('Liberar cancelado: escolha a pasta de destino.',true); return; } }
+  await salvarLaudoPasta();
+  try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
+  var exAtual=exames.find(function(e){return e.id===exId;}); if(exAtual) exAtual._liberado=true;
+  // próximo laudo com laudo gerado e ainda não liberado
+  var pendentes=exames.filter(function(e){return e.laudo&&!e._liberado;});
+  if(pendentes.length){ abrirRevisao(pendentes[0].id); }
+  else { log('Todos os laudos foram liberados.'); fecharRevisao(); renderRevisao(); }
 }
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{ try{ fsGetHandle('laudo').then(function(h){ pastaLaudoH=h; atualizarPastaInfoRev(); }); }catch(e){}

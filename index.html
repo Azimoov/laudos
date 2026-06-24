@@ -95,6 +95,11 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <input type="file" id="cfgAss" accept="image/*">
   <div id="assPrev" style="margin-top:6px"></div>
   <div id="cfgPastas" style="margin-top:10px;display:none"><label>Pastas no computador (Chrome/Edge)</label><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" onclick="definirPasta('audio')">📁 Pasta de áudios</button><button class="btn sec" onclick="definirPasta('laudo')">📁 Pasta de laudos</button></div><span class="aviso">No iPad, o botão Salvar abre a folha de compartilhamento do iOS.</span></div>
+  <div style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
+    <label>🧠 Aprendizados (regras tiradas das suas correções)</label>
+    <span class="aviso">Surgem quando você corrige um laudo e toca "Liberar e próximo". São aplicados nos próximos laudos. Exclua os que não quiser.</span>
+    <div id="listaRegras" style="margin-top:6px"></div>
+  </div>
   <div style="margin-top:12px"><button class="btn" onclick="salvarConfig()">Salvar</button></div>
   <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API da OpenAI para análise.</p>
 </div>
@@ -381,6 +386,7 @@ function alternarConfig(){
   document.getElementById('cfgModelo').value = cfg.modelo;
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
+  renderRegras();
 }
 document.getElementById('cfgAss').addEventListener('change', function(e){
   const f = e.target.files[0]; if(!f) return;
@@ -1092,6 +1098,7 @@ async function gerarLaudo(exId){
   try{
     const mod = MODELOS[ex.tipo];
     const trans = audios.filter(a=>a.exameId===exId).map(a=>a.transcricao).filter(Boolean).join('\n---\n');
+    const regrasAprend = regrasParaPrompt(ex.tipo);
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), use o texto padrão correspondente do médico como BASE do vocabulário, mas NÃO o cole mecanicamente: integre-o reescrevendo o parágrafo do órgão como um texto único, fluido e gramaticalmente correto, como um médico redigiria. Ajuste a CONCLUSÃO de acordo.\n\n"+
@@ -1100,11 +1107,13 @@ async function gerarLaudo(exId){
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico):\n"+BIZUS+"\n\n"+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
+(regrasAprend ? "REGRAS APRENDIDAS COM AS CORREÇÕES DO MÉDICO (cumpra à risca; têm prioridade sobre o estilo padrão quando houver conflito):\n"+regrasAprend+"\n\n" : "")+
 "Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
     const resp = await openai(partes);
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:resp.conclusao||mod.conclusao, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:resp.observacoes_para_o_medico||''};
+    ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
     renderExames();
     if(document.getElementById('cardRevisao')){ renderRevisao(); document.getElementById('cardRevisao').style.display='block'; }
 
@@ -1318,6 +1327,93 @@ function negrito(t){
   const esc = (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return esc.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
 }
+/* ============ Loop de aprendizado: regras das correções do médico (localStorage) ============ */
+function lerRegras(){ try{ return JSON.parse(localStorage.getItem('gregras')||'[]'); }catch(e){ return []; } }
+function gravarRegras(arr){ try{ localStorage.setItem('gregras', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar os aprendizados: '+e.message, true); } }
+function regrasParaPrompt(tipo){
+  var rs=lerRegras().filter(function(r){ return r.escopo==='global' || r.escopo===tipo; });
+  if(!rs.length) return '';
+  return rs.map(function(r,i){ return (i+1)+'- '+r.texto; }).join('\n');
+}
+function textoBaseLaudo(L){
+  if(!L) return '';
+  var c=L.cab||{};
+  var cab='Nome: '+(c.nome||'')+' | Idade: '+(c.idade||'')+' | Realizado em: '+(c.realizado_em||'')+' | Dados clínicos: '+(c.dados_clinicos||'');
+  return (cab+'\n\n'+String(L.corpo||'').replace(/\*\*/g,'')+'\n\nCONCLUSÃO: '+String(L.conclusao||'').replace(/\*\*/g,'')).trim();
+}
+function textoEditadoLaudo(){
+  var cab=document.querySelector('#areaImpressao .laudoCab');
+  var corpo=document.querySelector('#areaImpressao .laudoTexto');
+  var t1=cab?(cab.innerText||cab.textContent||''):'';
+  var t2=corpo?(corpo.innerText||corpo.textContent||''):'';
+  return (t1+'\n\n'+t2).replace(/ /g,' ').trim();
+}
+async function aprenderComEdicao(exId){
+  try{
+    var ex=exames.find(function(e){return e.id===exId;});
+    if(!ex||!ex.laudo||!ex.laudoBaseTexto||!cfg.chave) return;
+    var editado=textoEditadoLaudo(); if(!editado) return;
+    var norm=function(s){ return String(s||'').replace(/\s+/g,' ').trim(); };
+    if(norm(editado)===norm(ex.laudoBaseTexto)) return; // nada mudou
+    log('Analisando suas correções para aprender...');
+    var nomeTipo=(MODELOS[ex.tipo]&&MODELOS[ex.tipo].nome)||ex.tipo||'';
+    var prompt="Você ajuda a calibrar um assistente de laudos de ultrassom. O médico revisou e CORRIGIU um laudo. Compare a VERSÃO ORIGINAL (gerada pela IA) com a VERSÃO FINAL (corrigida pelo médico) e extraia REGRAS GENERALIZÁVEIS de preferência do médico (terminologia, redação, estrutura, formatação, conduta) para aplicar em FUTUROS laudos.\n\n"+
+      "REGRAS DA EXTRAÇÃO:\n- IGNORE diferenças específicas DESTE paciente: nomes, idades, datas, medidas numéricas, lado (direito/esquerdo) e achados pontuais deste exame — NÃO viram regra.\n- Só gere uma regra se a mudança refletir uma PREFERÊNCIA REPETÍVEL (ex.: trocar um termo por outro, alterar uma frase padrão, ordem dos parágrafos, formatação/negrito).\n- Cada regra: frase curta, imperativa, genérica, SEM nenhum dado do paciente.\n- Classifique o ESCOPO de cada regra: \"global\" (vale para qualquer exame) OU \""+ex.tipo+"\" (só faz sentido neste tipo de exame).\n- Se as mudanças forem apenas específicas do paciente, responda lista vazia.\n\n"+
+      "TIPO DO EXAME ATUAL: "+ex.tipo+" ("+nomeTipo+")\n\nVERSÃO ORIGINAL:\n"+ex.laudoBaseTexto+"\n\nVERSÃO FINAL (corrigida pelo médico):\n"+editado+"\n\n"+
+      "Responda SOMENTE em JSON: {\"regras\":[{\"texto\":\"...\",\"escopo\":\"global ou "+ex.tipo+"\"}]}";
+    var resp=await openai([{type:'text', text:prompt}]);
+    var regras=(resp&&Array.isArray(resp.regras))?resp.regras.filter(function(r){return r&&r.texto;}):[];
+    if(!regras.length){ log('Suas correções pareceram específicas deste paciente — nada a aprender.'); return; }
+    await confirmarAprendizados(regras, ex.tipo);
+  }catch(e){ log('Não consegui analisar as correções: '+e.message, true); }
+}
+function confirmarAprendizados(regras, tipo){
+  return new Promise(function(resolve){
+    var nomeTipo=(MODELOS[tipo]&&MODELOS[tipo].nome)||tipo||'este tipo';
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px';
+    var itens=regras.map(function(r,i){
+      var esc=(r.escopo===tipo)?tipo:'global';
+      return '<div style="border:1px solid #c8d0da;border-radius:8px;padding:8px;margin-top:8px">'
+        +'<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" class="apChk" data-i="'+i+'" checked>'
+        +'<textarea class="apTxt" data-i="'+i+'" style="flex:1;min-height:46px;font-size:13px;border:1px solid #c8d0da;border-radius:6px;padding:4px">'+String(r.texto||'').replace(/</g,'&lt;')+'</textarea></label>'
+        +'<div style="margin-top:4px;font-size:12px">Aplicar em: <select class="apEsc" data-i="'+i+'"><option value="global"'+(esc==='global'?' selected':'')+'>Todos os exames</option><option value="'+tipo+'"'+(esc===tipo?' selected':'')+'>Só '+nomeTipo+'</option></select></div>'
+        +'</div>';
+    }).join('');
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:560px;width:100%;max-height:85vh;overflow:auto;padding:16px">'
+      +'<h2 style="margin:0 0 4px">🧠 Aprender com suas correções</h2>'
+      +'<p class="aviso" style="margin:0 0 6px">Revise o que notei nas suas edições. O que você guardar será aplicado nos próximos laudos. Desmarque o que não quiser guardar.</p>'
+      +itens
+      +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn sec" id="apDescartar">Descartar</button><button class="btn" id="apGuardar">Guardar selecionadas</button></div>'
+      +'</div>';
+    document.body.appendChild(ov);
+    function fechar(){ try{ ov.remove(); }catch(e){} resolve(); }
+    ov.querySelector('#apDescartar').onclick=fechar;
+    ov.querySelector('#apGuardar').onclick=function(){
+      var novas=lerRegras();
+      Array.prototype.forEach.call(ov.querySelectorAll('.apChk'), function(ch){
+        if(!ch.checked) return;
+        var i=ch.getAttribute('data-i');
+        var txt=(ov.querySelector('.apTxt[data-i="'+i+'"]').value||'').trim();
+        var esc=ov.querySelector('.apEsc[data-i="'+i+'"]').value;
+        if(txt && !novas.some(function(r){return r.texto===txt && r.escopo===esc;})){ novas.push({id:'R'+Date.now()+'_'+i, texto:txt, escopo:esc, quando:Date.now()}); }
+      });
+      gravarRegras(novas); log('Aprendizados guardados.'); renderRegras(); fechar();
+    };
+  });
+}
+function renderRegras(){
+  var div=document.getElementById('listaRegras'); if(!div) return;
+  var rs=lerRegras();
+  if(!rs.length){ div.innerHTML='<span class="aviso">Nenhum aprendizado ainda. Eles surgem quando você corrige um laudo e toca "Liberar e próximo".</span>'; return; }
+  div.innerHTML=rs.map(function(r){
+    var esc=r.escopo==='global'?'Todos':((MODELOS[r.escopo]&&MODELOS[r.escopo].nome)||r.escopo);
+    return '<div style="display:flex;gap:8px;align-items:flex-start;border:1px solid #e1e7ee;border-radius:8px;padding:6px;margin-top:6px"><span style="flex:1;font-size:13px">'+String(r.texto).replace(/</g,'&lt;')+' <span class="tag">'+esc+'</span></span><button class="btn peq sec" style="color:#b3261e" onclick="excluirRegra(\''+r.id+'\')">✕</button></div>';
+  }).join('')+'<div style="margin-top:8px"><button class="btn peq sec" style="color:#b3261e" onclick="limparRegras()">🗑 Limpar todos</button></div>';
+}
+function excluirRegra(id){ gravarRegras(lerRegras().filter(function(r){return r.id!==id;})); renderRegras(); }
+function limparRegras(){ if(!confirm('Apagar TODOS os aprendizados guardados?')) return; gravarRegras([]); renderRegras(); }
+
 /* ============ Histórico de laudos (localStorage) ============ */
 function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')||'[]'); }catch(e){ return []; } }
 function gravarHistorico(arr){ try{ localStorage.setItem('glaudos', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar o histórico (armazenamento cheio?): '+e.message, true); } }
@@ -1528,6 +1624,7 @@ async function liberarEProximo(){
   await salvarLaudoPasta();
   try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
   var exAtual=exames.find(function(e){return e.id===exId;}); if(exAtual) exAtual._liberado=true;
+  await aprenderComEdicao(exId); // loop de aprendizado: analisa as correções do médico antes de seguir
   // próximo laudo com laudo gerado e ainda não liberado
   var pendentes=exames.filter(function(e){return e.laudo&&!e._liberado;});
   if(pendentes.length){ abrirRevisao(pendentes[0].id); }

@@ -97,7 +97,8 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div id="cfgPastas" style="margin-top:10px;display:none"><label>Pastas no computador (Chrome/Edge)</label><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" onclick="definirPasta('audio')">📁 Pasta de áudios</button><button class="btn sec" onclick="definirPasta('laudo')">📁 Pasta de laudos</button></div><span class="aviso">No iPad, o botão Salvar abre a folha de compartilhamento do iOS.</span></div>
   <div style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
     <label>🧠 Aprendizados (regras tiradas das suas correções)</label>
-    <span class="aviso">Surgem quando você corrige um laudo e toca "Liberar e próximo". São aplicados nos próximos laudos. Exclua os que não quiser.</span>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-top:4px"><input type="checkbox" id="cfgAprender" onchange="toggleAprender(this)"> Aprender com minhas correções (ao "Liberar e próximo")</label>
+    <span class="aviso">Desligue quando os laudos já estiverem saindo do seu jeito, para economizar tokens (não faz a chamada extra à IA). As regras já guardadas continuam sendo aplicadas.</span>
     <div id="listaRegras" style="margin-top:6px"></div>
   </div>
   <div style="margin-top:12px"><button class="btn" onclick="salvarConfig()">Salvar</button></div>
@@ -371,7 +372,8 @@ const cfg = {
   modelo: localStorage.getItem('gmodelo')||'chat-latest',
   medico: localStorage.getItem('gmedico')||'Dr. Daniel Serruya',
   crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962',
-  assinatura: localStorage.getItem('gass')||''
+  assinatura: localStorage.getItem('gass')||'',
+  aprender: localStorage.getItem('gaprende')!=='0'   // loop de aprendizado ligado por padrão
 };
 if(/^gemini/.test(cfg.modelo)){ cfg.modelo='chat-latest'; localStorage.setItem('gmodelo',cfg.modelo); }
 if(/^AIza/.test(cfg.chave)){ cfg.chave=''; localStorage.setItem('gmk',''); }
@@ -386,6 +388,7 @@ function alternarConfig(){
   document.getElementById('cfgModelo').value = cfg.modelo;
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
+  var ca=document.getElementById('cfgAprender'); if(ca) ca.checked = cfg.aprender;
   renderRegras();
 }
 document.getElementById('cfgAss').addEventListener('change', function(e){
@@ -1351,7 +1354,7 @@ function textoEditadoLaudo(){
 async function aprenderComEdicao(exId){
   try{
     var ex=exames.find(function(e){return e.id===exId;});
-    if(!ex||!ex.laudo||!ex.laudoBaseTexto||!cfg.chave) return;
+    if(!cfg.aprender||!ex||!ex.laudo||!ex.laudoBaseTexto||!cfg.chave) return;
     var editado=textoEditadoLaudo(); if(!editado) return;
     var norm=function(s){ return String(s||'').replace(/\s+/g,' ').trim(); };
     if(norm(editado)===norm(ex.laudoBaseTexto)) return; // nada mudou
@@ -1413,6 +1416,7 @@ function renderRegras(){
 }
 function excluirRegra(id){ gravarRegras(lerRegras().filter(function(r){return r.id!==id;})); renderRegras(); }
 function limparRegras(){ if(!confirm('Apagar TODOS os aprendizados guardados?')) return; gravarRegras([]); renderRegras(); }
+function toggleAprender(el){ cfg.aprender=!!el.checked; localStorage.setItem('gaprende', cfg.aprender?'1':'0'); log(cfg.aprender?'Aprendizado LIGADO — vou analisar suas correções ao "Liberar e próximo".':'Aprendizado DESLIGADO — economizando tokens. As regras já guardadas continuam valendo.'); }
 
 /* ============ Histórico de laudos (localStorage) ============ */
 function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')||'[]'); }catch(e){ return []; } }

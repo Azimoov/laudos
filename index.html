@@ -46,12 +46,18 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 .laudoTitulo{text-align:center;font-weight:600;margin:2px 0 12px;font-size:14px;}
 .laudoTexto{white-space:pre-wrap;text-align:justify;outline:none;}
 .laudoTexto:focus{background:#fffbe8;}
+#barraFormato{display:flex;gap:5px;flex-wrap:wrap;align-items:center;max-width:760px;margin:0 auto 8px;padding:6px 10px;background:#f0f4f8;border-radius:8px;border:1px solid #c8d0da;}
+#barraFormato button{padding:3px 10px;border:1px solid #b0bac4;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;min-width:32px;line-height:1.5;}
+#barraFormato button:hover{background:#dce6f0;}
+#barraFormato button.ativo{background:#c5d8f0;border-color:#7aaadb;}
+#barraFormato .fmtSep{width:1px;height:20px;background:#c8d0da;margin:0 3px;display:inline-block;}
 .assin{text-align:center;margin-top:14px;font-size:12.5px;}
 .assin .linha{display:inline-block;border-top:1px solid #000;padding-top:3px;min-width:330px;}
 .rodapeLaudo{border:1px solid #000;margin-top:10px;padding:5px 8px;font-size:10px;text-align:justify;}
 @media print{
   body{background:#fff;}
   body *{visibility:hidden;}
+  #barraFormato{display:none;}
   #areaImpressao,#areaImpressao *{visibility:visible;}
   #areaImpressao{position:absolute;left:0;top:0;width:100%;}
   .laudoFolha{border:0;max-width:none;padding:6mm 10mm;}
@@ -174,6 +180,20 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
       <button class="btn sec" id="btnFundo" onclick="trocarFundo()" style="display:none">🎨 Fundo</button>
       <button class="btn" id="btnLiberar" onclick="liberarEProximo()" style="display:none;background:#1f7a3d">✅ Liberar e próximo</button>
       <span class="aviso" style="align-self:center">Toque no texto para editar. No iPad: Imprimir → pinçar a pré-visualização → Compartilhar → Salvar em Arquivos (PDF).</span>
+    </div>
+    <!-- barra de formatação -->
+    <div id="barraFormato">
+      <button title="Negrito" onclick="fmtCmd('bold')"><b>N</b></button>
+      <button title="Itálico" onclick="fmtCmd('italic')"><i>I</i></button>
+      <button title="Sublinhado" onclick="fmtCmd('underline')"><u>S</u></button>
+      <span class="fmtSep"></span>
+      <button title="Diminuir fonte" onclick="ajustarFonte(-1)">A<sup>−</sup></button>
+      <button title="Aumentar fonte" onclick="ajustarFonte(+1)">A<sup>+</sup></button>
+      <span class="fmtSep"></span>
+      <button title="Alinhar à esquerda" onclick="fmtCmd('justifyLeft')">⬤≡</button>
+      <button title="Justificar" onclick="fmtCmd('justifyFull')">≡≡</button>
+      <span class="fmtSep"></span>
+      <button title="Limpar formatação da seleção" onclick="fmtCmd('removeFormat')" style="font-size:11px;color:#666">✕ fmt</button>
     </div>
     <!-- painel de mídia: fora do areaImpressao para não entrar no PDF/impressão -->
     <div id="revMidia" style="display:none;max-width:760px;margin:0 auto 10px;padding:10px;background:#f4f7fa;border-radius:10px">
@@ -1494,6 +1514,19 @@ function escolherFundo(){
       +'</div></div>';
     ov.addEventListener('click',function(e){ var b=e.target.closest('button[data-k]'); if(!b) return; window.__fundo=b.getAttribute('data-k'); window.__fundoPerguntado=true; if(ov.parentNode) document.body.removeChild(ov); resolve(window.__fundo); });
     document.body.appendChild(ov);
+  });
+}
+function fmtCmd(cmd){ document.execCommand(cmd); }
+function ajustarFonte(delta){
+  var sel=window.getSelection(); if(!sel||!sel.rangeCount||sel.isCollapsed) return;
+  document.execCommand('fontSize',false,'7');
+  var els=document.querySelectorAll('#areaImpressao font[size="7"]');
+  els.forEach(function(f){
+    var cur=parseInt(window.getComputedStyle(f.parentElement||f).fontSize)||13;
+    var prox=Math.max(7,Math.min(30,cur+delta));
+    var sp=document.createElement('span'); sp.style.fontSize=prox+'px';
+    while(f.firstChild) sp.appendChild(f.firstChild);
+    f.parentNode.replaceChild(sp,f);
   });
 }
 function garantirFundo(){ return window.__fundoPerguntado ? Promise.resolve(window.__fundo) : escolherFundo(); }

@@ -93,6 +93,9 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
     <option value="gpt-5.5">gpt-5.5 (mais capaz, mais caro)</option>
     <option value="gpt-4o">gpt-4o (antigo)</option>
   </select>
+  <label>Modelo auxiliar (tarefas simples — ex.: aprendizado)</label>
+  <input type="text" id="cfgModeloAux" placeholder="ex.: gpt-5-mini (vazio = usa o modelo acima)">
+  <span class="aviso">Modelo barato usado só na extração de regras do aprendizado. Se vazio, usa o modelo principal.</span>
   <label>Médico (assinatura)</label>
   <input type="text" id="cfgMedico" value="Dr. Daniel Serruya">
   <label>CRM</label>
@@ -394,6 +397,7 @@ const BIZUS = "  Bizus\n  -------\n\nMAMA:\n\nDois nódulos BR3:\n\nMama simétr
 const cfg = {
   chave: localStorage.getItem('gmk')||'',
   modelo: localStorage.getItem('gmodelo')||'chat-latest',
+  modeloAux: localStorage.getItem('gmodaux')||'',
   medico: localStorage.getItem('gmedico')||'Dr. Daniel Serruya',
   crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962',
   assinatura: localStorage.getItem('gass')||'',
@@ -410,6 +414,7 @@ function alternarConfig(){
   mostrarAssPrev();
   document.getElementById('cfgChave').value = cfg.chave;
   document.getElementById('cfgModelo').value = cfg.modelo;
+  document.getElementById('cfgModeloAux').value = cfg.modeloAux;
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
   var ca=document.getElementById('cfgAprender'); if(ca) ca.checked = cfg.aprender;
@@ -451,9 +456,10 @@ function removerAss(){ cfg.assinatura=''; localStorage.removeItem('gass'); mostr
 function salvarConfig(){
   cfg.chave = document.getElementById('cfgChave').value.trim();
   cfg.modelo = document.getElementById('cfgModelo').value;
+  cfg.modeloAux = document.getElementById('cfgModeloAux').value.trim();
   cfg.medico = document.getElementById('cfgMedico').value.trim();
   cfg.crm = document.getElementById('cfgCrm').value.trim();
-  localStorage.setItem('gmk',cfg.chave); localStorage.setItem('gmodelo',cfg.modelo);
+  localStorage.setItem('gmk',cfg.chave); localStorage.setItem('gmodelo',cfg.modelo); localStorage.setItem('gmodaux',cfg.modeloAux);
   localStorage.setItem('gmedico',cfg.medico); localStorage.setItem('gcrm',cfg.crm);
   document.getElementById('cardConfig').style.display='none';
   log('Configurações salvas.');
@@ -466,9 +472,10 @@ function log(m, erro){
 }
 
 /* ============ Chamada à API OpenAI ============ */
-async function openai(conteudo, querJson=true){
+async function openai(conteudo, querJson=true, opts){
   if(!cfg.chave) throw new Error('Configure sua chave da API em ⚙︎ Configurações.');
-  const body = {model: cfg.modelo, messages:[{role:'user', content: conteudo}]};
+  const modelo = (opts && opts.modelo) ? opts.modelo : cfg.modelo;
+  const body = {model: modelo, messages:[{role:'user', content: conteudo}]};
   if(querJson) body.response_format = {type:'json_object'};
   const r = await fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
@@ -1433,7 +1440,7 @@ async function aprenderComEdicao(exId){
       "REGRAS DA EXTRAÇÃO:\n- IGNORE diferenças específicas DESTE paciente: nomes, idades, datas, medidas numéricas, lado (direito/esquerdo) e achados pontuais deste exame — NÃO viram regra.\n- Só gere uma regra se a mudança refletir uma PREFERÊNCIA REPETÍVEL (ex.: trocar um termo por outro, alterar uma frase padrão, ordem dos parágrafos, formatação/negrito).\n- Cada regra: frase curta, imperativa, genérica, SEM nenhum dado do paciente.\n- Classifique o ESCOPO de cada regra: \"global\" (vale para qualquer exame) OU \""+ex.tipo+"\" (só faz sentido neste tipo de exame).\n- Se as mudanças forem apenas específicas do paciente, responda lista vazia.\n\n"+
       "TIPO DO EXAME ATUAL: "+ex.tipo+" ("+nomeTipo+")\n\nVERSÃO ORIGINAL:\n"+ex.laudoBaseTexto+"\n\nVERSÃO FINAL (corrigida pelo médico):\n"+editado+"\n\n"+
       "Responda SOMENTE em JSON: {\"regras\":[{\"texto\":\"...\",\"escopo\":\"global ou "+ex.tipo+"\"}]}";
-    var resp=await openai([{type:'text', text:prompt}]);
+    var resp=await openai([{type:'text', text:prompt}], true, {modelo: cfg.modeloAux||cfg.modelo});
     var regras=(resp&&Array.isArray(resp.regras))?resp.regras.filter(function(r){return r&&r.texto;}):[];
     if(!regras.length){ log('Suas correções pareceram específicas deste paciente — nada a aprender.'); return; }
     await confirmarAprendizados(regras, ex.tipo);

@@ -827,15 +827,25 @@ async function processar(){
       if(ehPdf){
         log('Lendo worksheet '+ff.name+' (texto, sem visão) ...');
         const meta=metaDoPdf(await pdfTextoPag1(ff));
-        if(meta.paciente) folderMap[folder].paciente=capNome(meta.paciente);
+        if(meta.paciente){ folderMap[folder].paciente=capNome(meta.paciente); folderMap[folder].usouPdf=true; }
         if(meta.data) folderMap[folder].data=meta.data;
         if(meta.idade) folderMap[folder].idade=meta.idade;
         // tipo NÃO vem do preset do worksheet (ex.: "ADULTO ABD" é o preset carregado, não o exame): o tipo vem do ditado
-        log('  → '+(folderMap[folder].paciente||'(nome?)')+(meta.data?' | '+meta.data:''));
+        log('  → '+(folderMap[folder].paciente||'(nome?)')+(meta.data?' | '+meta.data:'')+(folderMap[folder].usouPdf?'':' [PDF sem nome — usarei visão]'));
         continue; // worksheet não entra como imagem do exame
       }
       log('Lendo '+folder+'/'+ff.name+' ...');
       folderMap[folder].imagens = folderMap[folder].imagens.concat(await arquivoParaImagens(ff));
+    }
+    // fallback: pastas SEM worksheet PDF utilizável caem no método antigo (visão na 1ª imagem)
+    for(let i=0;i<folderOrder.length;i++){
+      const g=folderMap[folderOrder[i]];
+      if(g.usouPdf || !g.imagens.length) continue;
+      log('Pasta sem worksheet PDF — lendo a legenda da 1ª imagem por visão (método antigo) ...');
+      try{ const m=await extrairMetaImagem(g.imagens[0]);
+        if(m){ if(m.tipoExame){ const th=mapTipo(m.tipoExame); if(th && !g.tipo) g.tipo=th; }
+               if((!g.paciente||g.paciente.length<2) && m.paciente) g.paciente=capNome(m.paciente); }
+      }catch(e){}
     }
     exames = agruparItens(flatItens);
     for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:(g.paciente||fo), subExame:(g.subExame||''), imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:1, dataExame:g.data||'', idadeExame:g.idade||''}); }

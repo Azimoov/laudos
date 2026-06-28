@@ -333,7 +333,7 @@ async function transcreverAudio(arquivoOuBlob){
     if(r.status!==404 && r.status!==400) break;
   }
   if(texto===null) throw new Error('Transcrição falhou: '+ultimoErro);
-  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, abdomen_superior, rins, prostata, tireoide, mama, transvaginal, pelvica, obst1, obst1_descolamento, obst23, obst_gemelar, bolsa_escrotal, penis, parede_abdominal, partes_moles, ombro, cotovelo, punho, mao, joelho, tornozelo, pe, outro; (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio). Extraia lateralidade SOMENTE para os tipos: ombro, joelho, tornozelo, punho e partes_moles — para todos os demais tipos responda \"\" independentemente do que for dito. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
+  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, abdomen_superior, rins, prostata, tireoide, mama, transvaginal, pelvica, obst1, obst1_descolamento, obst23, obst_gemelar, bolsa_escrotal, penis, parede_abdominal, partes_moles, axila, ombro, cotovelo, punho, mao, joelho, tornozelo, pe, outro; (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio). Extraia lateralidade SOMENTE para os tipos: axila, ombro, joelho, tornozelo, punho e partes_moles — para todos os demais tipos responda \"\" independentemente do que for dito. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
   return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: resp.tipo_exame||'', lateralidade: resp.lateralidade||''};
 }
 
@@ -461,6 +461,7 @@ const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edit
   penis:['peniano','penis'],
   parede_abdominal:['parede abdominal','hernia','parede'],
   partes_moles:['partes moles','parte mole','tecido subcutaneo','nodulo subcutaneo'],
+  axila:['axila','axilar','linfonodo axilar','linfonodos axilares'],
   ombro:['ombro'], cotovelo:['cotovelo'], punho:['punho'], mao:['mao','quirodactilo'],
   joelho:['joelho'], tornozelo:['tornozelo'], pe:['pe','pododactilo']
 };
@@ -791,7 +792,7 @@ setInterval(atualizarPausa, 400);
 function primeiroUltimo(nome){ const p=(nome||'').trim().split(' ').filter(function(x){return x;}); if(!p.length) return ''; return p.slice(0,3).join(' '); }
 function nomeCompleto(nome){ return String(nome||'').replace(/\s+/g,' ').trim(); }
 function normLateralidade(s){ const t=norm(s); if(/esquerd/.test(t)) return 'Esquerdo'; if(/direit/.test(t)) return 'Direito'; if(/bilater|ambos|os dois|dois lados/.test(t)) return 'Bilateral'; return ''; }
-const TIPOS_COM_LATERALIDADE = new Set(['ombro','joelho','tornozelo','punho','partes_moles']);
+const TIPOS_COM_LATERALIDADE = new Set(['axila','ombro','joelho','tornozelo','punho','partes_moles']);
 function nomeAudio(nomePac, tipoTexto, lateralidade){ const pn=nomeCompleto(nomePac); const k=mapTipo(tipoTexto); const tn=(k&&MODELOS[k])?MODELOS[k].nome:(tipoTexto||''); const lat=(k&&TIPOS_COM_LATERALIDADE.has(k))?normLateralidade(lateralidade):''; const tnLat=(tn?tn:'')+(lat?(tn?' '+lat:lat):''); return ((pn||'Sem nome')+(tnLat?' - '+tnLat:'')).trim(); }
 function nomeArquivoSeguro(s){ return ((s||'audio').replace(/[^A-Za-z0-9 ÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇÑáàâãéèêíïóôõöúüçñ_-]/g,' ').replace(/  +/g,' ').trim())||'audio'; }
 function playerLinha(url){

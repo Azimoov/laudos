@@ -112,7 +112,7 @@ const MODELOS = {
  },
  "axila": {
   "nome": "Axila",
-  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO AXILA .....",
+  "titulo": "RELATÓRIO ULTRASSONOGRÁFICO AXILAS",
   "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
   "corpo": "**Pele e tecido celular subcutâneo** sem alterações significativas.\n\n**Linfonodos axilares** de forma, dimensões e ecotextura normais, com córtex preservado e hilo ecogênico identificado. Não se observam linfonodos com morfologia suspeita.\n\n**Vasos axilares** de trajeto e calibre habituais, sem alterações ao Doppler.",
   "conclusao": "Exame ecográfico compatível com a normalidade."

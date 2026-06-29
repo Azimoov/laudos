@@ -1450,15 +1450,43 @@ function bizusParse(texto){
 function bizusMontar(preamble, secoes){
   return preamble + secoes.map(function(s){ return s.nome+':\n\n'+s.corpo+'\n\n'; }).join('');
 }
+function bizusSplitRegiao(corpo){
+  // separa uma região em patologias individuais: cada bizu vai do título até a "Conclusão" (+ trailers como Categoria/Sugestão).
+  var blocos=corpo.split(/\n\s*\n/).map(function(b){return b.replace(/\s+$/,'');}).filter(function(b){return b.trim()!=='';});
+  function isTrailer(b){ return /^(categoria|sugest|obs\b|recomenda)/i.test(b.trim()); }
+  var bizus=[], cur=[], sawConc=false;
+  for(var i=0;i<blocos.length;i++){
+    var b=blocos[i];
+    if(sawConc){
+      if(isTrailer(b)){ cur.push(b); continue; }
+      bizus.push(cur); cur=[]; sawConc=false;
+    }
+    cur.push(b);
+    if(/conclus/i.test(b)) sawConc=true;
+  }
+  if(cur.length) bizus.push(cur);
+  return bizus.map(function(blocks){
+    var texto=blocks.join('\n\n');
+    var titulo=(blocks[0].split('\n')[0]||'').replace(/:\s*$/,'').trim();
+    if(titulo.length>62) titulo=titulo.slice(0,62)+'…';
+    return {titulo:titulo, texto:texto};
+  });
+}
 function abrirEditorBizus(){
   var cont=document.getElementById('bizusEditor'); if(!cont) return;
   if(cont.__aberto){ cont.innerHTML=''; cont.__aberto=false; return; }
   var parsed=bizusParse(bizusEfetivo());
-  var html='<p class="aviso">Edite os dizeres padrão por região e toque <b>Salvar BIZUS</b>. Ficam só neste navegador e entram nos próximos laudos.</p>';
+  var html='<p class="aviso">Cada patologia fica na sua caixinha (borda pontilhada). Edite e toque <b>Salvar BIZUS</b>. Ficam só neste navegador e entram nos próximos laudos.</p>';
   if(localStorage.getItem('gbizus')) html+='<p class="aviso" style="color:#1f7a3d;font-weight:600">✔ Você tem BIZUS personalizados salvos.</p>';
-  html+=parsed.secoes.map(function(s,i){
-    return '<details style="border:1px solid #c8d0da;border-radius:8px;margin-top:6px"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">'+(BIZUS_NOMES[s.nome]||s.nome)+'</summary>'
-      +'<textarea data-sec="'+i+'" style="width:100%;min-height:200px;font-size:12.5px;font-family:ui-monospace,Consolas,monospace;border:0;border-top:1px solid #c8d0da;border-radius:0 0 8px 8px;padding:8px;resize:vertical;box-sizing:border-box">'+String(s.corpo).replace(/</g,'&lt;')+'</textarea></details>';
+  html+=parsed.secoes.map(function(s,ri){
+    var bizus=bizusSplitRegiao(s.corpo);
+    var caixas=bizus.map(function(bz,bi){
+      var rows=Math.max(4, Math.min(28, (bz.texto.match(/\n/g)||[]).length+2));
+      return '<div style="border:1px dashed #7d97b5;border-radius:8px;padding:6px 8px;margin-top:8px;background:#fcfdff">'
+        +'<div style="font-size:12px;font-weight:700;color:#1e5b8a;margin-bottom:4px">'+String(bz.titulo||('Bizu '+(bi+1))).replace(/</g,'&lt;')+'</div>'
+        +'<textarea data-reg="'+ri+'" data-bz="'+bi+'" rows="'+rows+'" style="width:100%;font-size:12.5px;font-family:ui-monospace,Consolas,monospace;border:0;background:transparent;resize:vertical;box-sizing:border-box;outline:none">'+String(bz.texto).replace(/</g,'&lt;')+'</textarea></div>';
+    }).join('');
+    return '<details style="border:1px solid #c8d0da;border-radius:8px;margin-top:6px"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">'+(BIZUS_NOMES[s.nome]||s.nome)+' <span class="aviso" style="font-weight:400">('+bizus.length+')</span></summary><div style="padding:0 8px 8px">'+caixas+'</div></details>';
   }).join('');
   html+='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" onclick="salvarBizus()">💾 Salvar BIZUS</button><button class="btn sec" type="button" onclick="restaurarBizus()">↩ Restaurar padrão</button></div>';
   cont.innerHTML=html;
@@ -1468,9 +1496,13 @@ function abrirEditorBizus(){
 }
 function salvarBizus(){
   var cont=document.getElementById('bizusEditor'); if(!cont||!cont.__nomes) return;
-  var tas=cont.querySelectorAll('textarea[data-sec]');
-  var secoes=[];
-  Array.prototype.forEach.call(tas, function(ta){ var i=parseInt(ta.getAttribute('data-sec'),10); secoes[i]={nome:cont.__nomes[i], corpo:(ta.value||'').replace(/\s+$/,'')}; });
+  var corpos={};
+  Array.prototype.forEach.call(cont.querySelectorAll('textarea[data-reg]'), function(ta){
+    var rg=parseInt(ta.getAttribute('data-reg'),10);
+    if(!corpos[rg]) corpos[rg]=[];
+    corpos[rg].push((ta.value||'').replace(/\s+$/,''));
+  });
+  var secoes=cont.__nomes.map(function(nome,i){ return {nome:nome, corpo:(corpos[i]||[]).join('\n\n')}; });
   var novo=bizusMontar(cont.__preamble, secoes);
   try{ localStorage.setItem('gbizus', novo); log('BIZUS salvos — serão usados nos próximos laudos.'); var st=document.getElementById('bizusStatus'); if(st) st.textContent='✔ personalizados salvos'; }
   catch(e){ log('Não consegui salvar os BIZUS (armazenamento cheio?): '+e.message,true); }

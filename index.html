@@ -155,6 +155,27 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div id="lokoThumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
 </div>
 
+<div class="card" id="cardCaptura" style="border:2px solid #1f7a3d">
+  <h2>🔴 Captura ao vivo — grave agora, a imagem chega depois</h2>
+  <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando as imagens chegarem na pasta vigiada, o app vincula ao ditado e gera o laudo. Atalho: <b>barra de espaço</b> grava / pausa / retoma.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px">
+    <button class="btn" id="btnCapRec" onclick="capToggleRec()">🎙 Gravar ditado</button>
+    <button class="btn" id="btnCapFinalizar" onclick="capFinalizar()" style="display:none;background:#1f7a3d">✅ Finalizar ditado</button>
+    <canvas id="vuCap" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px;align-self:center"></canvas>
+    <span class="aviso" id="capRecInfo" style="align-self:center">Atalho: barra de espaço grava / pausa / retoma.</span>
+  </div>
+  <div id="capPendentes" style="margin-top:8px"></div>
+  <div id="capFolderSec" style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn sec" onclick="capEscolherPasta()">📁 Escolher pasta a vigiar</button>
+      <button class="btn" id="btnCapVigiar" onclick="capToggleVigia()" style="display:none">▶ Iniciar captura</button>
+      <span class="aviso" id="capPastaInfo">Nenhuma pasta escolhida.</span>
+    </div>
+    <div id="capStatus" class="aviso" style="margin-top:6px"></div>
+  </div>
+  <div id="capExamesNovos" style="margin-top:8px"></div>
+</div>
+
 <div class="card" id="cardExames" style="display:none">
   <h2>3 · Exames identificados — confira e gere os laudos</h2>
   <div id="listaExames"></div>
@@ -689,7 +710,7 @@ async function processar(){
     }
     // 2b. ditados guardados no aparelho
     let acum = [];
-    try{ acum = await gravListar(); }catch(e){ log('Falha ao ler ditados guardados: '+e.message, true); }
+    try{ acum = (await gravListar()).filter(function(g){return !g._captura;}); }catch(e){ log('Falha ao ler ditados guardados: '+e.message, true); }
     for(const g of acum){
       const dtg = new Date(g.quando);
       const rotulo = 'Ditado '+dtg.toLocaleDateString('pt-BR').slice(0,5)+' '+dtg.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -1154,7 +1175,7 @@ async function gravarAcumulado(){
 async function renderAcum(){
   const div=document.getElementById('listaAcum'); if(!div) return;
   let lista=[];
-  try{ lista=await gravListar(); window.__ditadosCache=lista; lista.sort(function(a,b){return (b.quando||0)-(a.quando||0);}); }catch(e){ div.innerHTML='<span class="aviso">não foi possível ler as gravações guardadas</span>'; return; }
+  try{ lista=(await gravListar()).filter(function(g){return !g._captura;}); window.__ditadosCache=lista; lista.sort(function(a,b){return (b.quando||0)-(a.quando||0);}); }catch(e){ div.innerHTML='<span class="aviso">não foi possível ler as gravações guardadas</span>'; return; }
   if(!lista.length){ div.innerHTML='<span class="aviso">Nenhum ditado guardado neste aparelho.</span>'; return; }
   div.innerHTML = '<div class="aviso" style="font-weight:600;margin-bottom:4px">📼 '+lista.length+' gravaç'+(lista.length===1?'ão':'ões')+' guardada'+(lista.length===1?'':'s')+' neste aparelho</div>' + lista.map(function(g){
     const dt=new Date(g.quando);
@@ -1612,6 +1633,209 @@ async function liberarEProximo(){
   if(pendentes.length){ abrirRevisao(pendentes[0].id); }
   else { log('Todos os laudos foram liberados.'); fecharRevisao(); renderRevisao(); }
 }
+/* ============================================================
+   Captura ao vivo: grava o ditado PRIMEIRO, vigia a pasta de
+   export do aparelho, vincula a imagem que chega ao ditado e
+   gera o laudo. Reaproveita transcreverAudio, arquivoParaImagens,
+   metaDoPdf, gerarLaudo, abrirRevisao, renderExames, File System.
+   ============================================================ */
+let capWatchH=null, capWatching=false, capTimer=null, capVarrendo=false, capArmado=false;
+let capSeen=new Set(), capProcessadas=new Set(), capStable={};
+let capMR=null, capChunks=[], capStream=null, capTimer2=null, capSeg=0;
+
+function capStatusTxt(t){ var s=document.getElementById('capStatus'); if(s) s.textContent=t; }
+function capEhMidia(nome){ return /\.(jpe?g|png|bmp|pdf)$/i.test(nome); }
+
+/* ---- gravação do ditado (atalho: barra de espaço) ---- */
+async function capToggleRec(){
+  capArmado=true;
+  if(capMR && capMR.state==='recording'){ try{ capMR.pause(); }catch(e){} capSetRecUI('pause'); return; }
+  if(capMR && capMR.state==='paused'){ try{ capMR.resume(); }catch(e){} capSetRecUI('rec'); return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação.',true); return; }
+  try{ capStream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ log('Acesso ao microfone negado: '+e.message,true); return; }
+  var mime=''; if(MediaRecorder.isTypeSupported('audio/mp4')) mime='audio/mp4'; else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
+  capMR=new MediaRecorder(capStream, mime?{mimeType:mime}:undefined);
+  capChunks=[];
+  capMR.ondataavailable=function(e){ if(e.data&&e.data.size>0) capChunks.push(e.data); };
+  capMR.onstop=async function(){
+    var blob=new Blob(capChunks,{type:capMR.mimeType||'audio/mp4'});
+    try{ capStream.getTracks().forEach(function(t){t.stop();}); }catch(e){}
+    vuParar('vuCap'); clearInterval(capTimer2); capSetRecUI('idle');
+    await capRegistrarDitado(blob);
+  };
+  capMR.start(); capSeg=0; vuIniciar(capStream,'vuCap'); capSetRecUI('rec');
+  capTimer2=setInterval(function(){ if(capMR&&capMR.state==='paused')return; capSeg++; capSetRecUI('rec'); },1000);
+}
+function capFinalizar(){ if(capMR && (capMR.state==='recording'||capMR.state==='paused')){ try{ capMR.stop(); }catch(e){ log('Falha ao finalizar: '+e.message,true); } } }
+function capSetRecUI(estado){
+  var b=document.getElementById('btnCapRec'), f=document.getElementById('btnCapFinalizar'), info=document.getElementById('capRecInfo');
+  if(!b) return;
+  if(estado==='rec'){ b.textContent='⏸ Pausar ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='inline-block'; if(info)info.textContent='Gravando… espaço pausa · Finalizar encerra.'; }
+  else if(estado==='pause'){ b.textContent='▶ Retomar'; b.style.background='#a36a00'; if(f)f.style.display='inline-block'; if(info)info.textContent='Pausado. Espaço retoma · Finalizar encerra.'; }
+  else { b.textContent='🎙 Gravar ditado'; b.style.background=''; if(f)f.style.display='none'; if(info)info.textContent='Atalho: barra de espaço grava / pausa / retoma.'; }
+}
+async function capRegistrarDitado(blob){
+  var novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
+  var hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  var a={idx:novoIdx, nome:'Ditado '+hora, url:URL.createObjectURL(blob), transcricao:'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true};
+  audios.push(a);
+  capRenderPendentes();
+  log('Transcrevendo ditado…');
+  try{
+    var r=await transcreverAudio(blob);
+    a.transcricao=r.transcricao||''; a.nomePaciente=r.nome_paciente||''; a.tipoExame=r.tipo_exame||''; a.lateralidade=r.lateralidade||'';
+    a.nome=nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||a.nome;
+    log('Ditado pronto: '+(a.nomePaciente||'(nome não citado)')+(a.tipoExame?' · '+a.tipoExame:''));
+  }catch(e){ log('Falha ao transcrever ditado: '+e.message,true); }
+  try{ await gravSalvar(blob, {transcricao:a.transcricao, nome_paciente:a.nomePaciente, tipo_exame:a.tipoExame, lateralidade:a.lateralidade, nome:a.nome, _captura:true}); }catch(e){}
+  capRenderPendentes(); renderExames(); capRenderNovos();
+}
+function capRenderPendentes(){
+  var div=document.getElementById('capPendentes'); if(!div) return;
+  var pend=audios.filter(function(a){return a._captura && a.exameId==null;});
+  if(!pend.length){ div.innerHTML=''; return; }
+  div.innerHTML='<div class="aviso" style="font-weight:600">🎙 '+pend.length+' ditado(s) aguardando exame:</div>'
+    +pend.map(function(a){ return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px"><span style="font-size:13px;font-weight:600;min-width:90px">'+String(a.nomePaciente||a.nome||'').replace(/</g,'&lt;')+'</span>'+(a.url?playerLinha(a.url):'')+'</div>'; }).join('');
+}
+
+/* ---- vigiar a pasta de export ---- */
+async function capEscolherPasta(){
+  if(!suportaFS()){ log('A vigilância de pasta funciona no Chrome/Edge do computador.',true); return; }
+  try{ var h=await window.showDirectoryPicker(); capWatchH=h; await fsSetHandle('watch',h); capPastaInfo(); var b=document.getElementById('btnCapVigiar'); if(b) b.style.display='inline-block'; }catch(e){}
+}
+function capPastaInfo(){ var s=document.getElementById('capPastaInfo'); if(s) s.innerHTML=capWatchH?('Pasta vigiada: <b>'+String(capWatchH.name||'(definida)').replace(/</g,'&lt;')+'</b>'):'Nenhuma pasta escolhida.'; }
+async function capToggleVigia(){
+  if(capWatching){ capWatching=false; if(capTimer) clearInterval(capTimer); capTimer=null; var b0=document.getElementById('btnCapVigiar'); if(b0) b0.textContent='▶ Iniciar captura'; capStatusTxt('Captura parada.'); return; }
+  if(!capWatchH){ log('Escolha a pasta a vigiar primeiro.',true); return; }
+  if(!(await fsPermissao(capWatchH))){ log('Sem permissão de leitura na pasta vigiada.',true); return; }
+  capSeen=new Set(); capProcessadas=new Set(); capStable={};
+  try{ for await (const ent of capWatchH.entries()){ if(ent[1].kind==='directory') capSeen.add(ent[0]); } }
+  catch(e){ log('Falha ao ler a pasta: '+e.message,true); return; }
+  capWatching=true; capArmado=true;
+  var b=document.getElementById('btnCapVigiar'); if(b) b.textContent='⏸ Parar captura';
+  capStatusTxt('Vigiando… '+capSeen.size+' pasta(s) antiga(s) ignorada(s). Aguardando exames novos.');
+  capTimer=setInterval(capVarrer, 3000);
+}
+async function capVarrer(){
+  if(!capWatching||!capWatchH||capVarrendo) return;
+  capVarrendo=true;
+  try{
+    for await (const ent of capWatchH.entries()){
+      var nome=ent[0], handle=ent[1];
+      if(handle.kind!=='directory') continue;
+      if(capSeen.has(nome)||capProcessadas.has(nome)) continue;
+      var n=await capContarArquivos(handle);
+      var st=capStable[nome]||{n:-1,ciclos:0};
+      if(n===st.n){ st.ciclos++; } else { st.n=n; st.ciclos=0; }
+      capStable[nome]=st;
+      if(n>0 && st.ciclos>=2){ capProcessadas.add(nome); delete capStable[nome]; await capProcessarPasta(nome, handle); }
+      else if(n>0){ capStatusTxt('Recebendo "'+nome+'"… ('+n+' arquivo(s))'); }
+    }
+  }catch(e){ capStatusTxt('Erro ao varrer: '+e.message); }
+  capVarrendo=false;
+}
+async function capContarArquivos(dirH){
+  var n=0;
+  async function walk(h){ for await (const ent of h.entries()){ if(ent[1].kind==='directory'){ await walk(ent[1]); } else if(capEhMidia(ent[0])){ n++; } } }
+  try{ await walk(dirH); }catch(e){}
+  return n;
+}
+async function capProcessarPasta(nome, dirH){
+  capStatusTxt('🆕 Novo exame: '+nome+' — lendo imagens…');
+  var imagens=[], pdfMeta=null, subNome='';
+  async function walk(h){
+    for await (const ent of h.entries()){
+      var nm=ent[0], hd=ent[1];
+      if(hd.kind==='directory'){ if(!subNome) subNome=nm; await walk(hd); continue; }
+      if(!capEhMidia(nm)) continue;
+      var file; try{ file=await hd.getFile(); }catch(e){ continue; }
+      if(/\.pdf$/i.test(nm)){ try{ var meta=metaDoPdf(await pdfTextoPag1(file)); if(meta&&(meta.paciente||meta.data||meta.idade)) pdfMeta=meta; }catch(e){} }
+      else { try{ imagens=imagens.concat(await arquivoParaImagens(file)); }catch(e){} }
+    }
+  }
+  try{ await walk(dirH); }catch(e){ log('Falha ao ler '+nome+': '+e.message,true); }
+  if(!imagens.length){ capStatusTxt('Pasta "'+nome+'" sem imagens utilizáveis — ignorada.'); return; }
+  var paciente=(pdfMeta&&pdfMeta.paciente)?capNome(pdfMeta.paciente):limparPaciente(nome);
+  var ex={id:0, nomeArquivo:'', paciente:paciente||nome, subExame:limparExame(subNome), imagens:imagens, tipo:'', audios:[], laudo:null, metaConf:1, dataExame:(pdfMeta&&pdfMeta.data)||'', idadeExame:(pdfMeta&&pdfMeta.idade)||'', _captura:true};
+  ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
+  exames.push(ex);
+  capStatusTxt('🆕 Exame de '+ex.paciente+' pronto ('+imagens.length+' imagens). Vincule o ditado abaixo.');
+  log('Exame capturado: '+ex.paciente+' ('+imagens.length+' imagens).');
+  renderExames(); capRenderNovos();
+}
+
+/* ---- vínculo imagem ↔ ditado + geração ---- */
+function capMelhorDitadoIdx(ex, pend){
+  if(!pend.length) return -1;
+  var alvo=tokensNome(ex.paciente||''); var best=pend[0].idx, bestS=-1;
+  for(var i=0;i<pend.length;i++){ var s=alvo.length?simNome(alvo, pend[i].nomePaciente||''):0; if(s>bestS){ bestS=s; best=pend[i].idx; } }
+  return best;
+}
+function capRenderNovos(){
+  var div=document.getElementById('capExamesNovos'); if(!div) return;
+  var novos=exames.filter(function(e){return e._captura;});
+  if(!novos.length){ div.innerHTML=''; return; }
+  var pend=audios.filter(function(a){return a._captura && a.exameId==null;});
+  div.innerHTML=novos.map(function(ex){
+    var nomeEx=String(ex.paciente||'').replace(/</g,'&lt;');
+    if(ex.laudo){ return capBanner('#1f7a3d','✅ Laudo de <b>'+nomeEx+'</b> gerado.','<button class="btn peq" onclick="abrirRevisao('+ex.id+')">📄 Abrir laudo</button> <button class="btn peq sec" onclick="capRemover('+ex.id+')">ocultar</button>'); }
+    if(!pend.length){ return capBanner('#a36a00','🆕 Novo exame: <b>'+nomeEx+'</b> ('+ex.imagens.length+' img) — aguardando ditado. Grave e finalize o ditado.','<button class="btn peq sec" onclick="capDescartar('+ex.id+')">✕ descartar</button>'); }
+    var melhor=capMelhorDitadoIdx(ex, pend);
+    var opts=pend.map(function(a){ return '<option value="'+a.idx+'"'+(a.idx===melhor?' selected':'')+'>'+String(a.nomePaciente||a.nome||'(sem nome)').replace(/</g,'&lt;')+(a.tipoExame?' · '+a.tipoExame:'')+'</option>'; }).join('');
+    return capBanner('#1f5fa6','🆕 Novo exame: <b>'+nomeEx+'</b> ('+ex.imagens.length+' img). Vincular ao ditado:',
+      '<select id="capSel'+ex.id+'" style="max-width:240px">'+opts+'</select> <button class="btn peq" onclick="capVincularGerar('+ex.id+')">✅ Vincular e gerar laudo</button> <button class="btn peq sec" onclick="capDescartar('+ex.id+')">✕</button>');
+  }).join('');
+}
+function capBanner(cor,texto,acoes){
+  return '<div style="border-left:5px solid '+cor+';background:#f7fafc;border-radius:8px;padding:10px 12px;margin-top:8px">'
+    +'<div style="font-size:14px;margin-bottom:6px">'+texto+'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+acoes+'</div></div>';
+}
+async function capVincularGerar(exId){
+  var ex=exames.find(function(e){return e.id===exId;}); if(!ex) return;
+  var selEl=document.getElementById('capSel'+exId);
+  var aIdx=selEl?parseInt(selEl.value,10):NaN;
+  var a=(!isNaN(aIdx))?audios.find(function(x){return x.idx===aIdx;}):null;
+  if(a){
+    exames.forEach(function(e){ e.audios=e.audios.filter(function(k){return k!==a.idx;}); });
+    a.exameId=ex.id; ex.audios.push(a.idx);
+    if(!ex.tipo){ var tt=mapTipo(a.tipoExame); if(tt) ex.tipo=tt; }
+  }
+  if(!ex.tipo){
+    log('Não identifiquei o tipo de exame no ditado de '+ex.paciente+' — escolha o tipo na lista do exame e toque Gerar.',true);
+    renderExames(); capRenderNovos();
+    var c=document.getElementById('cardExames'); if(c){ c.style.display='block'; c.scrollIntoView({behavior:'smooth'}); }
+    return;
+  }
+  capRenderPendentes(); capRenderNovos();
+  await gerarLaudo(ex.id);
+  capRenderPendentes(); capRenderNovos();
+  abrirRevisao(ex.id);
+}
+function capDescartar(exId){
+  if(!confirm('Descartar este exame capturado? (não apaga seus arquivos no disco)')) return;
+  audios.forEach(function(a){ if(a.exameId===exId) a.exameId=null; });
+  exames=exames.filter(function(e){return e.id!==exId;});
+  renderExames(); capRenderPendentes(); capRenderNovos();
+}
+function capRemover(exId){ var ex=exames.find(function(e){return e.id===exId;}); if(ex) ex._captura=false; capRenderNovos(); }
+
+function capInit(){
+  if(!document.getElementById('cardCaptura')) return;
+  if(!suportaFS()){ var fp=document.getElementById('capFolderSec'); if(fp) fp.innerHTML='<span class="aviso">A vigilância de pasta funciona no Chrome/Edge do computador. No iPad, use o fluxo "Processar".</span>'; }
+  else { try{ fsGetHandle('watch').then(function(h){ if(h){ capWatchH=h; capPastaInfo(); var b=document.getElementById('btnCapVigiar'); if(b) b.style.display='inline-block'; } }); }catch(e){} }
+  document.addEventListener('keydown', function(e){
+    if(e.code!=='Space') return;
+    if(!capArmado) return;
+    var el=document.activeElement;
+    if(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName||''))) return;
+    var tr=document.getElementById('telaRevisao'); if(tr && tr.style.display==='block') return;
+    e.preventDefault(); capToggleRec();
+  });
+}
+window.addEventListener('DOMContentLoaded', capInit);
+
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{ try{ fsGetHandle('laudo').then(function(h){ pastaLaudoH=h; atualizarPastaInfoRev(); }); }catch(e){}
   if(!cfg.chave) alternarConfig(); var _ip=document.getElementById('inpPasta'); if(_ip) _ip.addEventListener('change', renderPastaInfo); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}

@@ -1473,44 +1473,90 @@ function bizusSplitRegiao(corpo){
     return {titulo:titulo, texto:texto};
   });
 }
-function bizuBoxHtml(ri, titulo, texto, rows){
-  return '<div class="bizuBox" style="border:1px dashed #7d97b5;border-radius:8px;padding:6px 8px;margin-top:8px;background:#fcfdff">'
+function bizuEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function bizuEscAttr(s){ return bizuEsc(s).replace(/"/g,'&quot;'); }
+function bizuParse3(texto){
+  var t=String(texto||'').replace(/^\s+|\s+$/g,'');
+  var linhas=t.split('\n');
+  var ti=0; while(ti<linhas.length && linhas[ti].trim()==='') ti++;
+  var titulo=(linhas[ti]||'').replace(/:\s*$/,'').trim();
+  var resto=linhas.slice(ti+1).join('\n').replace(/^\s+/,'');
+  var mc=resto.match(/(^|\n)[ \t]*conclus[ãa]o[ \t]*:?[ \t]*/i);
+  var descricao, conclusao;
+  if(mc){
+    var idx=mc.index+(mc[1]?mc[1].length:0);
+    descricao=resto.slice(0,idx).replace(/\s+$/,'');
+    conclusao=resto.slice(idx).replace(/^[ \t]*conclus[ãa]o[ \t]*:?[ \t]*/i,'').replace(/\s+$/,'');
+  } else { descricao=resto.replace(/\s+$/,''); conclusao=''; }
+  return {titulo:titulo, descricao:descricao, conclusao:conclusao};
+}
+function bizuMontar3(titulo, descricao, conclusao){
+  var t=(titulo||'').trim().replace(/:\s*$/,'');
+  var d=(descricao||'').trim();
+  var c=(conclusao||'').trim();
+  var out=t?(t+':'):'';
+  if(d) out+=(out?'\n\n':'')+d;
+  if(c) out+=(out?'\n\n':'')+'Conclusão: '+c;
+  return out;
+}
+function bizuBoxHtml(ri, titulo, descricao, conclusao, locked){
+  var ro=locked?' readonly':'';
+  var bg=locked?'#eef2f6':'#fffdf5';
+  var dRows=Math.max(3, Math.min(22,(String(descricao||'').match(/\n/g)||[]).length+2));
+  var cRows=Math.max(2, Math.min(8,(String(conclusao||'').match(/\n/g)||[]).length+1));
+  var base='font-size:12.5px;font-family:ui-monospace,Consolas,monospace;padding:6px;border:1px solid #c8d0da;border-radius:6px;resize:vertical;box-sizing:border-box;width:100%;';
+  return '<div class="bizuBox" data-reg="'+ri+'" data-locked="'+(locked?'1':'0')+'" style="border:1px dashed #7d97b5;border-radius:8px;padding:8px;margin-top:8px;background:#fcfdff">'
     +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
-      +'<span class="bizuTit" style="font-size:12px;font-weight:700;color:#1e5b8a;flex:1;min-width:0">'+String(titulo||'Nova patologia').replace(/</g,'&lt;')+'</span>'
-      +'<button type="button" class="btn peq sec" style="color:#b3261e;padding:1px 8px" onclick="removerBizuBox(this)" title="Remover esta patologia">✕</button>'
+      +'<span class="bizuTit" style="font-size:13px;font-weight:700;color:#1e5b8a;flex:1;min-width:0">'+bizuEsc(titulo||'Nova patologia')+'</span>'
+      +'<button type="button" class="btn peq sec bzEdit" style="padding:2px 8px" onclick="editarBizuBox(this)">'+(locked?'✏️ Editar':'🔒 Travar')+'</button>'
+      +'<button type="button" class="btn peq sec" style="color:#b3261e;padding:2px 8px" onclick="removerBizuBox(this)" title="Remover esta patologia">✕</button>'
     +'</div>'
-    +'<textarea data-reg="'+ri+'" rows="'+(rows||6)+'" oninput="atualizarBizuTit(this)" style="width:100%;font-size:12.5px;font-family:ui-monospace,Consolas,monospace;border:0;background:transparent;resize:vertical;box-sizing:border-box;outline:none">'+String(texto||'').replace(/</g,'&lt;')+'</textarea>'
+    +'<label style="font-size:11px;font-weight:600;margin:2px 0 1px;color:#5a6776">Título</label>'
+    +'<input class="bzCampo bzTit" type="text"'+ro+' oninput="sincronizarTit(this)" value="'+bizuEscAttr(titulo)+'" style="'+base+'background:'+bg+'">'
+    +'<label style="font-size:11px;font-weight:600;margin:6px 0 1px;color:#5a6776">Descrição</label>'
+    +'<textarea class="bzCampo bzDesc"'+ro+' rows="'+dRows+'" style="'+base+'background:'+bg+'">'+bizuEsc(descricao)+'</textarea>'
+    +'<label style="font-size:11px;font-weight:600;margin:6px 0 1px;color:#5a6776">Conclusão</label>'
+    +'<textarea class="bzCampo bzConc"'+ro+' rows="'+cRows+'" style="'+base+'background:'+bg+'">'+bizuEsc(conclusao)+'</textarea>'
   +'</div>';
 }
-function atualizarBizuTit(ta){
-  var box=ta.closest('.bizuBox'); if(!box) return;
-  var tit=box.querySelector('.bizuTit'); if(!tit) return;
-  var linha=(ta.value.split('\n').filter(function(l){return l.trim()!=='';})[0]||'').replace(/:\s*$/,'').trim();
-  tit.textContent=linha||'Nova patologia';
+function sincronizarTit(inp){
+  var box=inp.closest('.bizuBox'); if(!box) return;
+  var tit=box.querySelector('.bizuTit'); if(tit) tit.textContent=(inp.value||'').replace(/:\s*$/,'').trim()||'Nova patologia';
+}
+function editarBizuBox(btn){
+  var box=btn.closest('.bizuBox'); if(!box) return;
+  var unlock=box.getAttribute('data-locked')==='1';
+  box.setAttribute('data-locked', unlock?'0':'1');
+  Array.prototype.forEach.call(box.querySelectorAll('.bzCampo'), function(c){
+    if(unlock){ c.removeAttribute('readonly'); c.style.background='#fffdf5'; }
+    else { c.setAttribute('readonly','readonly'); c.style.background='#eef2f6'; }
+  });
+  btn.textContent=unlock?'🔒 Travar':'✏️ Editar';
+  if(unlock){ var t=box.querySelector('.bzTit'); if(t) t.focus(); }
 }
 function adicionarBizuBox(ri){
   var box=document.getElementById('bizuReg'+ri); if(!box) return;
-  var tmp=document.createElement('div'); tmp.innerHTML=bizuBoxHtml(ri,'Nova patologia','',6);
+  var tmp=document.createElement('div'); tmp.innerHTML=bizuBoxHtml(ri,'','','',false);
   var novo=tmp.firstChild; box.appendChild(novo);
-  var ta=novo.querySelector('textarea'); if(ta){ ta.focus(); novo.scrollIntoView({block:'center'}); }
+  var inp=novo.querySelector('.bzTit'); if(inp){ inp.focus(); novo.scrollIntoView({block:'center'}); }
 }
 function removerBizuBox(btn){
   var box=btn.closest('.bizuBox'); if(!box) return;
-  var ta=box.querySelector('textarea');
-  if(ta && ta.value.trim() && !confirm('Remover esta patologia? (o texto dela será apagado ao salvar)')) return;
+  var temConteudo=Array.prototype.some.call(box.querySelectorAll('.bzCampo'), function(c){ return (c.value||'').trim(); });
+  if(temConteudo && !confirm('Remover esta patologia? (o texto dela será apagado ao salvar)')) return;
   box.remove();
 }
 function abrirEditorBizus(){
   var cont=document.getElementById('bizusEditor'); if(!cont) return;
   if(cont.__aberto){ cont.innerHTML=''; cont.__aberto=false; return; }
   var parsed=bizusParse(bizusEfetivo());
-  var html='<p class="aviso">Cada patologia fica na sua caixinha (borda pontilhada). Edite, adicione (➕) ou remova (✕) e toque <b>Salvar BIZUS</b>. Fica só neste navegador e entra nos próximos laudos.</p>';
+  var html='<p class="aviso">Cada patologia tem Título, Descrição e Conclusão. As caixinhas começam <b>travadas</b> (toque ✏️ Editar para alterar). Use ➕ para criar e ✕ para remover; depois toque <b>Salvar BIZUS</b>.</p>';
   if(localStorage.getItem('gbizus')) html+='<p class="aviso" style="color:#1f7a3d;font-weight:600">✔ Você tem BIZUS personalizados salvos.</p>';
   html+=parsed.secoes.map(function(s,ri){
     var bizus=bizusSplitRegiao(s.corpo);
     var caixas=bizus.map(function(bz){
-      var rows=Math.max(4, Math.min(28, (bz.texto.match(/\n/g)||[]).length+2));
-      return bizuBoxHtml(ri, bz.titulo, bz.texto, rows);
+      var p3=bizuParse3(bz.texto);
+      return bizuBoxHtml(ri, p3.titulo, p3.descricao, p3.conclusao, true);
     }).join('');
     return '<details style="border:1px solid #c8d0da;border-radius:8px;margin-top:6px"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">'+(BIZUS_NOMES[s.nome]||s.nome)+' <span class="aviso" style="font-weight:400">('+bizus.length+')</span></summary><div style="padding:0 8px 8px"><div id="bizuReg'+ri+'">'+caixas+'</div><button type="button" class="btn peq" style="margin-top:8px" onclick="adicionarBizuBox('+ri+')">➕ Adicionar patologia</button></div></details>';
   }).join('');
@@ -1523,11 +1569,14 @@ function abrirEditorBizus(){
 function salvarBizus(){
   var cont=document.getElementById('bizusEditor'); if(!cont||!cont.__nomes) return;
   var corpos={};
-  Array.prototype.forEach.call(cont.querySelectorAll('textarea[data-reg]'), function(ta){
-    var v=(ta.value||'').replace(/\s+$/,''); if(!v.trim()) return;
-    var rg=parseInt(ta.getAttribute('data-reg'),10);
+  Array.prototype.forEach.call(cont.querySelectorAll('.bizuBox'), function(box){
+    var ti=((box.querySelector('.bzTit')||{}).value||'').trim();
+    var de=((box.querySelector('.bzDesc')||{}).value||'').trim();
+    var co=((box.querySelector('.bzConc')||{}).value||'').trim();
+    if(!ti && !de && !co) return;
+    var rg=parseInt(box.getAttribute('data-reg'),10);
     if(!corpos[rg]) corpos[rg]=[];
-    corpos[rg].push(v);
+    corpos[rg].push(bizuMontar3(ti,de,co));
   });
   var secoes=cont.__nomes.map(function(nome,i){ return {nome:nome, corpo:(corpos[i]||[]).join('\n\n')}; });
   var novo=bizusMontar(cont.__preamble, secoes);

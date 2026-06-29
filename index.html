@@ -1452,7 +1452,7 @@ function bizusMontar(preamble, secoes){
 }
 function bizusSplitRegiao(corpo){
   // separa uma região em patologias individuais: cada bizu vai do título até a "Conclusão" (+ trailers como Categoria/Sugestão).
-  var blocos=corpo.split(/\n\s*\n/).map(function(b){return b.replace(/\s+$/,'');}).filter(function(b){return b.trim()!=='';});
+  var blocos=String(corpo).replace(/^\s+/,'').split(/\n\s*\n/).map(function(b){return b.replace(/\s+$/,'');}).filter(function(b){return b.trim()!=='';});
   function isTrailer(b){ return /^(categoria|sugest|obs\b|recomenda)/i.test(b.trim()); }
   var bizus=[], cur=[], sawConc=false;
   for(var i=0;i<blocos.length;i++){
@@ -1467,26 +1467,52 @@ function bizusSplitRegiao(corpo){
   if(cur.length) bizus.push(cur);
   return bizus.map(function(blocks){
     var texto=blocks.join('\n\n');
-    var titulo=(blocks[0].split('\n')[0]||'').replace(/:\s*$/,'').trim();
+    var linha=(blocks[0].split('\n').filter(function(l){return l.trim()!=='';})[0]||'');
+    var titulo=linha.replace(/:\s*$/,'').trim();
     if(titulo.length>62) titulo=titulo.slice(0,62)+'…';
     return {titulo:titulo, texto:texto};
   });
+}
+function bizuBoxHtml(ri, titulo, texto, rows){
+  return '<div class="bizuBox" style="border:1px dashed #7d97b5;border-radius:8px;padding:6px 8px;margin-top:8px;background:#fcfdff">'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+      +'<span class="bizuTit" style="font-size:12px;font-weight:700;color:#1e5b8a;flex:1;min-width:0">'+String(titulo||'Nova patologia').replace(/</g,'&lt;')+'</span>'
+      +'<button type="button" class="btn peq sec" style="color:#b3261e;padding:1px 8px" onclick="removerBizuBox(this)" title="Remover esta patologia">✕</button>'
+    +'</div>'
+    +'<textarea data-reg="'+ri+'" rows="'+(rows||6)+'" oninput="atualizarBizuTit(this)" style="width:100%;font-size:12.5px;font-family:ui-monospace,Consolas,monospace;border:0;background:transparent;resize:vertical;box-sizing:border-box;outline:none">'+String(texto||'').replace(/</g,'&lt;')+'</textarea>'
+  +'</div>';
+}
+function atualizarBizuTit(ta){
+  var box=ta.closest('.bizuBox'); if(!box) return;
+  var tit=box.querySelector('.bizuTit'); if(!tit) return;
+  var linha=(ta.value.split('\n').filter(function(l){return l.trim()!=='';})[0]||'').replace(/:\s*$/,'').trim();
+  tit.textContent=linha||'Nova patologia';
+}
+function adicionarBizuBox(ri){
+  var box=document.getElementById('bizuReg'+ri); if(!box) return;
+  var tmp=document.createElement('div'); tmp.innerHTML=bizuBoxHtml(ri,'Nova patologia','',6);
+  var novo=tmp.firstChild; box.appendChild(novo);
+  var ta=novo.querySelector('textarea'); if(ta){ ta.focus(); novo.scrollIntoView({block:'center'}); }
+}
+function removerBizuBox(btn){
+  var box=btn.closest('.bizuBox'); if(!box) return;
+  var ta=box.querySelector('textarea');
+  if(ta && ta.value.trim() && !confirm('Remover esta patologia? (o texto dela será apagado ao salvar)')) return;
+  box.remove();
 }
 function abrirEditorBizus(){
   var cont=document.getElementById('bizusEditor'); if(!cont) return;
   if(cont.__aberto){ cont.innerHTML=''; cont.__aberto=false; return; }
   var parsed=bizusParse(bizusEfetivo());
-  var html='<p class="aviso">Cada patologia fica na sua caixinha (borda pontilhada). Edite e toque <b>Salvar BIZUS</b>. Ficam só neste navegador e entram nos próximos laudos.</p>';
+  var html='<p class="aviso">Cada patologia fica na sua caixinha (borda pontilhada). Edite, adicione (➕) ou remova (✕) e toque <b>Salvar BIZUS</b>. Fica só neste navegador e entra nos próximos laudos.</p>';
   if(localStorage.getItem('gbizus')) html+='<p class="aviso" style="color:#1f7a3d;font-weight:600">✔ Você tem BIZUS personalizados salvos.</p>';
   html+=parsed.secoes.map(function(s,ri){
     var bizus=bizusSplitRegiao(s.corpo);
-    var caixas=bizus.map(function(bz,bi){
+    var caixas=bizus.map(function(bz){
       var rows=Math.max(4, Math.min(28, (bz.texto.match(/\n/g)||[]).length+2));
-      return '<div style="border:1px dashed #7d97b5;border-radius:8px;padding:6px 8px;margin-top:8px;background:#fcfdff">'
-        +'<div style="font-size:12px;font-weight:700;color:#1e5b8a;margin-bottom:4px">'+String(bz.titulo||('Bizu '+(bi+1))).replace(/</g,'&lt;')+'</div>'
-        +'<textarea data-reg="'+ri+'" data-bz="'+bi+'" rows="'+rows+'" style="width:100%;font-size:12.5px;font-family:ui-monospace,Consolas,monospace;border:0;background:transparent;resize:vertical;box-sizing:border-box;outline:none">'+String(bz.texto).replace(/</g,'&lt;')+'</textarea></div>';
+      return bizuBoxHtml(ri, bz.titulo, bz.texto, rows);
     }).join('');
-    return '<details style="border:1px solid #c8d0da;border-radius:8px;margin-top:6px"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">'+(BIZUS_NOMES[s.nome]||s.nome)+' <span class="aviso" style="font-weight:400">('+bizus.length+')</span></summary><div style="padding:0 8px 8px">'+caixas+'</div></details>';
+    return '<details style="border:1px solid #c8d0da;border-radius:8px;margin-top:6px"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">'+(BIZUS_NOMES[s.nome]||s.nome)+' <span class="aviso" style="font-weight:400">('+bizus.length+')</span></summary><div style="padding:0 8px 8px"><div id="bizuReg'+ri+'">'+caixas+'</div><button type="button" class="btn peq" style="margin-top:8px" onclick="adicionarBizuBox('+ri+')">➕ Adicionar patologia</button></div></details>';
   }).join('');
   html+='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" onclick="salvarBizus()">💾 Salvar BIZUS</button><button class="btn sec" type="button" onclick="restaurarBizus()">↩ Restaurar padrão</button></div>';
   cont.innerHTML=html;
@@ -1498,9 +1524,10 @@ function salvarBizus(){
   var cont=document.getElementById('bizusEditor'); if(!cont||!cont.__nomes) return;
   var corpos={};
   Array.prototype.forEach.call(cont.querySelectorAll('textarea[data-reg]'), function(ta){
+    var v=(ta.value||'').replace(/\s+$/,''); if(!v.trim()) return;
     var rg=parseInt(ta.getAttribute('data-reg'),10);
     if(!corpos[rg]) corpos[rg]=[];
-    corpos[rg].push((ta.value||'').replace(/\s+$/,''));
+    corpos[rg].push(v);
   });
   var secoes=cont.__nomes.map(function(nome,i){ return {nome:nome, corpo:(corpos[i]||[]).join('\n\n')}; });
   var novo=bizusMontar(cont.__preamble, secoes);

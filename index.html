@@ -232,8 +232,6 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
       <button class="btn sec" onclick="fecharRevisao()">← Voltar</button>
       <button class="btn" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
       <button class="btn" onclick="salvarLaudoPasta()">💾 Salvar na pasta</button>
-      <button class="btn sec" id="btnRevAudio" onclick="toggleRevMidia('audio')" style="display:none">🎙 Ouvir gravação</button>
-      <button class="btn sec" id="btnRevImg" onclick="toggleRevMidia('img')" style="display:none">🖼 Ver imagens</button>
       <button class="btn sec" id="btnFundo" onclick="trocarFundo()" style="display:none">🎨 Fundo</button>
       <button class="btn" id="btnLiberar" onclick="liberarEProximo()" style="display:none;background:#1f7a3d">✅ Liberar e próximo</button>
       <span class="aviso" style="align-self:center">Toque no texto para editar. No iPad: Imprimir → pinçar a pré-visualização → Compartilhar → Salvar em Arquivos (PDF).</span>
@@ -253,12 +251,16 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
       <button title="Limpar formatação da seleção" onclick="fmtCmd('removeFormat')" style="font-size:11px;color:#666">✕ fmt</button>
     </div>
     <!-- painel de mídia: fora do areaImpressao para não entrar no PDF/impressão -->
-    <div id="revMidia" style="display:none;max-width:760px;margin:0 auto 10px;padding:10px;background:#f4f7fa;border-radius:10px">
-      <div id="revMidiaAudio" style="display:none"></div>
-      <div id="revMidiaImg" style="display:none;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    <!-- áudio: sempre visível (barra de espaço = play/pausa) -->
+    <div id="revAudioWrap" style="display:none;max-width:760px;margin:0 auto 10px;padding:8px 10px;background:#f4f7fa;border-radius:10px">
+      <div id="revMidiaAudio"></div>
     </div>
     <div id="obsBanner" style="display:none;background:#fdf3e3;border-left:5px solid #d99a26;border-radius:8px;padding:12px 14px;margin:0 auto 14px;max-width:760px;font-size:14px;font-weight:600;"></div>
-    <div id="areaImpressao"></div>
+    <!-- laudo + imagens lado a lado (imagens ficam fora do areaImpressao p/ não entrarem na impressão) -->
+    <div id="revLayout" style="display:flex;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap">
+      <div id="areaImpressao" style="flex:1 1 600px;min-width:0;max-width:790px"></div>
+      <div id="revMidiaImg" style="display:none;flex:0 0 200px;max-width:200px"></div>
+    </div>
   </main>
 </div>
 
@@ -1785,27 +1787,41 @@ function fecharRevisao(){
   document.querySelector('main').style.display='block';
 }
 function _mostrarBotoesRev(visivel){
-  ['btnRevAudio','btnRevImg','btnFundo','btnLiberar'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display=visivel?'inline-block':'none'; });
-  var m=document.getElementById('revMidia'); if(m) m.style.display=visivel?'':'none';
+  ['btnFundo','btnLiberar'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display=visivel?'inline-block':'none'; });
+  if(!visivel){ var aw=document.getElementById('revAudioWrap'); if(aw) aw.style.display='none'; var di=document.getElementById('revMidiaImg'); if(di) di.style.display='none'; }
 }
 function montarRevMidia(exId){
   var ex=exames.find(function(e){return e.id===exId;});
   var da=document.getElementById('revMidiaAudio'); var di=document.getElementById('revMidiaImg');
+  var aw=document.getElementById('revAudioWrap');
   if(!da||!di) return;
-  // áudios
+  // áudios — sempre visível (é só apertar play; barra de espaço também toca)
   var auds=audios.filter(function(a){return a.exameId===exId;});
   da.innerHTML=auds.length
-    ? auds.map(function(a){return '<div style="margin-bottom:4px"><span style="font-size:13px;font-weight:600">🎙 '+a.nome+'</span>'+(a.url?playerLinha(a.url):'')+'</div>';}).join('')
-    : '<p class="aviso">Sem gravação vinculada a este exame.</p>';
-  // imagens
+    ? '<div class="aviso" style="font-weight:600;margin-bottom:2px">🎙 Gravação <span style="font-weight:400">(barra de espaço = play/pausa)</span></div>'
+      +auds.map(function(a){return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px;font-weight:600;white-space:nowrap">'+String(a.nome||'').replace(/</g,'&lt;')+'</span>'+(a.url?playerLinha(a.url):'')+'</div>';}).join('')
+    : '';
+  if(aw) aw.style.display=auds.length?'block':'none';
+  // imagens — ao lado do laudo, já visíveis
   var imgs=(ex&&ex.imagens)||[];
-  di.style.display='flex'; di.style.flexWrap='wrap'; di.style.gap='6px';
   di.innerHTML=imgs.length
-    ? imgs.map(function(d){return '<img class="revImg" onmousemove="revImgMove(event,this)" onmouseleave="revImgLeave(this)" src="'+d+'" style="max-width:110px;max-height:110px;border:1px solid #c8d0da;border-radius:6px;cursor:zoom-in">';}).join('')
-    : '<p class="aviso">Sem imagens.</p>';
-  // reset: ambos fechados
-  da.style.display='none'; di.style.display='none';
+    ? '<div class="aviso" style="font-weight:600;margin-bottom:4px">🖼 Imagens ('+imgs.length+')</div>'
+      +imgs.map(function(d){return '<img class="revImg" onmousemove="revImgMove(event,this)" onmouseleave="revImgLeave(this)" src="'+d+'" style="width:100%;margin-bottom:6px;border:1px solid #c8d0da;border-radius:6px;cursor:zoom-in">';}).join('')
+    : '';
+  di.style.display=imgs.length?'block':'none';
 }
+/* atalho: barra de espaço toca/pausa a gravação na tela de Revisão (exceto editando texto) */
+document.addEventListener('keydown', function(e){
+  var tr=document.getElementById('telaRevisao');
+  if(!tr || tr.style.display!=='block') return;
+  if(e.code!=='Space' && e.key!==' ') return;
+  var el=document.activeElement;
+  if(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName||''))) return;
+  var au=document.querySelector('#revMidiaAudio audio'); if(!au) return;
+  e.preventDefault();
+  if(au.paused){ var all=document.querySelectorAll('audio'); for(var i=0;i<all.length;i++){ if(all[i]!==au) all[i].pause(); } au.play().catch(function(){}); }
+  else au.pause();
+});
 function toggleRevMidia(tipo){
   var el=document.getElementById(tipo==='audio'?'revMidiaAudio':'revMidiaImg');
   var out=document.getElementById('revMidia');

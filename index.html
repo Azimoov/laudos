@@ -1689,7 +1689,7 @@ async function capRegistrarDitado(blob){
     a.transcricao=r.transcricao||''; a.nomePaciente=r.nome_paciente||''; a.tipoExame=r.tipo_exame||''; a.lateralidade=r.lateralidade||'';
     a.nome=nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||a.nome;
     log('Ditado pronto: '+(a.nomePaciente||'(nome não citado)')+(a.tipoExame?' · '+a.tipoExame:''));
-  }catch(e){ log('Falha ao transcrever ditado: '+e.message,true); }
+  }catch(e){ a._erro=e.message||String(e); log('Falha ao transcrever ditado: '+a._erro,true); }
   try{ await gravSalvar(blob, {transcricao:a.transcricao, nome_paciente:a.nomePaciente, tipo_exame:a.tipoExame, lateralidade:a.lateralidade, nome:a.nome, _captura:true}); }catch(e){}
   capRenderPendentes(); renderExames(); capRenderNovos();
 }
@@ -1700,7 +1700,7 @@ function capRenderPendentes(){
   div.innerHTML='<div class="aviso" style="font-weight:600">🎙 '+pend.length+' ditado(s) aguardando exame:</div>'
     +pend.map(function(a){
       var t=(a.transcricao||'').replace(/</g,'&lt;');
-      var resumo = a.transcricao ? (t.length>160?t.slice(0,160)+'…':t) : '<span class="erro">⚠️ transcrição vazia — confira o microfone e refaça o ditado</span>';
+      var resumo = a.transcricao ? (t.length>160?t.slice(0,160)+'…':t) : (a._erro ? '<span class="erro">⚠️ erro na transcrição: '+String(a._erro).replace(/</g,'&lt;')+'</span>' : '<span class="erro">⚠️ transcrição vazia — confira o microfone e refaça o ditado</span>');
       var tag = a.tipoExame ? '<span class="tag">'+a.tipoExame+'</span>' : '<span class="tag" style="background:#fde8e8;color:#b3261e">tipo não dito</span>';
       return '<div style="background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px">'
         +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;min-width:90px">'+String(a.nomePaciente||a.nome||'').replace(/</g,'&lt;')+'</span>'+tag+(a.url?playerLinha(a.url):'')+'</div>'

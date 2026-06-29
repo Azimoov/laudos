@@ -19,6 +19,10 @@ header h1{font-size:18px;margin:0;font-weight:600;}
 main{max-width:860px;margin:0 auto;padding:16px;}
 .card{background:#fff;border:1px solid var(--borda);border-radius:14px;padding:16px;margin-bottom:14px;}
 .card h2{font-size:16px;margin:0 0 10px;color:var(--azul);}
+#abas{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--azul);margin-bottom:14px;}
+#abas button{border:1px solid var(--borda);border-bottom:none;background:#e3e9f0;color:#1c2733;padding:9px 13px;border-radius:9px 9px 0 0;font-size:14px;font-weight:600;cursor:pointer;}
+#abas button.ativa{background:var(--azul);color:#fff;}
+.aba-conteudo{margin-bottom:8px;}
 label{font-size:14px;font-weight:600;display:block;margin:10px 0 4px;}
 input[type=text],input[type=password],select{width:100%;padding:11px;font-size:16px;border:1px solid var(--borda);border-radius:9px;background:#fff;}
 .filebox{border:2px dashed var(--borda);border-radius:12px;padding:14px;text-align:center;margin-top:6px;}
@@ -114,6 +118,15 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API da OpenAI para análise.</p>
 </div>
 
+<div id="abas">
+  <button id="aba-acumulados" onclick="mostrarAba('acumulados')">📥 Arquivos acumulados</button>
+  <button id="aba-loco" onclick="mostrarAba('loco')">📷 Exame na hora</button>
+  <button id="aba-captura" onclick="mostrarAba('captura')">🔴 Captura ao vivo</button>
+  <button id="aba-exames" onclick="mostrarAba('exames')">📋 Exames identificados</button>
+  <button id="aba-revisao" onclick="mostrarAba('revisao')">📄 Revisão dos laudos</button>
+</div>
+
+<div class="aba-conteudo" id="pane-acumulados" style="display:none">
 <div class="card">
   <h2>1 · Arquivos acumulados</h2>
   <div class="filebox">
@@ -136,12 +149,10 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
     <div style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn" id="btnGravarAcum" onclick="gravarAcumulado()">🎙 Gravar ditado</button><canvas id="vuAcum" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>
     <div id="listaAcum" style="margin-top:8px;text-align:left"></div>
   </div>
-  <div style="margin-top:14px">
-    <button class="btn" id="btnProcessar" onclick="processar()">2 · Processar (transcrever e associar)</button>
-  </div>
-  <div class="log" id="log"></div>
+</div>
 </div>
 
+<div class="aba-conteudo" id="pane-loco" style="display:none">
 <div class="card">
   <h2>Exame na hora (in loco)</h2>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -154,7 +165,9 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div id="lokoInfo" class="aviso">Capture as imagens do exame, grave o ditado e toque em ⚡.</div>
   <div id="lokoThumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
 </div>
+</div>
 
+<div class="aba-conteudo" id="pane-captura" style="display:block">
 <div class="card" id="cardCaptura" style="border:2px solid #1f7a3d">
   <h2>🔴 Captura ao vivo — grave agora, a imagem chega depois</h2>
   <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando as imagens chegarem na pasta vigiada, o app vincula ao ditado e gera o laudo. Atalho: <b>barra de espaço</b> grava / pausa / retoma.<br><b>Não precisa dizer o nome do paciente</b> — ele vem do worksheet do exame. Dite os achados; se quiser, diga o <b>tipo do exame</b> (ex.: "abdome total") para o laudo sair automático.</p>
@@ -175,8 +188,10 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   </div>
   <div id="capExamesNovos" style="margin-top:8px"></div>
 </div>
+</div>
 
-<div class="card" id="cardExames" style="display:none">
+<div class="aba-conteudo" id="pane-exames" style="display:none">
+<div class="card" id="cardExames">
   <h2>3 · Exames identificados — confira e gere os laudos</h2>
   <div id="listaExames"></div>
   <button class="btn" id="btnGerarTodos" onclick="gerarTodos()" style="margin-top:6px">⚙️ Gerar todos os laudos</button>
@@ -186,13 +201,21 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   </div>
   <p class="aviso">Confira a associação áudio ↔ paciente e o tipo de exame antes de gerar. O laudo gerado é um rascunho: <b>revise sempre antes de assinar</b>.</p>
 </div>
+</div>
 
-<div class="card" id="cardRevisao" style="display:none">
+<div class="aba-conteudo" id="pane-revisao" style="display:none">
+<div class="card" id="cardRevisao">
   <h2>4 · Revisão dos laudos — ouça, veja e salve</h2>
   <div id="pastaDestInfo" class="aviso" style="margin-bottom:4px"></div>
   <div style="margin-bottom:6px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" onclick="escolherPastaDestino()">📁 Escolher pasta de destino</button><button class="btn" onclick="salvarTodosRev()">💾 Salvar todos</button></div>
   <div id="listaRevisao"></div>
   <p class="aviso">Ouça o áudio e veja as imagens antes de salvar. Ao salvar, é criada uma pasta com o nome do paciente contendo o laudo e as fotos.</p>
+</div>
+</div>
+
+<div id="areaComum" style="border-top:2px solid #c8d0da;padding-top:12px;margin-top:6px">
+  <button class="btn" id="btnProcessar" onclick="processar()">2 · Processar (transcrever e associar)</button>
+  <div class="log" id="log"></div>
 </div>
 </main>
 
@@ -729,6 +752,7 @@ async function processar(){
     const _pend = audios.filter(function(a){return a.exameId==null;}).length;
     log('Áudios: '+(audios.length-_pend)+' vinculado(s) com segurança, '+_pend+' p/ revisão manual.');
     renderExames();
+    mostrarAba('exames');
     log('Pronto. Confira as associações abaixo e gere os laudos.');
   }catch(e){
     log('Erro: '+e.message, true);
@@ -1131,7 +1155,8 @@ async function restaurarSessao(id){
     audios=[];
     var b=document.getElementById('bannerRecup'); if(b) b.remove();
     renderExames(); renderRevisao();
-    var c=document.getElementById('cardRevisao'); if(c){c.style.display='block';c.scrollIntoView({behavior:'smooth'});}
+    mostrarAba('revisao');
+    var c=document.getElementById('cardRevisao'); if(c){c.scrollIntoView({behavior:'smooth'});}
     log(sess.exames.length+' laudo(s) restaurado(s) da sessão de '+new Date(sess.quando).toLocaleString('pt-BR')+'.');
   }catch(e){ log('Falha ao restaurar: '+e.message,true); }
 }
@@ -1296,6 +1321,7 @@ async function gerarInLoco(){
     if(!ex.tipo) ex.tipo='outro';
     renderExames();
     await gerarLaudo(id);
+    mostrarAba('revisao');
     lokoImgs=[]; lokoAudios=[]; lokoUrls=[]; renderLoko();
   }catch(e){ log('Erro no exame in loco: '+e.message, true); }
   btn.disabled=false; btn.textContent='⚡ Gerar laudo agora';
@@ -1563,7 +1589,8 @@ async function gerarTodos(){
   if(btn){ btn.disabled=false; btn.textContent="⚙️ Gerar todos os laudos"; }
   setTimeout(function(){ if(prog) prog.style.display='none'; },3000);
   renderRevisao();
-  const c=document.getElementById("cardRevisao"); if(c){ c.style.display="block"; c.scrollIntoView({behavior:"smooth"}); }
+  mostrarAba('revisao');
+  const c=document.getElementById("cardRevisao"); if(c){ c.scrollIntoView({behavior:"smooth"}); }
 }
 async function salvarExameRev(exId){
   const ex=exames.find(function(e){return e.id===exId;});
@@ -1844,6 +1871,17 @@ function capInit(){
   });
 }
 window.addEventListener('DOMContentLoaded', capInit);
+
+/* ===== Abas (estilo Excel) ===== */
+function mostrarAba(nome){
+  ['acumulados','loco','captura','exames','revisao'].forEach(function(n){
+    var p=document.getElementById('pane-'+n); if(p) p.style.display=(n===nome)?'block':'none';
+    var t=document.getElementById('aba-'+n); if(t) t.classList.toggle('ativa', n===nome);
+  });
+  window.__abaAtual=nome;
+  window.scrollTo(0,0);
+}
+window.addEventListener('DOMContentLoaded', function(){ mostrarAba('captura'); });
 
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{ try{ fsGetHandle('laudo').then(function(h){ pastaLaudoH=h; atualizarPastaInfoRev(); }); }catch(e){}

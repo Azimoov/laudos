@@ -157,7 +157,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 
 <div class="card" id="cardCaptura" style="border:2px solid #1f7a3d">
   <h2>🔴 Captura ao vivo — grave agora, a imagem chega depois</h2>
-  <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando as imagens chegarem na pasta vigiada, o app vincula ao ditado e gera o laudo. Atalho: <b>barra de espaço</b> grava / pausa / retoma.</p>
+  <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando as imagens chegarem na pasta vigiada, o app vincula ao ditado e gera o laudo. Atalho: <b>barra de espaço</b> grava / pausa / retoma.<br><b>Não precisa dizer o nome do paciente</b> — ele vem do worksheet do exame. Dite os achados; se quiser, diga o <b>tipo do exame</b> (ex.: "abdome total") para o laudo sair automático.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px">
     <button class="btn" id="btnCapRec" onclick="capToggleRec()">🎙 Gravar ditado</button>
     <button class="btn" id="btnCapFinalizar" onclick="capFinalizar()" style="display:none;background:#1f7a3d">✅ Finalizar ditado</button>
@@ -1646,11 +1646,12 @@ let capMR=null, capChunks=[], capStream=null, capTimer2=null, capSeg=0;
 function capStatusTxt(t){ var s=document.getElementById('capStatus'); if(s) s.textContent=t; }
 function capEhMidia(nome){ return /\.(jpe?g|png|bmp|pdf)$/i.test(nome); }
 
-/* ---- gravação do ditado (atalho: barra de espaço) ---- */
+/* ---- gravação do ditado (máquina de estados explícita: idle|rec|pause) ---- */
+let capEstado='idle';
 async function capToggleRec(){
   capArmado=true;
-  if(capMR && capMR.state==='recording'){ try{ capMR.pause(); }catch(e){} capSetRecUI('pause'); return; }
-  if(capMR && capMR.state==='paused'){ try{ capMR.resume(); }catch(e){} capSetRecUI('rec'); return; }
+  if(capEstado==='rec'){ if(capMR && capMR.state==='recording'){ try{ capMR.pause(); }catch(e){} } capEstado='pause'; capSetRecUI(); return; }
+  if(capEstado==='pause'){ if(capMR && capMR.state==='paused'){ try{ capMR.resume(); }catch(e){} } capEstado='rec'; capSetRecUI(); return; }
   if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação.',true); return; }
   try{ capStream=await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(e){ log('Acesso ao microfone negado: '+e.message,true); return; }
@@ -1661,18 +1662,19 @@ async function capToggleRec(){
   capMR.onstop=async function(){
     var blob=new Blob(capChunks,{type:capMR.mimeType||'audio/mp4'});
     try{ capStream.getTracks().forEach(function(t){t.stop();}); }catch(e){}
-    vuParar('vuCap'); clearInterval(capTimer2); capSetRecUI('idle');
+    vuParar('vuCap'); clearInterval(capTimer2); capEstado='idle'; capSetRecUI();
+    if(!blob || blob.size<1200){ log('Gravação muito curta/vazia — refaça o ditado.',true); return; }
     await capRegistrarDitado(blob);
   };
-  capMR.start(); capSeg=0; vuIniciar(capStream,'vuCap'); capSetRecUI('rec');
-  capTimer2=setInterval(function(){ if(capMR&&capMR.state==='paused')return; capSeg++; capSetRecUI('rec'); },1000);
+  capMR.start(); capSeg=0; capEstado='rec'; vuIniciar(capStream,'vuCap'); capSetRecUI();
+  capTimer2=setInterval(function(){ if(capEstado!=='rec') return; capSeg++; capSetRecUI(); },1000);
 }
 function capFinalizar(){ if(capMR && (capMR.state==='recording'||capMR.state==='paused')){ try{ capMR.stop(); }catch(e){ log('Falha ao finalizar: '+e.message,true); } } }
-function capSetRecUI(estado){
+function capSetRecUI(){
   var b=document.getElementById('btnCapRec'), f=document.getElementById('btnCapFinalizar'), info=document.getElementById('capRecInfo');
   if(!b) return;
-  if(estado==='rec'){ b.textContent='⏸ Pausar ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='inline-block'; if(info)info.textContent='Gravando… espaço pausa · Finalizar encerra.'; }
-  else if(estado==='pause'){ b.textContent='▶ Retomar'; b.style.background='#a36a00'; if(f)f.style.display='inline-block'; if(info)info.textContent='Pausado. Espaço retoma · Finalizar encerra.'; }
+  if(capEstado==='rec'){ b.textContent='⏸ Pausar ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='inline-block'; if(info)info.textContent='🔴 Gravando… espaço pausa · Finalizar encerra.'; }
+  else if(capEstado==='pause'){ b.textContent='▶ Retomar ('+capSeg+'s)'; b.style.background='#a36a00'; if(f)f.style.display='inline-block'; if(info)info.textContent='⏸ Pausado em '+capSeg+'s. Espaço retoma · Finalizar encerra.'; }
   else { b.textContent='🎙 Gravar ditado'; b.style.background=''; if(f)f.style.display='none'; if(info)info.textContent='Atalho: barra de espaço grava / pausa / retoma.'; }
 }
 async function capRegistrarDitado(blob){
@@ -1696,7 +1698,14 @@ function capRenderPendentes(){
   var pend=audios.filter(function(a){return a._captura && a.exameId==null;});
   if(!pend.length){ div.innerHTML=''; return; }
   div.innerHTML='<div class="aviso" style="font-weight:600">🎙 '+pend.length+' ditado(s) aguardando exame:</div>'
-    +pend.map(function(a){ return '<div style="display:flex;align-items:center;gap:8px;background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px"><span style="font-size:13px;font-weight:600;min-width:90px">'+String(a.nomePaciente||a.nome||'').replace(/</g,'&lt;')+'</span>'+(a.url?playerLinha(a.url):'')+'</div>'; }).join('');
+    +pend.map(function(a){
+      var t=(a.transcricao||'').replace(/</g,'&lt;');
+      var resumo = a.transcricao ? (t.length>160?t.slice(0,160)+'…':t) : '<span class="erro">⚠️ transcrição vazia — confira o microfone e refaça o ditado</span>';
+      var tag = a.tipoExame ? '<span class="tag">'+a.tipoExame+'</span>' : '<span class="tag" style="background:#fde8e8;color:#b3261e">tipo não dito</span>';
+      return '<div style="background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;min-width:90px">'+String(a.nomePaciente||a.nome||'').replace(/</g,'&lt;')+'</span>'+tag+(a.url?playerLinha(a.url):'')+'</div>'
+        +'<div class="aviso" style="margin-top:3px">'+resumo+'</div></div>';
+    }).join('');
 }
 
 /* ---- vigiar a pasta de export ---- */

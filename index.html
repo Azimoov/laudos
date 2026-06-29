@@ -1710,7 +1710,7 @@ function abrirRevisao(exId, semTela){
   _mostrarBotoesRev(true);
   }
 }
-function revImgMove(e,img){ var r=img.getBoundingClientRect(); var w=r.width||1, h=r.height||1; var x=(e.clientX-r.left)/w, y=(e.clientY-r.top)/h; var m=0.2; if(x<m||x>1-m||y<m||y>1-m){ img.classList.remove('zoom'); } else { img.classList.add('zoom'); } }
+function revImgMove(e,img){ var r=img.getBoundingClientRect(); var w=r.width||1, h=r.height||1; var x=(e.clientX-r.left)/w, y=(e.clientY-r.top)/h; var m=0.35; if(x<m||x>1-m||y<m||y>1-m){ img.classList.remove('zoom'); } else { img.classList.add('zoom'); } }
 function revImgLeave(img){ img.classList.remove('zoom'); }
 function renderRevisao(){
   const div=document.getElementById("listaRevisao"); if(!div) return;

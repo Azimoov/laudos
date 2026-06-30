@@ -117,6 +117,13 @@ const MODELOS = {
   "corpo": "**Pele** sem alterações significativas.\n\n**Tecido celular subcutâneo** sem alterações significativas.\n\n**Musculatura eutrófica**, sem alterações significativas.\n\n**Estrutura Vascular:** sem alterações significativas.",
   "conclusao": "Exame ecográfico compatível com a normalidade."
  },
+ "axila": {
+  "nome": "Axila",
+  "titulo": "EXAME ECOGRÁFICO DA REGIÃO AXILAR BILATERALMENTE.",
+  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
+  "corpo": "**Pele** sem alterações significativas.\n\n**Tecido celular subcutâneo** sem alterações significativas.\n\n**Musculatura eutrófica**, sem alterações significativas.\n\n**Estrutura Vascular:** sem alterações significativas.\n\nNão identificou-se massas ou coleções na ocasião do exame.",
+  "conclusao": "Exame ecográfico compatível com a normalidade."
+ },
  "ombro": {
   "nome": "Ombro",
   "titulo": "RELATÓRIO ULTRASSONOGRÁFICO OMBRO .....",

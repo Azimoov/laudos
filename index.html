@@ -182,12 +182,12 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 <div class="aba-conteudo" id="pane-captura" style="display:block">
 <div class="card" id="cardCaptura" style="border:2px solid #1f7a3d">
   <h2>🔴 Captura ao vivo — grave agora, a imagem chega depois</h2>
-  <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando as imagens chegarem na pasta vigiada, o app vincula ao ditado e gera o laudo. Atalho: <b>barra de espaço</b> grava / pausa / retoma.<br><b>Não precisa dizer o nome do paciente</b> — ele vem do worksheet do exame. Dite os achados; se quiser, diga o <b>tipo do exame</b> (ex.: "abdome total") para o laudo sair automático.</p>
+  <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando as imagens chegarem na pasta vigiada, o app vincula ao ditado e gera o laudo. Atalho: durante a gravação, a <b>barra de espaço</b> pausa/retoma.<br><b>Não precisa dizer o nome do paciente</b> — ele vem do worksheet do exame. Dite os achados; se quiser, diga o <b>tipo do exame</b> (ex.: "abdome total") para o laudo sair automático.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px">
     <button class="btn" id="btnCapRec" onclick="capToggleRec()">🎙 Gravar ditado</button>
     <button class="btn" id="btnCapFinalizar" onclick="capFinalizar()" style="display:none;background:#1f7a3d">✅ Finalizar ditado</button>
     <canvas id="vuCap" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px;align-self:center"></canvas>
-    <span class="aviso" id="capRecInfo" style="align-self:center">Atalho: barra de espaço grava / pausa / retoma.</span>
+    <span class="aviso" id="capRecInfo" style="align-self:center">Toque em Gravar para começar — durante a gravação, espaço pausa/retoma.</span>
   </div>
   <div id="capPendentes" style="margin-top:8px"></div>
   <div id="capFolderSec" style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
@@ -1989,7 +1989,7 @@ function capSetRecUI(){
   if(!b) return;
   if(capEstado==='rec'){ b.textContent='⏸ Pausar ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='inline-block'; if(info)info.textContent='🔴 Gravando… espaço pausa · Finalizar encerra.'; }
   else if(capEstado==='pause'){ b.textContent='▶ Retomar ('+capSeg+'s)'; b.style.background='#a36a00'; if(f)f.style.display='inline-block'; if(info)info.textContent='⏸ Pausado em '+capSeg+'s. Espaço retoma · Finalizar encerra.'; }
-  else { b.textContent='🎙 Gravar ditado'; b.style.background=''; if(f)f.style.display='none'; if(info)info.textContent='Atalho: barra de espaço grava / pausa / retoma.'; }
+  else { b.textContent='🎙 Gravar ditado'; b.style.background=''; if(f)f.style.display='none'; if(info)info.textContent='Toque em Gravar para começar — durante a gravação, espaço pausa/retoma.'; }
 }
 async function capRegistrarDitado(blob){
   var novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
@@ -2150,7 +2150,8 @@ function capInit(){
   else { try{ fsGetHandle('watch').then(function(h){ if(h){ capWatchH=h; capPastaInfo(); var b=document.getElementById('btnCapVigiar'); if(b) b.style.display='inline-block'; } }); }catch(e){} }
   document.addEventListener('keydown', function(e){
     if(e.code!=='Space') return;
-    if(!capArmado) return;
+    if(window.__abaAtual!=='captura') return;               // só na aba Captura ao vivo
+    if(capEstado!=='rec' && capEstado!=='pause') return;     // só pausa/retoma uma gravação em andamento (iniciar é pelo botão)
     var el=document.activeElement;
     if(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName||''))) return;
     var tr=document.getElementById('telaRevisao'); if(tr && tr.style.display==='block') return;

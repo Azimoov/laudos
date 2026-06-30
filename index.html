@@ -395,8 +395,10 @@ async function transcreverAudio(arquivoOuBlob){
     if(r.status!==404 && r.status!==400) break;
   }
   if(texto===null) throw new Error('Transcrição falhou: '+ultimoErro);
-  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME, escolhendo exatamente uma destas chaves: abdominal, abdomen_superior, rins, prostata, tireoide, mama, transvaginal, pelvica, obst1, obst1_descolamento, obst23, obst_gemelar, bolsa_escrotal, penis, parede_abdominal, partes_moles, ombro, cotovelo, punho, mao, joelho, tornozelo, pe, outro; (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio). Extraia lateralidade SOMENTE para os tipos: ombro, joelho, tornozelo, punho e partes_moles — para todos os demais tipos responda \"\" independentemente do que for dito. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
-  return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: resp.tipo_exame||'', lateralidade: resp.lateralidade||''};
+  var nomesTipos = Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
+  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME ditado: quando corresponder, responda EXATAMENTE com um destes nomes de exame: "+nomesTipos+". Se o exame ditado não estiver nessa lista, responda \"outro\". Se não der para saber, responda \"\". (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio). Extraia lateralidade SOMENTE para os tipos: ombro, joelho, tornozelo, punho e partes_moles — para todos os demais tipos responda \"\" independentemente do que for dito. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
+  var tipoKey = mapTipo(resp.tipo_exame||'');
+  return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: tipoKey, lateralidade: resp.lateralidade||''};
 }
 
 /* ============ Áudio: m4a → WAV 16 kHz mono ============ */
@@ -529,6 +531,7 @@ const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edit
 function limparPaciente(folder){ if(!folder) return ''; var nome=String(folder).split(/\d{8}/)[0]; nome=nome.replace(/[_\-\s]+$/,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim(); nome=nome.toLowerCase().replace(/(^|\s)([a-zà-ú])/g,function(m,a,b){return a+b.toUpperCase();}); return nome; }
 function limparExame(sub){ if(!sub) return ''; return String(sub).split(/\d{8}/)[0].replace(/[_\-\s]+$/,'').replace(/[_]+/g,' ').trim(); }
 function mapTipo(texto){
+  if(texto && MODELOS[texto]) return texto;   // já é uma chave válida (inclui modelos personalizados)
   const t=norm(texto); if(!t) return '';
   for(const chave in SINONIMOS_TIPO){ if(SINONIMOS_TIPO[chave].some(function(s){return t.indexOf(norm(s))>=0;})) return chave; }
   for(const k in MODELOS){ const n=norm(MODELOS[k].nome); if(n && (t.indexOf(n)>=0 || n.indexOf(t)>=0)) return k; }
@@ -1999,7 +2002,7 @@ async function capRegistrarDitado(blob){
     var r=await transcreverAudio(blob);
     a.transcricao=r.transcricao||''; a.nomePaciente=r.nome_paciente||''; a.tipoExame=r.tipo_exame||''; a.lateralidade=r.lateralidade||'';
     a.nome=nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||a.nome;
-    log('Ditado pronto: '+(a.nomePaciente||'(nome não citado)')+(a.tipoExame?' · '+a.tipoExame:''));
+    log('Ditado pronto: '+(a.nomePaciente||'(nome não citado)')+(a.tipoExame?' · '+((MODELOS[a.tipoExame]&&MODELOS[a.tipoExame].nome)||a.tipoExame):''));
   }catch(e){ a._erro=e.message||String(e); log('Falha ao transcrever ditado: '+a._erro,true); }
   try{ await gravSalvar(blob, {transcricao:a.transcricao, nome_paciente:a.nomePaciente, tipo_exame:a.tipoExame, lateralidade:a.lateralidade, nome:a.nome, _captura:true}); }catch(e){}
   capRenderPendentes(); renderExames(); capRenderNovos();
@@ -2012,7 +2015,7 @@ function capRenderPendentes(){
     +pend.map(function(a){
       var t=(a.transcricao||'').replace(/</g,'&lt;');
       var resumo = a.transcricao ? (t.length>160?t.slice(0,160)+'…':t) : (a._erro ? '<span class="erro">⚠️ erro na transcrição: '+String(a._erro).replace(/</g,'&lt;')+'</span>' : '<span class="erro">⚠️ transcrição vazia — confira o microfone e refaça o ditado</span>');
-      var tag = a.tipoExame ? '<span class="tag">'+a.tipoExame+'</span>' : '<span class="tag" style="background:#fde8e8;color:#b3261e">tipo não dito</span>';
+      var tag = a.tipoExame ? '<span class="tag">'+((MODELOS[a.tipoExame]&&MODELOS[a.tipoExame].nome)||a.tipoExame)+'</span>' : '<span class="tag" style="background:#fde8e8;color:#b3261e">tipo não dito</span>';
       return '<div style="background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px">'
         +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;min-width:90px">'+String(a.nomePaciente||a.nome||'').replace(/</g,'&lt;')+'</span>'+tag+(a.url?playerLinha(a.url):'')+'</div>'
         +'<div class="aviso" style="margin-top:3px">'+resumo+'</div></div>';
@@ -2102,7 +2105,7 @@ function capRenderNovos(){
     if(ex.laudo){ return capBanner('#1f7a3d','✅ Laudo de <b>'+nomeEx+'</b> gerado.','<button class="btn peq" onclick="abrirRevisao('+ex.id+')">📄 Abrir laudo</button> <button class="btn peq sec" onclick="capRemover('+ex.id+')">ocultar</button>'); }
     if(!pend.length){ return capBanner('#a36a00','🆕 Novo exame: <b>'+nomeEx+'</b> ('+ex.imagens.length+' img) — aguardando ditado. Grave e finalize o ditado.','<button class="btn peq sec" onclick="capDescartar('+ex.id+')">✕ descartar</button>'); }
     var melhor=capMelhorDitadoIdx(ex, pend);
-    var opts=pend.map(function(a){ return '<option value="'+a.idx+'"'+(a.idx===melhor?' selected':'')+'>'+String(a.nomePaciente||a.nome||'(sem nome)').replace(/</g,'&lt;')+(a.tipoExame?' · '+a.tipoExame:'')+'</option>'; }).join('');
+    var opts=pend.map(function(a){ return '<option value="'+a.idx+'"'+(a.idx===melhor?' selected':'')+'>'+String(a.nomePaciente||a.nome||'(sem nome)').replace(/</g,'&lt;')+(a.tipoExame?' · '+((MODELOS[a.tipoExame]&&MODELOS[a.tipoExame].nome)||a.tipoExame):'')+'</option>'; }).join('');
     return capBanner('#1f5fa6','🆕 Novo exame: <b>'+nomeEx+'</b> ('+ex.imagens.length+' img). Vincular ao ditado:',
       '<select id="capSel'+ex.id+'" style="max-width:240px">'+opts+'</select> <button class="btn peq" onclick="capVincularGerar('+ex.id+')">✅ Vincular e gerar laudo</button> <button class="btn peq sec" onclick="capDescartar('+ex.id+')">✕</button>');
   }).join('');

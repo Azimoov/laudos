@@ -110,8 +110,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div id="cfgPastas" style="margin-top:10px;display:none"><label>Pastas no computador (Chrome/Edge)</label><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" onclick="definirPasta('audio')">📁 Pasta de áudios</button><button class="btn sec" onclick="definirPasta('laudo')">📁 Pasta de laudos</button></div><span class="aviso">No iPad, o botão Salvar abre a folha de compartilhamento do iOS.</span></div>
   <div style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
     <label>🧠 Aprendizados (regras tiradas das suas correções)</label>
-    <label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-top:4px"><input type="checkbox" id="cfgAprender" onchange="toggleAprender(this)"> Aprender com minhas correções (ao "Liberar e próximo")</label>
-    <span class="aviso">Desligue quando os laudos já estiverem saindo do seu jeito, para economizar tokens (não faz a chamada extra à IA). As regras já guardadas continuam sendo aplicadas.</span>
+    <span class="aviso">Na revisão de cada laudo, use o botão <b>🧠 Aprender com minhas correções</b> para o sistema analisar suas edições e guardar regras. As regras guardadas são aplicadas nos próximos laudos — veja e gerencie abaixo.</span>
     <div id="listaRegras" style="margin-top:6px"></div>
   </div>
   <div style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
@@ -239,6 +238,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
       <button class="btn" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
       <button class="btn" onclick="salvarLaudoPasta()">💾 Salvar na pasta</button>
       <button class="btn sec" id="btnFundo" onclick="trocarFundo()" style="display:none">🎨 Fundo</button>
+      <button class="btn sec" id="btnAprender" onclick="aprenderAgora()" style="display:none">🧠 Aprender com minhas correções</button>
       <button class="btn" id="btnLiberar" onclick="liberarEProximo()" style="display:none;background:#1f7a3d">✅ Liberar e próximo</button>
       <span class="aviso" style="align-self:center">Toque no texto para editar. No iPad: Imprimir → pinçar a pré-visualização → Compartilhar → Salvar em Arquivos (PDF).</span>
     </div>
@@ -1374,13 +1374,19 @@ function textoEditadoLaudo(){
   var t2=corpo?(corpo.innerText||corpo.textContent||''):'';
   return (t1+'\n\n'+t2).replace(/ /g,' ').trim();
 }
+function aprenderAgora(){
+  var exId = window.__revAtual && window.__revAtual.exId!=null ? window.__revAtual.exId : null;
+  if(exId==null){ log('Abra um laudo para analisar as correções.', true); return; }
+  aprenderComEdicao(exId);
+}
 async function aprenderComEdicao(exId){
   try{
     var ex=exames.find(function(e){return e.id===exId;});
-    if(!cfg.aprender||!ex||!ex.laudo||!ex.laudoBaseTexto||!cfg.chave) return;
-    var editado=textoEditadoLaudo(); if(!editado) return;
+    if(!ex||!ex.laudo||!ex.laudoBaseTexto){ log('Este laudo não pode ser analisado (gere o laudo antes).', true); return; }
+    if(!cfg.chave){ log('Configure a chave da API para analisar correções.', true); return; }
+    var editado=textoEditadoLaudo(); if(!editado){ log('Não consegui ler o texto do laudo.', true); return; }
     var norm=function(s){ return String(s||'').replace(/\s+/g,' ').trim(); };
-    if(norm(editado)===norm(ex.laudoBaseTexto)) return; // nada mudou
+    if(norm(editado)===norm(ex.laudoBaseTexto)){ log('Nenhuma correção detectada neste laudo — nada a aprender.'); return; }
     log('Analisando suas correções para aprender...');
     var nomeTipo=(MODELOS[ex.tipo]&&MODELOS[ex.tipo].nome)||ex.tipo||'';
     var prompt="Você ajuda a calibrar um assistente de laudos de ultrassom. O médico revisou e CORRIGIU um laudo. Compare a VERSÃO ORIGINAL (gerada pela IA) com a VERSÃO FINAL (corrigida pelo médico) e extraia REGRAS GENERALIZÁVEIS de preferência do médico (terminologia, redação, estrutura, formatação, conduta) para aplicar em FUTUROS laudos.\n\n"+
@@ -1878,7 +1884,7 @@ function fecharRevisao(){
   document.querySelector('main').style.display='block';
 }
 function _mostrarBotoesRev(visivel){
-  ['btnFundo','btnLiberar'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display=visivel?'inline-block':'none'; });
+  ['btnFundo','btnLiberar','btnAprender'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display=visivel?'inline-block':'none'; });
   if(!visivel){ var aw=document.getElementById('revAudioWrap'); if(aw) aw.style.display='none'; var di=document.getElementById('revMidiaImg'); if(di) di.style.display='none'; }
 }
 function montarRevMidia(exId){
@@ -1941,7 +1947,7 @@ async function liberarEProximo(){
   await salvarLaudoPasta();
   try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
   var exAtual=exames.find(function(e){return e.id===exId;}); if(exAtual) exAtual._liberado=true;
-  await aprenderComEdicao(exId); // loop de aprendizado: analisa as correções do médico antes de seguir
+  // aprendizado agora é manual (botão "🧠 Aprender com minhas correções"), não automático aqui
   // próximo laudo com laudo gerado e ainda não liberado
   var pendentes=exames.filter(function(e){return e.laudo&&!e._liberado;});
   if(pendentes.length){ abrirRevisao(pendentes[0].id); }

@@ -120,6 +120,12 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
     <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn sec" type="button" onclick="abrirEditorBizus()">✏️ Abrir/fechar editor de BIZUS</button><span id="bizusStatus" class="aviso"></span></div>
     <div id="bizusEditor" style="margin-top:8px"></div>
   </div>
+  <div style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
+    <label>📋 Modelos de laudo</label>
+    <span class="aviso">Edite os modelos (Nome, Título, Técnica, Corpo, Conclusão) ou adicione novos. Ficam salvos só neste navegador e valem na lista de tipos e na geração.</span>
+    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn sec" type="button" onclick="abrirEditorModelos()">✏️ Abrir/fechar editor de modelos</button><span id="modelosStatus" class="aviso"></span></div>
+    <div id="modelosEditor" style="margin-top:8px"></div>
+  </div>
   <div style="margin-top:12px"><button class="btn" onclick="salvarConfig()">Salvar</button></div>
   <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API da OpenAI para análise.</p>
 </div>
@@ -282,6 +288,10 @@ if(/^gemini/.test(cfg.modelo)){ cfg.modelo='chat-latest'; localStorage.setItem('
 if(/^AIza/.test(cfg.chave)){ cfg.chave=''; localStorage.setItem('gmk',''); }
 let exames = [];   // {id, arquivo, nomeArquivo, paciente, imagens:[dataUrl], tipo, audios:[idx], laudo}
 let audios = [];   // {idx, file, nome, transcricao, nomePaciente, tipoExame, exameId}
+
+/* MODELOS personalizados (editor em Configurações): guarda o padrão e aplica o override salvo, mutando MODELOS no lugar (é const, mas o objeto é mutável) */
+const MODELOS_PADRAO = JSON.parse(JSON.stringify(MODELOS));
+(function(){ try{ var s=localStorage.getItem('gmodelos'); if(s){ var o=JSON.parse(s); if(o&&typeof o==='object'&&Object.keys(o).length){ Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, o); } } }catch(e){} })();
 
 function alternarConfig(){
   const c = document.getElementById('cardConfig');
@@ -1591,6 +1601,84 @@ function restaurarBizus(){
   var cont=document.getElementById('bizusEditor'); if(cont){ cont.__aberto=false; abrirEditorBizus(); }
   var st=document.getElementById('bizusStatus'); if(st) st.textContent='';
   log('BIZUS restaurados ao padrão.');
+}
+
+/* ============ Editor de MODELOS de laudo (estruturados) — salvo no navegador ============ */
+function modeloBoxHtml(key, m, locked){
+  m=m||{};
+  var ro=locked?' readonly':''; var bg=locked?'#eef2f6':'#fffdf5';
+  var base='font-size:12.5px;font-family:ui-monospace,Consolas,monospace;padding:6px;border:1px solid #c8d0da;border-radius:6px;resize:vertical;box-sizing:border-box;width:100%;';
+  function campo(cls,label,val,rows){ return '<label style="font-size:11px;font-weight:600;margin:6px 0 1px;color:#5a6776">'+label+'</label><textarea class="mdCampo '+cls+'"'+ro+' rows="'+(rows||3)+'" style="'+base+'background:'+bg+'">'+bizuEsc(val)+'</textarea>'; }
+  return '<div class="modeloBox" data-key="'+bizuEscAttr(key||'')+'" data-locked="'+(locked?'1':'0')+'" style="border:1px dashed #7d97b5;border-radius:8px;padding:8px;margin-top:8px;background:#fcfdff">'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+      +'<span class="modeloTit" style="font-size:13px;font-weight:700;color:#1e5b8a;flex:1;min-width:0">'+bizuEsc(m.nome||'Novo modelo')+'</span>'
+      +'<button type="button" class="btn peq sec" style="padding:2px 8px" onclick="editarModeloBox(this)">'+(locked?'✏️ Editar':'🔒 Travar')+'</button>'
+      +'<button type="button" class="btn peq sec" style="color:#b3261e;padding:2px 8px" onclick="removerModeloBox(this)" title="Remover este modelo">✕</button>'
+    +'</div>'
+    +'<label style="font-size:11px;font-weight:600;margin:2px 0 1px;color:#5a6776">Nome (aparece na lista de tipos)</label>'
+    +'<input class="mdCampo mdNome" type="text"'+ro+' oninput="sincronizarModeloTit(this)" value="'+bizuEscAttr(m.nome)+'" style="'+base+'background:'+bg+'">'
+    +campo('mdTitulo','Título do laudo', m.titulo, 2)
+    +campo('mdTecnica','Técnica', m.tecnica, 3)
+    +campo('mdCorpo','Corpo (descrição)', m.corpo, 10)
+    +campo('mdConclusao','Conclusão', m.conclusao, 2)
+    +campo('mdExtra','Texto fixo após a conclusão (opcional)', m.extra||'', 2)
+  +'</div>';
+}
+function sincronizarModeloTit(inp){ var box=inp.closest('.modeloBox'); if(!box) return; var tit=box.querySelector('.modeloTit'); if(tit) tit.textContent=(inp.value||'').trim()||'Novo modelo'; }
+function editarModeloBox(btn){
+  var box=btn.closest('.modeloBox'); if(!box) return;
+  var unlock=box.getAttribute('data-locked')==='1';
+  box.setAttribute('data-locked', unlock?'0':'1');
+  Array.prototype.forEach.call(box.querySelectorAll('.mdCampo'), function(c){ if(unlock){ c.removeAttribute('readonly'); c.style.background='#fffdf5'; } else { c.setAttribute('readonly','readonly'); c.style.background='#eef2f6'; } });
+  btn.textContent=unlock?'🔒 Travar':'✏️ Editar';
+  if(unlock){ var t=box.querySelector('.mdNome'); if(t) t.focus(); }
+}
+function removerModeloBox(btn){ var box=btn.closest('.modeloBox'); if(!box) return; var temConteudo=Array.prototype.some.call(box.querySelectorAll('.mdCampo'), function(c){ return (c.value||'').trim(); }); if(temConteudo && !confirm('Remover este modelo? (será apagado ao salvar)')) return; box.remove(); }
+function adicionarModeloBox(){
+  var lista=document.getElementById('modelosLista'); if(!lista) return;
+  var key='modelo_'+Date.now();
+  var tmp=document.createElement('div'); tmp.innerHTML=modeloBoxHtml(key,{nome:'',titulo:'',tecnica:'',corpo:'',conclusao:'',extra:''},false);
+  var novo=tmp.firstChild; lista.appendChild(novo);
+  var inp=novo.querySelector('.mdNome'); if(inp){ inp.focus(); novo.scrollIntoView({block:'center'}); }
+}
+function abrirEditorModelos(){
+  var cont=document.getElementById('modelosEditor'); if(!cont) return;
+  if(cont.__aberto){ cont.innerHTML=''; cont.__aberto=false; return; }
+  var html='<p class="aviso">Cada modelo tem Nome, Título, Técnica, Corpo e Conclusão. Travados por padrão (✏️ Editar para alterar). ➕ cria, ✕ remove; depois toque <b>Salvar modelos</b>.</p>';
+  if(localStorage.getItem('gmodelos')) html+='<p class="aviso" style="color:#1f7a3d;font-weight:600">✔ Você tem modelos personalizados salvos.</p>';
+  html+='<div id="modelosLista">'+Object.keys(MODELOS).map(function(k){ return modeloBoxHtml(k, MODELOS[k], true); }).join('')+'</div>';
+  html+='<button type="button" class="btn peq" style="margin-top:8px" onclick="adicionarModeloBox()">➕ Adicionar modelo</button>';
+  html+='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" onclick="salvarModelos()">💾 Salvar modelos</button><button class="btn sec" type="button" onclick="restaurarModelos()">↩ Restaurar padrão</button></div>';
+  cont.innerHTML=html;
+  cont.__aberto=true;
+}
+function salvarModelos(){
+  var cont=document.getElementById('modelosEditor'); if(!cont) return;
+  var novo={};
+  Array.prototype.forEach.call(cont.querySelectorAll('.modeloBox'), function(box){
+    var nome=((box.querySelector('.mdNome')||{}).value||'').trim();
+    var corpo=((box.querySelector('.mdCorpo')||{}).value||'').trim();
+    if(!nome && !corpo) return;
+    var key=box.getAttribute('data-key')||('modelo_'+Date.now()+Math.random().toString(36).slice(2,5));
+    var m={ nome:nome, titulo:((box.querySelector('.mdTitulo')||{}).value||'').trim(), tecnica:((box.querySelector('.mdTecnica')||{}).value||'').trim(), corpo:corpo, conclusao:((box.querySelector('.mdConclusao')||{}).value||'').trim() };
+    var extra=((box.querySelector('.mdExtra')||{}).value||'').trim(); if(extra) m.extra=extra;
+    novo[key]=m;
+  });
+  if(!Object.keys(novo).length){ log('Nenhum modelo para salvar.', true); return; }
+  try{ localStorage.setItem('gmodelos', JSON.stringify(novo)); }catch(e){ log('Não consegui salvar os modelos (armazenamento cheio?): '+e.message, true); return; }
+  Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, novo);
+  var st=document.getElementById('modelosStatus'); if(st) st.textContent='✔ personalizados salvos';
+  log('Modelos salvos — '+Object.keys(novo).length+' modelo(s) ativos.');
+  try{ if(exames && exames.length) renderExames(); }catch(e){}
+}
+function restaurarModelos(){
+  if(!confirm('Restaurar os modelos originais do código? Suas edições e adições serão apagadas.')) return;
+  try{ localStorage.removeItem('gmodelos'); }catch(e){}
+  Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, JSON.parse(JSON.stringify(MODELOS_PADRAO)));
+  var cont=document.getElementById('modelosEditor'); if(cont){ cont.__aberto=false; abrirEditorModelos(); }
+  var st=document.getElementById('modelosStatus'); if(st) st.textContent='';
+  log('Modelos restaurados ao padrão.');
+  try{ if(exames && exames.length) renderExames(); }catch(e){}
 }
 
 /* ============ Histórico de laudos (localStorage) ============ */

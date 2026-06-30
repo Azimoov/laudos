@@ -1798,8 +1798,17 @@ function montarRevMidia(exId){
   // áudios — sempre visível (é só apertar play; barra de espaço também toca)
   var auds=audios.filter(function(a){return a.exameId===exId;});
   da.innerHTML=auds.length
-    ? '<div class="aviso" style="font-weight:600;margin-bottom:2px">🎙 Gravação <span style="font-weight:400">(barra de espaço = play/pausa)</span></div>'
-      +auds.map(function(a){return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px;font-weight:600;white-space:nowrap">'+String(a.nome||'').replace(/</g,'&lt;')+'</span>'+(a.url?playerLinha(a.url):'')+'</div>';}).join('')
+    ? '<div class="aviso" style="font-weight:600;margin-bottom:4px">🎙 Gravação <span style="font-weight:400">(barra de espaço = play/pausa)</span></div>'
+      +auds.map(function(a){
+          var tr=(a.transcricao||'').replace(/</g,'&lt;');
+          var trBox = tr
+            ? '<div style="margin-top:4px;font-size:13px;line-height:1.45;color:#27313c;background:#fff;border:1px solid #dde3ea;border-radius:8px;padding:8px 10px;white-space:pre-wrap">'+tr+'</div>'
+            : '<div class="aviso" style="margin-top:4px">(transcrição indisponível)</div>';
+          return '<div style="margin-bottom:8px">'
+            +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;white-space:nowrap">'+String(a.nome||'').replace(/</g,'&lt;')+'</span>'+(a.url?playerLinha(a.url):'')+'</div>'
+            +trBox
+          +'</div>';
+        }).join('')
     : '';
   if(aw) aw.style.display=auds.length?'block':'none';
   // imagens — ao lado do laudo, já visíveis

@@ -131,6 +131,7 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
 
 <div id="abas">
   <button id="aba-acumulados" onclick="mostrarAba('acumulados')">📥 Arquivos acumulados</button>
+  <button id="aba-gravar" onclick="mostrarAba('gravar')">🎙 Gravar ditados</button>
   <button id="aba-loco" onclick="mostrarAba('loco')">📷 Exame na hora</button>
   <button id="aba-captura" onclick="mostrarAba('captura')">🔴 Captura ao vivo</button>
   <button id="aba-exames" onclick="mostrarAba('exames')">📋 Exames identificados</button>
@@ -153,9 +154,20 @@ input[type=text],input[type=password],select{width:100%;padding:11px;font-size:1
   <div class="filebox">
     <b>Áudios ditados</b> (m4a, mp3, wav — pode selecionar vários)
     <input type="file" id="inpAudios" accept="audio/*,.m4a" multiple>
+    <div style="margin-top:10px;border-top:1px dashed #c8d0da;padding-top:8px">
+      <b>Ou grave agora o áudio de um exame específico</b><br>
+      <span class="aviso">Fica guardado neste aparelho e entra automaticamente no Processar (também aparece na aba 🎙 Gravar ditados).</span>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn" id="btnGravarAcumRapido" onclick="gravarAcumulado('btnGravarAcumRapido','vuAcumRapido')">🎙 Gravar ditado</button><canvas id="vuAcumRapido" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>
+    </div>
   </div>
+</div>
+</div>
+
+<div class="aba-conteudo" id="pane-gravar" style="display:none">
+<div class="card">
+  <h2>🎙 Gravar ditados — ao longo do dia</h2>
   <div class="filebox">
-    <b>Ou grave os ditados aqui mesmo, ao longo do dia</b><br>
+    <b>Grave os ditados aqui mesmo, ao longo do dia</b><br>
     <span class="aviso">Ficam guardados neste aparelho e entram automaticamente no Processar. Toque 💾 para salvar uma cópia no Arquivos/iCloud.</span>
     <div style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn" id="btnGravarAcum" onclick="gravarAcumulado()">🎙 Gravar ditado</button><canvas id="vuAcum" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>
     <div id="listaAcum" style="margin-top:8px;text-align:left"></div>
@@ -396,7 +408,7 @@ async function transcreverAudio(arquivoOuBlob){
   }
   if(texto===null) throw new Error('Transcrição falhou: '+ultimoErro);
   var nomesTipos = Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
-  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME ditado: quando corresponder, responda EXATAMENTE com um destes nomes de exame: "+nomesTipos+". Se o exame ditado não estiver nessa lista, responda \"outro\". Se não der para saber, responda \"\". (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio). Extraia lateralidade SOMENTE para os tipos: ombro, joelho, tornozelo, punho e partes_moles — para todos os demais tipos responda \"\" independentemente do que for dito. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
+  const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME ditado: quando corresponder, responda EXATAMENTE com um destes nomes de exame: "+nomesTipos+". Se o exame ditado não estiver nessa lista, responda \"outro\". Se não der para saber, responda \"\". (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio). Extraia lateralidade SOMENTE para os tipos: ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles — para todos os demais tipos responda \"\" independentemente do que for dito. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
   var tipoKey = mapTipo(resp.tipo_exame||'');
   return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: tipoKey, lateralidade: resp.lateralidade||''};
 }
@@ -857,7 +869,7 @@ setInterval(atualizarPausa, 400);
 function primeiroUltimo(nome){ const p=(nome||'').trim().split(' ').filter(function(x){return x;}); if(!p.length) return ''; return p.slice(0,3).join(' '); }
 function nomeCompleto(nome){ return String(nome||'').replace(/\s+/g,' ').trim(); }
 function normLateralidade(s){ const t=norm(s); if(/esquerd/.test(t)) return 'Esquerdo'; if(/direit/.test(t)) return 'Direito'; if(/bilater|ambos|os dois|dois lados/.test(t)) return 'Bilateral'; return ''; }
-const TIPOS_COM_LATERALIDADE = new Set(['ombro','joelho','tornozelo','punho','partes_moles']);
+const TIPOS_COM_LATERALIDADE = new Set(['ombro','cotovelo','punho','mao','joelho','tornozelo','pe','partes_moles']);
 function nomeAudio(nomePac, tipoTexto, lateralidade){ const pn=nomeCompleto(nomePac); const k=mapTipo(tipoTexto); const tn=(k&&MODELOS[k])?MODELOS[k].nome:(tipoTexto||''); const lat=(k&&TIPOS_COM_LATERALIDADE.has(k))?normLateralidade(lateralidade):''; const tnLat=(tn?tn:'')+(lat?(tn?' '+lat:lat):''); return ((pn||'Sem nome')+(tnLat?' - '+tnLat:'')).trim(); }
 function nomeArquivoSeguro(s){ return ((s||'audio').replace(/[^A-Za-z0-9 ÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇÑáàâãéèêíïóôõöúüçñ_-]/g,' ').replace(/  +/g,' ').trim())||'audio'; }
 function playerLinha(url){
@@ -1191,8 +1203,9 @@ async function gravApagar(id){const db=await dbOpen();return new Promise(functio
 async function gravRenomear(id,novo){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');const st=tx.objectStore('gravacoes');const rq=st.get(id);rq.onsuccess=function(){const r=rq.result;if(r){r.nome=novo;r.nome_paciente=novo;st.put(r);}};tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
 async function renomearDitado(el,id){const novo=(el.textContent||'').trim();if(!novo)return;try{await gravRenomear(id,novo);if(window.__ditadosCache){const it=window.__ditadosCache.find(function(x){return x.id===id;});if(it){it.nome=novo;it.nome_paciente=novo;}}}catch(e){log('Nao consegui salvar o nome: '+e.message,true);}}
 let mediaRecA=null, recChunksA=[], recStreamA=null, recTimerA=null, recSegA=0;
-async function gravarAcumulado(){
-  const btn=document.getElementById('btnGravarAcum');
+async function gravarAcumulado(btnId, vuId){
+  btnId = btnId || 'btnGravarAcum'; vuId = vuId || 'vuAcum';
+  const btn=document.getElementById(btnId);
   if(mediaRecA && (mediaRecA.state==='recording'||mediaRecA.state==='paused')){ mediaRecA.stop(); return; }
   if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
   try{ recStreamA = await navigator.mediaDevices.getUserMedia({audio:true}); }
@@ -1204,9 +1217,9 @@ async function gravarAcumulado(){
   mediaRecA.onstop=async function(){
     const blob=new Blob(recChunksA,{type:mediaRecA.mimeType||'audio/mp4'});
     recStreamA.getTracks().forEach(function(t){t.stop();});
-    vuParar('vuAcum');
+    vuParar(vuId);
     clearInterval(recTimerA);
-    btn.textContent='🎙 Gravar ditado'; btn.style.background='';
+    if(btn){ btn.textContent='🎙 Gravar ditado'; btn.style.background=''; }
     let metaG={};
     try{ const rr=await transcreverAudio(blob); metaG={transcricao:rr.transcricao||'', nome_paciente:rr.nome_paciente||'', tipo_exame:rr.tipo_exame||'', lateralidade:rr.lateralidade||'', nome:nomeAudio(rr.nome_paciente, rr.tipo_exame, rr.lateralidade)}; log('Ditado guardado: '+(metaG.nome||'(sem nome)')); }
     catch(e){ log('Não consegui transcrever o ditado agora (será transcrito no Processar): '+e.message, true); }
@@ -1214,9 +1227,9 @@ async function gravarAcumulado(){
     renderAcum();
   };
   mediaRecA.start(); recSegA=0;
-  vuIniciar(recStreamA, 'vuAcum');
-  btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
-  recTimerA=setInterval(function(){if(mediaRecA&&mediaRecA.state==='paused')return;recSegA++;btn.textContent='⏹ Parar ('+recSegA+'s)';},1000);
+  vuIniciar(recStreamA, vuId);
+  if(btn){ btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e'; }
+  recTimerA=setInterval(function(){if(mediaRecA&&mediaRecA.state==='paused')return;recSegA++;if(btn)btn.textContent='⏹ Parar ('+recSegA+'s)';},1000);
 }
 async function renderAcum(){
   const div=document.getElementById('listaAcum'); if(!div) return;
@@ -2168,7 +2181,7 @@ window.addEventListener('DOMContentLoaded', capInit);
 
 /* ===== Abas (estilo Excel) ===== */
 function mostrarAba(nome){
-  ['acumulados','loco','captura','exames','revisao'].forEach(function(n){
+  ['acumulados','gravar','loco','captura','exames','revisao'].forEach(function(n){
     var p=document.getElementById('pane-'+n); if(p) p.style.display=(n===nome)?'block':'none';
     var t=document.getElementById('aba-'+n); if(t) t.classList.toggle('ativa', n===nome);
   });

@@ -1062,6 +1062,12 @@ function removerAudioExame(aIdx){
 let mediaRecE=null, recChunksE=[], recStreamE=null, recTimerE=null, recSegE=0, recExAlvo=null;
 /* ============ Pausar gravação + player com bolinha + nome do arquivo ============ */
 function recAtivo(){ const r=[ (typeof mediaRec!=='undefined'?mediaRec:null), (typeof mediaRecE!=='undefined'?mediaRecE:null), (typeof mediaRecA!=='undefined'?mediaRecA:null) ]; for(const m of r){ if(m && (m.state==='recording'||m.state==='paused')) return m; } return null; }
+/* impede duas gravações simultâneas (medidor VU e botão de pausa são globais): true se algum gravador != "exceto" está gravando/pausado */
+function algumGravando(exceto){
+  var lst=[['mediaRec',typeof mediaRec!=='undefined'?mediaRec:null],['mediaRecA',typeof mediaRecA!=='undefined'?mediaRecA:null],['mediaRecE',typeof mediaRecE!=='undefined'?mediaRecE:null],['capMR',typeof capMR!=='undefined'?capMR:null]];
+  for(var i=0;i<lst.length;i++){ if(lst[i][0]!==exceto && lst[i][1] && (lst[i][1].state==='recording'||lst[i][1].state==='paused')) return true; }
+  return false;
+}
 function pausarRec(){ const m=recAtivo(); if(!m) return; try{ if(m.state==='recording'){ if(typeof m.pause==='function') m.pause(); else log('Pausa não suportada neste navegador.', true); } else if(m.state==='paused'){ m.resume(); } }catch(e){ log('Falha ao pausar/retomar: '+e.message, true); } atualizarPausa(); }
 function atualizarPausa(){ const m=recAtivo(); const els=document.querySelectorAll('.btnPausa'); for(let i=0;i<els.length;i++){ els[i].style.display = m?'inline-block':'none'; els[i].textContent = (m&&m.state==='paused')?'▶ Retomar':'⏸ Pausar'; } }
 setInterval(atualizarPausa, 400);function nomeCompleto(nome){ return String(nome||'').replace(/\s+/g,' ').trim(); }
@@ -1171,6 +1177,7 @@ async function gravarParaExame(id){
   // Já gravando este exame: o botão vermelho agora PAUSA (permite retomar do ponto onde parou).
   if(mediaRecE && recExAlvo===id && mediaRecE.state==='recording'){ pausarRecEx(id); return; }
   if(mediaRecE && (mediaRecE.state==='recording'||mediaRecE.state==='paused')){ log('Conclua a gravação em andamento antes de iniciar outra.', true); return; }
+  if(algumGravando('mediaRecE')){ log('Conclua a gravação em andamento antes de iniciar outra.', true); return; }
   if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
   try{ recStreamE = await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(e){ log('Acesso ao microfone negado: '+e.message, true); return; }
@@ -1404,6 +1411,7 @@ async function gravarAcumulado(btnId, vuId){
   btnId = btnId || 'btnGravarAcum'; vuId = vuId || 'vuAcum';
   const btn=document.getElementById(btnId);
   if(mediaRecA && (mediaRecA.state==='recording'||mediaRecA.state==='paused')){ mediaRecA.stop(); return; }
+  if(algumGravando('mediaRecA')){ log('Conclua a gravação em andamento antes de iniciar outra.', true); return; }
   if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
   try{ recStreamA = await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(e){ log('Acesso ao microfone negado: '+e.message, true); return; }
@@ -1508,6 +1516,7 @@ function apagarLokoAudio(i){ URL.revokeObjectURL(lokoUrls[i]); lokoAudios.splice
 async function alternarGravacao(){
   const btn = document.getElementById('btnGravar');
   if(mediaRec && (mediaRec.state==='recording'||mediaRec.state==='paused')){ mediaRec.stop(); return; }
+  if(algumGravando('mediaRec')){ log('Conclua a gravação em andamento antes de iniciar outra.', true); return; }
   if(!navigator.mediaDevices || !window.MediaRecorder){ log('Este navegador não suporta gravação. Use o Safari.', true); return; }
   try{ recStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(e){ log('Acesso ao microfone negado: '+e.message, true); return; }
@@ -2193,6 +2202,7 @@ async function capToggleRec(){
   capArmado=true;
   if(capEstado==='rec'){ if(capMR && capMR.state==='recording'){ try{ capMR.pause(); }catch(e){} } capEstado='pause'; capSetRecUI(); return; }
   if(capEstado==='pause'){ if(capMR && capMR.state==='paused'){ try{ capMR.resume(); }catch(e){} } capEstado='rec'; capSetRecUI(); return; }
+  if(algumGravando('capMR')){ log('Conclua a gravação em andamento antes de iniciar outra.',true); return; }
   if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não suporta gravação.',true); return; }
   try{ capStream=await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(e){ log('Acesso ao microfone negado: '+e.message,true); return; }

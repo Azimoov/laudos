@@ -1274,7 +1274,7 @@ function ampliarImg(el){
   if(el.dataset.amp==='1'){ el.dataset.amp=''; el.style.height='90px'; el.style.width=''; }
   else { el.dataset.amp='1'; el.style.height='auto'; el.style.width='100%'; }
 }
-function mudarTipo(id, v){ exames.find(function(e){return e.id===id;}).tipo = v; }
+function mudarTipo(id, v){ var e=exames.find(function(x){return x.id===id;}); if(e) e.tipo = v; }
 function excluirExame(id){
   if(!confirm('Excluir este exame e seu laudo? (não afeta seus arquivos)')) return;
   audios.forEach(function(a){ if(a.exameId===id) a.exameId=null; });
@@ -2031,7 +2031,8 @@ function garantirFundo(){ return window.__fundoPerguntado ? Promise.resolve(wind
 async function trocarFundo(){ await escolherFundo(); var ex=(window.__revAtual&&window.__revAtual.exId!=null)?window.__revAtual.exId:null; if(ex!=null) abrirRevisao(ex); }
 function abrirRevisao(exId, semTela){
   const ex = exames.find(e=>e.id===exId);
-  const L = ex.laudo; const c = L.cab;
+  if(!ex || !ex.laudo){ log('Gere o laudo antes de abrir a revisão.', true); return; }
+  const L = ex.laudo; const c = L.cab||{};
   if(!ex.histKey) ex.histKey='L'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   window.__revAtual = {id:ex.histKey, exId:ex.id, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||''};
   var _fnd = FUNDOS[window.__fundo||'branco'] || FUNDOS.branco;

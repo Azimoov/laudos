@@ -1936,11 +1936,15 @@ function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')|
 function gravarHistorico(arr){ try{ localStorage.setItem('glaudos', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar o histórico (armazenamento cheio?): '+e.message, true); } }
 function salvarLaudoHistorico(meta){
   if(!meta) return;
-  const html = document.getElementById('areaImpressao').innerHTML;
+  let html = document.getElementById('areaImpressao').innerHTML;
   if(!html) return;
+  // não guardar o timbrado embutido (base64 ~300KB estoura o localStorage);
+  // guarda só a chave do fundo e reinjeta a imagem ao abrir (ver abrirHistorico)
+  html = html.replace(/<img class="fundoLaudo"[^>]*>/g, '');
+  const fundo = window.__fundo || 'branco';
   const arr = lerHistorico();
   const i = arr.findIndex(function(x){return x.id===meta.id;});
-  const reg = {id:meta.id, paciente:meta.paciente||'(sem nome)', tipo:meta.tipo||'', data:meta.data||'', obs:meta.obs||'', html:html, ts:Date.now()};
+  const reg = {id:meta.id, paciente:meta.paciente||'(sem nome)', tipo:meta.tipo||'', data:meta.data||'', obs:meta.obs||'', html:html, fundo:fundo, ts:Date.now()};
   if(i>=0) arr[i]=reg; else arr.push(reg);
   gravarHistorico(arr);
 }
@@ -1973,6 +1977,14 @@ function abrirHistorico(id){
   const r = lerHistorico().find(function(x){return x.id===id;});
   if(!r){ log('Laudo não encontrado no histórico.', true); return; }
   document.getElementById('areaImpressao').innerHTML = r.html;
+  // reinjeta o timbrado (não é mais guardado embutido); laudos antigos já trazem a imagem no html
+  try{
+    var folha=document.querySelector('#areaImpressao .laudoFolha');
+    if(folha && !folha.querySelector('.fundoLaudo')){
+      var fnd=FUNDOS[r.fundo||'branco'];
+      if(fnd && fnd.img){ var im=document.createElement('img'); im.className='fundoLaudo'; im.src=fnd.img; im.alt=''; folha.insertBefore(im, folha.firstChild); }
+    }
+  }catch(e){}
   const ob = document.getElementById('obsBanner');
   if(r.obs){ ob.style.display='block'; ob.textContent='⚠️ Aviso da IA — revise com atenção: '+r.obs; } else { ob.style.display='none'; }
   window.__revAtual = {id:r.id, paciente:r.paciente, tipo:r.tipo, data:r.data, obs:r.obs};

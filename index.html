@@ -507,8 +507,7 @@ const cfg = {
   modeloAux: localStorage.getItem('gmodaux')||'',
   medico: localStorage.getItem('gmedico')||'Dr. Daniel Serruya',
   crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962',
-  assinatura: localStorage.getItem('gass')||'',
-  aprender: localStorage.getItem('gaprende')!=='0'   // loop de aprendizado ligado por padrão
+  assinatura: localStorage.getItem('gass')||''
 };
 if(/^gemini/.test(cfg.modelo)){ cfg.modelo='chat-latest'; localStorage.setItem('gmodelo',cfg.modelo); }
 if(/^AIza/.test(cfg.chave)){ cfg.chave=''; localStorage.setItem('gmk',''); }
@@ -528,7 +527,6 @@ function alternarConfig(){
   document.getElementById('cfgModeloAux').value = cfg.modeloAux;
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
-  var ca=document.getElementById('cfgAprender'); if(ca) ca.checked = cfg.aprender;
   renderRegras();
 }
 document.getElementById('cfgAss').addEventListener('change', function(e){
@@ -725,12 +723,6 @@ function metaDoPdf(txt){
 function norm(s){
   return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 }
-function casa(nomeAudio, nomeArquivo){
-  const a = norm(nomeAudio).split(' ').filter(x=>x.length>2);
-  const b = norm(nomeArquivo);
-  return a.length>0 && a.some(t=>b.includes(t));
-}
-
 /* ============ Fluxo principal ============ */
 /* ============ Agrupamento por imagem (visão) + vínculo de áudios ============ */
 const LIMIAR_VINCULO = 0.6;   // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual
@@ -794,14 +786,7 @@ function agruparItens(itens){
     if(!g.idadeExame&&it.idadeExame) g.idadeExame=it.idadeExame;
   }
   return grupos.map(function(g,i){ return {id:i, nomeArquivo:'', paciente:g.paciente, imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:(g.confs.reduce(function(s,c){return s+c;},0)/(g.confs.length||1)), dataExame:g.dataExame||'', idadeExame:g.idadeExame||''}; });
-}
-function simPaciente(an,bn){ if(!an||!bn) return 0; if(an===bn) return 1;
-  const at=an.split(' ').filter(function(x){return x.length>2;}), bt=bn.split(' ').filter(function(x){return x.length>2;});
-  if(!at.length||!bt.length) return 0; let hit=0;
-  for(const t of at){ if(bt.some(function(u){return u===t||levenshtein(u,t)<=1;})) hit++; }
-  return hit/Math.max(at.length,bt.length);
-}
-function tokensNome(s){ return norm(s).split(' ').filter(function(x){ return x.length>2 && !/^[0-9]+$/.test(x); }); }
+}function tokensNome(s){ return norm(s).split(' ').filter(function(x){ return x.length>2 && !/^[0-9]+$/.test(x); }); }
 function nomeArquivoLimpo(nm){ return String(nm||'').replace(/\.[a-z0-9]{1,5}$/i,'').replace(/\d{8}[\d\-]*/g,' '); }
 function simNome(alvoToks, candStr){
   var bt = tokensNome(candStr);
@@ -1079,9 +1064,7 @@ let mediaRecE=null, recChunksE=[], recStreamE=null, recTimerE=null, recSegE=0, r
 function recAtivo(){ const r=[ (typeof mediaRec!=='undefined'?mediaRec:null), (typeof mediaRecE!=='undefined'?mediaRecE:null), (typeof mediaRecA!=='undefined'?mediaRecA:null) ]; for(const m of r){ if(m && (m.state==='recording'||m.state==='paused')) return m; } return null; }
 function pausarRec(){ const m=recAtivo(); if(!m) return; try{ if(m.state==='recording'){ if(typeof m.pause==='function') m.pause(); else log('Pausa não suportada neste navegador.', true); } else if(m.state==='paused'){ m.resume(); } }catch(e){ log('Falha ao pausar/retomar: '+e.message, true); } atualizarPausa(); }
 function atualizarPausa(){ const m=recAtivo(); const els=document.querySelectorAll('.btnPausa'); for(let i=0;i<els.length;i++){ els[i].style.display = m?'inline-block':'none'; els[i].textContent = (m&&m.state==='paused')?'▶ Retomar':'⏸ Pausar'; } }
-setInterval(atualizarPausa, 400);
-function primeiroUltimo(nome){ const p=(nome||'').trim().split(' ').filter(function(x){return x;}); if(!p.length) return ''; return p.slice(0,3).join(' '); }
-function nomeCompleto(nome){ return String(nome||'').replace(/\s+/g,' ').trim(); }
+setInterval(atualizarPausa, 400);function nomeCompleto(nome){ return String(nome||'').replace(/\s+/g,' ').trim(); }
 function normLateralidade(s){ const t=norm(s); if(/esquerd/.test(t)) return 'Esquerdo'; if(/direit/.test(t)) return 'Direito'; if(/bilater|ambos|os dois|dois lados/.test(t)) return 'Bilateral'; return ''; }
 const TIPOS_COM_LATERALIDADE = new Set(['ombro','cotovelo','punho','mao','joelho','tornozelo','pe','partes_moles']);
 function nomeAudio(nomePac, tipoTexto, lateralidade){ const pn=nomeCompleto(nomePac); const k=mapTipo(tipoTexto); const tn=(k&&MODELOS[k])?MODELOS[k].nome:(tipoTexto||''); const lat=(k&&TIPOS_COM_LATERALIDADE.has(k))?normLateralidade(lateralidade):''; const tnLat=(tn?tn:'')+(lat?(tn?' '+lat:lat):''); return ((pn||'Sem nome')+(tnLat?' - '+tnLat:'')).trim(); }
@@ -1672,8 +1655,6 @@ function renderRegras(){
 }
 function excluirRegra(id){ gravarRegras(lerRegras().filter(function(r){return r.id!==id;})); renderRegras(); }
 function limparRegras(){ if(!confirm('Apagar TODOS os aprendizados guardados?')) return; gravarRegras([]); renderRegras(); }
-function toggleAprender(el){ cfg.aprender=!!el.checked; localStorage.setItem('gaprende', cfg.aprender?'1':'0'); log(cfg.aprender?'Aprendizado LIGADO — vou analisar suas correções ao "Liberar e próximo".':'Aprendizado DESLIGADO — economizando tokens. As regras já guardadas continuam valendo.'); }
-
 /* ============ Editor de BIZUS (dizeres padrão), por região — salvo no navegador ============ */
 const BIZUS_SECOES = ['MAMA','ABDOMINAL TOTAL','TRANSVAGINAL','TIREOIDE','PAREDE ABDOMINAL','JOELHO','PARTES MOLES','REGIÃO CERVICAL','OMBRO','PUNHO','PROSTATA','BOLSA ESCROTAL','OBSTÉTRICO'];
 const BIZUS_NOMES = {'MAMA':'Mama','ABDOMINAL TOTAL':'Abdome total','TRANSVAGINAL':'Transvaginal','TIREOIDE':'Tireoide','PAREDE ABDOMINAL':'Parede abdominal (hérnias)','JOELHO':'Joelho','PARTES MOLES':'Partes moles','REGIÃO CERVICAL':'Região cervical','OMBRO':'Ombro','PUNHO':'Punho','PROSTATA':'Próstata','BOLSA ESCROTAL':'Bolsa escrotal','OBSTÉTRICO':'Obstétrico'};
@@ -2179,19 +2160,7 @@ document.addEventListener('keydown', function(e){
   e.preventDefault();
   if(au.paused){ var all=document.querySelectorAll('audio'); for(var i=0;i<all.length;i++){ if(all[i]!==au) all[i].pause(); } au.play().catch(function(){}); }
   else au.pause();
-});
-function toggleRevMidia(tipo){
-  var el=document.getElementById(tipo==='audio'?'revMidiaAudio':'revMidiaImg');
-  var out=document.getElementById('revMidia');
-  if(!el) return;
-  var abrindo=el.style.display==='none';
-  if(tipo==='img') el.style.display=abrindo?'flex':'none';
-  else el.style.display=abrindo?'block':'none';
-  // garante que o container pai seja visível se qualquer filho estiver aberto
-  var da=document.getElementById('revMidiaAudio'); var di=document.getElementById('revMidiaImg');
-  if(out) out.style.display=(da&&da.style.display!=='none')||(di&&di.style.display!=='none')?'block':'none';
-}
-async function liberarEProximo(){
+});async function liberarEProximo(){
   var exId=window.__revAtual&&window.__revAtual.exId!=null?window.__revAtual.exId:null;
   if(exId==null){ log('Nenhum exame ativo para liberar.',true); return; }
   // 1ª ação do gesto: garantir pasta se necessário (antes de qualquer await de longa duração)

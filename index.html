@@ -2030,7 +2030,23 @@ function ajustarFonte(delta){
   });
 }
 function garantirFundo(){ return window.__fundoPerguntado ? Promise.resolve(window.__fundo) : escolherFundo(); }
-async function trocarFundo(){ await escolherFundo(); var ex=(window.__revAtual&&window.__revAtual.exId!=null)?window.__revAtual.exId:null; if(ex!=null) abrirRevisao(ex); }
+/* troca só a imagem de fundo da folha aberta, PRESERVANDO as edições feitas no texto (não re-renderiza o laudo) */
+function aplicarFundoNaFolha(){
+  var folha=document.querySelector('#areaImpressao .laudoFolha'); if(!folha) return;
+  var fnd=FUNDOS[window.__fundo||'branco']||FUNDOS.branco;
+  var img=folha.querySelector('.fundoLaudo'); if(img) img.remove();
+  if(fnd && fnd.img){
+    folha.classList.add('comFundo');
+    folha.style.paddingTop=(fnd.padTopMm||30)+'mm';
+    folha.style.paddingBottom=(fnd.padBottomMm||20)+'mm';
+    var im=document.createElement('img'); im.className='fundoLaudo'; im.src=fnd.img; im.alt='';
+    folha.insertBefore(im, folha.firstChild);
+  } else {
+    folha.classList.remove('comFundo');
+    folha.style.paddingTop=''; folha.style.paddingBottom='';
+  }
+}
+async function trocarFundo(){ await escolherFundo(); aplicarFundoNaFolha(); }
 function abrirRevisao(exId, semTela){
   const ex = exames.find(e=>e.id===exId);
   if(!ex || !ex.laudo){ log('Gere o laudo antes de abrir a revisão.', true); return; }

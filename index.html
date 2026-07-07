@@ -1304,11 +1304,21 @@ async function gerarLaudo(exId){
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
 (regrasAprend ? "REGRAS APRENDIDAS COM AS CORREÇÕES DO MÉDICO (cumpra à risca; têm prioridade sobre o estilo padrão quando houver conflito):\n"+regrasAprend+"\n\n" : "")+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}"
+(ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\""+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")+"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
     const resp = await openai(partes);
-    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:resp.conclusao||mod.conclusao, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:resp.observacoes_para_o_medico||''};
+    let conclusaoFinal = resp.conclusao||mod.conclusao;
+    let obsFinal = resp.observacoes_para_o_medico||'';
+    if(ex.tipo==='tireoide' && resp.tirads){
+      try{
+        const tri = processarTirads(resp.tirads, trans);
+        if(tri.linhas.length) conclusaoFinal = (conclusaoFinal?conclusaoFinal+'\n':'')+tri.linhas.join('\n');
+        if(tri.obs.length) obsFinal = (obsFinal?obsFinal+' | ':'')+tri.obs.join(' ');
+      }catch(e){}
+    }
+    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal};
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
     try{ await salvarSessao(); }catch(_){}
     renderExames();
@@ -2435,21 +2445,63 @@ async function copiarCalc(id){
   try{ await navigator.clipboard.writeText(t); log('Resultado copiado.'); }
   catch(e){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); log('Resultado copiado.'); }catch(e2){ log('Não consegui copiar: '+e2.message, true); } ta.remove(); }
 }
+/* ---- TI-RADS: núcleo determinístico compartilhado (calculadora manual + cálculo automático do laudo) ---- */
+function tiradsCategoria(pts){ if(pts<=1) return {tr:1,desc:'benigno'}; if(pts===2) return {tr:2,desc:'não suspeito'}; if(pts===3) return {tr:3,desc:'levemente suspeito'}; if(pts<=6) return {tr:4,desc:'moderadamente suspeito'}; return {tr:5,desc:'altamente suspeito'}; }
+function tiradsConduta(tr, tam){
+  if(tr<=2) return 'sem indicação de PAAF ou seguimento pela classificação';
+  if(!tam) return '';
+  if(tr===3) return tam>=2.5?'PAAF indicada (≥ 2,5 cm)':(tam>=1.5?'seguimento ecográfico em 1, 3 e 5 anos (≥ 1,5 cm)':'sem PAAF nem seguimento pelo tamanho');
+  if(tr===4) return tam>=1.5?'PAAF indicada (≥ 1,5 cm)':(tam>=1.0?'seguimento ecográfico em 1, 2, 3 e 5 anos (≥ 1,0 cm)':'sem PAAF nem seguimento pelo tamanho');
+  return tam>=1.0?'PAAF indicada (≥ 1,0 cm)':(tam>=0.5?'seguimento ecográfico anual por até 5 anos (≥ 0,5 cm)':'sem PAAF nem seguimento pelo tamanho');
+}
+/* pontua os descritores DITADOS (extraídos pela IA como texto); devolve {pts, falta[], tam} */
+function tiradsPontuarDescritores(d){
+  var falta=[], pts=0;
+  var comp=norm(d.composicao), eco=norm(d.ecogenicidade), forma=norm(d.forma), marg=norm(d.margem);
+  if(!comp) falta.push('composição');
+  else if(/espongi/.test(comp)) pts+=0; else if(/mist/.test(comp)) pts+=1; else if(/solid/.test(comp)) pts+=2; else if(/cist/.test(comp)) pts+=0;
+  else falta.push('composição ("'+d.composicao+'" não reconhecida)');
+  if(!eco) falta.push('ecogenicidade');
+  else if(/anecoic/.test(eco)) pts+=0; else if(/muito hipo|acentuadamente hipo|marcadamente hipo/.test(eco)) pts+=3; else if(/hipo/.test(eco)) pts+=2; else if(/hiper|iso/.test(eco)) pts+=1;
+  else falta.push('ecogenicidade ("'+d.ecogenicidade+'" não reconhecida)');
+  if(!forma) falta.push('forma (mais alta × mais larga)');
+  else if(/mais alta|alta que larg|nao paralel|vertical/.test(forma)) pts+=3; else if(/mais larga|larga que alt|paralel|horizontal/.test(forma)) pts+=0;
+  else falta.push('forma ("'+d.forma+'" não reconhecida)');
+  if(!marg) falta.push('margem');
+  else if(/extratireoid/.test(marg)) pts+=3; else if(/lobulad|irregular/.test(marg)) pts+=2; else if(/lis|regular|definid|circunscrit|indistint/.test(marg)) pts+=0;
+  else falta.push('margem ("'+d.margem+'" não reconhecida)');
+  var focos=d.focos; if(focos && !Array.isArray(focos)) focos=[focos];
+  (focos||[]).forEach(function(f){ var x=norm(f); if(/macrocalc/.test(x)) pts+=1; else if(/perifer|casca|anel/.test(x)) pts+=2; else if(/puntif|microcalc|pontilh/.test(x)) pts+=3; });
+  var tam=parseFloat(String(d.tamanho_cm==null?'':d.tamanho_cm).replace(',','.'))||0;
+  return {pts:pts, falta:falta, tam:tam};
+}
+/* monta as linhas p/ conclusão + observações a partir dos nódulos extraídos do ditado */
+function processarTirads(lista, ditadoTexto){
+  var linhas=[], obs=[];
+  var jaDitouTirads=/ti.?rads/i.test(ditadoTexto||'');
+  var n=(lista||[]).length;
+  (lista||[]).forEach(function(d,i){
+    var r=tiradsPontuarDescritores(d||{});
+    var rot=n>1?('Nódulo '+(i+1)):'Nódulo';
+    if(r.falta.length){ obs.push(rot+': TI-RADS não calculado — faltou ditar: '+r.falta.join(', ')+'.'); return; }
+    var c=tiradsCategoria(r.pts);
+    if(!jaDitouTirads) linhas.push((n>1?('Nódulo '+(i+1)+' — '):'')+'Categoria: ACR TI-RADS '+c.tr+'.');
+    var cond=tiradsConduta(c.tr, r.tam);
+    obs.push(rot+': TI-RADS calculado automaticamente dos descritores ditados — TR'+c.tr+' ('+c.desc+', '+r.pts+' pts'+(r.tam?', '+String(r.tam).replace('.',',')+' cm':'')+')'+(cond?'; conduta ACR: '+cond:'; dite o tamanho para a conduta')+'. Confira antes de liberar.'+(jaDitouTirads?' (A categoria que você ditou foi mantida no laudo.)':''));
+  });
+  return {linhas:linhas, obs:obs};
+}
 function calcTirads(){
   var comp=calcRadio('blocoTirads','trComp'), eco=calcRadio('blocoTirads','trEco'), forma=calcRadio('blocoTirads','trForma'), marg=calcRadio('blocoTirads','trMarg');
   if(comp==null||eco==null||forma==null||marg==null){ calcOut('trRes',''); return; }
   var pts=parseInt(comp,10)+parseInt(eco,10)+parseInt(forma,10)+parseInt(marg,10);
   document.querySelectorAll('#blocoTirads input[name=trFoco]:checked').forEach(function(c){ pts+=parseInt(c.value,10); });
-  var tr, desc;
-  if(pts<=1){ tr=1; desc='benigno'; } else if(pts===2){ tr=2; desc='não suspeito'; } else if(pts===3){ tr=3; desc='levemente suspeito'; }
-  else if(pts<=6){ tr=4; desc='moderadamente suspeito'; } else { tr=5; desc='altamente suspeito'; }
+  var c=tiradsCategoria(pts);
   var tam=calcNum('trTam'), cond='';
-  if(tr<=2) cond='Sem indicação de PAAF ou seguimento pela classificação.';
+  if(c.tr<=2) cond='Sem indicação de PAAF ou seguimento pela classificação.';
   else if(!tam) cond='Informe o maior diâmetro para a conduta (PAAF × seguimento).';
-  else if(tr===3) cond = tam>=2.5?'PAAF indicada (≥ 2,5 cm).':(tam>=1.5?'Seguimento ecográfico em 1, 3 e 5 anos (≥ 1,5 cm).':'Sem PAAF nem seguimento pelo tamanho.');
-  else if(tr===4) cond = tam>=1.5?'PAAF indicada (≥ 1,5 cm).':(tam>=1.0?'Seguimento ecográfico em 1, 2, 3 e 5 anos (≥ 1,0 cm).':'Sem PAAF nem seguimento pelo tamanho.');
-  else cond = tam>=1.0?'PAAF indicada (≥ 1,0 cm).':(tam>=0.5?'Seguimento ecográfico anual por até 5 anos (≥ 0,5 cm).':'Sem PAAF nem seguimento pelo tamanho.');
-  calcOut('trRes','ACR TI-RADS: '+pts+' ponto'+(pts===1?'':'s')+' → TR'+tr+' ('+desc+').'+(tam?' Nódulo de '+String(tam).replace('.',',')+' cm.':'')+'\n'+cond);
+  else { cond=tiradsConduta(c.tr, tam); cond=cond.charAt(0).toUpperCase()+cond.slice(1)+'.'; }
+  calcOut('trRes','ACR TI-RADS: '+pts+' ponto'+(pts===1?'':'s')+' → TR'+c.tr+' ('+c.desc+').'+(tam?' Nódulo de '+String(tam).replace('.',',')+' cm.':'')+'\n'+cond);
 }
 function calcBirads(){
   var esp=(document.getElementById('biEsp')||{}).value||'';

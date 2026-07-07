@@ -7,15 +7,37 @@
 <title>Laudos USG — Dr. Daniel Serruya</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
-:root{--azul:#1e5b8a;--cinza:#f2f4f7;--borda:#c8d0da;}
+:root{
+  /* paleta (clínica, em torno do azul original) */
+  --azul:#1e5b8a;--azul-escuro:#17486e;--azul-claro:#e8f0f7;
+  --cinza:#eef1f5;--borda:#c8d0da;--superficie:#fff;
+  --texto:#1c2733;--texto-2:#5f6f80;
+  --verde:#1f7a3d;--vermelho:#b3261e;--ambar:#d99a26;
+  /* tipografia */
+  --fs-0:12px;--fs-1:13px;--fs-2:14px;--fs-3:16px;--fs-4:18px;
+  /* espaçamento e forma */
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;
+  --rd-1:6px;--rd-2:9px;--rd-3:12px;--rd-4:14px;
+  --sombra-1:0 1px 2px rgba(16,33,46,.05),0 1px 3px rgba(16,33,46,.07);
+  --anel:0 0 0 3px rgba(30,91,138,.28);
+}
 *{box-sizing:border-box;}
-body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;margin:0;background:var(--cinza);color:#1c2733;}
+body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;margin:0;background:var(--cinza);color:var(--texto);}
 header{background:var(--azul);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;}
 header h1{font-size:18px;margin:0;font-weight:600;}
-.btn{border:0;border-radius:10px;padding:12px 18px;font-size:16px;cursor:pointer;background:var(--azul);color:#fff;font-weight:600;}
-.btn.sec{background:#e3e9f0;color:#1c2733;}
-.btn.peq{padding:8px 12px;font-size:14px;}
-.btn:disabled{opacity:.45;}
+.btn{border:0;border-radius:10px;padding:12px 18px;font-size:var(--fs-3);cursor:pointer;background:var(--azul);color:#fff;font-weight:600;
+  box-shadow:0 1px 2px rgba(16,33,46,.18);
+  transition:filter .15s ease,box-shadow .15s ease,transform .06s ease;}
+.btn:hover:not(:disabled){filter:brightness(.94);}
+.btn:active:not(:disabled){transform:translateY(1px);box-shadow:inset 0 2px 5px rgba(0,0,0,.25);filter:brightness(.88);}
+.btn:focus-visible{outline:2px solid transparent;box-shadow:var(--anel);}
+.btn.sec{background:#e3e9f0;color:var(--texto);box-shadow:0 1px 2px rgba(16,33,46,.10);}
+.btn.sec:active:not(:disabled){box-shadow:inset 0 2px 5px rgba(0,0,0,.14);}
+.btn.peq{padding:8px 12px;font-size:var(--fs-2);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+/* feedback tátil universal: qualquer botão "afunda" ao clicar */
+button{font-family:inherit;}
+button:not(:disabled):active{transform:translateY(1px);}
 main{max-width:860px;margin:0 auto;padding:16px;}
 .card{background:#fff;border:1px solid var(--borda);border-radius:14px;padding:16px;margin-bottom:14px;}
 .card h2{font-size:16px;margin:0 0 10px;color:var(--azul);}

@@ -73,6 +73,16 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   .card{padding:14px 12px;}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;}}
+/* ===== calculadoras ===== */
+.calcBloco{border:1px solid var(--borda);border-radius:var(--rd-2);margin-top:8px;background:#fbfcfe;}
+.calcBloco summary{cursor:pointer;padding:10px 12px;font-weight:600;color:var(--azul);font-size:var(--fs-2);}
+.calcBloco[open] summary{border-bottom:1px dashed var(--borda);}
+.calcCorpo{padding:2px 12px 12px;}
+.calcOpts{display:flex;flex-wrap:wrap;gap:2px 16px;margin-top:2px;}
+.calcOpts label{display:flex;align-items:center;gap:6px;font-weight:400;font-size:var(--fs-1);margin:3px 0;}
+.calcCorpo input[type=number],.calcCorpo input[type=date]{width:100%;padding:8px;font-size:var(--fs-2);}
+.calcRes{margin-top:10px;background:var(--azul-claro);border-left:4px solid var(--azul);border-radius:var(--rd-1);padding:9px 11px;font-size:var(--fs-2);white-space:pre-wrap;}
+.calcRes:empty{display:none;}
 /* ===== página do laudo (espelha o modelo do Pages) ===== */
 .laudoFolha{position:relative;background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.32;color:#000;}
 .fundoLaudo{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;}
@@ -171,6 +181,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <button id="aba-captura" onclick="mostrarAba('captura')">🔴 Captura ao vivo</button>
   <button id="aba-exames" onclick="mostrarAba('exames')">📋 Exames identificados</button>
   <button id="aba-revisao" onclick="mostrarAba('revisao')">📄 Revisão dos laudos</button>
+  <button id="aba-calc" onclick="mostrarAba('calc')">🧮 Calculadoras</button>
 </div>
 
 <div class="aba-conteudo" id="pane-acumulados" style="display:none">
@@ -268,6 +279,174 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <div style="margin-bottom:6px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" onclick="escolherPastaDestino()">📁 Escolher pasta de destino</button><button class="btn" onclick="salvarTodosRev()">💾 Salvar todos</button></div>
   <div id="listaRevisao"></div>
   <p class="aviso">Ouça o áudio e veja as imagens antes de salvar. Ao salvar, é criada uma pasta com o nome do paciente contendo o laudo e as fotos.</p>
+</div>
+</div>
+
+<div class="aba-conteudo" id="pane-calc" style="display:none">
+<div class="card">
+  <h2>🧮 Calculadoras ultrassonográficas</h2>
+  <p class="aviso">Ferramentas de apoio à decisão — confira sempre os documentos oficiais (ACR TI-RADS 2017, BI-RADS 5ª ed., O-RADS US v2022, Bosniak v2019). A classificação final é responsabilidade do médico.</p>
+
+  <details class="calcBloco">
+    <summary>Tireoide — ACR TI-RADS</summary>
+    <div class="calcCorpo" id="blocoTirads" onchange="calcTirads()">
+      <label>Composição</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="trComp" value="0">Cística / quase toda cística</label>
+        <label><input type="radio" name="trComp" value="0">Espongiforme</label>
+        <label><input type="radio" name="trComp" value="1">Mista cística-sólida</label>
+        <label><input type="radio" name="trComp" value="2">Sólida / quase toda sólida</label>
+      </div>
+      <label>Ecogenicidade</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="trEco" value="0">Anecoica</label>
+        <label><input type="radio" name="trEco" value="1">Hiper ou isoecogênica</label>
+        <label><input type="radio" name="trEco" value="2">Hipoecogênica</label>
+        <label><input type="radio" name="trEco" value="3">Muito hipoecogênica</label>
+      </div>
+      <label>Forma</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="trForma" value="0">Mais larga que alta</label>
+        <label><input type="radio" name="trForma" value="3">Mais alta que larga</label>
+      </div>
+      <label>Margem</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="trMarg" value="0">Lisa</label>
+        <label><input type="radio" name="trMarg" value="0">Mal definida</label>
+        <label><input type="radio" name="trMarg" value="2">Lobulada ou irregular</label>
+        <label><input type="radio" name="trMarg" value="3">Extensão extratireoidiana</label>
+      </div>
+      <label>Focos ecogênicos (marque todos os presentes; nenhum/cauda de cometa = 0)</label>
+      <div class="calcOpts">
+        <label><input type="checkbox" name="trFoco" value="1">Macrocalcificações (+1)</label>
+        <label><input type="checkbox" name="trFoco" value="2">Calcificação periférica (+2)</label>
+        <label><input type="checkbox" name="trFoco" value="3">Focos ecogênicos puntiformes (+3)</label>
+      </div>
+      <label>Maior diâmetro (cm, opcional — define a conduta)</label>
+      <input type="number" id="trTam" step="0.1" min="0" placeholder="ex.: 1,6" oninput="calcTirads()">
+      <div class="calcRes" id="trRes"></div>
+      <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('trRes')">📋 Copiar</button></div>
+    </div>
+  </details>
+
+  <details class="calcBloco">
+    <summary>Mama — BI-RADS (descritores US)</summary>
+    <div class="calcCorpo" id="blocoBirads" onchange="calcBirads()">
+      <label>Caso especial (se houver, ignora os descritores abaixo)</label>
+      <select id="biEsp" onchange="calcBirads()">
+        <option value="">— nenhum: usar descritores —</option>
+        <option value="cistoSimples">Cisto simples</option>
+        <option value="cistoComplicado">Cisto complicado (debris, sem sólido/fluxo)</option>
+        <option value="microcistos">Microcistos agrupados</option>
+        <option value="linfonodo">Linfonodo intramamário típico</option>
+      </select>
+      <label>Forma</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="biForma" value="oval">Oval</label>
+        <label><input type="radio" name="biForma" value="redonda">Redonda</label>
+        <label><input type="radio" name="biForma" value="irregular">Irregular</label>
+      </div>
+      <label>Orientação</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="biOri" value="paralela">Paralela à pele</label>
+        <label><input type="radio" name="biOri" value="nao">Não paralela</label>
+      </div>
+      <label>Margem</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="biMarg" value="circ">Circunscrita</label>
+        <label><input type="radio" name="biMarg" value="indistinta">Indistinta</label>
+        <label><input type="radio" name="biMarg" value="angular">Angular</label>
+        <label><input type="radio" name="biMarg" value="microlobulada">Microlobulada</label>
+        <label><input type="radio" name="biMarg" value="espiculada">Espiculada</label>
+      </div>
+      <label>Acústico posterior</label>
+      <div class="calcOpts">
+        <label><input type="radio" name="biPost" value="nenhum">Sem alteração</label>
+        <label><input type="radio" name="biPost" value="reforco">Reforço</label>
+        <label><input type="radio" name="biPost" value="sombra">Sombra</label>
+      </div>
+      <div class="calcRes" id="biRes"></div>
+      <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('biRes')">📋 Copiar</button></div>
+    </div>
+  </details>
+
+  <details class="calcBloco">
+    <summary>Ovário / anexos — O-RADS US v2022</summary>
+    <div class="calcCorpo" id="blocoOrads" onchange="calcOrads()">
+      <label>Tipo de lesão</label>
+      <select id="orTipo" onchange="calcOrads()">
+        <option value="">— escolher —</option>
+        <option value="fisio">Folículo ou corpo lúteo ≤ 3 cm (fisiológico)</option>
+        <option value="uniSimples">Cisto unilocular SIMPLES (anecoico, parede lisa)</option>
+        <option value="uniNaoSimples">Cisto unilocular NÃO simples, parede lisa (conteúdo interno)</option>
+        <option value="uniIrreg">Cisto unilocular com parede interna IRREGULAR (&lt; 3 mm)</option>
+        <option value="classica">Lesão clássica benigna típica (dermoide / endometrioma / cisto hemorrágico)</option>
+        <option value="multiLisa">Multilocular, paredes e septos LISOS</option>
+        <option value="multiIrreg">Multilocular com parede ou septo IRREGULAR</option>
+        <option value="solido">Lesão com componente SÓLIDO ou projeção papilar</option>
+        <option value="solidoLiso">Lesão sólida (≥ 80%) de contorno LISO</option>
+        <option value="solidoIrreg">Lesão sólida (≥ 80%) de contorno IRREGULAR</option>
+      </select>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <span><label>Maior diâmetro (cm)</label><input type="number" id="orTam" step="0.1" min="0" style="width:110px" oninput="calcOrads()"></span>
+        <span><label>Escore de cor (Doppler)</label><select id="orCS" style="width:150px" onchange="calcOrads()"><option value="">—</option><option value="1">CS 1 (sem fluxo)</option><option value="2">CS 2 (mínimo)</option><option value="3">CS 3 (moderado)</option><option value="4">CS 4 (intenso)</option></select></span>
+        <span><label>Projeções papilares (nº)</label><input type="number" id="orPap" step="1" min="0" style="width:110px" oninput="calcOrads()"></span>
+      </div>
+      <label style="margin-top:8px;font-weight:400"><input type="checkbox" id="orAscite" onchange="calcOrads()"> Ascite e/ou nódulos peritoneais</label>
+      <div class="calcRes" id="orRes"></div>
+      <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('orRes')">📋 Copiar</button></div>
+    </div>
+  </details>
+
+  <details class="calcBloco">
+    <summary>Cisto renal — Bosniak (v2019, TC/RM)</summary>
+    <div class="calcCorpo" id="blocoBosniak" onchange="calcBosniak()">
+      <label>Descrição que melhor se aplica</label>
+      <select id="boTipo" onchange="calcBosniak()">
+        <option value="">— escolher —</option>
+        <option value="1">I — parede fina e lisa, conteúdo líquido simples, sem septos ou calcificações</option>
+        <option value="2">II — poucos septos finos e lisos, ou calcificação fina, ou cisto hiperdenso &lt; 3 cm homogêneo</option>
+        <option value="2f">IIF — muitos septos finos ou minimamente espessados/realçados, calcificação nodular, hiperdenso ≥ 3 cm ou totalmente intrarrenal</option>
+        <option value="3">III — parede ou septos espessados (≥ 4 mm) ou irregulares, com realce</option>
+        <option value="4">IV — componente sólido/nódulo com realce</option>
+      </select>
+      <div class="calcRes" id="boRes"></div>
+      <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('boRes')">📋 Copiar</button></div>
+    </div>
+  </details>
+
+  <details class="calcBloco">
+    <summary>Volume (elipsoide) — próstata, resíduo, tireoide…</summary>
+    <div class="calcCorpo" id="blocoVolume">
+      <label>Contexto</label>
+      <select id="voCtx" onchange="calcVolume()">
+        <option value="generico">Genérico (cm³ / mL)</option>
+        <option value="prostata">Próstata (peso em g)</option>
+        <option value="rpm">Resíduo pós-miccional</option>
+        <option value="lobo">Lobo tireoidiano</option>
+      </select>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <span><label>Longitudinal (cm)</label><input type="number" id="voD1" step="0.1" min="0" style="width:110px" oninput="calcVolume()"></span>
+        <span><label>Ântero-posterior (cm)</label><input type="number" id="voD2" step="0.1" min="0" style="width:110px" oninput="calcVolume()"></span>
+        <span><label>Transverso (cm)</label><input type="number" id="voD3" step="0.1" min="0" style="width:110px" oninput="calcVolume()"></span>
+        <span id="voPsaWrap" style="display:none"><label>PSA (ng/mL, opcional)</label><input type="number" id="voPsa" step="0.1" min="0" style="width:110px" oninput="calcVolume()"></span>
+      </div>
+      <div class="calcRes" id="voRes"></div>
+      <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('voRes')">📋 Copiar</button></div>
+    </div>
+  </details>
+
+  <details class="calcBloco">
+    <summary>Obstetrícia — idade gestacional e DPP (DUM / CCN)</summary>
+    <div class="calcCorpo" id="blocoIg">
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <span><label>DUM (data da última menstruação)</label><input type="date" id="igDum" style="width:170px" onchange="calcIg()"></span>
+        <span><label>CCN (mm, 4–84 — Robinson)</label><input type="number" id="igCcn" step="1" min="0" style="width:130px" oninput="calcIg()"></span>
+      </div>
+      <div class="calcRes" id="igRes"></div>
+      <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('igRes')">📋 Copiar</button></div>
+    </div>
+  </details>
 </div>
 </div>
 
@@ -2238,9 +2417,128 @@ function capInit(){
 }
 window.addEventListener('DOMContentLoaded', capInit);
 
+/* ============ Calculadoras ultrassonográficas (100% locais, sem IA) ============ */
+function calcRadio(escopo, nome){ var el=document.querySelector('#'+escopo+' input[name='+nome+']:checked'); return el?el.value:null; }
+function calcNum(id){ var v=parseFloat(String((document.getElementById(id)||{}).value||'').replace(',','.')); return isNaN(v)?0:v; }
+function calcOut(id, txt){ var el=document.getElementById(id); if(el) el.textContent=txt; }
+async function copiarCalc(id){
+  var el=document.getElementById(id); if(!el||!el.textContent){ log('Nada para copiar ainda — preencha a calculadora.', true); return; }
+  var t=el.textContent;
+  try{ await navigator.clipboard.writeText(t); log('Resultado copiado.'); }
+  catch(e){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); log('Resultado copiado.'); }catch(e2){ log('Não consegui copiar: '+e2.message, true); } ta.remove(); }
+}
+function calcTirads(){
+  var comp=calcRadio('blocoTirads','trComp'), eco=calcRadio('blocoTirads','trEco'), forma=calcRadio('blocoTirads','trForma'), marg=calcRadio('blocoTirads','trMarg');
+  if(comp==null||eco==null||forma==null||marg==null){ calcOut('trRes',''); return; }
+  var pts=parseInt(comp,10)+parseInt(eco,10)+parseInt(forma,10)+parseInt(marg,10);
+  document.querySelectorAll('#blocoTirads input[name=trFoco]:checked').forEach(function(c){ pts+=parseInt(c.value,10); });
+  var tr, desc;
+  if(pts<=1){ tr=1; desc='benigno'; } else if(pts===2){ tr=2; desc='não suspeito'; } else if(pts===3){ tr=3; desc='levemente suspeito'; }
+  else if(pts<=6){ tr=4; desc='moderadamente suspeito'; } else { tr=5; desc='altamente suspeito'; }
+  var tam=calcNum('trTam'), cond='';
+  if(tr<=2) cond='Sem indicação de PAAF ou seguimento pela classificação.';
+  else if(!tam) cond='Informe o maior diâmetro para a conduta (PAAF × seguimento).';
+  else if(tr===3) cond = tam>=2.5?'PAAF indicada (≥ 2,5 cm).':(tam>=1.5?'Seguimento ecográfico em 1, 3 e 5 anos (≥ 1,5 cm).':'Sem PAAF nem seguimento pelo tamanho.');
+  else if(tr===4) cond = tam>=1.5?'PAAF indicada (≥ 1,5 cm).':(tam>=1.0?'Seguimento ecográfico em 1, 2, 3 e 5 anos (≥ 1,0 cm).':'Sem PAAF nem seguimento pelo tamanho.');
+  else cond = tam>=1.0?'PAAF indicada (≥ 1,0 cm).':(tam>=0.5?'Seguimento ecográfico anual por até 5 anos (≥ 0,5 cm).':'Sem PAAF nem seguimento pelo tamanho.');
+  calcOut('trRes','ACR TI-RADS: '+pts+' ponto'+(pts===1?'':'s')+' → TR'+tr+' ('+desc+').'+(tam?' Nódulo de '+String(tam).replace('.',',')+' cm.':'')+'\n'+cond);
+}
+function calcBirads(){
+  var esp=(document.getElementById('biEsp')||{}).value||'';
+  if(esp){
+    var mapa={cistoSimples:['2','Cisto simples — achado benigno. Rotina.'], cistoComplicado:['3','Cisto complicado — provavelmente benigno. Seguimento em 6 meses (ou aspiração se sintomático).'], microcistos:['3','Microcistos agrupados — provavelmente benigno. Seguimento em 6 meses.'], linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.']};
+    var r=mapa[esp]; calcOut('biRes','BI-RADS '+r[0]+'. '+r[1]); return;
+  }
+  var forma=calcRadio('blocoBirads','biForma'), ori=calcRadio('blocoBirads','biOri'), marg=calcRadio('blocoBirads','biMarg'), post=calcRadio('blocoBirads','biPost');
+  if(!forma||!ori||!marg){ calcOut('biRes',''); return; }
+  var susp=[], cat, cond;
+  if(forma==='irregular') susp.push('forma irregular');
+  if(ori==='nao') susp.push('orientação não paralela');
+  if(marg!=='circ') susp.push('margem '+({indistinta:'indistinta',angular:'angular',microlobulada:'microlobulada',espiculada:'espiculada'})[marg]);
+  if(post==='sombra') susp.push('sombra acústica posterior');
+  var n=susp.length;
+  if(n===0){ cat='3'; cond='Provavelmente benigno (≤ 2% de risco) — seguimento em 6, 12 e 24 meses; estabilidade ≥ 2–3 anos permite reclassificar como BI-RADS 2.'; }
+  else if(marg==='espiculada' && n>=2){ cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
+  else if(marg==='espiculada'){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
+  else if(n===1){ cat='4A'; cond='Suspeita baixa (2–10%) — biópsia/PAAF.'; }
+  else if(n===2){ cat='4B'; cond='Suspeita moderada (10–50%) — biópsia.'; }
+  else if(n===3){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
+  else { cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
+  calcOut('biRes','BI-RADS '+cat+(n?' — descritores suspeitos: '+susp.join(', ')+'.':' — descritores benignos (oval/redonda, paralela, circunscrita).')+'\n'+cond+'\n(Apoio por descritores — a categoria final considera o conjunto clínico-radiológico.)');
+}
+function calcOrads(){
+  var t=(document.getElementById('orTipo')||{}).value||'';
+  if(!t){ calcOut('orRes',''); return; }
+  var tam=calcNum('orTam'), cs=parseInt((document.getElementById('orCS')||{}).value||'0',10), pap=calcNum('orPap'), asc=(document.getElementById('orAscite')||{}).checked;
+  var cat=0, notas=[];
+  if(t==='fisio') cat=1;
+  else if(t==='uniSimples'||t==='uniNaoSimples'){ cat=(tam&&tam>=10)?3:2; if(!tam) notas.push('assumi < 10 cm — informe o tamanho'); }
+  else if(t==='uniIrreg') cat=3;
+  else if(t==='classica'){ cat=(tam&&tam>=10)?3:2; if(!tam) notas.push('assumi < 10 cm'); if(tam&&tam>=5&&tam<10) notas.push('cisto hemorrágico de 5–10 cm: controle ecográfico em 8–12 semanas'); }
+  else if(t==='multiLisa'){ if(cs===4||(tam&&tam>=10)) cat=4; else { cat=3; if(!cs) notas.push('assumi CS 1–3'); if(!tam) notas.push('assumi < 10 cm'); } }
+  else if(t==='multiIrreg') cat=4;
+  else if(t==='solido'){ cat=(pap>=4)?5:4; if(!pap) notas.push('assumi 1–3 projeções papilares'); }
+  else if(t==='solidoLiso'){ if(cs===1) cat=3; else { cat=4; if(!cs) notas.push('assumi CS ≥ 2'); } }
+  else if(t==='solidoIrreg') cat=5;
+  if(asc){ if(cat>=3) cat=5; else notas.push('ascite/nódulos com lesão de baixa categoria: investigar outras causas'); }
+  var risco={1:'achado fisiológico',2:'quase certamente benigno (< 1% de risco)',3:'baixo risco (1 a < 10%)',4:'risco intermediário (10 a < 50%)',5:'alto risco (≥ 50%)'}[cat];
+  var cond={1:'Nenhuma conduta necessária.',2:'Em geral sem seguimento (ver notas quando houver).',3:'US por especialista ou RM; conduta conforme contexto clínico.',4:'RM ou avaliação por ginecologista com experiência oncológica.',5:'Encaminhar à ginecologia oncológica.'}[cat];
+  calcOut('orRes','O-RADS US: categoria '+cat+' — '+risco+'.\n'+cond+(notas.length?'\nNotas: '+notas.join('; ')+'.':''));
+}
+function calcBosniak(){
+  var v=(document.getElementById('boTipo')||{}).value||'';
+  if(!v){ calcOut('boRes',''); return; }
+  var m={
+    '1':['I','Benigno (~0% de malignidade). Sem seguimento.'],
+    '2':['II','Benigno (~0%). Sem seguimento.'],
+    '2f':['IIF','Provavelmente benigno (~5% de malignidade). Seguimento por imagem (TC/RM) por 5 anos.'],
+    '3':['III','Indeterminado (~50% de malignidade). Discussão urológica — cirurgia ou vigilância ativa.'],
+    '4':['IV','Provavelmente maligno (~90%). Tratamento cirúrgico.']
+  }[v];
+  calcOut('boRes','Bosniak '+m[0]+' — '+m[1]+'\n(Classificação original baseada em TC/RM com contraste; ao US, achados ≥ II merecem confirmação por TC ou RM.)');
+}
+function calcVolume(){
+  var ctx=(document.getElementById('voCtx')||{}).value||'generico';
+  var w=document.getElementById('voPsaWrap'); if(w) w.style.display=(ctx==='prostata')?'inline-block':'none';
+  var a=calcNum('voD1'), b=calcNum('voD2'), c=calcNum('voD3');
+  if(!a||!b||!c){ calcOut('voRes',''); return; }
+  var vol=0.523*a*b*c, vTxt=vol.toFixed(1).replace('.',',');
+  var out='Volume (elipsoide 0,523 × '+String(a).replace('.',',')+' × '+String(b).replace('.',',')+' × '+String(c).replace('.',',')+'): '+vTxt+' cm³.';
+  if(ctx==='prostata'){
+    out='Peso prostático estimado: '+vTxt+' g (elipsoide).'+(vol>30?' Volume aumentado (> 30 g).':' Dentro da normalidade (≤ 30 g).');
+    var psa=calcNum('voPsa'); if(psa){ var dens=psa/vol; out+='\nDensidade do PSA: '+dens.toFixed(2).replace('.',',')+' ng/mL/cm³'+(dens>0.15?' — acima de 0,15 (suspeito).':' — dentro do habitual (≤ 0,15).'); }
+  } else if(ctx==='rpm'){
+    var cls = vol<=30?'desprezível':(vol<=80?'pequeno':(vol<=150?'moderado':(vol<=300?'acentuado':'muito acentuado')));
+    out='Volume pós-miccional: '+vTxt+' mL — resíduo '+cls+'.\n(0–30 desprezível · 30–80 pequeno · 80–150 moderado · 150–300 acentuado · > 300 muito acentuado)';
+  } else if(ctx==='lobo'){
+    out='Volume do lobo tireoidiano: '+vTxt+' cm³.';
+  }
+  calcOut('voRes',out);
+}
+function calcIg(){
+  var out=[];
+  var dum=(document.getElementById('igDum')||{}).value||'';
+  if(dum){
+    var d0=new Date(dum+'T12:00:00'); var dias=Math.floor((Date.now()-d0.getTime())/86400000);
+    if(dias>=0&&dias<=320){
+      var dpp=new Date(d0.getTime()+280*86400000);
+      out.push('Pela DUM: IG de '+Math.floor(dias/7)+' semana'+(Math.floor(dias/7)===1?'':'s')+' e '+(dias%7)+' dia'+(dias%7===1?'':'s')+' hoje. DPP: '+dpp.toLocaleDateString('pt-BR')+'.');
+    } else out.push('Pela DUM: data fora do intervalo esperado para gestação.');
+  }
+  var ccn=calcNum('igCcn');
+  if(ccn){
+    if(ccn>=4&&ccn<=84){
+      var dg=Math.round(8.052*Math.sqrt(ccn)+23.73);
+      var dppC=new Date(Date.now()+(280-dg)*86400000);
+      out.push('Pelo CCN de '+String(ccn).replace('.',',')+' mm (Robinson): IG de '+Math.floor(dg/7)+' semana'+(Math.floor(dg/7)===1?'':'s')+' e '+(dg%7)+' dia'+(dg%7===1?'':'s')+' na data de hoje. DPP estimada: '+dppC.toLocaleDateString('pt-BR')+'.');
+    } else out.push('CCN fora da faixa de validade da fórmula de Robinson (4–84 mm).');
+  }
+  calcOut('igRes',out.join('\n'));
+}
+
 /* ===== Abas (estilo Excel) ===== */
 function mostrarAba(nome){
-  ['acumulados','gravar','loco','captura','exames','revisao'].forEach(function(n){
+  ['acumulados','gravar','loco','captura','exames','revisao','calc'].forEach(function(n){
     var p=document.getElementById('pane-'+n); if(p) p.style.display=(n===nome)?'block':'none';
     var t=document.getElementById('aba-'+n); if(t) t.classList.toggle('ativa', n===nome);
   });

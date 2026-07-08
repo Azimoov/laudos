@@ -264,6 +264,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <h2>3 · Exames identificados — confira e gere os laudos</h2>
   <div id="listaExames"></div>
   <button class="btn" id="btnGerarTodos" onclick="gerarTodos()" style="margin-top:6px">⚙️ Gerar todos os laudos</button>
+  <button class="btn sec" id="btnGerarFaltaram" onclick="gerarTodos(true)" style="margin-top:6px;display:none;color:#b3261e;border:1px solid #e6b8b4">↻ Gerar os que faltaram</button>
   <div id="progressoGeracao" style="display:none;margin:10px 0 4px">
     <div id="progressoTexto" style="font-size:13px;margin-bottom:5px;color:#444"></div>
     <div style="background:#dde3ea;border-radius:99px;height:8px;overflow:hidden"><div id="progressoBarra" style="background:#2563eb;height:100%;width:0%;transition:width .35s ease;border-radius:99px"></div></div>
@@ -581,20 +582,42 @@ function log(m, erro){
 }
 
 /* ============ Chamada à API OpenAI ============ */
+/* ============ Retentativa com backoff (robustez em lote de 100+ exames) ============ */
+function esperar(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+/* Executa fazerFetch() (deve retornar uma Response) repetindo em erros TRANSITÓRIOS
+   (rede, 429 limite de taxa, 5xx). 400/401/403 (requisição/chave inválida) NÃO repetem.
+   Respeita o cabeçalho Retry-After em 429. */
+async function fetchRetentativa(fazerFetch, rotulo, maxTent){
+  maxTent = maxTent || 5; var espera = 1500, ultimo = '';
+  for(var t=1; t<=maxTent; t++){
+    var r=null, transitorio=false;
+    try{ r = await fazerFetch(); }
+    catch(e){ ultimo = 'rede: '+((e&&e.message)||e); transitorio = true; }
+    if(r){
+      if(r.ok) return r;
+      var corpo=''; try{ corpo = await r.text(); }catch(e){}
+      if(r.status===400||r.status===401||r.status===403){ throw new Error((rotulo?rotulo+' — ':'')+'API '+r.status+': '+corpo.slice(0,200)); }
+      ultimo = 'API '+r.status+': '+corpo.slice(0,150);
+      transitorio = (r.status===429 || r.status>=500);
+      var ra = (r.headers && r.headers.get) ? r.headers.get('retry-after') : null;
+      if(r.status===429 && ra){ var s=parseInt(ra,10); if(!isNaN(s)&&s>0) espera=Math.max(espera, s*1000); }
+    }
+    if(!transitorio) throw new Error((rotulo?rotulo+' — ':'')+ultimo);
+    if(t>=maxTent) throw new Error((rotulo?rotulo+' — ':'')+'falhou após '+maxTent+' tentativas ('+ultimo+')');
+    log('⏳ '+(rotulo||'chamada')+': tentativa '+t+' falhou ('+ultimo+') — repetindo em '+Math.round(espera/1000)+'s', true);
+    await esperar(espera); espera = Math.min(espera*2, 30000);
+  }
+}
 async function openai(conteudo, querJson=true, opts){
   if(!cfg.chave) throw new Error('Configure sua chave da API em ⚙︎ Configurações.');
   const modelo = (opts && opts.modelo) ? opts.modelo : cfg.modelo;
   const body = {model: modelo, messages:[{role:'user', content: conteudo}]};
   if(querJson) body.response_format = {type:'json_object'};
-  const r = await fetch('https://api.openai.com/v1/chat/completions',{
+  const r = await fetchRetentativa(function(){ return fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.chave},
     body: JSON.stringify(body)
-  });
-  if(!r.ok){
-    const t = await r.text();
-    throw new Error('API '+r.status+': '+t.slice(0,300));
-  }
+  }); }, (opts&&opts.rotulo)||'IA');
   const j = await r.json();
   const texto = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
   if(!texto) throw new Error('Resposta vazia da API.');
@@ -608,15 +631,22 @@ async function transcreverAudio(arquivoOuBlob){
   const wav = await audioParaWavBlob(arquivoOuBlob);
   let texto=null, ultimoErro=null;
   for(const m of MODELOS_TRANSCRICAO){
-    const fd = new FormData();
-    fd.append('file', wav, 'audio.wav');
-    fd.append('model', m);
-    fd.append('language', 'pt');
-    fd.append('response_format', 'json');
-    const r = await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+cfg.chave}, body:fd});
-    if(r.ok){ const j = await r.json(); texto = j.text||''; break; }
-    ultimoErro = 'API '+r.status+': '+(await r.text()).slice(0,200);
-    if(r.status!==404 && r.status!==400) break;
+    try{
+      const r = await fetchRetentativa(function(){
+        const fd = new FormData();
+        fd.append('file', wav, 'audio.wav');
+        fd.append('model', m);
+        fd.append('language', 'pt');
+        fd.append('response_format', 'json');
+        return fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+cfg.chave}, body:fd});
+      }, 'transcrição ('+m+')');
+      const j = await r.json(); texto = j.text||''; break;
+    }catch(e){
+      ultimoErro = (e&&e.message)||String(e);
+      // 400/404 = modelo indisponível ou entrada inválida -> tenta o próximo modelo;
+      // demais erros já esgotaram a retentativa transitória, então desiste
+      if(!/API (400|404)/.test(ultimoErro)) break;
+    }
   }
   if(texto===null) throw new Error('Transcrição falhou: '+ultimoErro);
   var nomesTipos = Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
@@ -1014,7 +1044,8 @@ function renderExames(){
       +'</div>';
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+(ex.subExame?' - '+ex.subExame:'')+' <span class="tag">'+ex.imagens.length+' pág.</span>'
-      +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')+'</div>'
+      +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')
+      +(ex._falhou?'<span class="tag" style="background:#fde8e8;color:#b3261e">⚠️ laudo falhou — refazer</span>':'')+'</div>'
       +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
       +(audios.length?'<div style="margin-top:8px"><button class="btn peq sec" onclick="alternarAudios('+ex.id+')">🔗 Áudios deste paciente ('+audiosDoExame.length+' marcado'+(audiosDoExame.length===1?'':'s')+') ▾</button><div id="auds'+ex.id+'" style="display:'+(audsAbertos[ex.id]?'block':'none')+';margin-top:6px;background:#f4f7fa;border-radius:10px;padding:8px">'+listaAudios+'</div></div>':'')
       +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
@@ -1025,6 +1056,10 @@ function renderExames(){
       +'</div>'+detalhes+'</div>';
   }
   div.innerHTML = html;
+  // botão "Gerar os que faltaram": aparece quando há mistura de laudos prontos e pendentes/falhos
+  var semLaudo=exames.filter(function(e){return !e.laudo;}).length, comLaudo=exames.length-semLaudo;
+  var bf=document.getElementById('btnGerarFaltaram');
+  if(bf){ if(semLaudo>0 && comLaudo>0){ bf.style.display='inline-block'; bf.textContent='↻ Gerar os '+semLaudo+' que faltaram'; } else { bf.style.display='none'; } }
   // Se há gravação por exame em curso/pausada, restaura os controles após o re-render
   if(mediaRecE && recExAlvo!=null && (mediaRecE.state==='recording'||mediaRecE.state==='paused')){
     setRecExUI(recExAlvo, mediaRecE.state==='paused'?'pause':'rec');
@@ -1319,6 +1354,7 @@ async function gerarLaudo(exId){
       }catch(e){}
     }
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal};
+    ex._falhou=false;
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
     try{ await salvarSessao(); }catch(_){}
     renderExames();
@@ -2116,31 +2152,42 @@ function renderRevisao(){
     else { const box=document.getElementById((act==="aud"?"aud":"img")+id); if(box) box.style.display=(box.style.display==="none"?"block":"none"); }
   };
 }
-async function gerarTodos(){
-  const alvo=exames.slice();
-  if(!alvo.length){ log("Nenhum exame para gerar.", true); return; }
+async function gerarTodos(soFaltantes){
+  // soFaltantes=true: refaz só os exames sem laudo (retomável — não regenera o que já saiu)
+  const alvo = soFaltantes ? exames.filter(function(e){return !e.laudo;}) : exames.slice();
+  if(!alvo.length){ log(soFaltantes?"Nenhum exame pendente — todos já têm laudo.":"Nenhum exame para gerar.", true); return; }
   await garantirFundo();
-  exames.forEach(function(e){ e._liberado=false; });
+  if(!soFaltantes) exames.forEach(function(e){ e._liberado=false; });
   const btn=document.getElementById("btnGerarTodos"); if(btn){ btn.disabled=true; btn.textContent="Gerando..."; }
+  const btnF=document.getElementById("btnGerarFaltaram"); if(btnF) btnF.disabled=true;
   const prog=document.getElementById("progressoGeracao");
   const progTxt=document.getElementById("progressoTexto");
   const progBar=document.getElementById("progressoBarra");
-  const n=alvo.length; var feitos=0;
+  const n=alvo.length; var feitos=0, falhas=[];
   function atualizarProg(){
     if(progBar) progBar.style.width=Math.round(feitos/n*100)+'%';
-    if(feitos===n){ if(progTxt) progTxt.textContent='✅ '+n+' laudo'+(n===1?'':'s')+' gerado'+(n===1?'':'s')+'.'; }
+    if(feitos===n){ if(progTxt) progTxt.textContent='Concluído: '+(n-falhas.length)+' de '+n+' gerado(s)'+(falhas.length?' · '+falhas.length+' falhou(aram)':'')+'.'; }
     else { if(progTxt) progTxt.textContent='Gerando laudo '+(feitos+1)+' de '+n+(alvo[feitos]?' — '+(alvo[feitos].paciente||''):''); }
   }
   if(prog){ prog.style.display='block'; if(progBar) progBar.style.width='0%'; atualizarProg(); }
   for(const ex of alvo){
     try{ await gerarLaudo(ex.id); }catch(e){ log("Falha no laudo de "+(ex.paciente||ex.id)+": "+e.message, true); }
+    if(!ex.laudo){ ex._falhou=true; falhas.push(ex); }   // gerarLaudo engole o erro; a verdade é ter (ou não) laudo
     feitos++; atualizarProg();
   }
   if(btn){ btn.disabled=false; btn.textContent="⚙️ Gerar todos os laudos"; }
-  setTimeout(function(){ if(prog) prog.style.display='none'; },3000);
+  if(btnF) btnF.disabled=false;
+  setTimeout(function(){ if(prog) prog.style.display='none'; },4000);
+  if(falhas.length){
+    var nomes=falhas.map(function(e){return e.paciente||('#'+e.id);});
+    log('⚠️ '+falhas.length+' de '+n+' laudo(s) NÃO saíram: '+nomes.slice(0,12).join(', ')+(nomes.length>12?' …':'')+'. Toque "↻ Gerar os que faltaram" para refazer só esses.', true);
+  } else {
+    log('✅ Todos os '+n+' laudo(s) gerados com sucesso.');
+  }
+  renderExames();
   renderRevisao();
-  mostrarAba('revisao');
-  const c=document.getElementById("cardRevisao"); if(c){ c.scrollIntoView({behavior:"smooth"}); }
+  mostrarAba(falhas.length ? 'exames' : 'revisao');
+  const c=document.getElementById(falhas.length ? "cardExames" : "cardRevisao"); if(c){ c.scrollIntoView({behavior:"smooth"}); }
 }
 async function salvarExameRev(exId){
   const ex=exames.find(function(e){return e.id===exId;});

@@ -1356,7 +1356,7 @@ async function gerarLaudo(exId){
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal};
     ex._falhou=false;
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
-    try{ await salvarSessao(); }catch(_){}
+    try{ agendarSalvarSessao(); }catch(_){}
     renderExames();
     if(document.getElementById('cardRevisao')){ renderRevisao(); document.getElementById('cardRevisao').style.display='block'; }
 
@@ -1407,9 +1407,18 @@ async function salvarSessao(){
   var comLaudo=exames.filter(function(e){return e.laudo;}); if(!comLaudo.length) return;
   try{
     var db=await dbOpen();
-    var snap=comLaudo.map(function(e){return {id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',laudo:e.laudo,imagens:e.imagens||[]};});
+    // snapshot de recuperação SEM as imagens (base64 pesado): guarda o laudo (texto), que é o que importa
+    // recuperar após fechar a aba. Reserializar imagens a cada laudo travaria um lote de 100+ exames.
+    var snap=comLaudo.map(function(e){return {id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',laudo:e.laudo};});
     await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();st.add({quando:Date.now(),exames:snap});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});
   }catch(e){}
+}
+/* Throttle: em lote, salva no máx. 1×/5s (é rede de segurança, não precisa a cada laudo). */
+var _sessTimer=null, _sessPend=false;
+function agendarSalvarSessao(){
+  _sessPend=true;
+  if(_sessTimer) return;
+  _sessTimer=setTimeout(function(){ _sessTimer=null; if(_sessPend){ _sessPend=false; salvarSessao(); } }, 5000);
 }
 async function verificarSessaoSalva(){
   try{
@@ -1434,7 +1443,7 @@ async function restaurarSessao(id){
     var db=await dbOpen();
     var sess=await new Promise(function(res,rej){var rq=db.transaction('sessoes').objectStore('sessoes').get(id);rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};});
     if(!sess) return;
-    exames=sess.exames.map(function(e){return Object.assign({audios:[],metaConf:1,_liberado:false},e);});
+    exames=sess.exames.map(function(e){return Object.assign({audios:[],imagens:[],metaConf:1,_liberado:false},e);});
     audios=[];
     var b=document.getElementById('bannerRecup'); if(b) b.remove();
     renderExames(); renderRevisao();
@@ -2177,6 +2186,7 @@ async function gerarTodos(soFaltantes){
   }
   if(btn){ btn.disabled=false; btn.textContent="⚙️ Gerar todos os laudos"; }
   if(btnF) btnF.disabled=false;
+  try{ salvarSessao(); }catch(e){}   // save final garantido (fora do throttle)
   setTimeout(function(){ if(prog) prog.style.display='none'; },4000);
   if(falhas.length){
     var nomes=falhas.map(function(e){return e.paciente||('#'+e.id);});

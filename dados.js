@@ -127,8 +127,8 @@ const MODELOS = {
  "ombro": {
   "nome": "Ombro",
   "titulo": "RELATÓRIO ULTRASSONOGRÁFICO OMBRO .....",
-  "tecnica": "Exame realizado em modo bidimensional, com equipamento dinâmico. Varredura com transdutor linear, multifrequêncial, acesso externo.",
-  "corpo": "Pele sem alterações significativas.\n\nTecido celular subcutâneo, sem alterações significativas.\n\nTendão supra espinhal sem alterações.\n\nTendão subescapular sem alterações.\n\nTendão do infraespinhal sem alterações.\n\nTendão do cabo longo do bíceps braquial centrado no sulco bicipital, apresentando-se íntegro em seu trajeto extra articular.\n\nBursa sub-acromial e subdeltoidea sem espessamento ou distensão líquida.\n\nArticulação acrômio-clavicular de contornos regulares.\n\nNão há sinais de derrame articular glenoumeral.\n\nVentres musculares com trofismo conservado.",
+  "tecnica": "Exame realizado em modo bidimensional, em tempo real, com transdutor linear multifrequencial de alta resolução, incluindo avaliação dinâmica com manobras de rotação interna e externa e estudo Doppler colorido direcionado.",
+  "corpo": "Pele sem alterações significativas.\n\nTecido celular subcutâneo, sem alterações significativas.\n\nTendão supraespinhal sem alterações.\n\nTendão subescapular sem alterações.\n\nTendão do infraespinhal sem alterações.\n\nTendão do cabo longo do bíceps braquial centrado no sulco bicipital, apresentando-se íntegro em seu trajeto extra articular.\n\nBursas subacromial-subdeltoidea: sem espessamento ou distensão líquida. Avaliação dinâmica sem sinais de impacto subacromial.\n\nArticulação acrômio-clavicular de contornos regulares.\n\nNão há sinais de derrame articular glenoumeral.\n\nVentres musculares com trofismo conservado.",
   "conclusao": "Exame ecográfico compatível com a normalidade."
  },
  "cotovelo": {

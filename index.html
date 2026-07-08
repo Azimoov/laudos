@@ -1481,22 +1481,23 @@ function vuParar(canvasId){
 
 /* ============ Ditados acumulados (guardados no aparelho) ============ */
 function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',2);r.onupgradeneeded=function(ev){const db=r.result;if(!db.objectStoreNames.contains('gravacoes'))db.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('sessoes'))db.createObjectStore('sessoes',{keyPath:'id',autoIncrement:true});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
-async function salvarSessao(){
+async function salvarSessao(comImagens){
+  // comImagens=false: snapshot leve (só texto) — usado DURANTE o lote p/ não reserializar
+  // as imagens a cada laudo (travaria 100+ exames). comImagens!=false: snapshot completo (com
+  // as fotos), usado em laudo avulso e no save final do lote — é o que a recuperação reexibe.
   var comLaudo=exames.filter(function(e){return e.laudo;}); if(!comLaudo.length) return;
   try{
     var db=await dbOpen();
-    // snapshot de recuperação SEM as imagens (base64 pesado): guarda o laudo (texto), que é o que importa
-    // recuperar após fechar a aba. Reserializar imagens a cada laudo travaria um lote de 100+ exames.
-    var snap=comLaudo.map(function(e){return {id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',laudo:e.laudo};});
+    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',laudo:e.laudo}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
     await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();st.add({quando:Date.now(),exames:snap});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});
   }catch(e){}
 }
-/* Throttle: em lote, salva no máx. 1×/5s (é rede de segurança, não precisa a cada laudo). */
+/* Throttle: no máx. 1×/5s. Durante o lote salva só texto (leve); fora do lote salva com as fotos. */
 var _sessTimer=null, _sessPend=false;
 function agendarSalvarSessao(){
   _sessPend=true;
   if(_sessTimer) return;
-  _sessTimer=setTimeout(function(){ _sessTimer=null; if(_sessPend){ _sessPend=false; salvarSessao(); } }, 5000);
+  _sessTimer=setTimeout(function(){ _sessTimer=null; if(_sessPend){ _sessPend=false; salvarSessao(!_gerandoEmLote); } }, 5000);
 }
 async function verificarSessaoSalva(){
   try{

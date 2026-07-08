@@ -1182,11 +1182,12 @@ function carregarJsPDF(){
   });
 }
 function medirImagem(d){ return new Promise(function(res){ var i=new Image(); i.onload=function(){res({w:i.naturalWidth||4,h:i.naturalHeight||3});}; i.onerror=function(){res({w:4,h:3});}; i.src=d; }); }
-/* Grade 2x3 (6 imagens/página) em A4 retrato, com cabeçalho do paciente; mantém proporção de cada imagem */
+/* Grade 2x4 (8 imagens/página) em A4 retrato, margens e vãos mínimos; mantém a proporção de cada imagem.
+   Célula ~96x67mm casa com a proporção 4:3 das capturas de USG => quase sem espaço em branco. */
 async function gerarPdfImagens(imagens, paciente){
   await carregarJsPDF();
   var doc=new window.jspdf.jsPDF({unit:'mm', format:'a4'});
-  var PW=210, PH=297, M=10, CAB=8, GAP=4, COLS=2, LINS=3;
+  var PW=210, PH=297, M=6, CAB=6, GAP=2, COLS=2, LINS=4;
   var cw=(PW-2*M-GAP*(COLS-1))/COLS;
   var ch=(PH-2*M-CAB-GAP*(LINS-1))/LINS;
   var totPag=Math.ceil(imagens.length/(COLS*LINS));
@@ -1194,8 +1195,8 @@ async function gerarPdfImagens(imagens, paciente){
     var pag=Math.floor(i/(COLS*LINS)), pos=i%(COLS*LINS);
     if(pos===0){
       if(pag>0) doc.addPage();
-      doc.setFontSize(10); doc.setTextColor(70);
-      doc.text(String(paciente||'')+' — imagens do exame  ('+(pag+1)+'/'+totPag+')', M, M+4);
+      doc.setFontSize(9); doc.setTextColor(70);
+      doc.text(String(paciente||'')+' — imagens do exame  ('+(pag+1)+'/'+totPag+')', M, M+3.5);
     }
     var col=pos%COLS, lin=Math.floor(pos/COLS);
     var x0=M+col*(cw+GAP), y0=M+CAB+lin*(ch+GAP);

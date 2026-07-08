@@ -1318,12 +1318,14 @@ function ligarAudio(aIdx, exId, marcado){
 }
 
 /* ============ Geração do laudo ============ */
+var _gerandoEmLote=false;
 async function gerarLaudo(exId){
   const ex = exames.find(e=>e.id===exId);
+  if(!ex){ return; }
   if(!ex.tipo){ log('Escolha o tipo de exame de '+ex.paciente+'.', true); return; }
   await garantirFundo();
   const btn = document.getElementById('btnGerar'+exId);
-  btn.disabled = true; btn.textContent = 'Gerando...';
+  if(btn){ btn.disabled = true; btn.textContent = 'Gerando...'; }
   try{
     const mod = MODELOS[ex.tipo];
     const trans = audios.filter(a=>a.exameId===exId).map(a=>a.transcricao).filter(Boolean).join('\n---\n');
@@ -1357,14 +1359,15 @@ async function gerarLaudo(exId){
     ex._falhou=false;
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
     try{ agendarSalvarSessao(); }catch(_){}
-    renderExames();
-    if(document.getElementById('cardRevisao')){ renderRevisao(); document.getElementById('cardRevisao').style.display='block'; }
-
+    if(!_gerandoEmLote){   // em lote, gerarTodos renderiza uma vez no fim (evita centenas de re-renders)
+      renderExames();
+      if(document.getElementById('cardRevisao')){ renderRevisao(); document.getElementById('cardRevisao').style.display='block'; }
+    }
     if(ex.laudo.obs) log('Observações da IA sobre '+ex.paciente+': '+ex.laudo.obs, true);
   }catch(e){
     log('Erro ao gerar laudo de '+ex.paciente+': '+e.message, true);
   }
-  btn.disabled = false; btn.textContent = ex.laudo ? 'Refazer laudo' : 'Gerar laudo';
+  if(btn){ btn.disabled = false; btn.textContent = ex.laudo ? 'Refazer laudo' : 'Gerar laudo'; }
 }
 
 /* ============ Medidor de microfone (barras ao vivo) ============ */
@@ -2179,11 +2182,19 @@ async function gerarTodos(soFaltantes){
     else { if(progTxt) progTxt.textContent='Gerando laudo '+(feitos+1)+' de '+n+(alvo[feitos]?' — '+(alvo[feitos].paciente||''):''); }
   }
   if(prog){ prog.style.display='block'; if(progBar) progBar.style.width='0%'; atualizarProg(); }
-  for(const ex of alvo){
-    try{ await gerarLaudo(ex.id); }catch(e){ log("Falha no laudo de "+(ex.paciente||ex.id)+": "+e.message, true); }
-    if(!ex.laudo){ ex._falhou=true; falhas.push(ex); }   // gerarLaudo engole o erro; a verdade é ter (ou não) laudo
-    feitos++; atualizarProg();
+  // concorrência limitada: ~4 laudos em paralelo (a retentativa cuida do limite de taxa)
+  const CONCORRENCIA=4; var prox=0;
+  _gerandoEmLote=true;
+  async function trabalhador(){
+    while(prox < alvo.length){
+      var ex=alvo[prox++];
+      try{ await gerarLaudo(ex.id); }catch(e){ log("Falha no laudo de "+(ex.paciente||ex.id)+": "+e.message, true); }
+      if(!ex.laudo){ ex._falhou=true; falhas.push(ex); }   // gerarLaudo engole o erro; a verdade é ter (ou não) laudo
+      feitos++; atualizarProg();
+    }
   }
+  try{ await Promise.all(Array.from({length:Math.min(CONCORRENCIA, alvo.length)}, trabalhador)); }
+  finally{ _gerandoEmLote=false; }
   if(btn){ btn.disabled=false; btn.textContent="⚙️ Gerar todos os laudos"; }
   if(btnF) btnF.disabled=false;
   try{ salvarSessao(); }catch(e){}   // save final garantido (fora do throttle)

@@ -1170,6 +1170,43 @@ async function pastaLivre(parent, base){
   }
   return base+' '+Date.now();
 }
+/* ============ PDF das imagens (6 por página, A4, pronto p/ imprimir) ============ */
+function carregarJsPDF(){
+  return new Promise(function(res, rej){
+    if(window.jspdf && window.jspdf.jsPDF) return res();
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload=function(){ (window.jspdf&&window.jspdf.jsPDF)?res():rej(new Error('gerador de PDF indisponível')); };
+    s.onerror=function(){ rej(new Error('sem acesso ao gerador de PDF (internet?)')); };
+    document.head.appendChild(s);
+  });
+}
+function medirImagem(d){ return new Promise(function(res){ var i=new Image(); i.onload=function(){res({w:i.naturalWidth||4,h:i.naturalHeight||3});}; i.onerror=function(){res({w:4,h:3});}; i.src=d; }); }
+/* Grade 2x3 (6 imagens/página) em A4 retrato, com cabeçalho do paciente; mantém proporção de cada imagem */
+async function gerarPdfImagens(imagens, paciente){
+  await carregarJsPDF();
+  var doc=new window.jspdf.jsPDF({unit:'mm', format:'a4'});
+  var PW=210, PH=297, M=10, CAB=8, GAP=4, COLS=2, LINS=3;
+  var cw=(PW-2*M-GAP*(COLS-1))/COLS;
+  var ch=(PH-2*M-CAB-GAP*(LINS-1))/LINS;
+  var totPag=Math.ceil(imagens.length/(COLS*LINS));
+  for(var i=0;i<imagens.length;i++){
+    var pag=Math.floor(i/(COLS*LINS)), pos=i%(COLS*LINS);
+    if(pos===0){
+      if(pag>0) doc.addPage();
+      doc.setFontSize(10); doc.setTextColor(70);
+      doc.text(String(paciente||'')+' — imagens do exame  ('+(pag+1)+'/'+totPag+')', M, M+4);
+    }
+    var col=pos%COLS, lin=Math.floor(pos/COLS);
+    var x0=M+col*(cw+GAP), y0=M+CAB+lin*(ch+GAP);
+    var dim=await medirImagem(imagens[i]);
+    var esc=Math.min(cw/dim.w, ch/dim.h);
+    var w=dim.w*esc, h=dim.h*esc;
+    var fmt=/^data:image\/png/i.test(imagens[i])?'PNG':'JPEG';
+    doc.addImage(imagens[i], fmt, x0+(cw-w)/2, y0+(ch-h)/2, w, h);
+  }
+  return doc.output('blob');
+}
 async function salvarLaudoPasta(){
   const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return; }
   const pac=(window.__revAtual&&window.__revAtual.paciente)?window.__revAtual.paciente:'laudo';
@@ -1179,6 +1216,11 @@ async function salvarLaudoPasta(){
   const ex=(window.__revAtual&&window.__revAtual.exId!=null)?exames.find(function(e){return e.id===window.__revAtual.exId;}):null;
   const imgs=(ex&&ex.imagens)?ex.imagens:[];
   const imgBlobs=imgs.map(function(d){ try{ return dataURLtoBlob(d); }catch(e){ return null; } }).filter(function(b){return b;});
+  let pdfBlob=null;
+  if(imgs.length){
+    try{ pdfBlob=await gerarPdfImagens(imgs, pac); }
+    catch(e){ log('PDF das imagens não gerado ('+e.message+') — salvando sem ele.', true); }
+  }
   if(suportaFS()){
     const h=pastaLaudoH;
     if(h && (await fsPermissao(h))){
@@ -1186,16 +1228,18 @@ async function salvarLaudoPasta(){
         const nomePasta=await pastaLivre(h, base); const sub=await h.getDirectoryHandle(nomePasta,{create:true});
         await fsEscrever(sub, 'Laudo - '+base+'.html', laudoBlob);
         for(let i=0;i<imgBlobs.length;i++){ await fsEscrever(sub, 'foto-'+(i+1)+'.jpg', imgBlobs[i]); }
-        log('Salvo na pasta "'+nomePasta+'": laudo + '+imgBlobs.length+' foto(s).');
+        if(pdfBlob) await fsEscrever(sub, 'Fotos - '+base+'.pdf', pdfBlob);
+        log('Salvo na pasta "'+nomePasta+'": laudo + '+imgBlobs.length+' foto(s)'+(pdfBlob?' + PDF das imagens (6/página)':'')+'.');
         return;
       }catch(e){ log('Falha ao salvar na pasta ('+e.message+'). Compartilhando...', true); }
     }
   }
   const files=[new File([laudoBlob], 'Laudo - '+base+'.html', {type:'text/html'})];
   for(let i=0;i<imgBlobs.length;i++){ files.push(new File([imgBlobs[i]], base+' - foto '+(i+1)+'.jpg', {type:imgBlobs[i].type||'image/jpeg'})); }
+  if(pdfBlob) files.push(new File([pdfBlob], 'Fotos - '+base+'.pdf', {type:'application/pdf'}));
   try{ if(navigator.canShare && navigator.canShare({files:files})){ await navigator.share({files:files, title:pac}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
   for(let i=0;i<files.length;i++){ const u=URL.createObjectURL(files[i]); const an=document.createElement('a'); an.href=u; an.download=files[i].name; document.body.appendChild(an); an.click(); setTimeout(function(){URL.revokeObjectURL(u);an.remove();},2500); }
-  log('Baixados: laudo + '+imgBlobs.length+' foto(s).');
+  log('Baixados: laudo + '+imgBlobs.length+' foto(s)'+(pdfBlob?' + PDF das imagens':'')+'.');
 }
 
 // Controle de UI do gravador por exame. estado: 'idle' | 'rec' | 'pause'

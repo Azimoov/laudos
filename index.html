@@ -113,6 +113,11 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 [style*="color:#9a6b14"]{color:#e6c47a!important;}
 [style*="background:#e3edf6"]{background:var(--azul-claro)!important;color:var(--acento)!important;}
 [style*="#fde8e8"]{background:#3a1512!important;color:#ff8a80!important;}
+/* elementos que o JS mostra via .style (o navegador reescreve o style em rgb e quebra o match por hex):
+   regras por ID resolvem de forma robusta */
+#revAudioWrap{background:var(--superficie-2)!important;color:var(--texto)!important;}
+#revAudioWrap .aviso{color:var(--texto)!important;}
+#obsBanner{background:#2a2410!important;color:#f0d089!important;border-left-color:var(--ambar)!important;}
 /* ===== página do laudo (espelha o modelo do Pages) ===== */
 .laudoFolha{position:relative;background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.32;color:#000;}
 .fundoLaudo{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;}
@@ -2323,7 +2328,7 @@ function montarRevMidia(exId){
       +auds.map(function(a){
           var tr=(a.transcricao||'').replace(/</g,'&lt;');
           var trBox = tr
-            ? '<div style="margin-top:4px;font-size:13px;line-height:1.45;color:#27313c;background:#fff;border:1px solid #dde3ea;border-radius:8px;padding:8px 10px;white-space:pre-wrap">'+tr+'</div>'
+            ? '<div style="margin-top:4px;font-size:13px;line-height:1.45;color:var(--texto);background:var(--superficie);border:1px solid var(--borda);border-radius:8px;padding:8px 10px;white-space:pre-wrap">'+tr+'</div>'
             : '<div class="aviso" style="margin-top:4px">(transcrição indisponível)</div>';
           return '<div style="margin-bottom:8px">'
             +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;white-space:nowrap">'+String(a.nome||'').replace(/</g,'&lt;')+'</span>'+(a.url?playerLinha(a.url):'')+'</div>'

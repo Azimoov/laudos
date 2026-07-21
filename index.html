@@ -935,7 +935,7 @@ function vincularManual(idx, exId){
 function renderPendentes(){
   const pend=audios.filter(function(a){return a.exameId==null;});
   if(!pend.length) return '';
-  const opts=exames.map(function(e){ return '<option value="'+e.id+'">'+(e.paciente||'(sem nome)')+(e.subExame?' - '+e.subExame:'')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+(e.lateralidade?' ('+e.lateralidade+')':'')+'</option>'; }).join('');
+  const opts=exames.slice().sort(function(a,b){ return String(a.paciente||'').localeCompare(String(b.paciente||''), 'pt-BR', {sensitivity:'base'}); }).map(function(e){ return '<option value="'+e.id+'">'+(e.paciente||'(sem nome)')+(e.subExame?' - '+e.subExame:'')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+(e.lateralidade?' ('+e.lateralidade+')':'')+'</option>'; }).join('');
   return '<div class="card" style="border:2px solid #d99a26;background:#fdf6e9">'
     +'<h2 style="color:#9a6b14">⚠️ '+pend.length+' áudio(s) sem vínculo seguro — revise</h2>'
     +'<p class="aviso">Por segurança, só vinculei automaticamente os áudios de alta certeza. Escolha o exame de cada áudio abaixo (ou deixe em branco para ignorar).</p>'

@@ -801,7 +801,8 @@ function norm(s){
 }
 /* ============ Fluxo principal ============ */
 /* ============ Agrupamento por imagem (visão) + vínculo de áudios ============ */
-const LIMIAR_VINCULO = 0.45;  // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual. A guarda de ambiguidade (best-second<0,15) continua protegendo contra vínculo ao paciente errado quando há 2+ candidatos parecidos.
+const LIMIAR_VINCULO = 0.35;  // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual. A guarda de ambiguidade (best-second<MARGEM_EMPATE) continua protegendo contra vínculo ao paciente errado quando há 2+ candidatos parecidos.
+const MARGEM_EMPATE = 0.10;   // diferença mínima entre o 1º e o 2º candidato p/ o app decidir sozinho
 const MERGE_LEV = 2;          // tolerância (edições) p/ fundir nomes quase iguais no agrupamento
 const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edite à vontade)
   abdominal:['abdome total','abdomen total','abd total','abdominal total','abdominal','abdome'],
@@ -822,11 +823,19 @@ const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edit
   ombro:['ombro'], cotovelo:['cotovelo'], punho:['punho'], mao:['mao','quirodactilo'],
   joelho:['joelho'], tornozelo:['tornozelo'], pe:['pe','pododactilo']
 };
+// Presets ambíguos do aparelho: URO serve p/ rins E próstata; GYN p/ transvaginal E pélvica.
+// Tipos compatíveis contam como "tipo bateu" no vínculo, e o tipo DITADO corrige o do exame.
+const TIPOS_COMPATIVEIS = { rins:['prostata'], prostata:['rins'], transvaginal:['pelvica'], pelvica:['transvaginal'] };
+function tipoCompat(a,b){ if(!a||!b) return false; if(a===b) return true; return (TIPOS_COMPATIVEIS[a]||[]).indexOf(b)>=0; }
 function limparPaciente(folder){ if(!folder) return ''; var nome=String(folder).split(/\d{8}/)[0]; nome=nome.replace(/[_\-\s]+$/,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim(); nome=nome.toLowerCase().replace(/(^|\s)([a-zà-ú])/g,function(m,a,b){return a+b.toUpperCase();}); return nome; }
 function limparExame(sub){ if(!sub) return ''; return String(sub).split(/\d{8}/)[0].replace(/[_\-\s]+$/,'').replace(/[_]+/g,' ').trim(); }
 function mapTipo(texto){
   if(texto && MODELOS[texto]) return texto;   // já é uma chave válida (inclui modelos personalizados)
   const t=norm(texto); if(!t) return '';
+  // Presets impressos pelo aparelho (token exato p/ "outro" não casar com "uro"):
+  // URO = rins OU próstata (ambíguo — vira 'rins' aqui; TIPOS_COMPATIVEIS trata a ambiguidade e o ditado corrige)
+  if(/(^|\s)uro(\s|$)/.test(t)) return 'rins';
+  if(/(^|\s)gyn(\s|$)/.test(t)) return 'transvaginal';   // GYN = ginecológico → transvaginal
   for(const chave in SINONIMOS_TIPO){ if(SINONIMOS_TIPO[chave].some(function(s){return t.indexOf(norm(s))>=0;})) return chave; }
   for(const k in MODELOS){ const n=norm(MODELOS[k].nome); if(n && (t.indexOf(n)>=0 || n.indexOf(t)>=0)) return k; }
   return '';
@@ -892,7 +901,7 @@ function vincularAudios(){
       var sp=0; for(var i=0;i<fontes.length;i++){ var v=simNome(alvo, fontes[i]); if(v>sp) sp=v; }
       var subTok=ex.subExame?tokensNome(ex.subExame):[];
       var subHit=subTok.length>0 && fonteToks.some(function(ft){ return ft.some(function(u){ return subTok.some(function(st){ return u===st||u.indexOf(st)===0; }); }); });
-      var tipoMatch=!!(tipoAudio && ex.tipo && tipoAudio===ex.tipo);
+      var tipoMatch=!!(tipoAudio && ex.tipo && tipoCompat(tipoAudio, ex.tipo));
       var latE=normLateralidade(ex.lateralidade||'');
       var latMatch=!!(latA && latE && (latA===latE || latA==='Bilateral' || latE==='Bilateral'));
       var latConflito=!!(latA && latE && !latMatch);
@@ -907,9 +916,11 @@ function vincularAudios(){
     if(!cands.length){ a._motivo='nenhum candidato: '+(fontes.length?'nome "'+(a.nomePaciente||nomeArquivoLimpo(a.nome))+'" não bateu com nenhum exame':'áudio sem nome de paciente')+(tipoAudio?' (tipo '+tipoAudio+(latA?' '+latA:' sem lado')+')':' e sem tipo reconhecido'); continue; }
     cands.sort(function(x,y){ return y.s-x.s; });
     const best=cands[0]; const second=cands[1];
-    const ambiguo = !!second && (best.s-second.s)<0.15;
+    const ambiguo = !!second && (best.s-second.s)<MARGEM_EMPATE;
     a.score=best.s;
-    if(best.s>=LIMIAR_VINCULO && !ambiguo){ a.exameId=best.ex.id; a.pendente=false; best.ex.audios.push(a.idx); if(!best.ex.tipo&&tipoAudio) best.ex.tipo=tipoAudio; }
+    if(best.s>=LIMIAR_VINCULO && !ambiguo){ a.exameId=best.ex.id; a.pendente=false; best.ex.audios.push(a.idx);
+      // o tipo DITADO manda: preenche se vazio e corrige preset ambíguo (URO: rins→prostata; GYN: transvaginal→pelvica)
+      if(tipoAudio && best.ex.tipo!==tipoAudio && (!best.ex.tipo || tipoCompat(best.ex.tipo, tipoAudio))) best.ex.tipo=tipoAudio; }
     else if(ambiguo){ a._motivo='empate entre "'+best.ex.paciente+'" ('+best.s.toFixed(2)+') e "'+second.ex.paciente+'" ('+second.s.toFixed(2)+')'; }
     else { a._motivo='melhor: "'+best.ex.paciente+'" score '+best.s.toFixed(2)+' < limiar '+LIMIAR_VINCULO; }
   }

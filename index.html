@@ -2308,19 +2308,27 @@ async function revChatEnviar(){
   if(st) st.textContent='🤖 Aplicando: “'+inst.slice(0,90)+(inst.length>90?'…':'')+'”';
   try{
     var L=ex.laudo;
+    // economia de tokens: só manda a versão da tela se o médico editou algo à mão
+    // (senão a estruturada, que tem os **negritos**, já basta — evita o laudo em dobro)
     var atual=textoEditadoLaudo();
+    var normCmp=function(s){ return String(s||'').replace(/\s+/g,' ').trim(); };
+    var editouAlgo = window.__revTextoInicial!=null && normCmp(atual)!==normCmp(window.__revTextoInicial);
+    var blocoLaudo = "LAUDO ATUAL (com ** de negrito):\nTÍTULO: "+(L.titulo||'')+"\nCORPO:\n"+(L.corpo||'')+"\nCONCLUSÃO: "+(L.conclusao||'')+"\n\n"
+      +(editouAlgo ? "VERSÃO NA TELA (o médico fez edições manuais — esta é a vigente; sem marcações de negrito):\n"+atual+"\n\n" : "");
     var prompt="Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Um laudo está em revisão e o médico pediu um ajuste.\n\n"
-      +"LAUDO ATUAL (como está na tela, já com as edições do médico; sem marcações de negrito):\nTÍTULO: "+(L.titulo||'')+"\n"+atual+"\n\n"
-      +"VERSÃO ESTRUTURADA (com ** de negrito — referência de formato e de quais trechos vão em negrito):\nCORPO:\n"+(L.corpo||'')+"\nCONCLUSÃO: "+(L.conclusao||'')+"\n\n"
+      +blocoLaudo
       +"PEDIDO DO MÉDICO (cumpra exatamente; altere SOMENTE o necessário e preserve todo o resto do laudo):\n"+inst+"\n\n"
       +"REGRAS: mantenha o estilo, a ortografia e a estrutura do laudo; achados patológicos em **negrito**; exatamente UMA linha em branco entre parágrafos; NUNCA invente medidas ou achados que não foram pedidos nem constem do laudo; se o pedido for para gerar um novo laudo, gere-o completo mantendo o mesmo modelo e cabeçalho.\n\n"
-      +"Responda SOMENTE em JSON válido: {\"titulo\":\"\",\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}";
-    var resp=await openai([{type:'text',text:prompt}]);
-    if(!resp || (!resp.corpo && !resp.conclusao && !resp.titulo)) throw new Error('a IA devolveu uma resposta vazia — tente de novo');
+      +"Responda SOMENTE em JSON válido: {\"titulo\":\"\",\"corpo\":\"\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"} — corpo com ** para negrito e \\n para quebras. ECONOMIA: preencha APENAS os campos que você alterou; os que não mudaram devem vir como \"\" (string vazia).";
+    // tarefa leve, sem imagens: usa o modelo auxiliar barato (Configurações), como o loop de aprendizado
+    var resp=await openai([{type:'text',text:prompt}], true, {modelo: cfg.modeloAux||cfg.modelo});
+    if(!resp) throw new Error('a IA devolveu uma resposta vazia — tente de novo');
+    var mudouAlgo = !!(resp.titulo||resp.corpo||resp.conclusao||resp.observacoes_para_o_medico);
+    if(!mudouAlgo) throw new Error('a IA não alterou nada — reformule o pedido');
     if(resp.titulo) L.titulo=resp.titulo;
     if(resp.corpo) L.corpo=resp.corpo;
     if(resp.conclusao) L.conclusao=resp.conclusao;
-    L.obs=resp.observacoes_para_o_medico||'';
+    if(resp.observacoes_para_o_medico) L.obs=resp.observacoes_para_o_medico;
     ex.laudoBaseTexto=textoBaseLaudo(L);   // atualiza a base p/ o loop de aprendizado não confundir mudança da IA com correção do médico
     abrirRevisao(exId);
     if(inp) inp.value='';
@@ -2357,6 +2365,8 @@ function abrirRevisao(exId, semTela){
   montarRevMidia(exId);
   revPreencherModelos(ex.tipo||'');
   _mostrarBotoesRev(true);
+  // foto do texto recém-renderizado COM a tela visível (innerText muda quando oculto) — p/ detectar edições manuais
+  window.__revTextoInicial = textoEditadoLaudo();
   }
 }
 function revImgMove(e,img){ var r=img.getBoundingClientRect(); var w=r.width||1, h=r.height||1; var x=(e.clientX-r.left)/w, y=(e.clientY-r.top)/h; var m=0.35; if(x<m||x>1-m||y<m||y>1-m){ img.classList.remove('zoom'); } else { img.classList.add('zoom'); } }

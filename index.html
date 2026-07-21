@@ -1528,6 +1528,7 @@ async function gerarLaudo(exId){
       }catch(e){}
     }
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal};
+    ex._liberado=false;   // laudo novo = ainda não liberado (volta p/ a lista de revisão)
     ex._falhou=false;
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
     try{ agendarSalvarSessao(); }catch(_){}
@@ -2371,17 +2372,20 @@ function abrirRevisao(exId, semTela){
 }
 function revImgMove(e,img){ var r=img.getBoundingClientRect(); var w=r.width||1, h=r.height||1; var x=(e.clientX-r.left)/w, y=(e.clientY-r.top)/h; var m=0.35; if(x<m||x>1-m||y<m||y>1-m){ img.classList.remove('zoom'); } else { img.classList.add('zoom'); } }
 function revImgLeave(img){ img.classList.remove('zoom'); }
+function revToggleLiberados(){ window.__revMostrarLiberados=!window.__revMostrarLiberados; renderRevisao(); }
 function renderRevisao(){
   const div=document.getElementById("listaRevisao"); if(!div) return;
-  const lista=exames.filter(function(e){return e.laudo;});
-  if(!lista.length){ div.innerHTML='<p class="aviso">Gere os laudos para revisar aqui.</p>'; return; }
-  div.innerHTML=lista.map(function(ex){
+  const nLib=exames.filter(function(e){return e.laudo && e._liberado;}).length;
+  const lista=exames.filter(function(e){return e.laudo && (window.__revMostrarLiberados || !e._liberado);});
+  const rodapeLib = nLib ? '<div class="aviso" style="margin-top:8px">✅ '+nLib+' laudo(s) liberado(s)'+(window.__revMostrarLiberados?' (exibidos abaixo com a etiqueta ✅)':' — ocultos desta lista (continuam no Histórico)')+' <button class="btn peq sec" onclick="revToggleLiberados()">'+(window.__revMostrarLiberados?'ocultar':'mostrar')+'</button></div>' : '';
+  if(!lista.length){ div.innerHTML=(nLib?'<p class="aviso">Todos os laudos foram liberados. 🎉</p>':'<p class="aviso">Gere os laudos para revisar aqui.</p>')+rodapeLib; return; }
+  div.innerHTML=rodapeLib+lista.map(function(ex){
     const auds=audios.filter(function(a){return a.exameId===ex.id;});
     const nome=(ex.paciente||"(sem nome)")+(ex.subExame?" - "+ex.subExame:"");
     const players=auds.length?auds.map(function(a){return '<div style="margin-top:4px">'+(a.url?playerLinha(a.url):"(áudio indisponível)")+"</div>";}).join(""):'<p class="aviso">Sem áudio vinculado.</p>';
     const imgs=(ex.imagens||[]).length?ex.imagens.map(function(d){return '<img class="revImg" onmousemove="revImgMove(event,this)" onmouseleave="revImgLeave(this)" src="'+d+'" style="max-width:120px;max-height:120px;margin:4px;border:1px solid #c8d0da;border-radius:6px">';}).join(""):'<p class="aviso">Sem imagens.</p>';
     return '<div style="border:1px solid #c8d0da;border-radius:10px;padding:10px;margin-top:8px">'
-      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:120px">'+nome+"</b>"
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:120px">'+nome+(ex._liberado?' <span style="background:#1f7a3d;color:#fff;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600">✅ liberado</span>':'')+"</b>"
       +'<button class="btn peq sec" data-act="ver" data-ex="'+ex.id+'">📄 Ver / editar</button>'
       +'<button class="btn peq sec" data-act="aud" data-ex="'+ex.id+'">🎙 Áudio</button>'
       +'<button class="btn peq sec" data-act="img" data-ex="'+ex.id+'">🖼 Imagens</button>'
@@ -2451,6 +2455,8 @@ async function salvarExameRev(exId){
   abrirRevisao(exId, true);
   await salvarLaudoPasta();
   try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
+  ex._liberado=true;   // aprovado = liberado: sai da lista de revisão (fica no Histórico)
+  renderRevisao();
 }
 async function salvarTodosRev(){
   const lista=exames.filter(function(e){return e.laudo;});

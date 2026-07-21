@@ -1028,12 +1028,28 @@ async function salvarTodosDitados(){
   log('Baixados '+files.length+' ditado(s).');
 }
 
-function ehArquivoAudio(f){ var tp=f.type||''; if(tp.indexOf('audio')===0) return true; return /\.(m4a|mp3|wav|ogg|webm|aac|opus|flac)$/i.test(f.name||''); }
+// extensões que claramente NÃO são áudio (rejeita só estas; o resto numa pasta de "áudios" é aceito)
+var EXT_NAO_AUDIO = /\.(jpe?g|png|gif|bmp|webp|heic|heif|tiff?|svg|pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|7z|exe|dll|dcm|json|xml|html?|mp4|mov|avi|mkv|wmv)$/i;
+var EXT_AUDIO = /\.(m4a|m4b|mp3|wav|wave|ogg|oga|webm|weba|aac|opus|flac|caf|amr|3gp|3gpp|aiff?|aifc|wma|mpga|mpeg|mp2)$/i;
+function ehArquivoAudio(f){
+  var tp=f.type||'', nm=f.name||'';
+  if(tp.indexOf('audio')===0) return true;                 // mime de áudio
+  if(EXT_AUDIO.test(nm)) return true;                       // extensão de áudio conhecida
+  if(!tp && !EXT_NAO_AUDIO.test(nm) && /\.[a-z0-9]{1,5}$/i.test(nm)) return true; // sem mime e sem cara de imagem/doc: numa pasta de áudios, aceita
+  return false;
+}
+function extDe(nm){ var m=String(nm||'').match(/\.([a-z0-9]{1,6})$/i); return m?('.'+m[1].toLowerCase()):'(sem extensão)'; }
 function audiosDaPastaSel(){ var inp=document.getElementById('inpPastaAudios'); if(!inp||!inp.files||!inp.files.length) return []; return Array.prototype.filter.call(inp.files, ehArquivoAudio); }
 function renderPastaAudiosInfo(){
   var span=document.getElementById('pastaAudiosInfo'); if(!span) return;
+  var inp=document.getElementById('inpPastaAudios'); var todos=(inp&&inp.files)?inp.files.length:0;
   var aus=audiosDaPastaSel();
-  span.textContent = aus.length ? (aus.length+' áudio(s) encontrado(s) na pasta. Toque em Processar.') : 'Nenhum áudio na pasta selecionada.';
+  if(aus.length){ span.textContent=aus.length+' áudio(s) encontrado(s) na pasta. Toque em Processar.'; return; }
+  if(!todos){ span.textContent='Nenhum arquivo na pasta selecionada.'; return; }
+  // diagnóstico: nenhum áudio reconhecido -> mostrar as extensões que apareceram
+  var exts={}; Array.prototype.forEach.call(inp.files, function(f){ var e=extDe(f.name); exts[e]=(exts[e]||0)+1; });
+  var lista=Object.keys(exts).map(function(e){ return e+' ('+exts[e]+')'; }).join(', ');
+  span.textContent='Nenhum áudio reconhecido entre '+todos+' arquivo(s). Extensões encontradas: '+lista;
 }
 function renderPastaInfo(){
   const inp=document.getElementById('inpPasta'); const span=document.getElementById('pastaInfo'); if(!span) return;

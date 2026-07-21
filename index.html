@@ -952,6 +952,7 @@ function vincularManual(idx, exId){
   exames.forEach(function(e){ e.audios=e.audios.filter(function(k){return k!==idx;}); });
   if(exId===''||exId==null){ a.exameId=null; a.pendente=true; }
   else { const ex=exames.find(function(e){return e.id===Number(exId);}); if(ex){ a.exameId=ex.id; a.pendente=false; ex.audios.push(idx); if(!ex.tipo){ const tt=mapTipo(a.tipoExame); if(tt) ex.tipo=tt; } } }
+  agendarSalvarSessao();
   renderExames();
 }
 function verFotosPendente(aIdx, exId){
@@ -1137,11 +1138,11 @@ async function processar(){
       log('Transcrevendo '+f.name+' ...');
       try{
         const resp = await transcreverAudio(f);
-        audios.push({idx:i, nome:f.name, url:URL.createObjectURL(f), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
+        audios.push({idx:i, nome:f.name, blob:f, url:URL.createObjectURL(f), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
         log('Falha no áudio '+f.name+': '+e.message, true);
-        audios.push({idx:i, nome:f.name, url:URL.createObjectURL(f), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
+        audios.push({idx:i, nome:f.name, blob:f, url:URL.createObjectURL(f), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
       }
     }
     // 2b. ditados guardados no aparelho
@@ -1155,17 +1156,18 @@ async function processar(){
       log('Transcrevendo '+rotulo+' ...');
       try{
         const resp = (g.transcricao!==undefined) ? {transcricao:g.transcricao, nome_paciente:g.nome_paciente||'', tipo_exame:g.tipo_exame||'', lateralidade:g.lateralidade||''} : await transcreverAudio(g.blob);
-        audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
+        audios.push({idx:audios.length, nome:rotulo, blob:g.blob, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
         log('Falha em '+rotulo+': '+e.message, true);
-        audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
+        audios.push({idx:audios.length, nome:rotulo, blob:g.blob, url:URL.createObjectURL(g.blob), transcricao:'', nomePaciente:'', tipoExame:'', exameId:null});
       }
     }
     // 3. associação automática (com score; baixa confiança vai p/ revisão manual)
     vincularAudios();
     const _pend = audios.filter(function(a){return a.exameId==null;}).length;
     log('Áudios: '+(audios.length-_pend)+' vinculado(s) com segurança, '+_pend+' p/ revisão manual.');
+    audsBlobSalvarTodos();   // blobs no IndexedDB (1×): áudios sobrevivem ao reload por 24h
     _progFeito=_progTotal; progVincSet(); progVincHide();
     renderExames();
     mostrarAba('exames');
@@ -1514,6 +1516,7 @@ function ligarAudio(aIdx, exId, marcado){
   }else{
     a.exameId = null; exames.find(e=>e.id===exId).audios = exames.find(e=>e.id===exId).audios.filter(i=>i!==aIdx);
   }
+  agendarSalvarSessao();
   renderExames();
 }
 
@@ -1606,7 +1609,13 @@ function vuParar(canvasId){
 }
 
 /* ============ Ditados acumulados (guardados no aparelho) ============ */
-function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',2);r.onupgradeneeded=function(ev){const db=r.result;if(!db.objectStoreNames.contains('gravacoes'))db.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('sessoes'))db.createObjectStore('sessoes',{keyPath:'id',autoIncrement:true});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',3);r.onupgradeneeded=function(ev){const db=r.result;if(!db.objectStoreNames.contains('gravacoes'))db.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('sessoes'))db.createObjectStore('sessoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('audiosSessao'))db.createObjectStore('audiosSessao',{keyPath:'idx'});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+/* ---- áudios da sessão: blobs guardados 1× no IndexedDB p/ sobreviverem ao reload (validade 24h) ---- */
+async function audsBlobSalvarTodos(){
+  try{ var db=await dbOpen(); await new Promise(function(res,rej){ var tx=db.transaction('audiosSessao','readwrite'); var st=tx.objectStore('audiosSessao'); st.clear(); audios.forEach(function(a){ if(a.blob) st.put({idx:a.idx, blob:a.blob, quando:Date.now()}); }); tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }catch(e){}
+}
+async function audsBlobLer(){ try{ var db=await dbOpen(); return await new Promise(function(res,rej){ var rq=db.transaction('audiosSessao').objectStore('audiosSessao').getAll(); rq.onsuccess=function(){res(rq.result||[]);}; rq.onerror=function(){rej(rq.error);}; }); }catch(e){ return []; } }
+async function audsBlobLimpar(){ try{ var db=await dbOpen(); await new Promise(function(res){ var tx=db.transaction('audiosSessao','readwrite'); tx.objectStore('audiosSessao').clear(); tx.oncomplete=function(){res();}; tx.onerror=function(){res();}; }); }catch(e){} }
 async function salvarSessao(comImagens){
   // comImagens=false: snapshot leve (só texto) — usado DURANTE o lote p/ não reserializar
   // as imagens a cada laudo (travaria 100+ exames). comImagens!=false: snapshot completo (com
@@ -1614,8 +1623,9 @@ async function salvarSessao(comImagens){
   var comLaudo=exames.filter(function(e){return e.laudo;}); if(!comLaudo.length) return;
   try{
     var db=await dbOpen();
-    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',laudo:e.laudo}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
-    await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();st.add({quando:Date.now(),exames:snap});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});
+    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice()}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
+    var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||''}; });
+    await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();st.add({quando:Date.now(),exames:snap,audios:audsMeta});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});
   }catch(e){}
 }
 /* Throttle: no máx. 1×/5s. Durante o lote salva só texto (leve); fora do lote salva com as fotos. */
@@ -1629,9 +1639,9 @@ async function verificarSessaoSalva(){
   try{
     var db=await dbOpen();
     var lista=await new Promise(function(res,rej){var rq=db.transaction('sessoes').objectStore('sessoes').getAll();rq.onsuccess=function(){res(rq.result||[]);};rq.onerror=function(){rej(rq.error);};});
-    if(!lista.length) return;
+    if(!lista.length){ audsBlobLimpar(); return; }
     var ult=lista[lista.length-1];
-    if(Date.now()-ult.quando>24*3600*1000) return;
+    if(Date.now()-ult.quando>24*3600*1000){ audsBlobLimpar(); return; }   // sessão velha: apaga também os áudios guardados
     var n=ult.exames.length;
     var dt=new Date(ult.quando).toLocaleString('pt-BR');
     var b=document.createElement('div');
@@ -1648,17 +1658,24 @@ async function restaurarSessao(id){
     var db=await dbOpen();
     var sess=await new Promise(function(res,rej){var rq=db.transaction('sessoes').objectStore('sessoes').get(id);rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};});
     if(!sess) return;
-    exames=sess.exames.map(function(e){return Object.assign({audios:[],imagens:[],metaConf:1,_liberado:false},e);});
+    exames=sess.exames.map(function(e){return Object.assign({audios:[],imagens:[],metaConf:1,_liberado:false},e);});   // _liberado/audios salvos no snapshot sobrescrevem os defaults
     audios=[];
+    var comSom=0;
+    try{
+      var blobs=await audsBlobLer(); var porIdx={}; blobs.forEach(function(bb){ porIdx[bb.idx]=bb.blob; });
+      (sess.audios||[]).forEach(function(sa){ var bl=porIdx[sa.idx]; if(bl) comSom++; audios.push(Object.assign({}, sa, {blob:bl||null, url:bl?URL.createObjectURL(bl):null, pendente:sa.exameId==null})); });
+    }catch(e){}
     var b=document.getElementById('bannerRecup'); if(b) b.remove();
     renderExames(); renderRevisao();
     mostrarAba('revisao');
     var c=document.getElementById('cardRevisao'); if(c){c.scrollIntoView({behavior:'smooth'});}
-    log(sess.exames.length+' laudo(s) restaurado(s) da sessão de '+new Date(sess.quando).toLocaleString('pt-BR')+'.');
+    var nLibR=exames.filter(function(e){return e._liberado;}).length;
+    log(sess.exames.length+' laudo(s) restaurado(s) ('+nLibR+' já liberado(s)) e '+audios.length+' áudio(s) ('+comSom+' com som) da sessão de '+new Date(sess.quando).toLocaleString('pt-BR')+'.');
   }catch(e){ log('Falha ao restaurar: '+e.message,true); }
 }
 async function descartarSessao(id){
   try{ var db=await dbOpen(); await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');tx.objectStore('sessoes').delete(id);tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}catch(e){}
+  audsBlobLimpar();
   var b=document.getElementById('bannerRecup'); if(b) b.remove();
 }
 async function gravSalvar(blob, meta){const db=await dbOpen();return new Promise(function(res,rej){const tx=db.transaction('gravacoes','readwrite');tx.objectStore('gravacoes').add(Object.assign({blob:blob,quando:Date.now()}, meta||{}));tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}
@@ -2419,9 +2436,13 @@ function revToggleLiberados(){ window.__revMostrarLiberados=!window.__revMostrar
 function renderRevisao(){
   const div=document.getElementById("listaRevisao"); if(!div) return;
   const nLib=exames.filter(function(e){return e.laudo && e._liberado;}).length;
+  const totalL=exames.filter(function(e){return e.laudo;}).length;
   const lista=exames.filter(function(e){return e.laudo && (window.__revMostrarLiberados || !e._liberado);});
-  const rodapeLib = nLib ? '<div class="aviso" style="margin-top:8px">✅ '+nLib+' laudo(s) liberado(s)'+(window.__revMostrarLiberados?' (exibidos abaixo com a etiqueta ✅)':' — ocultos desta lista (continuam no Histórico)')+' <button class="btn peq sec" onclick="revToggleLiberados()">'+(window.__revMostrarLiberados?'ocultar':'mostrar')+'</button></div>' : '';
-  if(!lista.length){ div.innerHTML=(nLib?'<p class="aviso">Todos os laudos foram liberados. 🎉</p>':'<p class="aviso">Gere os laudos para revisar aqui.</p>')+rodapeLib; return; }
+  const rodapeLib = totalL ? '<div style="margin:8px 0;padding:8px 12px;border-radius:9px;background:'+(nLib===totalL?'#e4f4ec':'#eef3f8')+';font-size:14px;font-weight:700;color:#1a2733">'
+      +(nLib===totalL?'🎉 Todos liberados: ':'✅ Liberados ')+nLib+' de '+totalL+(nLib<totalL?' — <span style="color:#9a6b14">faltam '+(totalL-nLib)+'</span>':'')
+      +(nLib?' <button class="btn peq sec" onclick="revToggleLiberados()">'+(window.__revMostrarLiberados?'ocultar liberados':'mostrar liberados')+'</button>':'')
+      +'</div>' : '';
+  if(!lista.length){ div.innerHTML=rodapeLib+(nLib?'<p class="aviso">Todos os laudos foram liberados (ocultos — toque em "mostrar liberados"; também estão no Histórico).</p>':'<p class="aviso">Gere os laudos para revisar aqui.</p>'); return; }
   div.innerHTML=rodapeLib+lista.map(function(ex){
     const auds=audios.filter(function(a){return a.exameId===ex.id;});
     const nome=(ex.paciente||"(sem nome)")+(ex.subExame?" - "+ex.subExame:"");
@@ -2499,6 +2520,7 @@ async function salvarExameRev(exId){
   await salvarLaudoPasta();
   try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
   ex._liberado=true;   // aprovado = liberado: sai da lista de revisão (fica no Histórico)
+  agendarSalvarSessao();
   renderRevisao();
 }
 async function salvarTodosRev(){
@@ -2566,7 +2588,7 @@ document.addEventListener('keydown', function(e){
   if(suportaFS()&&!pastaLaudoH){ await garantirPasta(); if(!pastaLaudoH){ log('Liberar cancelado: escolha a pasta de destino.',true); return; } }
   await salvarLaudoPasta();
   try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
-  var exAtual=exames.find(function(e){return e.id===exId;}); if(exAtual) exAtual._liberado=true;
+  var exAtual=exames.find(function(e){return e.id===exId;}); if(exAtual){ exAtual._liberado=true; agendarSalvarSessao(); }
   // aprendizado agora é manual (botão "🧠 Aprender com minhas correções"), não automático aqui
   // próximo laudo com laudo gerado e ainda não liberado
   var pendentes=exames.filter(function(e){return e.laudo&&!e._liberado;});

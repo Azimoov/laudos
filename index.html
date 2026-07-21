@@ -117,6 +117,9 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
    regras por ID resolvem de forma robusta */
 #revAudioWrap{background:var(--superficie-2)!important;color:var(--texto)!important;}
 #revAudioWrap .aviso{color:var(--texto)!important;}
+#revIaWrap{background:var(--superficie-2)!important;color:var(--texto)!important;}
+#revIaWrap .aviso{color:var(--texto)!important;}
+#revIaWrap input,#revIaWrap select{background:var(--superficie)!important;color:var(--texto)!important;border-color:var(--borda)!important;}
 #obsBanner{background:#2a2410!important;color:#f0d089!important;border-left-color:var(--ambar)!important;}
 /* ===== página do laudo (espelha o modelo do Pages) ===== */
 .laudoFolha{position:relative;background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.32;color:#000;}
@@ -523,6 +526,19 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <button title="Justificar" onclick="fmtCmd('justifyFull')">≡≡</button>
       <span class="fmtSep"></span>
       <button title="Limpar formatação da seleção" onclick="fmtCmd('removeFormat')" style="font-size:11px;color:#666">✕ fmt</button>
+    </div>
+    <!-- IA na revisão: trocar modelo + pedir ajustes por texto (fora do areaImpressao: não imprime) -->
+    <div id="revIaWrap" style="display:none;max-width:760px;margin:0 auto 10px;padding:8px 10px;background:#f4f7fa;border-radius:10px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label for="revModeloSel" style="font-size:12px;font-weight:600">Modelo do laudo:</label>
+        <select id="revModeloSel" style="flex:1;min-width:160px;max-width:340px"></select>
+        <button class="btn peq sec" onclick="revRegerarModelo()">🔄 Regerar com este modelo</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap">
+        <input id="revChatTxt" type="text" placeholder="Peça à IA — ex.: acrescente cisto renal simples de 8 mm à direita" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid #c8d0da;border-radius:8px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();revChatEnviar();}">
+        <button class="btn peq" id="revChatBtn" onclick="revChatEnviar()">🤖 Aplicar</button>
+      </div>
+      <div id="revChatStatus" class="aviso" style="margin-top:4px"></div>
     </div>
     <!-- painel de mídia: fora do areaImpressao para não entrar no PDF/impressão -->
     <!-- áudio: sempre visível (barra de espaço = play/pausa) -->
@@ -2262,6 +2278,56 @@ function aplicarFundoNaFolha(){
   }
 }
 async function trocarFundo(){ await escolherFundo(); aplicarFundoNaFolha(); }
+/* ---- IA na tela de revisão: trocar modelo do laudo + pedidos por texto ---- */
+function revPreencherModelos(tipo){
+  var sel=document.getElementById('revModeloSel'); if(!sel) return;
+  var ks=Object.keys(MODELOS).sort(function(a,b){ return String(MODELOS[a].nome||a).localeCompare(String(MODELOS[b].nome||b),'pt-BR',{sensitivity:'base'}); });
+  sel.innerHTML=ks.map(function(k){ return '<option value="'+k+'"'+(k===tipo?' selected':'')+'>'+(MODELOS[k].nome||k)+'</option>'; }).join('');
+}
+async function revRegerarModelo(){
+  var exId=window.__revAtual&&window.__revAtual.exId!=null?window.__revAtual.exId:null; if(exId==null) return;
+  var ex=exames.find(function(e){return e.id===exId;}); if(!ex) return;
+  var sel=document.getElementById('revModeloSel'); var novo=sel?sel.value:''; if(!novo||!MODELOS[novo]) return;
+  if(!confirm('Regerar o laudo com o modelo "'+(MODELOS[novo].nome||novo)+'"?\n\nO laudo será gerado de novo a partir do ditado e das imagens; as edições manuais desta folha serão substituídas.')) return;
+  var st=document.getElementById('revChatStatus'); if(st) st.textContent='🔄 Regerando com o modelo '+(MODELOS[novo].nome||novo)+'…';
+  ex.tipo=novo;
+  try{
+    await gerarLaudo(exId);
+    abrirRevisao(exId);
+    var st2=document.getElementById('revChatStatus'); if(st2) st2.textContent='✅ Laudo regerado com o modelo '+(MODELOS[novo].nome||novo)+' — revise.';
+  }catch(e){ var stE=document.getElementById('revChatStatus'); if(stE) stE.textContent='⚠️ Falha ao regerar: '+e.message; log('Falha ao regerar: '+e.message,true); }
+}
+async function revChatEnviar(){
+  var exId=window.__revAtual&&window.__revAtual.exId!=null?window.__revAtual.exId:null; if(exId==null) return;
+  var ex=exames.find(function(e){return e.id===exId;}); if(!ex||!ex.laudo) return;
+  var inp=document.getElementById('revChatTxt'); var inst=(inp&&inp.value||'').trim();
+  var st=document.getElementById('revChatStatus'); var btn=document.getElementById('revChatBtn');
+  if(!inst){ if(st) st.textContent='Escreva o pedido — ex.: "corrija a lateralidade para esquerdo" ou "gere o laudo de novo mais sucinto".'; return; }
+  if(!cfg.chave){ if(st) st.textContent='Configure a chave da API em Configurações para usar a IA.'; return; }
+  if(btn) btn.disabled=true;
+  if(st) st.textContent='🤖 Aplicando: “'+inst.slice(0,90)+(inst.length>90?'…':'')+'”';
+  try{
+    var L=ex.laudo;
+    var atual=textoEditadoLaudo();
+    var prompt="Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Um laudo está em revisão e o médico pediu um ajuste.\n\n"
+      +"LAUDO ATUAL (como está na tela, já com as edições do médico; sem marcações de negrito):\nTÍTULO: "+(L.titulo||'')+"\n"+atual+"\n\n"
+      +"VERSÃO ESTRUTURADA (com ** de negrito — referência de formato e de quais trechos vão em negrito):\nCORPO:\n"+(L.corpo||'')+"\nCONCLUSÃO: "+(L.conclusao||'')+"\n\n"
+      +"PEDIDO DO MÉDICO (cumpra exatamente; altere SOMENTE o necessário e preserve todo o resto do laudo):\n"+inst+"\n\n"
+      +"REGRAS: mantenha o estilo, a ortografia e a estrutura do laudo; achados patológicos em **negrito**; exatamente UMA linha em branco entre parágrafos; NUNCA invente medidas ou achados que não foram pedidos nem constem do laudo; se o pedido for para gerar um novo laudo, gere-o completo mantendo o mesmo modelo e cabeçalho.\n\n"
+      +"Responda SOMENTE em JSON válido: {\"titulo\":\"\",\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"}";
+    var resp=await openai([{type:'text',text:prompt}]);
+    if(!resp || (!resp.corpo && !resp.conclusao && !resp.titulo)) throw new Error('a IA devolveu uma resposta vazia — tente de novo');
+    if(resp.titulo) L.titulo=resp.titulo;
+    if(resp.corpo) L.corpo=resp.corpo;
+    if(resp.conclusao) L.conclusao=resp.conclusao;
+    L.obs=resp.observacoes_para_o_medico||'';
+    ex.laudoBaseTexto=textoBaseLaudo(L);   // atualiza a base p/ o loop de aprendizado não confundir mudança da IA com correção do médico
+    abrirRevisao(exId);
+    if(inp) inp.value='';
+    var stOk=document.getElementById('revChatStatus'); if(stOk) stOk.textContent='✅ Ajuste aplicado — confira o laudo.';
+  }catch(e){ var stE2=document.getElementById('revChatStatus'); if(stE2) stE2.textContent='⚠️ Falha: '+e.message; }
+  if(btn) btn.disabled=false;
+}
 function abrirRevisao(exId, semTela){
   const ex = exames.find(e=>e.id===exId);
   if(!ex || !ex.laudo){ log('Gere o laudo antes de abrir a revisão.', true); return; }
@@ -2289,6 +2355,7 @@ function abrirRevisao(exId, semTela){
   document.getElementById('telaRevisao').style.display='block';
   window.scrollTo(0,0);
   montarRevMidia(exId);
+  revPreencherModelos(ex.tipo||'');
   _mostrarBotoesRev(true);
   }
 }
@@ -2390,6 +2457,7 @@ function fecharRevisao(){
 }
 function _mostrarBotoesRev(visivel){
   ['btnFundo','btnLiberar','btnAprender'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display=visivel?'inline-block':'none'; });
+  var iw=document.getElementById('revIaWrap'); if(iw) iw.style.display=visivel?'block':'none';
   if(!visivel){ var aw=document.getElementById('revAudioWrap'); if(aw) aw.style.display='none'; var di=document.getElementById('revMidiaImg'); if(di) di.style.display='none'; }
 }
 function montarRevMidia(exId){

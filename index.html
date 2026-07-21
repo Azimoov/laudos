@@ -536,8 +536,8 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
     <div id="revIaWrap" style="display:none;max-width:760px;margin:0 auto 10px;padding:8px 10px;background:#f4f7fa;border-radius:10px">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <label for="revModeloSel" style="font-size:12px;font-weight:600">Modelo do laudo:</label>
-        <select id="revModeloSel" style="flex:1;min-width:160px;max-width:340px"></select>
-        <button class="btn peq sec" onclick="revRegerarModelo()">🔄 Regerar com este modelo</button>
+        <select id="revModeloSel" style="flex:1;min-width:160px;max-width:340px" onchange="revAplicarModelo()"></select>
+        <button class="btn peq sec" onclick="revRegerarModelo()">🤖 Regerar com IA (ditado + imagens)</button>
       </div>
       <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap">
         <input id="revChatTxt" type="text" placeholder="Peça à IA — ex.: acrescente cisto renal simples de 8 mm à direita" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid #c8d0da;border-radius:8px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();revChatEnviar();}">
@@ -2297,6 +2297,21 @@ function revPreencherModelos(tipo){
   var ks=Object.keys(MODELOS).sort(function(a,b){ return String(MODELOS[a].nome||a).localeCompare(String(MODELOS[b].nome||b),'pt-BR',{sensitivity:'base'}); });
   sel.innerHTML=ks.map(function(k){ return '<option value="'+k+'"'+(k===tipo?' selected':'')+'>'+(MODELOS[k].nome||k)+'</option>'; }).join('');
 }
+function revAplicarModelo(){
+  // trocar o modelo no seletor SOBREPÕE a folha com o modelo em branco na hora (sem IA, sem custo);
+  // o botão "Regerar com IA" continua p/ preencher a partir do ditado + imagens
+  var exId=window.__revAtual&&window.__revAtual.exId!=null?window.__revAtual.exId:null; if(exId==null) return;
+  var ex=exames.find(function(e){return e.id===exId;}); if(!ex||!ex.laudo) return;
+  var sel=document.getElementById('revModeloSel'); var novo=sel?sel.value:''; if(!novo||!MODELOS[novo]||novo===ex.tipo) return;
+  if(!confirm('Substituir a folha pelo modelo "'+(MODELOS[novo].nome||novo)+'"?\n\nO texto atual será sobreposto pelo modelo em branco (pontilhados). O cabeçalho do paciente é mantido.')){ if(sel) sel.value=ex.tipo||''; return; }
+  var mod=MODELOS[novo];
+  ex.tipo=novo; ex._liberado=false;
+  var L=ex.laudo;
+  L.titulo=mod.titulo; L.tecnica=mod.tecnica; L.corpo=mod.corpo; L.conclusao=mod.conclusao; L.extra=mod.extra||''; L.obs='';
+  ex.laudoBaseTexto=textoBaseLaudo(L);
+  abrirRevisao(exId);
+  var st=document.getElementById('revChatStatus'); if(st) st.textContent='📄 Modelo '+(MODELOS[novo].nome||novo)+' aplicado — edite os pontilhados ou use "Regerar com IA" p/ preencher pelo ditado.';
+}
 async function revRegerarModelo(){
   var exId=window.__revAtual&&window.__revAtual.exId!=null?window.__revAtual.exId:null; if(exId==null) return;
   var ex=exames.find(function(e){return e.id===exId;}); if(!ex) return;
@@ -2361,7 +2376,7 @@ function abrirRevisao(exId, semTela){
   document.getElementById('areaImpressao').innerHTML =
   _folhaAbre
   +'<div class="laudoCab"><div contenteditable="true"><b>Nome do Paciente:</b>'+(c.nome||'')+'<br><b>Idade:</b> '+(c.idade||'')+'<br><b>Realizado em:</b> '+(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+(c.dados_clinicos||'')+'</div></div>'
-  +'<div class="laudoCorpoBox"><div class="laudoTitulo">'+L.titulo+'</div>'
+  +'<div class="laudoCorpoBox"><div class="laudoTitulo" contenteditable="true">'+L.titulo+'</div>'
   +'<div class="laudoTexto" contenteditable="true">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n'))
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')

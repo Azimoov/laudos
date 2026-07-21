@@ -881,7 +881,8 @@ function latDoAudio(a, tipoAudio){
 }
 function vincularAudios(){
   for(const a of audios){ a.exameId=null; a.score=0; a.pendente=true;
-    var tipoAudio=mapTipo(a.tipoExame); if(!tipoAudio) tipoAudio=mapTipo(nomeArquivoLimpo(a.nome));
+    var tipoAudio=mapTipo(a.tipoExame);
+    if(!tipoAudio){ var nmArq=nomeArquivoLimpo(a.nome); if(norm(nmArq).length>=4) tipoAudio=mapTipo(nmArq); } // guarda: nome muito curto casa errado (ex.: "b" ⊂ "Abdome total")
     const latA=latDoAudio(a, tipoAudio);
     var fontes=[a.nomePaciente, nomeArquivoLimpo(a.nome)].filter(function(x){ return x && tokensNome(x).length; });
     const fonteToks=fontes.map(function(s){ return tokensNome(s); });
@@ -903,12 +904,14 @@ function vincularAudios(){
       if(latMatch) s+=0.30;
       cands.push({ex:ex, s:s});
     }
-    if(!cands.length) continue;
+    if(!cands.length){ a._motivo='nenhum candidato: '+(fontes.length?'nome "'+(a.nomePaciente||nomeArquivoLimpo(a.nome))+'" não bateu com nenhum exame':'áudio sem nome de paciente')+(tipoAudio?' (tipo '+tipoAudio+(latA?' '+latA:' sem lado')+')':' e sem tipo reconhecido'); continue; }
     cands.sort(function(x,y){ return y.s-x.s; });
     const best=cands[0]; const second=cands[1];
     const ambiguo = !!second && (best.s-second.s)<0.15;
     a.score=best.s;
     if(best.s>=LIMIAR_VINCULO && !ambiguo){ a.exameId=best.ex.id; a.pendente=false; best.ex.audios.push(a.idx); if(!best.ex.tipo&&tipoAudio) best.ex.tipo=tipoAudio; }
+    else if(ambiguo){ a._motivo='empate entre "'+best.ex.paciente+'" ('+best.s.toFixed(2)+') e "'+second.ex.paciente+'" ('+second.s.toFixed(2)+')'; }
+    else { a._motivo='melhor: "'+best.ex.paciente+'" score '+best.s.toFixed(2)+' < limiar '+LIMIAR_VINCULO; }
   }
 }
 function vincularManual(idx, exId){
@@ -927,7 +930,8 @@ function renderPendentes(){
     +'<p class="aviso">Por segurança, só vinculei automaticamente os áudios de alta certeza. Escolha o exame de cada áudio abaixo (ou deixe em branco para ignorar).</p>'
     +pend.map(function(a){ return '<div style="border:1px solid #e3cda0;border-radius:9px;padding:8px 10px;margin-top:6px">'
         +'<div style="font-size:13px"><b>🎙 '+String(a.nome||'').replace(/</g,'&lt;')+'</b> — disse: <i>'+(String(a.nomePaciente||'').replace(/</g,'&lt;')||'(paciente não citado)')+(a.tipoExame?' / '+String(a.tipoExame).replace(/</g,'&lt;'):'')+'</i></div>'
-        +'<div class="aviso" style="margin:3px 0">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;').slice(0,160))+'</div>'+(a.url?'<div style="margin:5px 0">'+playerLinha(a.url)+'</div>':'')
+        +'<div class="aviso" style="margin:3px 0">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;').slice(0,160))+'</div>'
+        +(a._motivo?'<div class="aviso" style="margin:3px 0;color:#9a6b14">↳ por quê: '+String(a._motivo).replace(/</g,'&lt;')+'</div>':'')+(a.url?'<div style="margin:5px 0">'+playerLinha(a.url)+'</div>':'')
         +'<select onchange="vincularManual('+a.idx+', this.value)"><option value="">— escolher exame —</option>'+opts+'</select>'
         +'</div>'; }).join('')
     +'</div>';

@@ -802,7 +802,7 @@ function norm(s){
 /* ============ Fluxo principal ============ */
 /* ============ Agrupamento por imagem (visão) + vínculo de áudios ============ */
 const LIMIAR_VINCULO = 0.35;  // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual. A guarda de ambiguidade (best-second<MARGEM_EMPATE) continua protegendo contra vínculo ao paciente errado quando há 2+ candidatos parecidos.
-const MARGEM_EMPATE = 0.10;   // diferença mínima entre o 1º e o 2º candidato p/ o app decidir sozinho
+const MARGEM_EMPATE = 0.01;   // só empate DE VERDADE (scores praticamente iguais) vai p/ revisão; 1,00 vs 0,94 decide sozinho (pedido do médico 2026-07-20)
 const MERGE_LEV = 2;          // tolerância (edições) p/ fundir nomes quase iguais no agrupamento
 const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edite à vontade)
   abdominal:['abdome total','abdomen total','abd total','abdominal total','abdominal','abdome'],
@@ -889,7 +889,7 @@ function latDoAudio(a, tipoAudio){
   return normLateralidade(a.lateralidade||'') || normLateralidade(a.nome||'') || normLateralidade(a.transcricao||'');
 }
 function vincularAudios(){
-  for(const a of audios){ a.exameId=null; a.score=0; a.pendente=true;
+  for(const a of audios){ a.exameId=null; a.score=0; a.pendente=true; a._cands=null; a._motivo='';
     var tipoAudio=mapTipo(a.tipoExame);
     if(!tipoAudio){ var nmArq=nomeArquivoLimpo(a.nome); if(norm(nmArq).length>=4) tipoAudio=mapTipo(nmArq); } // guarda: nome muito curto casa errado (ex.: "b" ⊂ "Abdome total")
     const latA=latDoAudio(a, tipoAudio);
@@ -915,6 +915,7 @@ function vincularAudios(){
     }
     if(!cands.length){ a._motivo='nenhum candidato: '+(fontes.length?'nome "'+(a.nomePaciente||nomeArquivoLimpo(a.nome))+'" não bateu com nenhum exame':'áudio sem nome de paciente')+(tipoAudio?' (tipo '+tipoAudio+(latA?' '+latA:' sem lado')+')':' e sem tipo reconhecido'); continue; }
     cands.sort(function(x,y){ return y.s-x.s; });
+    a._cands=cands.slice(0,3).map(function(c){ return {id:c.ex.id, s:c.s}; });   // top 3 p/ o cartão de revisão (fotos + usar este)
     const best=cands[0]; const second=cands[1];
     const ambiguo = !!second && (best.s-second.s)<MARGEM_EMPATE;
     a.score=best.s;
@@ -932,6 +933,16 @@ function vincularManual(idx, exId){
   else { const ex=exames.find(function(e){return e.id===Number(exId);}); if(ex){ a.exameId=ex.id; a.pendente=false; ex.audios.push(idx); if(!ex.tipo){ const tt=mapTipo(a.tipoExame); if(tt) ex.tipo=tt; } } }
   renderExames();
 }
+function verFotosPendente(aIdx, exId){
+  var box=document.getElementById('pfot'+aIdx); if(!box) return;
+  if(box.dataset.ex===String(exId) && box.style.display!=='none'){ box.style.display='none'; return; }   // 2º clique fecha
+  var ex=exames.find(function(e){return e.id===Number(exId);}); if(!ex) return;
+  box.dataset.ex=String(exId);
+  var fotos=(ex.imagens||[]).slice(0,8).map(function(im){ return '<img src="'+im+'" style="height:90px;border-radius:6px;border:1px solid #c8d0da;cursor:pointer" onclick="ampliarImg(this)">'; }).join('');
+  box.innerHTML='<b style="font-size:12px">'+String(ex.paciente||'(sem nome)').replace(/</g,'&lt;')+(ex.lateralidade?' · '+ex.lateralidade:'')+' — '+((ex.imagens||[]).length)+' foto(s), toque para ampliar:</b>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+(fotos||'<span class="aviso">(exame sem fotos)</span>')+'</div>';
+  box.style.display='block';
+}
 function renderPendentes(){
   const pend=audios.filter(function(a){return a.exameId==null;});
   if(!pend.length) return '';
@@ -939,10 +950,23 @@ function renderPendentes(){
   return '<div class="card" style="border:2px solid #d99a26;background:#fdf6e9">'
     +'<h2 style="color:#9a6b14">⚠️ '+pend.length+' áudio(s) sem vínculo seguro — revise</h2>'
     +'<p class="aviso">Por segurança, só vinculei automaticamente os áudios de alta certeza. Escolha o exame de cada áudio abaixo (ou deixe em branco para ignorar).</p>'
-    +pend.map(function(a){ return '<div style="border:1px solid #e3cda0;border-radius:9px;padding:8px 10px;margin-top:6px">'
+    +pend.map(function(a){
+        var candsHtml='';
+        if(a._cands && a._cands.length){
+          candsHtml='<div style="margin:5px 0;display:flex;flex-direction:column;gap:4px">'+a._cands.map(function(c){
+            var e=exames.find(function(x){return x.id===c.id;}); if(!e) return '';
+            var rot=(e.paciente||'(sem nome)')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+(e.lateralidade?' ('+e.lateralidade+')':'');
+            return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px"><span>'+rot.replace(/</g,'&lt;')+' <span class="tag">'+c.s.toFixed(2)+'</span></span>'
+              +'<button class="btn peq sec" onclick="verFotosPendente('+a.idx+','+c.id+')">📷 fotos</button>'
+              +'<button class="btn peq" onclick="vincularManual('+a.idx+','+c.id+')">✔ usar este</button></div>';
+          }).join('')+'</div>';
+        }
+        return '<div style="border:1px solid #e3cda0;border-radius:9px;padding:8px 10px;margin-top:6px">'
         +'<div style="font-size:13px"><b>🎙 '+String(a.nome||'').replace(/</g,'&lt;')+'</b> — disse: <i>'+(String(a.nomePaciente||'').replace(/</g,'&lt;')||'(paciente não citado)')+(a.tipoExame?' / '+String(a.tipoExame).replace(/</g,'&lt;'):'')+'</i></div>'
         +'<div class="aviso" style="margin:3px 0">'+((a.transcricao||'(sem transcrição)').replace(/</g,'&lt;').slice(0,160))+'</div>'
         +(a._motivo?'<div class="aviso" style="margin:3px 0;color:#9a6b14">↳ por quê: '+String(a._motivo).replace(/</g,'&lt;')+'</div>':'')+(a.url?'<div style="margin:5px 0">'+playerLinha(a.url)+'</div>':'')
+        +candsHtml
+        +'<div id="pfot'+a.idx+'" style="display:none;background:#fff;border:1px solid #e3cda0;border-radius:8px;padding:6px;margin:4px 0"></div>'
         +'<select onchange="vincularManual('+a.idx+', this.value)"><option value="">— escolher exame —</option>'+opts+'</select>'
         +'</div>'; }).join('')
     +'</div>';

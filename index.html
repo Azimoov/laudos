@@ -488,6 +488,12 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 
 <div id="areaComum" style="border-top:2px solid #c8d0da;padding-top:12px;margin-top:6px">
   <button class="btn" id="btnProcessar" onclick="processar()">2 · Processar (transcrever e associar)</button>
+  <div id="progVinc" style="display:none;margin:12px 0">
+    <div style="height:16px;background:#dfe6ee;border-radius:9px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.12)">
+      <div id="progVincBar" style="height:100%;width:0%;background:linear-gradient(90deg,#2563eb,#0d9494);border-radius:9px;transition:width .35s ease"></div>
+    </div>
+    <div id="progVincTxt" style="text-align:center;font-size:13px;font-weight:600;margin-top:5px;color:#2563eb">Vinculando… 0%</div>
+  </div>
   <div class="log" id="log"></div>
 </div>
 </main>
@@ -662,6 +668,10 @@ async function openai(conteudo, querJson=true, opts){
 }
 
 const MODELOS_TRANSCRICAO = ['gpt-4o-transcribe','gpt-4o-mini-transcribe','whisper-1'];
+// Enviesa a transcrição para o vocabulário de ultrassonografia (pt-BR). Reduz erros como
+// "epatomegalia"→"hepatomegalia", "rei direito"→"rim direito". Lista de termos (não frases)
+// p/ minimizar risco de alucinação; whisper usa ~os últimos 224 tokens.
+const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em português do Brasil. Vocabulário: ecogenicidade, ecotextura, hipoecogênico, hiperecogênico, anecoico, isoecoico, parênquima, hepatomegalia, esteatose hepática, colelitíase, colecistite, colecistectomia, colédoco, veia porta, esplenomegalia, pancreatite, rim direito, rim esquerdo, hidronefrose, nefrolitíase, pielocalicial, resíduo pós-miccional, próstata, vesículas seminais, bexiga, endométrio, miométrio, mioma, adenomiose, folículo, corpo lúteo, saco gestacional, tireoide, istmo, TI-RADS, BI-RADS, linfonodo, Doppler colorido, estenose, ateromatose, trombose venosa profunda, safena magna, carótida, poplítea, tendinopatia, tenossinovite, bursite, cisto de Baker, hérnia inguinal, hérnia umbilical, diástase dos retos, manguito rotador.";
 async function transcreverAudio(arquivoOuBlob){
   const wav = await audioParaWavBlob(arquivoOuBlob);
   let texto=null, ultimoErro=null;
@@ -672,6 +682,7 @@ async function transcreverAudio(arquivoOuBlob){
         fd.append('file', wav, 'audio.wav');
         fd.append('model', m);
         fd.append('language', 'pt');
+        fd.append('prompt', PROMPT_TRANSCRICAO_USG);
         fd.append('response_format', 'json');
         return fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+cfg.chave}, body:fd});
       }, 'transcrição ('+m+')');
@@ -790,7 +801,7 @@ function norm(s){
 }
 /* ============ Fluxo principal ============ */
 /* ============ Agrupamento por imagem (visão) + vínculo de áudios ============ */
-const LIMIAR_VINCULO = 0.6;   // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual
+const LIMIAR_VINCULO = 0.45;  // score mínimo p/ vincular áudio automaticamente; abaixo disso => revisão manual. A guarda de ambiguidade (best-second<0,15) continua protegendo contra vínculo ao paciente errado quando há 2+ candidatos parecidos.
 const MERGE_LEV = 2;          // tolerância (edições) p/ fundir nomes quase iguais no agrupamento
 const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edite à vontade)
   abdominal:['abdome total','abdomen total','abd total','abdominal total','abdominal','abdome'],
@@ -829,12 +840,12 @@ function reduzImagem(dataUrl, maxW){ return new Promise(function(res){ const img
   img.onload=function(){ const esc=Math.min(1, maxW/img.width); const c=document.createElement('canvas'); c.width=Math.round(img.width*esc); c.height=Math.round(img.height*esc); c.getContext('2d').drawImage(img,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',0.6)); };
   img.onerror=function(){ res(dataUrl); }; img.src=dataUrl; }); }
 async function extrairMetaImagem(dataUrl){
-  const p='Leia APENAS o texto impresso pelo aparelho de ultrassom nesta imagem (cabecalho/legenda do equipamento). Extraia o nome do paciente exatamente como impresso e o tipo de exame, se visiveis. Nao infira nem invente: se nao conseguir ler, devolva vazio com confianca baixa. Responda apenas com um objeto JSON com as chaves paciente (texto), tipoExame (texto) e confianca (numero de 0 a 1).';
+  const p='Leia APENAS o texto impresso pelo aparelho de ultrassom nesta imagem (cabecalho/legenda do equipamento). Extraia: o nome do paciente exatamente como impresso; o tipo de exame; e a LATERALIDADE (o lado examinado) se estiver visivel no texto impresso ou no marcador de lado (ex.: "D", "E", "DIR", "ESQ", "RIGHT", "LEFT", "joelho D"). Nao infira nem invente: se nao conseguir ler, devolva vazio com confianca baixa. Responda apenas com um objeto JSON com as chaves paciente (texto), tipoExame (texto), lateralidade (um de: "direito", "esquerdo", "bilateral" ou "") e confianca (numero de 0 a 1).';
   let r=null;
   try{ r=await openai([{type:'text',text:p}, dataUrlParaParte(await reduzImagem(dataUrl,900))]); }catch(e){ r=null; }
-  let meta={paciente:(r&&r.paciente)||'', tipoExame:(r&&r.tipoExame)||'', confianca:(r&&typeof r.confianca==='number')?r.confianca:0};
+  let meta={paciente:(r&&r.paciente)||'', tipoExame:(r&&r.tipoExame)||'', lateralidade:normLateralidade((r&&r.lateralidade)||''), confianca:(r&&typeof r.confianca==='number')?r.confianca:0};
   if(!meta.paciente || meta.confianca<0.4){
-    try{ const r2=await openai([{type:'text',text:p}, dataUrlParaParte(dataUrl)]); if(r2&&r2.paciente){ meta={paciente:r2.paciente, tipoExame:r2.tipoExame||meta.tipoExame, confianca:(typeof r2.confianca==='number')?r2.confianca:0.5}; } }catch(e){}
+    try{ const r2=await openai([{type:'text',text:p}, dataUrlParaParte(dataUrl)]); if(r2&&r2.paciente){ meta={paciente:r2.paciente, tipoExame:r2.tipoExame||meta.tipoExame, lateralidade:normLateralidade(r2.lateralidade||meta.lateralidade), confianca:(typeof r2.confianca==='number')?r2.confianca:0.5}; } }catch(e){}
   }
   return meta;
 }
@@ -842,15 +853,17 @@ function agruparItens(itens){
   const grupos=[];
   for(const it of itens){
     const tipoChave=mapTipo(it.tipoExame); const pNorm=norm(it.paciente);
-    let g = pNorm ? grupos.find(function(x){ const mt=(x.tipo===tipoChave)||(!x.tipo&&!tipoChave); if(!mt||!x.chaveP) return false; return x.chaveP===pNorm||levenshtein(x.chaveP,pNorm)<=MERGE_LEV; }) : null;
-    if(!g){ const base=it.nomeArquivo&&it.nomeArquivo.indexOf('.')>=0 ? it.nomeArquivo.split('.').slice(0,-1).join('.') : (it.nomeArquivo||''); g={chaveP:pNorm, tipo:tipoChave, paciente:it.paciente||base, imagens:[], confs:[], dataExame:it.dataExame||'', idadeExame:it.idadeExame||''}; grupos.push(g); }
+    const latChave = TIPOS_COM_LATERALIDADE.has(tipoChave) ? normLateralidade(it.lateralidade||'') : '';
+    let g = pNorm ? grupos.find(function(x){ const mt=(x.tipo===tipoChave)||(!x.tipo&&!tipoChave); const ml=(x.lat===latChave)||!x.lat||!latChave; if(!mt||!ml||!x.chaveP) return false; return x.chaveP===pNorm||levenshtein(x.chaveP,pNorm)<=MERGE_LEV; }) : null;
+    if(!g){ const base=it.nomeArquivo&&it.nomeArquivo.indexOf('.')>=0 ? it.nomeArquivo.split('.').slice(0,-1).join('.') : (it.nomeArquivo||''); g={chaveP:pNorm, tipo:tipoChave, lat:latChave, paciente:it.paciente||base, imagens:[], confs:[], dataExame:it.dataExame||'', idadeExame:it.idadeExame||''}; grupos.push(g); }
     g.imagens=g.imagens.concat(it.imgs); g.confs.push(it.conf||0);
     if((!g.paciente||g.paciente.length<2)&&it.paciente) g.paciente=it.paciente;
     if(!g.tipo&&tipoChave) g.tipo=tipoChave;
+    if(!g.lat&&latChave) g.lat=latChave;
     if(!g.dataExame&&it.dataExame) g.dataExame=it.dataExame;
     if(!g.idadeExame&&it.idadeExame) g.idadeExame=it.idadeExame;
   }
-  return grupos.map(function(g,i){ return {id:i, nomeArquivo:'', paciente:g.paciente, imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:(g.confs.reduce(function(s,c){return s+c;},0)/(g.confs.length||1)), dataExame:g.dataExame||'', idadeExame:g.idadeExame||''}; });
+  return grupos.map(function(g,i){ return {id:i, nomeArquivo:'', paciente:g.paciente, imagens:g.imagens, tipo:g.tipo||'', lateralidade:g.lat||'', audios:[], laudo:null, metaConf:(g.confs.reduce(function(s,c){return s+c;},0)/(g.confs.length||1)), dataExame:g.dataExame||'', idadeExame:g.idadeExame||''}; });
 }function tokensNome(s){ return norm(s).split(' ').filter(function(x){ return x.length>2 && !/^[0-9]+$/.test(x); }); }
 function nomeArquivoLimpo(nm){ return String(nm||'').replace(/\.[a-z0-9]{1,5}$/i,'').replace(/\d{8}[\d\-]*/g,' '); }
 function simNome(alvoToks, candStr){
@@ -862,24 +875,35 @@ function simNome(alvoToks, candStr){
   }
   var ratio=hit/alvoToks.length; if(hit>=2) return 0.85+0.15*ratio; if(hit===1) return 0.5*ratio; return 0;   // 2+ partes do nome batem => forte
 }
+function latDoAudio(a, tipoAudio){
+  if(!TIPOS_COM_LATERALIDADE.has(tipoAudio)) return '';
+  return normLateralidade(a.lateralidade||'') || normLateralidade(a.nome||'') || normLateralidade(a.transcricao||'');
+}
 function vincularAudios(){
   for(const a of audios){ a.exameId=null; a.score=0; a.pendente=true;
+    var tipoAudio=mapTipo(a.tipoExame); if(!tipoAudio) tipoAudio=mapTipo(nomeArquivoLimpo(a.nome));
+    const latA=latDoAudio(a, tipoAudio);
     var fontes=[a.nomePaciente, nomeArquivoLimpo(a.nome)].filter(function(x){ return x && tokensNome(x).length; });
-    if(!fontes.length) continue;
-    const tipoAudio=mapTipo(a.tipoExame);
     const fonteToks=fontes.map(function(s){ return tokensNome(s); });
-    const cands=exames.map(function(ex){
+    const cands=[];
+    for(var e=0;e<exames.length;e++){ var ex=exames[e];
       var alvo=tokensNome(ex.paciente);
       var sp=0; for(var i=0;i<fontes.length;i++){ var v=simNome(alvo, fontes[i]); if(v>sp) sp=v; }
       var subTok=ex.subExame?tokensNome(ex.subExame):[];
       var subHit=subTok.length>0 && fonteToks.some(function(ft){ return ft.some(function(u){ return subTok.some(function(st){ return u===st||u.indexOf(st)===0; }); }); });
-      return {ex:ex, sp:sp, subHit:subHit};
-    }).filter(function(c){return c.sp>0;});
-    if(!cands.length) continue;
-    for(var i=0;i<cands.length;i++){ var c=cands[i]; c.s=c.sp;
-      if(tipoAudio && c.ex.tipo && tipoAudio===c.ex.tipo) c.s+=0.25;
-      if(c.subHit) c.s+=0.2;
+      var tipoMatch=!!(tipoAudio && ex.tipo && tipoAudio===ex.tipo);
+      var latE=normLateralidade(ex.lateralidade||'');
+      var latMatch=!!(latA && latE && (latA===latE || latA==='Bilateral' || latE==='Bilateral'));
+      var latConflito=!!(latA && latE && !latMatch);
+      if(latConflito) continue;                          // SEGURANÇA: nunca vincular lados opostos
+      if(sp<=0 && !(tipoMatch && latMatch)) continue;     // precisa de nome OU (tipo + lado)
+      var s=sp;
+      if(tipoMatch) s+=0.25;
+      if(subHit) s+=0.2;
+      if(latMatch) s+=0.30;
+      cands.push({ex:ex, s:s});
     }
+    if(!cands.length) continue;
     cands.sort(function(x,y){ return y.s-x.s; });
     const best=cands[0]; const second=cands[1];
     const ambiguo = !!second && (best.s-second.s)<0.15;
@@ -897,7 +921,7 @@ function vincularManual(idx, exId){
 function renderPendentes(){
   const pend=audios.filter(function(a){return a.exameId==null;});
   if(!pend.length) return '';
-  const opts=exames.map(function(e){ return '<option value="'+e.id+'">'+(e.paciente||'(sem nome)')+(e.subExame?' - '+e.subExame:'')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+'</option>'; }).join('');
+  const opts=exames.map(function(e){ return '<option value="'+e.id+'">'+(e.paciente||'(sem nome)')+(e.subExame?' - '+e.subExame:'')+(e.tipo&&MODELOS[e.tipo]?' · '+MODELOS[e.tipo].nome:'')+(e.lateralidade?' ('+e.lateralidade+')':'')+'</option>'; }).join('');
   return '<div class="card" style="border:2px solid #d99a26;background:#fdf6e9">'
     +'<h2 style="color:#9a6b14">⚠️ '+pend.length+' áudio(s) sem vínculo seguro — revise</h2>'
     +'<p class="aviso">Por segurança, só vinculei automaticamente os áudios de alta certeza. Escolha o exame de cada áudio abaixo (ou deixe em branco para ignorar).</p>'
@@ -953,6 +977,11 @@ function renderPastaInfo(){
   span.textContent=nimg+' arquivo(s) em '+nomes.length+' paciente(s): '+nomes.slice(0,8).join(', ')+(nomes.length>8?'…':'')+'. Toque em Processar.';
 }
 
+let _progTotal=1, _progFeito=0;
+function progVincShow(total){ _progTotal=Math.max(1,total||1); _progFeito=0; var w=document.getElementById('progVinc'); if(w) w.style.display='block'; progVincSet(); }
+function progVincStep(n){ _progFeito+=(n==null?1:n); progVincSet(); }
+function progVincSet(){ var pct=Math.max(0,Math.min(100, Math.round(100*_progFeito/_progTotal))); var b=document.getElementById('progVincBar'); var t=document.getElementById('progVincTxt'); if(b) b.style.width=pct+'%'; if(t) t.textContent=(pct>=100?'Concluído — 100%':'Vinculando… '+pct+'%'); }
+function progVincHide(){ var w=document.getElementById('progVinc'); if(w) setTimeout(function(){ w.style.display='none'; }, 900); }
 async function processar(){
   const fEx = document.getElementById('inpExames').files;
   const fAu = document.getElementById('inpAudios').files;
@@ -961,10 +990,12 @@ async function processar(){
   if(!cfg.chave){ alternarConfig(); log('Antes de processar, cole sua chave da API em Configurações.', true); return; }
   document.getElementById('btnProcessar').disabled = true;
   exames = []; audios = [];
+  progVincShow(fEx.length + fPasta.length + fAu.length);
   try{
     // 1. preparar exames — ler metadados (visão) de cada imagem e agrupar por paciente+tipo
     const flatItens = [];
     for(let i=0;i<fEx.length;i++){
+      progVincStep();
       const f = fEx[i];
       log('Lendo '+f.name+' ...');
       const ehPdf=(f.type||'').indexOf('pdf')>=0||/\.pdf$/i.test(f.name);
@@ -977,13 +1008,14 @@ async function processar(){
         }
       }
       const imgs = await arquivoParaImagens(f);
-      let meta = {paciente:'', tipoExame:'', confianca:0};
+      let meta = {paciente:'', tipoExame:'', lateralidade:'', confianca:0};
       try{ meta = await extrairMetaImagem(imgs[0]); }catch(e){ log('  leitura da legenda falhou em '+f.name+': '+e.message, true); }
-      flatItens.push({imgs:imgs, nomeArquivo:f.name, paciente:meta.paciente, tipoExame:meta.tipoExame, conf:meta.confianca});
+      flatItens.push({imgs:imgs, nomeArquivo:f.name, paciente:meta.paciente, tipoExame:meta.tipoExame, lateralidade:meta.lateralidade||'', conf:meta.confianca});
       log('  → '+(meta.paciente||'(nome ilegível)')+' | '+(meta.tipoExame||'tipo?')+' ['+Math.round((meta.confianca||0)*100)+'%]');
     }
     const folderMap={}; const folderOrder=[];
     for(let i=0;i<fPasta.length;i++){
+      progVincStep();
       const ff=fPasta[i]; const tp=ff.type||''; const ehPdf=tp.indexOf('pdf')>=0||/\.pdf$/i.test(ff.name);
       if(tp.indexOf('image')!==0 && !ehPdf) continue;
       const rel=ff.webkitRelativePath||''; const pp=rel.split('/'); const folder=(pp.slice(0,-1).join('/'))||ff.name; const __pac=pp.length>=3?pp[pp.length-3]:(pp.length>=2?pp[pp.length-2]:ff.name); const __sub=pp.length>=2?pp[pp.length-2]:'';
@@ -1012,16 +1044,17 @@ async function processar(){
       }catch(e){}
     }
     exames = agruparItens(flatItens);
-    for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:(g.paciente||fo), subExame:(g.subExame||''), imagens:g.imagens, tipo:g.tipo||'', audios:[], laudo:null, metaConf:1, dataExame:g.data||'', idadeExame:g.idade||''}); }
+    for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:(g.paciente||fo), subExame:(g.subExame||''), imagens:g.imagens, tipo:g.tipo||'', lateralidade:normLateralidade(g.subExame||''), audios:[], laudo:null, metaConf:1, dataExame:g.data||'', idadeExame:g.idade||''}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s) em '+exames.length+' exame(s).');
     // 2. transcrever áudios
     for(let i=0;i<fAu.length;i++){
+      progVincStep();
       const f = fAu[i];
       log('Transcrevendo '+f.name+' ...');
       try{
         const resp = await transcreverAudio(f);
-        audios.push({idx:i, nome:f.name, url:URL.createObjectURL(f), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', exameId:null});
+        audios.push({idx:i, nome:f.name, url:URL.createObjectURL(f), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
         log('Falha no áudio '+f.name+': '+e.message, true);
@@ -1031,13 +1064,15 @@ async function processar(){
     // 2b. ditados guardados no aparelho
     let acum = [];
     try{ acum = (await gravListar()).filter(function(g){return !g._captura;}); }catch(e){ log('Falha ao ler ditados guardados: '+e.message, true); }
+    _progTotal += acum.length; progVincSet();
     for(const g of acum){
+      progVincStep();
       const dtg = new Date(g.quando);
       const rotulo = 'Ditado '+dtg.toLocaleDateString('pt-BR').slice(0,5)+' '+dtg.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
       log('Transcrevendo '+rotulo+' ...');
       try{
-        const resp = (g.transcricao!==undefined) ? {transcricao:g.transcricao, nome_paciente:g.nome_paciente||'', tipo_exame:g.tipo_exame||''} : await transcreverAudio(g.blob);
-        audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', exameId:null});
+        const resp = (g.transcricao!==undefined) ? {transcricao:g.transcricao, nome_paciente:g.nome_paciente||'', tipo_exame:g.tipo_exame||'', lateralidade:g.lateralidade||''} : await transcreverAudio(g.blob);
+        audios.push({idx:audios.length, nome:rotulo, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
         log('Falha em '+rotulo+': '+e.message, true);
@@ -1048,10 +1083,12 @@ async function processar(){
     vincularAudios();
     const _pend = audios.filter(function(a){return a.exameId==null;}).length;
     log('Áudios: '+(audios.length-_pend)+' vinculado(s) com segurança, '+_pend+' p/ revisão manual.');
+    _progFeito=_progTotal; progVincSet(); progVincHide();
     renderExames();
     mostrarAba('exames');
     log('Pronto. Confira as associações abaixo e gere os laudos.');
   }catch(e){
+    progVincHide();
     log('Erro: '+e.message, true);
   }
   document.getElementById('btnProcessar').disabled = false;
@@ -1078,7 +1115,7 @@ function renderExames(){
       +'<div class="aviso" style="margin-top:6px">Comece o ditado pelo <b>nome completo do paciente</b> e, em exames de ombro, cotovelo, punho, mão, joelho, tornozelo, pé ou partes moles, diga a <b>lateralidade</b> (ex.: "ombro direito"). Toque <b>⏹ Parar</b> para pausar e <b>▶ Retomar</b> para continuar do ponto onde parou; <b>✅ Finalizar</b> transcreve. Você pode adicionar fotos ou gravar a qualquer momento, mesmo com o laudo pronto — ao tocar "Refazer laudo", a IA aplica as alterações ditadas.</div>'
       +'</div>';
     html += '<div class="exame">'
-      +'<div class="nome">'+ex.paciente+(ex.subExame?' - '+ex.subExame:'')+' <span class="tag">'+ex.imagens.length+' pág.</span>'
+      +'<div class="nome">'+ex.paciente+(ex.subExame?' - '+ex.subExame:'')+(ex.lateralidade?' · '+ex.lateralidade:'')+' <span class="tag">'+ex.imagens.length+' pág.</span>'
       +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')
       +(ex._falhou?'<span class="tag" style="background:#fde8e8;color:#b3261e">⚠️ laudo falhou — refazer</span>':'')+'</div>'
       +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'

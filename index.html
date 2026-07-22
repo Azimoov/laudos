@@ -183,6 +183,9 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <label>Modelo auxiliar (tarefas simples — ex.: aprendizado)</label>
   <input type="text" id="cfgModeloAux" placeholder="ex.: gpt-5-mini (vazio = usa o modelo acima)">
   <span class="aviso">Modelo barato usado só na extração de regras do aprendizado. Se vazio, usa o modelo principal.</span>
+  <label>Motor de transcrição local (opcional)</label>
+  <input type="text" id="cfgAgenteLocal" placeholder="ex.: http://127.0.0.1:8977 (vazio = transcreve na OpenAI)">
+  <span class="aviso">Se preenchido e o motor local estiver rodando, a transcrição é feita nele (melhor vocabulário médico, áudio não sai da máquina). Se estiver fora do ar, cai automaticamente na OpenAI.</span>
   <label>Médico (assinatura)</label>
   <input type="text" id="cfgMedico" value="Dr. Daniel Serruya">
   <label>CRM</label>
@@ -568,6 +571,7 @@ const cfg = {
   chave: localStorage.getItem('gmk')||'',
   modelo: localStorage.getItem('gmodelo')||'chat-latest',
   modeloAux: localStorage.getItem('gmodaux')||'',
+  agenteLocal: localStorage.getItem('gagente')||'',   // URL do agente local de transcrição (ex.: http://127.0.0.1:8977). Vazio = só OpenAI.
   medico: localStorage.getItem('gmedico')||'Dr. Daniel Serruya',
   crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962',
   assinatura: localStorage.getItem('gass')||''
@@ -588,6 +592,7 @@ function alternarConfig(){
   document.getElementById('cfgChave').value = cfg.chave;
   document.getElementById('cfgModelo').value = cfg.modelo;
   document.getElementById('cfgModeloAux').value = cfg.modeloAux;
+  document.getElementById('cfgAgenteLocal').value = cfg.agenteLocal;
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
   renderRegras();
@@ -629,8 +634,11 @@ function salvarConfig(){
   cfg.chave = document.getElementById('cfgChave').value.trim();
   cfg.modelo = document.getElementById('cfgModelo').value;
   cfg.modeloAux = document.getElementById('cfgModeloAux').value.trim();
+  cfg.agenteLocal = document.getElementById('cfgAgenteLocal').value.trim().replace(/\/+$/,'');
+  _agenteLocalOk = null;   // revalida o agente na próxima transcrição
   cfg.medico = document.getElementById('cfgMedico').value.trim();
   cfg.crm = document.getElementById('cfgCrm').value.trim();
+  localStorage.setItem('gagente',cfg.agenteLocal);
   localStorage.setItem('gmk',cfg.chave); localStorage.setItem('gmodelo',cfg.modelo); localStorage.setItem('gmodaux',cfg.modeloAux);
   localStorage.setItem('gmedico',cfg.medico); localStorage.setItem('gcrm',cfg.crm);
   document.getElementById('cardConfig').style.display='none';
@@ -693,10 +701,37 @@ const MODELOS_TRANSCRICAO = ['gpt-4o-transcribe','gpt-4o-mini-transcribe','whisp
 // "epatomegalia"→"hepatomegalia", "rei direito"→"rim direito". Lista de termos (não frases)
 // p/ minimizar risco de alucinação; whisper usa ~os últimos 224 tokens.
 const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em português do Brasil. Vocabulário: ecogenicidade, ecotextura, hipoecogênico, hiperecogênico, anecoico, isoecoico, parênquima, hepatomegalia, esteatose hepática, colelitíase, colecistite, colecistectomia, colédoco, veia porta, esplenomegalia, pancreatite, rim direito, rim esquerdo, hidronefrose, nefrolitíase, pielocalicial, resíduo pós-miccional, próstata, vesículas seminais, bexiga, endométrio, miométrio, mioma, adenomiose, folículo, corpo lúteo, saco gestacional, tireoide, istmo, TI-RADS, BI-RADS, linfonodo, Doppler colorido, estenose, ateromatose, trombose venosa profunda, safena magna, carótida, poplítea, tendinopatia, tenossinovite, bursite, cisto de Baker, hérnia inguinal, hérnia umbilical, diástase dos retos, manguito rotador.";
+/* Agente local de transcrição (decisão 2026-07-21: web fala com serviço local, cai na OpenAI se ausente).
+   http://127.0.0.1 é permitido a partir de páginas HTTPS (exceção de loopback); LAN/iPhone exige HTTPS+cert. */
+var _agenteLocalOk=null;   // null=não checado · true/false=cache da sessão
+async function agenteLocalDisponivel(){
+  if(_agenteLocalOk!==null) return _agenteLocalOk;
+  var base=(cfg.agenteLocal||'').trim(); if(!base){ _agenteLocalOk=false; return false; }
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},1000);
+    var r=await fetch(base.replace(/\/+$/,'')+'/health',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json(); _agenteLocalOk=!!(j&&j.ok);
+  }catch(e){ _agenteLocalOk=false; }
+  return _agenteLocalOk;
+}
+async function transcreverLocal(wavBlob){
+  var base=(cfg.agenteLocal||'').trim().replace(/\/+$/,'');
+  var b64=await new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=function(){rej(fr.error);}; fr.readAsDataURL(wavBlob); });
+  var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},120000);
+  var r=await fetch(base+'/transcrever',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64:b64}),signal:ctrl.signal}); clearTimeout(t);
+  var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'agente local falhou');
+  return j.texto||'';
+}
 async function transcreverAudio(arquivoOuBlob){
   const wav = await audioParaWavBlob(arquivoOuBlob);
   let texto=null, ultimoErro=null;
-  for(const m of MODELOS_TRANSCRICAO){
+  // 1) motor LOCAL primeiro (se o agente estiver rodando): melhor vocabulário médico, áudio não sai da máquina
+  if(await agenteLocalDisponivel()){
+    try{ var tl=await transcreverLocal(wav); if(tl && tl.trim()) texto=tl; }
+    catch(e){ ultimoErro='local: '+((e&&e.message)||e); _agenteLocalOk=null; /* revalida na próxima; cai na OpenAI agora */ }
+  }
+  // 2) fallback OpenAI
+  if(texto===null) for(const m of MODELOS_TRANSCRICAO){
     try{
       const r = await fetchRetentativa(function(){
         const fd = new FormData();

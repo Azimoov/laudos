@@ -185,7 +185,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <span class="aviso">Modelo barato usado só na extração de regras do aprendizado. Se vazio, usa o modelo principal.</span>
   <label>Motor de transcrição local (opcional)</label>
   <input type="text" id="cfgAgenteLocal" placeholder="ex.: http://127.0.0.1:8977 (vazio = transcreve na OpenAI)">
-  <span class="aviso">Se preenchido e o motor local estiver rodando, a transcrição é feita nele (melhor vocabulário médico, áudio não sai da máquina). Se estiver fora do ar, cai automaticamente na OpenAI.</span>
+  <span class="aviso">Serviço que roda no computador da clínica. Se preenchido e ativo, a <b>transcrição</b> é feita nele (melhor vocabulário médico, áudio não sai da máquina); se estiver fora do ar, cai automaticamente na OpenAI. A busca de exames por <b>DICOM</b> usa este endereço (ou <span class="mono">http://127.0.0.1:8977</span> quando vazio).</span>
   <label>Médico (assinatura)</label>
   <input type="text" id="cfgMedico" value="Dr. Daniel Serruya">
   <label>CRM</label>
@@ -228,6 +228,15 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 <div class="aba-conteudo" id="pane-acumulados" style="display:none">
 <div class="card">
   <h2>1 · Arquivos acumulados</h2>
+  <div class="filebox" id="boxDicom" style="border-color:#1f7a3d">
+    <b>🩻 Exames do aparelho (DICOM)</b><br>
+    <span class="aviso">As imagens que o ultrassom enviou chegam com <b>nome, idade e data</b> já preenchidos — sem precisar ler a legenda.</span>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center">
+      <button class="btn" type="button" onclick="dicomBuscar()">🔍 Buscar exames do aparelho</button>
+      <span id="dicomInfo" class="aviso"></span>
+    </div>
+    <div id="dicomLista" style="margin-top:8px"></div>
+  </div>
   <div class="filebox">
     <b>Fotos dos exames</b> (PDF ou foto — pode selecionar vários)
     <input type="file" id="inpExames" accept="application/pdf,image/*" multiple>
@@ -701,8 +710,11 @@ const MODELOS_TRANSCRICAO = ['gpt-4o-transcribe','gpt-4o-mini-transcribe','whisp
 // "epatomegalia"→"hepatomegalia", "rei direito"→"rim direito". Lista de termos (não frases)
 // p/ minimizar risco de alucinação; whisper usa ~os últimos 224 tokens.
 const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em português do Brasil. Vocabulário: ecogenicidade, ecotextura, hipoecogênico, hiperecogênico, anecoico, isoecoico, parênquima, hepatomegalia, esteatose hepática, colelitíase, colecistite, colecistectomia, colédoco, veia porta, esplenomegalia, pancreatite, rim direito, rim esquerdo, hidronefrose, nefrolitíase, pielocalicial, resíduo pós-miccional, próstata, vesículas seminais, bexiga, endométrio, miométrio, mioma, adenomiose, folículo, corpo lúteo, saco gestacional, tireoide, istmo, TI-RADS, BI-RADS, linfonodo, Doppler colorido, estenose, ateromatose, trombose venosa profunda, safena magna, carótida, poplítea, tendinopatia, tenossinovite, bursite, cisto de Baker, hérnia inguinal, hérnia umbilical, diástase dos retos, manguito rotador.";
-/* Agente local de transcrição (decisão 2026-07-21: web fala com serviço local, cai na OpenAI se ausente).
+/* Agente local (decisão 2026-07-21: web fala com serviço local, cai na nuvem se ausente).
+   Faz duas coisas: transcrição com dicionário de USG e ponte com o Orthanc (DICOM).
    http://127.0.0.1 é permitido a partir de páginas HTTPS (exceção de loopback); LAN/iPhone exige HTTPS+cert. */
+const AGENTE_PADRAO = 'http://127.0.0.1:8977';
+function agenteBase(){ return ((cfg.agenteLocal||'').trim().replace(/\/+$/,'')) || AGENTE_PADRAO; }
 var _agenteLocalOk=null;   // null=não checado · true/false=cache da sessão
 async function agenteLocalDisponivel(){
   if(_agenteLocalOk!==null) return _agenteLocalOk;
@@ -1067,6 +1079,73 @@ async function salvarTodosDitados(){
 // extensões que claramente NÃO são áudio (rejeita só estas; o resto numa pasta de "áudios" é aceito)
 var EXT_NAO_AUDIO = /\.(jpe?g|png|gif|bmp|webp|heic|heif|tiff?|svg|pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|7z|exe|dll|dcm|json|xml|html?|mp4|mov|avi|mkv|wmv)$/i;
 var EXT_AUDIO = /\.(m4a|m4b|mp3|wav|wave|ogg|oga|webm|weba|aac|opus|flac|caf|amr|3gp|3gpp|aiff?|aifc|wma|mpga|mpeg|mp2)$/i;
+/* ====== Exames do aparelho via DICOM (agente local → Orthanc) ======
+   O Orthanc não envia CORS, por isso o navegador fala com o AGENTE, que faz a ponte. */
+var dicomEstudos=[], dicomProntos=[];   // listados · importados (viram exames no Processar)
+function dicomInfoTxt(t){ var s=document.getElementById('dicomInfo'); if(s) s.textContent=t; }
+async function dicomBuscar(){
+  dicomInfoTxt('Procurando exames…');
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},15000);
+    var r=await fetch(agenteBase()+'/dicom/estudos',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json();
+    if(!j||!j.ok) throw new Error((j&&j.erro)||'resposta inválida');
+    dicomEstudos=j.estudos||[];
+    dicomInfoTxt(dicomEstudos.length?(dicomEstudos.length+' exame(s) no aparelho'):'Nenhum exame no aparelho ainda.');
+    dicomRender();
+  }catch(e){
+    dicomEstudos=[]; dicomRender();
+    var msg=(e&&e.name==='AbortError')?'o agente não respondeu a tempo':((e&&e.message)||e);
+    dicomInfoTxt('Não consegui falar com o agente ('+msg+').');
+    document.getElementById('dicomLista').innerHTML='<div class="aviso" style="border:1px solid #d99a26;background:#fdf6e9;border-radius:8px;padding:8px 10px;color:#9a6b14">O agente local precisa estar rodando no computador da clínica (endereço em Configurações; padrão '+AGENTE_PADRAO+').</div>';
+  }
+}
+function dicomRender(){
+  var div=document.getElementById('dicomLista'); if(!div) return;
+  if(!dicomEstudos.length){ div.innerHTML=''; return; }
+  div.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
+      +'<button class="btn peq sec" type="button" onclick="dicomMarcarTodos(true)">marcar todos</button>'
+      +'<button class="btn peq sec" type="button" onclick="dicomMarcarTodos(false)">desmarcar</button>'
+      +'<button class="btn peq" type="button" onclick="dicomImportar()">⬇ Importar selecionados</button></div>'
+    + dicomEstudos.map(function(e,i){
+        var jaImportado=dicomProntos.some(function(p){return p.id===e.id;});
+        return '<label style="display:flex;gap:8px;align-items:center;font-weight:400;border:1px solid #c8d0da;border-radius:8px;padding:7px 10px;margin-top:4px'+(jaImportado?';opacity:.6':'')+'">'
+          +'<input type="checkbox" class="dicomChk" data-i="'+i+'"'+(jaImportado?' disabled':'')+'>'
+          +'<span style="flex:1;min-width:140px;font-size:13px"><b>'+String(e.paciente||'(sem nome)').replace(/</g,'&lt;')+'</b>'
+          +'<span class="aviso"> · '+(e.idade!==''&&e.idade!=null?e.idade+' anos · ':'')+(e.data||'')+(e.hora?' '+e.hora:'')+' · '+e.nImagens+' imagem(ns)'+(jaImportado?' · <b>já importado</b>':'')+'</span></span></label>';
+      }).join('');
+}
+function dicomMarcarTodos(v){ var cs=document.querySelectorAll('.dicomChk'); for(var i=0;i<cs.length;i++){ if(!cs[i].disabled) cs[i].checked=v; } }
+async function dicomBaixarImagem(instanciaId){
+  var r=await fetch(agenteBase()+'/dicom/imagem/'+instanciaId);
+  if(!r.ok) throw new Error('imagem '+instanciaId.slice(0,8)+' falhou');
+  var b=await r.blob();
+  var f=new File([b], instanciaId+'.png', {type:'image/png'});
+  var imgs=await arquivoParaImagens(f);   // reusa o redimensionamento/JPEG do app
+  return imgs[0];
+}
+async function dicomImportar(){
+  var cs=document.querySelectorAll('.dicomChk:checked');
+  if(!cs.length){ dicomInfoTxt('Marque ao menos um exame para importar.'); return; }
+  var alvo=[]; for(var i=0;i<cs.length;i++){ alvo.push(dicomEstudos[parseInt(cs[i].getAttribute('data-i'),10)]); }
+  var totalImgs=alvo.reduce(function(s,e){return s+(e.instancias||[]).length;},0), feitas=0;
+  progVincShow(totalImgs||1);
+  for(var k=0;k<alvo.length;k++){
+    var e=alvo[k];
+    dicomInfoTxt('Baixando "'+(e.paciente||'')+'"… ('+(k+1)+' de '+alvo.length+')');
+    var imagens=[];
+    for(var q=0;q<(e.instancias||[]).length;q++){
+      try{ imagens.push(await dicomBaixarImagem(e.instancias[q])); }catch(err){ log('Falha ao baixar imagem: '+err.message, true); }
+      feitas++; progVincStep(0); _progFeito=feitas; progVincSet();
+    }
+    if(!imagens.length){ log('Exame de '+(e.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
+    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens});
+  }
+  progVincHide();
+  dicomInfoTxt(dicomProntos.length+' exame(s) do aparelho prontos — toque em Processar.');
+  dicomRender();
+  log(dicomProntos.length+' exame(s) importado(s) do aparelho (nome/idade/data vieram do DICOM — sem custo de leitura de legenda).');
+}
 function ehArquivoAudio(f){
   var tp=f.type||'', nm=f.name||'';
   if(tp.indexOf('audio')===0) return true;                 // mime de áudio
@@ -1105,7 +1184,7 @@ async function processar(){
   const fEx = document.getElementById('inpExames').files;
   const fAu = Array.prototype.slice.call(document.getElementById('inpAudios').files).concat(audiosDaPastaSel());   // arquivos avulsos + pasta de áudios
   const fPasta = (document.getElementById('inpPasta')||{}).files||[];
-  if(fEx.length===0 && fPasta.length===0){ log('Selecione as fotos dos exames ou uma pasta.', true); return; }
+  if(fEx.length===0 && fPasta.length===0 && !dicomProntos.length){ log('Selecione as fotos dos exames, uma pasta, ou importe os exames do aparelho.', true); return; }
   if(!cfg.chave){ alternarConfig(); log('Antes de processar, cole sua chave da API em Configurações.', true); return; }
   document.getElementById('btnProcessar').disabled = true;
   exames = []; audios = [];
@@ -1164,8 +1243,10 @@ async function processar(){
     }
     exames = agruparItens(flatItens);
     for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:(g.paciente||fo), subExame:(g.subExame||''), imagens:g.imagens, tipo:g.tipo||'', lateralidade:normLateralidade(g.subExame||''), audios:[], laudo:null, metaConf:1, dataExame:g.data||'', idadeExame:g.idade||''}); }
+    // exames vindos do aparelho (DICOM): cadastro já veio das tags — nenhuma leitura de legenda por IA
+    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', _dicom:true}); }
     exames.forEach(function(e,i){ e.id=i; });
-    log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s) em '+exames.length+' exame(s).');
+    log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s)'+(dicomProntos.length?' + '+dicomProntos.length+' exame(s) do aparelho':'')+' em '+exames.length+' exame(s).');
     // 2. transcrever áudios
     for(let i=0;i<fAu.length;i++){
       progVincStep();

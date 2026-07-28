@@ -302,6 +302,14 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
     <span class="aviso" id="capRecInfo" style="align-self:center">Toque em Gravar para começar — durante a gravação, espaço pausa/retoma.</span>
   </div>
   <div id="capPendentes" style="margin-top:8px"></div>
+  <div id="capDicomSec" style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
+    <b style="font-size:14px">🩻 Aguardar o exame chegar pelo aparelho (DICOM)</b>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+      <button class="btn" id="btnCapOrt" onclick="capOrtToggle()">▶ Aguardar exame do aparelho</button>
+      <label style="font-weight:400;display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="capOrtAuto" checked> gerar o laudo automaticamente</label>
+      <span class="aviso" id="capOrtStatus">Grave o ditado, toque aqui e envie o exame no aparelho.</span>
+    </div>
+  </div>
   <div id="capFolderSec" style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn sec" onclick="capEscolherPasta()">📁 Escolher pasta a vigiar</button>
@@ -2771,6 +2779,9 @@ async function capRegistrarDitado(blob){
   }catch(e){ a._erro=e.message||String(e); log('Falha ao transcrever ditado: '+a._erro,true); }
   try{ await gravSalvar(blob, {transcricao:a.transcricao, nome_paciente:a.nomePaciente, tipo_exame:a.tipoExame, lateralidade:a.lateralidade, nome:a.nome, _captura:true}); }catch(e){}
   capRenderPendentes(); renderExames(); capRenderNovos();
+  // o exame pode ter chegado ANTES do ditado terminar: se há exame do aparelho esperando, vincula agora
+  var esperando=exames.filter(function(e){return e._captura && !e.laudo && !(e.audios||[]).length;});
+  if(esperando.length) await capAutoVincular(esperando[0]);
 }
 function capRenderPendentes(){
   var div=document.getElementById('capPendentes'); if(!div) return;
@@ -2787,6 +2798,98 @@ function capRenderPendentes(){
     }).join('');
 }
 
+/* ---- aguardar o exame chegar pelo aparelho (Orthanc via agente) ----
+   Fecha o ciclo: ditado gravado → médico envia no aparelho → o exame chega,
+   vincula sozinho ao ditado pendente e o laudo é gerado. */
+let capOrtWatching=false, capOrtTimer=null, capOrtVarrendo=false;
+let capOrtSeen=new Set(), capOrtFeitos=new Set(), capOrtStable={};
+function capOrtStatusTxt(t){ var s=document.getElementById('capOrtStatus'); if(s) s.textContent=t; }
+async function capOrtListar(){
+  var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},12000);
+  var r=await fetch(agenteBase()+'/dicom/estudos',{signal:ctrl.signal}); clearTimeout(t);
+  var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'resposta inválida');
+  return j.estudos||[];
+}
+async function capOrtToggle(){
+  var b=document.getElementById('btnCapOrt');
+  if(capOrtWatching){ capOrtWatching=false; if(capOrtTimer) clearInterval(capOrtTimer); capOrtTimer=null; if(b) b.textContent='▶ Aguardar exame do aparelho'; capOrtStatusTxt('Espera parada.'); return; }
+  capOrtStatusTxt('Conectando ao agente…');
+  try{
+    var lista=await capOrtListar();
+    capOrtSeen=new Set(lista.map(function(e){return e.id;}));   // o que já existe agora é "antigo"
+    capOrtFeitos=new Set(); capOrtStable={};
+    capOrtWatching=true; capArmado=true;
+    if(b) b.textContent='⏸ Parar espera';
+    capOrtStatusTxt('Aguardando… ('+capOrtSeen.size+' exame(s) anterior(es) ignorado(s)). Envie o exame no aparelho.');
+    capOrtTimer=setInterval(capOrtVarrer, 4000);
+  }catch(e){
+    capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+'). Ele precisa estar rodando no computador.');
+  }
+}
+async function capOrtVarrer(){
+  if(!capOrtWatching||capOrtVarrendo) return;
+  capOrtVarrendo=true;
+  try{
+    var lista=await capOrtListar();
+    for(var i=0;i<lista.length;i++){
+      var e=lista[i];
+      if(capOrtSeen.has(e.id)||capOrtFeitos.has(e.id)) continue;
+      var st=capOrtStable[e.id]||{n:-1,ciclos:0};
+      if(e.nImagens===st.n){ st.ciclos++; } else { st.n=e.nImagens; st.ciclos=0; }
+      capOrtStable[e.id]=st;
+      // espera o nº de imagens parar de crescer (o envio ainda pode estar em curso)
+      if(e.nImagens>0 && st.ciclos>=1){ capOrtFeitos.add(e.id); delete capOrtStable[e.id]; await capOrtProcessar(e); }
+      else if(e.nImagens>0){ capOrtStatusTxt('Recebendo exame de '+(e.paciente||'?')+'… ('+e.nImagens+' imagem(ns))'); }
+    }
+  }catch(e){ capOrtStatusTxt('Erro ao consultar o agente: '+((e&&e.message)||e)); }
+  capOrtVarrendo=false;
+}
+async function capOrtProcessar(est){
+  capOrtStatusTxt('🆕 Exame de '+(est.paciente||'?')+' chegou — baixando '+est.nImagens+' imagem(ns)…');
+  var imagens=[];
+  for(var i=0;i<(est.instancias||[]).length;i++){
+    try{ imagens.push(await capOrtBaixar(est.instancias[i])); }catch(err){ log('Falha ao baixar imagem: '+err.message,true); }
+  }
+  if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
+  var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true};
+  ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
+  exames.push(ex);
+  log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
+  renderExames(); capRenderNovos();
+  await capAutoVincular(ex);
+}
+async function capOrtBaixar(instanciaId){
+  var r=await fetch(agenteBase()+'/dicom/imagem/'+instanciaId);
+  if(!r.ok) throw new Error('imagem '+String(instanciaId).slice(0,8));
+  var b=await r.blob();
+  var imgs=await arquivoParaImagens(new File([b], instanciaId+'.png', {type:'image/png'}));
+  return imgs[0];
+}
+/* vincula o ditado pendente ao exame que chegou e (se possível) gera o laudo */
+async function capAutoVincular(ex){
+  var auto=(document.getElementById('capOrtAuto')||{}).checked;
+  var pend=audios.filter(function(a){return a._captura && a.exameId==null;});
+  if(!pend.length){ capOrtStatusTxt('🆕 Exame de '+ex.paciente+' pronto — aguardando o ditado. Grave e finalize.'); return; }
+  var aIdx=capMelhorDitadoIdx(ex, pend);
+  var a=audios.find(function(x){return x.idx===aIdx;});
+  if(!a){ capOrtStatusTxt('🆕 Exame de '+ex.paciente+' pronto — vincule o ditado abaixo.'); return; }
+  exames.forEach(function(e){ e.audios=e.audios.filter(function(k){return k!==a.idx;}); });
+  a.exameId=ex.id; a.pendente=false; ex.audios.push(a.idx);
+  if(!ex.tipo){ var tt=mapTipo(a.tipoExame); if(tt) ex.tipo=tt; }
+  if(a.lateralidade && !ex.lateralidade) ex.lateralidade=normLateralidade(a.lateralidade);
+  capRenderPendentes(); renderExames(); capRenderNovos();
+  if(!ex.tipo){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado, mas o TIPO do exame não foi dito — escolha o tipo e gere.'); log('Diga o tipo do exame no ditado (ex.: "abdome total") para o laudo sair sozinho.',true); return; }
+  if(!auto){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado. Toque em gerar quando quiser.'); return; }
+  if(!cfg.chave){ capOrtStatusTxt('Configure a chave da API para gerar o laudo.'); return; }
+  capOrtStatusTxt('⚙️ Gerando o laudo de '+ex.paciente+'…');
+  try{
+    await gerarLaudo(ex.id);
+    capOrtStatusTxt('✅ Laudo de '+ex.paciente+' pronto — revise e libere.');
+    capRenderPendentes(); capRenderNovos();
+    abrirRevisao(ex.id);
+  }catch(e){ capOrtStatusTxt('Falha ao gerar o laudo de '+ex.paciente+': '+((e&&e.message)||e)); }
+}
 /* ---- vigiar a pasta de export ---- */
 async function capEscolherPasta(){
   if(!suportaFS()){ log('A vigilância de pasta funciona no Chrome/Edge do computador.',true); return; }

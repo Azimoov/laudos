@@ -2341,14 +2341,29 @@ function restaurarModelos(){
 
 /* ============ Histórico de laudos (localStorage) ============ */
 function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')||'[]'); }catch(e){ return []; } }
-function gravarHistorico(arr){ try{ localStorage.setItem('glaudos', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar o histórico (armazenamento cheio?): '+e.message, true); } }
+/* Nunca falhar por cota: se encher, descarta os laudos mais ANTIGOS até caber.
+   (o laudo já foi salvo em PDF/pasta; o histórico é conveniência, não é o arquivo legal) */
+function gravarHistorico(arr){
+  var lista=arr.slice().sort(function(a,b){ return (a.ts||0)-(b.ts||0); });   // antigos primeiro
+  for(var tent=0; tent<12; tent++){
+    try{ localStorage.setItem('glaudos', JSON.stringify(lista)); return true; }
+    catch(e){
+      if(lista.length<=1){ log('Não consegui salvar no histórico: '+e.message, true); return false; }
+      var fora=Math.max(1, Math.floor(lista.length*0.2));                      // corta 20% dos mais antigos
+      lista=lista.slice(fora);
+      log('Histórico cheio — removi '+fora+' laudo(s) antigo(s) para caber o novo (os PDFs salvos não são afetados).', true);
+    }
+  }
+  return false;
+}
 function salvarLaudoHistorico(meta){
   if(!meta) return;
   let html = document.getElementById('areaImpressao').innerHTML;
   if(!html) return;
-  // não guardar o timbrado embutido (base64 ~300KB estoura o localStorage);
-  // guarda só a chave do fundo e reinjeta a imagem ao abrir (ver abrirHistorico)
+  // NÃO guardar imagens base64 embutidas — é o que estoura a cota do localStorage:
+  // timbrado (~300KB) e ASSINATURA (~50-200KB POR LAUDO). Ambos reinjetados ao abrir.
   html = html.replace(/<img class="fundoLaudo"[^>]*>/g, '');
+  html = html.replace(/<img[^>]*src="data:image[^"]*"[^>]*>/g, '<!--IMG-ASSINATURA-->');
   const fundo = window.__fundo || 'branco';
   const arr = lerHistorico();
   const i = arr.findIndex(function(x){return x.id===meta.id;});
@@ -2385,12 +2400,19 @@ function abrirHistorico(id){
   const r = lerHistorico().find(function(x){return x.id===id;});
   if(!r){ log('Laudo não encontrado no histórico.', true); return; }
   document.getElementById('areaImpressao').innerHTML = r.html;
-  // reinjeta o timbrado (não é mais guardado embutido); laudos antigos já trazem a imagem no html
+  // reinjeta timbrado e assinatura (não são mais guardados embutidos, p/ não estourar a cota);
+  // laudos antigos já trazem as imagens no html e passam batido por estas guardas
   try{
     var folha=document.querySelector('#areaImpressao .laudoFolha');
     if(folha && !folha.querySelector('.fundoLaudo')){
       var fnd=FUNDOS[r.fundo||'branco'];
       if(fnd && fnd.img){ var im=document.createElement('img'); im.className='fundoLaudo'; im.src=fnd.img; im.alt=''; folha.insertBefore(im, folha.firstChild); }
+    }
+    var ass=document.querySelector('#areaImpressao .assin');
+    if(ass && cfg.assinatura && !ass.querySelector('img')){
+      var ia=document.createElement('img'); ia.src=cfg.assinatura;
+      ia.style.cssText='height:62px;display:block;margin:0 auto -16px';
+      ass.insertBefore(ia, ass.firstChild);
     }
   }catch(e){}
   const ob = document.getElementById('obsBanner');

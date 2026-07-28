@@ -2886,10 +2886,22 @@ async function capOrtToggle(){
     capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+'). Ele precisa estar rodando no computador.');
   }
 }
+var _capOrtCiclo=0;
 async function capOrtVarrer(){
   if(!capOrtWatching||capOrtVarrendo) return;
   capOrtVarrendo=true;
   try{
+    // a cada ~20s confere o agente: se ele reiniciou (ou perdeu o microfone), reabre o pré-buffer
+    if((++_capOrtCiclo % 5)===0){
+      var st=await capAgenteEstado();
+      if(st && !st.microfone && capOrtWatching){
+        try{
+          await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:true})});
+          await capAgenteEstado();
+          if(capAgenteMic) log('O agente havia perdido o microfone (reinício?) — gravação religada.', true);
+        }catch(e){}
+      }
+    }
     var lista=await capOrtListar();
     for(var i=0;i<lista.length;i++){
       var e=lista[i];

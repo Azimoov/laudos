@@ -912,7 +912,14 @@ function mapTipo(texto){
   // URO = rins OU próstata (ambíguo — vira 'rins' aqui; TIPOS_COMPATIVEIS trata a ambiguidade e o ditado corrige)
   if(/(^|\s)uro(\s|$)/.test(t)) return 'rins';
   if(/(^|\s)gyn(\s|$)/.test(t)) return 'transvaginal';   // GYN = ginecológico → transvaginal
-  for(const chave in SINONIMOS_TIPO){ if(SINONIMOS_TIPO[chave].some(function(s){return t.indexOf(norm(s))>=0;})) return chave; }
+  // vence o sinônimo MAIS ESPECÍFICO (mais longo), não o primeiro da lista:
+  // "parede abdominal" contém "abdominal", mas deve virar parede_abdominal, não abdome total
+  var melhorChave='', melhorLen=0;
+  for(const chave in SINONIMOS_TIPO){
+    var syn=SINONIMOS_TIPO[chave];
+    for(var si=0;si<syn.length;si++){ var s=norm(syn[si]); if(s && t.indexOf(s)>=0 && s.length>melhorLen){ melhorLen=s.length; melhorChave=chave; } }
+  }
+  if(melhorChave) return melhorChave;
   for(const k in MODELOS){ const n=norm(MODELOS[k].nome); if(n && (t.indexOf(n)>=0 || n.indexOf(t)>=0)) return k; }
   return '';
 }
@@ -2736,6 +2743,25 @@ function capEhMidia(nome){ return /\.(jpe?g|png|bmp|pdf)$/i.test(nome); }
 let capEstado='idle';
 async function capToggleRec(){
   capArmado=true;
+  // se o agente nativo está com microfone, é ele quem grava (pré-buffer + recorte pela 1ª imagem)
+  if(capEstado==='idle'){
+    await capAgenteEstado();
+    if(capAgenteMic){
+      try{
+        await capAgenteIniciar();
+        capEstado='agente'; capSeg=0; capSetRecUI();
+        capTimer2=setInterval(function(){ if(capEstado!=='agente'){ clearInterval(capTimer2); return; } capSeg++; capSetRecUI(); },1000);
+        capOrtStatusTxt('🔴 Gravando pelo agente — para sozinho quando o exame chegar.');
+        return;
+      }catch(e){ log('Agente não conseguiu gravar ('+((e&&e.message)||e)+') — usando o microfone do navegador.', true); }
+    }
+  }
+  if(capEstado==='agente'){   // parar manualmente a gravação do agente
+    try{ await fetch(agenteBase()+'/gravacao/parar',{method:'POST'}); }catch(e){}
+    capEstado='idle'; clearInterval(capTimer2); capSetRecUI();
+    capOrtStatusTxt('Gravação do agente encerrada.');
+    return;
+  }
   if(capEstado==='rec'){ if(capMR && capMR.state==='recording'){ try{ capMR.pause(); }catch(e){} } capEstado='pause'; capSetRecUI(); return; }
   if(capEstado==='pause'){ if(capMR && capMR.state==='paused'){ try{ capMR.resume(); }catch(e){} } capEstado='rec'; capSetRecUI(); return; }
   if(algumGravando('capMR')){ log('Conclua a gravação em andamento antes de iniciar outra.',true); return; }
@@ -2760,6 +2786,7 @@ function capFinalizar(){ if(capMR && (capMR.state==='recording'||capMR.state==='
 function capSetRecUI(){
   var b=document.getElementById('btnCapRec'), f=document.getElementById('btnCapFinalizar'), info=document.getElementById('capRecInfo');
   if(!b) return;
+  if(capEstado==='agente'){ b.textContent='⏹ Parar gravação ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='none'; if(info)info.textContent='🔴 Gravando pelo agente — para sozinho quando o exame chegar pelo aparelho.'; return; }
   if(capEstado==='rec'){ b.textContent='⏸ Pausar ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='inline-block'; if(info)info.textContent='🔴 Gravando… espaço pausa · Finalizar encerra.'; }
   else if(capEstado==='pause'){ b.textContent='▶ Retomar ('+capSeg+'s)'; b.style.background='#a36a00'; if(f)f.style.display='inline-block'; if(info)info.textContent='⏸ Pausado em '+capSeg+'s. Espaço retoma · Finalizar encerra.'; }
   else { b.textContent='🎙 Gravar ditado'; b.style.background=''; if(f)f.style.display='none'; if(info)info.textContent='Toque em Gravar para começar — durante a gravação, espaço pausa/retoma.'; }
@@ -2820,7 +2847,11 @@ async function capOrtToggle(){
     capOrtFeitos=new Set(); capOrtStable={};
     capOrtWatching=true; capArmado=true;
     if(b) b.textContent='⏸ Parar espera';
-    capOrtStatusTxt('Aguardando… ('+capOrtSeen.size+' exame(s) anterior(es) ignorado(s)). Envie o exame no aparelho.');
+    var est=await capAgenteEstado();
+    var extra = capAgenteMic
+      ? ' 🎧 O agente está gravando (pré-buffer de '+((est&&est.prebufferDisponivelSeg)?Math.round((est.prebufferDisponivelSeg)/60)+'+ min':'10 min')+') — se esquecer de apertar gravar, ele recupera pelo horário da 1ª imagem.'
+      : ' (sem microfone no agente — grave o ditado pelo botão acima)';
+    capOrtStatusTxt('Aguardando… ('+capOrtSeen.size+' exame(s) anterior(es) ignorado(s)). Envie o exame no aparelho.'+extra);
     capOrtTimer=setInterval(capOrtVarrer, 4000);
   }catch(e){
     capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+'). Ele precisa estar rodando no computador.');
@@ -2844,6 +2875,36 @@ async function capOrtVarrer(){
   }catch(e){ capOrtStatusTxt('Erro ao consultar o agente: '+((e&&e.message)||e)); }
   capOrtVarrendo=false;
 }
+/* Gravação pelo AGENTE (programa nativo): pré-buffer contínuo em memória, recorte
+   ancorado na 1ª imagem do exame. Resolve o "esqueci de apertar gravar". */
+var capAgenteMic=false;
+async function capAgenteEstado(){
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},1500);
+    var r=await fetch(agenteBase()+'/gravacao/estado',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json(); capAgenteMic=!!(j&&j.ok&&j.microfone); return j;
+  }catch(e){ capAgenteMic=false; return null; }
+}
+async function capAgenteIniciar(){
+  var r=await fetch(agenteBase()+'/gravacao/iniciar',{method:'POST'});
+  var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao iniciar');
+  return j;
+}
+async function capAgenteFecharExame(est){
+  var r=await fetch(agenteBase()+'/exame/fechar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contentDate:est.imgData||'', contentTime:est.imgHora||'', margemSeg:90})});
+  var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao fechar o exame');
+  return j;
+}
+/* cria o "áudio" do exame a partir do texto que o agente transcreveu */
+function capAudioDoAgente(texto, origem){
+  var idx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
+  var hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  var a={idx:idx, nome:'Ditado '+hora+(origem==='prebuffer'?' (recuperado)':''), url:null, blob:null,
+         transcricao:texto||'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true, _agente:true};
+  audios.push(a);
+  return a;
+}
 async function capOrtProcessar(est){
   capOrtStatusTxt('🆕 Exame de '+(est.paciente||'?')+' chegou — baixando '+est.nImagens+' imagem(ns)…');
   var imagens=[];
@@ -2857,7 +2918,35 @@ async function capOrtProcessar(est){
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
   renderExames(); capRenderNovos();
+  // o agente estava gravando (ou tem pré-buffer): fecha o exame e traz o ditado já transcrito
+  if(capAgenteMic){
+    capOrtStatusTxt('🎧 Recortando e transcrevendo o ditado de '+ex.paciente+'…');
+    try{
+      var res=await capAgenteFecharExame(est);
+      if(res.texto && res.texto.trim()){
+        var a=capAudioDoAgente(res.texto, res.origem);
+        var meta=await capClassificarDitado(res.texto);
+        a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
+        a.nome=nomeAudio(meta.nome_paciente, meta.tipo_exame, meta.lateralidade)||a.nome;
+        log('Ditado do agente ('+res.origem+', '+res.segundos+'s): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
+        if(res.aviso) log('Aviso do agente: '+res.aviso, true);
+      } else {
+        capOrtStatusTxt('⚠️ '+ex.paciente+': não havia áudio no período do exame — grave o ditado e vincule.');
+        log('O agente não achou áudio para este exame'+(res.aviso?' ('+res.aviso+')':'')+'.', true);
+      }
+    }catch(e){ log('Falha ao fechar o exame no agente: '+((e&&e.message)||e), true); }
+    capRenderPendentes();
+  }
   await capAutoVincular(ex);
+}
+/* extrai tipo/lateralidade do texto já transcrito (o nome vem do DICOM, não precisa ditar) */
+async function capClassificarDitado(texto){
+  if(!cfg.chave) return {nome_paciente:'', tipo_exame:'', lateralidade:''};
+  try{
+    var nomesTipos=Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
+    var r=await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) NOME DO PACIENTE se citado (ou \"\"); (2) o TIPO DE EXAME: responda EXATAMENTE com um destes nomes quando corresponder: "+nomesTipos+"; se não estiver na lista, \"outro\"; se não der para saber, \"\". (3) LATERALIDADE: \"direito\", \"esquerdo\", \"bilateral\" ou \"\" — SOMENTE para ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles; nos demais responda \"\". Responda em JSON: {\"nome_paciente\":\"\",\"tipo_exame\":\"\",\"lateralidade\":\"\"}\n\nDITADO:\n"+texto}], true, {modelo: cfg.modeloAux||cfg.modelo});
+    return {nome_paciente:r.nome_paciente||'', tipo_exame:mapTipo(r.tipo_exame||''), lateralidade:r.lateralidade||''};
+  }catch(e){ return {nome_paciente:'', tipo_exame:'', lateralidade:''}; }
 }
 async function capOrtBaixar(instanciaId){
   var r=await fetch(agenteBase()+'/dicom/imagem/'+instanciaId);

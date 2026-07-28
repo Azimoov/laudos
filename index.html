@@ -2839,10 +2839,17 @@ async function capOrtListar(){
 }
 async function capOrtToggle(){
   var b=document.getElementById('btnCapOrt');
-  if(capOrtWatching){ capOrtWatching=false; if(capOrtTimer) clearInterval(capOrtTimer); capOrtTimer=null; if(b) b.textContent='▶ Aguardar exame do aparelho'; capOrtStatusTxt('Espera parada.'); return; }
+  if(capOrtWatching){
+    capOrtWatching=false; if(capOrtTimer) clearInterval(capOrtTimer); capOrtTimer=null;
+    if(b) b.textContent='▶ Aguardar exame do aparelho';
+    try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(e){}
+    capAgenteMic=false; capOrtStatusTxt('Espera parada — microfone do agente desligado.'); return;
+  }
   capOrtStatusTxt('Conectando ao agente…');
   try{
     var lista=await capOrtListar();
+    // entra em "modo exame": abre o microfone do agente (pré-buffer). Fora disso ele fica fechado.
+    try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:true})}); }catch(e){}
     capOrtSeen=new Set(lista.map(function(e){return e.id;}));   // o que já existe agora é "antigo"
     capOrtFeitos=new Set(); capOrtStable={};
     capOrtWatching=true; capArmado=true;

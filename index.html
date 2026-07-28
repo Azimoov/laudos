@@ -2816,7 +2816,7 @@ function capSetRecUI(){
 async function capRegistrarDitado(blob){
   var novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
   var hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  var a={idx:novoIdx, nome:'Ditado '+hora, url:URL.createObjectURL(blob), transcricao:'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true};
+  var a={idx:novoIdx, nome:'Ditado '+hora, url:URL.createObjectURL(blob), transcricao:'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true, _transcrevendo:true};
   audios.push(a);
   capRenderPendentes();
   log('Transcrevendo ditado…');
@@ -2826,6 +2826,7 @@ async function capRegistrarDitado(blob){
     a.nome=nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||a.nome;
     log('Ditado pronto: '+(a.nomePaciente||'(nome não citado)')+(a.tipoExame?' · '+((MODELOS[a.tipoExame]&&MODELOS[a.tipoExame].nome)||a.tipoExame):''));
   }catch(e){ a._erro=e.message||String(e); log('Falha ao transcrever ditado: '+a._erro,true); }
+  a._transcrevendo=false;
   try{ await gravSalvar(blob, {transcricao:a.transcricao, nome_paciente:a.nomePaciente, tipo_exame:a.tipoExame, lateralidade:a.lateralidade, nome:a.nome, _captura:true}); }catch(e){}
   capRenderPendentes(); renderExames(); capRenderNovos();
   // o exame pode ter chegado ANTES do ditado terminar: se há exame do aparelho esperando, vincula agora
@@ -2839,8 +2840,13 @@ function capRenderPendentes(){
   div.innerHTML='<div class="aviso" style="font-weight:600">🎙 '+pend.length+' ditado(s) aguardando exame:</div>'
     +pend.map(function(a){
       var t=(a.transcricao||'').replace(/</g,'&lt;');
-      var resumo = a.transcricao ? (t.length>160?t.slice(0,160)+'…':t) : (a._erro ? '<span class="erro">⚠️ erro na transcrição: '+String(a._erro).replace(/</g,'&lt;')+'</span>' : '<span class="erro">⚠️ transcrição vazia — confira o microfone e refaça o ditado</span>');
-      var tag = a.tipoExame ? '<span class="tag">'+((MODELOS[a.tipoExame]&&MODELOS[a.tipoExame].nome)||a.tipoExame)+'</span>' : '<span class="tag" style="background:#fde8e8;color:#b3261e">tipo não dito</span>';
+      // enquanto transcreve, NÃO alarmar: só depois de terminar é que "vazio" vira erro
+      var resumo = a._transcrevendo ? '<span class="aviso">⏳ transcrevendo o ditado… (o motor local leva alguns segundos)</span>'
+        : (a.transcricao ? (t.length>160?t.slice(0,160)+'…':t)
+        : (a._erro ? '<span class="erro">⚠️ erro na transcrição: '+String(a._erro).replace(/</g,'&lt;')+'</span>'
+        : '<span class="erro">⚠️ transcrição vazia — confira o microfone e refaça o ditado</span>'));
+      var tag = a._transcrevendo ? '<span class="tag">aguarde…</span>'
+        : (a.tipoExame ? '<span class="tag">'+((MODELOS[a.tipoExame]&&MODELOS[a.tipoExame].nome)||a.tipoExame)+'</span>' : '<span class="tag" style="background:#fde8e8;color:#b3261e">tipo não dito</span>');
       return '<div style="background:#eef3f8;border-radius:8px;padding:6px 10px;margin-top:6px">'
         +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;min-width:90px">'+String(a.nomePaciente||a.nome||'').replace(/</g,'&lt;')+'</span>'+tag+(a.url?playerLinha(a.url):'')+'</div>'
         +'<div class="aviso" style="margin-top:3px">'+resumo+'</div></div>';
@@ -2878,7 +2884,7 @@ async function capOrtToggle(){
     if(b) b.textContent='⏸ Parar espera';
     var est=await capAgenteEstado();
     var extra = capAgenteMic
-      ? ' 🎧 O agente está gravando (pré-buffer de '+((est&&est.prebufferDisponivelSeg)?Math.round((est.prebufferDisponivelSeg)/60)+'+ min':'10 min')+') — se esquecer de apertar gravar, ele recupera pelo horário da 1ª imagem.'
+      ? ' 🎧 O agente está gravando — se esquecer de apertar gravar, ele recupera pelo horário da 1ª imagem.'
       : ' (sem microfone no agente — grave o ditado pelo botão acima)';
     capOrtStatusTxt('Aguardando… ('+capOrtSeen.size+' exame(s) anterior(es) ignorado(s)). Envie o exame no aparelho.'+extra);
     capOrtTimer=setInterval(capOrtVarrer, 4000);

@@ -306,6 +306,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
     <b style="font-size:14px">🩻 Aguardar o exame chegar pelo aparelho (DICOM)</b>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
       <button class="btn" id="btnCapOrt" onclick="capOrtToggle()">▶ Aguardar exame do aparelho</button>
+      <button class="btn sec" onclick="capRecuperar()" title="Traz de volta os exames e ditados guardados no computador">🔄 Recuperar exames</button>
       <label style="font-weight:400;display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="capOrtAuto" checked> gerar o laudo automaticamente</label>
       <span class="aviso" id="capOrtStatus">Grave o ditado, toque aqui e envie o exame no aparelho.</span>
     </div>
@@ -2950,7 +2951,7 @@ async function capAgenteIniciar(){
 }
 async function capAgenteFecharExame(est){
   var r=await fetch(agenteBase()+'/exame/fechar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({contentDate:est.imgData||'', contentTime:est.imgHora||'',
+    body:JSON.stringify({estudoId:est.id||'', contentDate:est.imgData||'', contentTime:est.imgHora||'',
                          contentDateFim:est.imgDataFim||'', contentTimeFim:est.imgHoraFim||'', margemSeg:90})});
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao fechar o exame');
   return j;
@@ -2972,7 +2973,7 @@ async function capOrtProcessar(est){
   }
   if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
@@ -2997,6 +2998,57 @@ async function capOrtProcessar(est){
     capRenderPendentes();
   }
   await capAutoVincular(ex);
+}
+/* ---- RECUPERAR: refaz os exames do dia com os ditados guardados em disco pelo agente ----
+   Sobrevive a recarregar a página, fechar o navegador e reiniciar o agente/notebook:
+   as imagens estão no Orthanc e o ditado (áudio + texto) está na pasta do agente. */
+async function capRecuperar(){
+  capOrtStatusTxt('Procurando exames e ditados guardados…');
+  var estudos, ditados;
+  try{
+    estudos=await capOrtListar();
+    var r=await fetch(agenteBase()+'/exame/ditados');
+    var j=await r.json(); ditados=(j&&j.ditados)||{};
+  }catch(e){ capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+').'); return; }
+
+  var hoje=new Date(); var dh=('0'+hoje.getDate()).slice(-2)+'/'+('0'+(hoje.getMonth()+1)).slice(-2)+'/'+hoje.getFullYear();
+  var jaTem={}; exames.forEach(function(e){ if(e._estudoId) jaTem[e._estudoId]=true; });
+  var alvo=estudos.filter(function(e){ return e.data===dh && ditados[e.id] && !jaTem[e.id]; });
+  if(!alvo.length){
+    var comDitado=estudos.filter(function(e){ return ditados[e.id]; }).length;
+    capOrtStatusTxt(comDitado? 'Nada a recuperar: os exames com ditado guardado já estão carregados.' :
+      'Nenhum ditado guardado para recuperar (só exames fechados pelo agente ficam guardados).');
+    return;
+  }
+  var auto=(document.getElementById('capOrtAuto')||{}).checked;
+  var feitos=0;
+  for(var i=0;i<alvo.length;i++){
+    var est=alvo[i], dit=ditados[est.id];
+    capOrtStatusTxt('🔄 Recuperando '+(i+1)+' de '+alvo.length+': '+(est.paciente||'?')+'…');
+    var imagens=[];
+    for(var q=0;q<(est.instancias||[]).length;q++){
+      try{ imagens.push(await capOrtBaixar(est.instancias[q])); }catch(err){}
+    }
+    if(!imagens.length){ log('Recuperação: exame de '+(est.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
+    var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
+            tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
+            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id};
+    ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
+    exames.push(ex);
+    // o ditado guardado volta como áudio do exame (com o WAV original p/ você poder ouvir)
+    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado');
+    a.nome='Ditado recuperado ('+(dit.quandoTexto||'')+')';
+    if(dit.temAudio) a.url=agenteBase()+'/exame/audio/'+est.id;
+    var meta=await capClassificarDitado(dit.texto||'');
+    a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
+    renderExames();
+    await capAutoVincular(ex);
+    feitos++;
+  }
+  capRenderPendentes(); capRenderNovos(); renderExames();
+  agendarSalvarSessao();
+  capOrtStatusTxt('✅ '+feitos+' exame(s) recuperado(s)'+(auto?' — laudos gerados':'')+'. Confira na revisão.');
+  log('Recuperação concluída: '+feitos+' exame(s) com ditado restaurado(s) do disco.');
 }
 /* extrai tipo/lateralidade do texto já transcrito (o nome vem do DICOM, não precisa ditar) */
 async function capClassificarDitado(texto){

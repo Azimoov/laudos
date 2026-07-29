@@ -2950,7 +2950,8 @@ async function capAgenteIniciar(){
 }
 async function capAgenteFecharExame(est){
   var r=await fetch(agenteBase()+'/exame/fechar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({contentDate:est.imgData||'', contentTime:est.imgHora||'', margemSeg:90})});
+    body:JSON.stringify({contentDate:est.imgData||'', contentTime:est.imgHora||'',
+                         contentDateFim:est.imgDataFim||'', contentTimeFim:est.imgHoraFim||'', margemSeg:90})});
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao fechar o exame');
   return j;
 }
@@ -2986,7 +2987,7 @@ async function capOrtProcessar(est){
         var meta=await capClassificarDitado(res.texto);
         a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
         a.nome=nomeAudio(meta.nome_paciente, meta.tipo_exame, meta.lateralidade)||a.nome;
-        log('Ditado do agente ('+res.origem+', '+res.segundos+'s): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
+        log('Ditado do agente ('+res.origem+', '+res.segundos+'s de áudio): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
         if(res.aviso) log('Aviso do agente: '+res.aviso, true);
       } else {
         capOrtStatusTxt('⚠️ '+ex.paciente+': não havia áudio no período do exame — grave o ditado e vincule.');

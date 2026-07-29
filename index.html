@@ -533,6 +533,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <button class="btn sec" onclick="fecharRevisao()">← Voltar</button>
       <button class="btn" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
       <button class="btn" onclick="salvarLaudoPasta()">💾 Salvar na pasta</button>
+      <button class="btn sec" id="btnPastaRev" onclick="escolherPastaDestino()" title="Escolher onde os laudos são salvos">📁 Pasta…</button>
       <button class="btn sec" id="btnFundo" onclick="trocarFundo()" style="display:none">🎨 Fundo</button>
       <button class="btn sec" id="btnAprender" onclick="aprenderAgora()" style="display:none">🧠 Aprender com minhas correções</button>
       <button class="btn" id="btnLiberar" onclick="liberarEProximo()" style="display:none;background:#1f7a3d">✅ Liberar e próximo</button>
@@ -1430,7 +1431,16 @@ async function fsGetHandle(key){ try{ const db=await fsDbOpen(); return await ne
 async function fsSetHandle(key,h){ try{ const db=await fsDbOpen(); await new Promise(function(res,rej){ const tx=db.transaction('handles','readwrite'); tx.objectStore('handles').put(h,key); tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }catch(e){} }
 async function fsPermissao(h){ if(!h||!h.queryPermission) return true; try{ if((await h.queryPermission({mode:'readwrite'}))==='granted') return true; return (await h.requestPermission({mode:'readwrite'}))==='granted'; }catch(e){ return false; } }
 let pastaLaudoH=null;
-function atualizarPastaInfoRev(){ const el=document.getElementById('pastaDestInfo'); if(!el) return; el.innerHTML = pastaLaudoH ? ('📁 Pasta de destino: <b>'+(pastaLaudoH.name||'(definida)')+'</b>') : (suportaFS()?'⚠️ Nenhuma pasta de destino definida — escolha antes de salvar.':'No iPad o salvar usa a folha de compartilhamento.'); }
+function atualizarPastaInfoRev(){
+  const el=document.getElementById('pastaDestInfo');
+  if(el) el.innerHTML = pastaLaudoH ? ('📁 Pasta de destino: <b>'+String(pastaLaudoH.name||'(definida)').replace(/</g,'&lt;')+'</b>') : (suportaFS()?'⚠️ Nenhuma pasta de destino definida — escolha antes de salvar.':'No iPad o salvar usa a folha de compartilhamento.');
+  // o botão na tela do laudo mostra a pasta atual (ou alerta se não houver)
+  const b=document.getElementById('btnPastaRev');
+  if(b){
+    if(pastaLaudoH){ b.textContent='📁 '+String(pastaLaudoH.name||'pasta'); b.title='Laudos vão para "'+(pastaLaudoH.name||'')+'" — clique para trocar'; b.style.background=''; b.style.color=''; }
+    else { b.textContent='📁 Escolher pasta'; b.title='Nenhuma pasta definida — clique para escolher'; b.style.background='#d99a26'; b.style.color='#fff'; }
+  }
+}
 async function escolherPastaDestino(){ if(!suportaFS()){ log('No iPad usa-se a folha de compartilhamento.', true); return null; } try{ const h=await window.showDirectoryPicker(); pastaLaudoH=h; await fsSetHandle('laudo',h); atualizarPastaInfoRev(); log('Pasta de destino: '+(h.name||'')); return h; }catch(e){ return null; } }
 async function garantirPasta(){ if(pastaLaudoH) return pastaLaudoH; return await escolherPastaDestino(); }
 async function definirPasta(tipo){ if(!suportaFS()){ log('No iPad o salvar usa a folha de compartilhamento do iOS (botão Salvar).', true); return; } let h; try{ h=await window.showDirectoryPicker(); }catch(e){ return; } await fsSetHandle(tipo,h); if(tipo==='laudo'){ pastaLaudoH=h; atualizarPastaInfoRev(); } log('Pasta de '+(tipo==='audio'?'áudios':'laudos')+' definida neste computador.'); }
@@ -2579,6 +2589,7 @@ function abrirRevisao(exId, semTela){
   montarRevMidia(exId);
   revPreencherModelos(ex.tipo||'');
   _mostrarBotoesRev(true);
+  atualizarPastaInfoRev();   // o botão 📁 mostra a pasta de destino atual
   // foto do texto recém-renderizado COM a tela visível (innerText muda quando oculto) — p/ detectar edições manuais
   window.__revTextoInicial = textoEditadoLaudo();
   }

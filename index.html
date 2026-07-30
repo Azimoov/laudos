@@ -76,14 +76,17 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 /* revisão: laudo à esquerda começando no TOPO; ferramentas (IA, áudio) e imagens numa
    coluna lateral. Antes tudo isso ficava empilhado acima e empurrava o laudo p/ baixo. */
 #obsBanner{max-width:1104px;margin:0 auto 8px;}
-#revLateral{flex:0 0 300px;max-width:300px;display:flex;flex-direction:column;gap:10px;}
+/* três colunas: FERRAMENTAS (IA + áudio) | LAUDO | IMAGENS */
+#revLateral{flex:0 0 260px;max-width:260px;display:flex;flex-direction:column;gap:10px;order:1;}
+#areaImpressao{order:2;}
+#revMidiaImg{order:3;flex:0 0 200px;max-width:200px;width:100%;}
 #revFerramentas{display:flex;flex-direction:column;gap:10px;}
 #revIaWrap,#revAudioWrap{min-width:0;max-height:240px;overflow:auto;}
-#revMidiaImg{width:100%;}
-@media (max-width:1150px){   /* telas estreitas: ferramentas voltam p/ cima, em 2 colunas */
-  #revLateral{flex:1 1 100%;max-width:none;}
+@media (max-width:1150px){   /* telas estreitas: ferramentas em cima, em duas colunas */
+  #revLateral{flex:1 1 100%;max-width:none;order:0;}
   #revFerramentas{flex-direction:row;flex-wrap:wrap;}
   #revIaWrap,#revAudioWrap{flex:1 1 340px;}
+  #revMidiaImg{flex:1 1 100%;max-width:none;}
 }
 .barraRev{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
 #progressoBarra{background:linear-gradient(90deg,#3b82f6,#8b5cf6,#ec4899)!important;}
@@ -585,9 +588,9 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <div id="revMidiaAudio"></div>
     </div>
     </div><!-- /revFerramentas -->
-        <!-- imagens do exame (fora do areaImpressao p/ não entrarem na impressão) -->
-        <div id="revMidiaImg" style="display:none"></div>
       </div><!-- /revLateral -->
+      <!-- imagens do exame, à DIREITA (fora do areaImpressao p/ não entrarem na impressão) -->
+      <div id="revMidiaImg" style="display:none"></div>
     </div><!-- /revLayout -->
   </main>
   <!-- pré-visualização grande da imagem (abre sobre o laudo, nunca corta) -->

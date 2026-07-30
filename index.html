@@ -66,9 +66,26 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 .aviso{font-size:var(--fs-1);color:var(--texto-2);margin-top:8px;}
 .erro{color:var(--vermelho);font-weight:600;}
 #telaRevisao{display:none;}
-.revImg{transition:transform .12s ease;cursor:zoom-in;}
-.revImg.zoom{transform:scale(5);position:relative;z-index:50;box-shadow:0 4px 18px rgba(0,0,0,.55);}
-.barraRev{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.revImg{cursor:zoom-in;}
+/* zoom da imagem: painel FIXO que abre sobre o laudo, sempre inteiro na tela
+   (antes era transform:scale(5), que estourava a borda direita e cortava a imagem) */
+#revZoom{display:none;position:fixed;right:222px;top:50%;transform:translateY(-50%);z-index:200;
+  background:#0b131e;padding:6px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);pointer-events:none;}
+#revZoom img{display:block;max-height:88vh;max-width:58vw;border-radius:6px;}
+@media (max-width:900px){ #revZoom{right:12px;left:12px;} #revZoom img{max-width:100%;} }
+/* revisão: laudo à esquerda começando no TOPO; ferramentas (IA, áudio) e imagens numa
+   coluna lateral. Antes tudo isso ficava empilhado acima e empurrava o laudo p/ baixo. */
+#obsBanner{max-width:1104px;margin:0 auto 8px;}
+#revLateral{flex:0 0 300px;max-width:300px;display:flex;flex-direction:column;gap:10px;}
+#revFerramentas{display:flex;flex-direction:column;gap:10px;}
+#revIaWrap,#revAudioWrap{min-width:0;max-height:240px;overflow:auto;}
+#revMidiaImg{width:100%;}
+@media (max-width:1150px){   /* telas estreitas: ferramentas voltam p/ cima, em 2 colunas */
+  #revLateral{flex:1 1 100%;max-width:none;}
+  #revFerramentas{flex-direction:row;flex-wrap:wrap;}
+  #revIaWrap,#revAudioWrap{flex:1 1 340px;}
+}
+.barraRev{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
 #progressoBarra{background:linear-gradient(90deg,#3b82f6,#8b5cf6,#ec4899)!important;}
 /* desktop largo: exames e revisão em grade de cards (estilo dashboard) */
 @media (min-width:1100px){
@@ -218,7 +235,6 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 <div id="abas">
   <button id="aba-acumulados" onclick="mostrarAba('acumulados')">📥 Arquivos acumulados</button>
   <button id="aba-gravar" onclick="mostrarAba('gravar')">🎙 Gravar ditados</button>
-  <button id="aba-loco" onclick="mostrarAba('loco')">📷 Exame na hora</button>
   <button id="aba-captura" onclick="mostrarAba('captura')">🔴 Captura ao vivo</button>
   <button id="aba-exames" onclick="mostrarAba('exames')">📋 Exames identificados</button>
   <button id="aba-revisao" onclick="mostrarAba('revisao')">📄 Revisão dos laudos</button>
@@ -276,20 +292,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 </div>
 </div>
 
-<div class="aba-conteudo" id="pane-loco" style="display:none">
-<div class="card">
-  <h2>Exame na hora (in loco)</h2>
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button class="btn" onclick="abrirCamera('loko')">📷 Capturar imagem</button>
-    <button class="btn sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn" id="btnGravar" onclick="alternarGravacao()">🎙 Gravar áudio</button><canvas id="vuLoko" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px;align-self:center"></canvas>
-    <button class="btn" id="btnLoko" onclick="gerarInLoco()">⚡ Gerar laudo agora</button>
-  </div>
-  <input type="file" id="inpCamera" accept="image/*" capture="environment" style="display:none">
-  <input type="file" id="inpCameraExame" accept="image/*" capture="environment" style="display:none">
-  <div id="lokoInfo" class="aviso">Capture as imagens do exame, grave o ditado e toque em ⚡.</div>
-  <div id="lokoThumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
-</div>
-</div>
+<!-- aba "Exame na hora" removida (2026-07-29): o fluxo é a Captura ao vivo.
+     Os inputs de câmera ficam aqui porque "Nova foto" dos Exames identificados usa o inpCameraExame. -->
+<input type="file" id="inpCamera" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="inpCameraExame" accept="image/*" capture="environment" style="display:none">
 
 <div class="aba-conteudo" id="pane-captura" style="display:block">
 <div class="card" id="cardCaptura" style="border:2px solid #1f7a3d">
@@ -554,8 +560,15 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <span class="fmtSep"></span>
       <button title="Limpar formatação da seleção" onclick="fmtCmd('removeFormat')" style="font-size:11px;color:#666">✕ fmt</button>
     </div>
-    <!-- IA na revisão: trocar modelo + pedir ajustes por texto (fora do areaImpressao: não imprime) -->
-    <div id="revIaWrap" style="display:none;max-width:760px;margin:0 auto 10px;padding:8px 10px;background:#f4f7fa;border-radius:10px">
+    <!-- painel de trabalho: aviso da IA + ferramentas (IA e áudio) lado a lado.
+         Fica FORA do areaImpressao, então nada disso entra no PDF/impressão. -->
+    <div id="obsBanner" style="display:none;background:#fdf3e3;border-left:5px solid #d99a26;border-radius:8px;padding:9px 12px;font-size:13.5px;font-weight:600;"></div>
+    <div id="revLayout" style="display:flex;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap">
+      <div id="areaImpressao" style="flex:1 1 600px;min-width:0;max-width:790px"></div>
+      <div id="revLateral">
+    <div id="revFerramentas">
+    <!-- IA na revisão: trocar modelo + pedir ajustes por texto -->
+    <div id="revIaWrap" style="display:none;padding:8px 10px;background:#f4f7fa;border-radius:10px">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <label for="revModeloSel" style="font-size:12px;font-weight:600">Modelo do laudo:</label>
         <select id="revModeloSel" style="flex:1;min-width:160px;max-width:340px" onchange="revAplicarModelo()"></select>
@@ -567,18 +580,18 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       </div>
       <div id="revChatStatus" class="aviso" style="margin-top:4px"></div>
     </div>
-    <!-- painel de mídia: fora do areaImpressao para não entrar no PDF/impressão -->
-    <!-- áudio: sempre visível (barra de espaço = play/pausa) -->
-    <div id="revAudioWrap" style="display:none;max-width:760px;margin:0 auto 10px;padding:8px 10px;background:#f4f7fa;border-radius:10px">
+    <!-- áudio do exame (barra de espaço = play/pausa) -->
+    <div id="revAudioWrap" style="display:none;padding:8px 10px;background:#f4f7fa;border-radius:10px">
       <div id="revMidiaAudio"></div>
     </div>
-    <div id="obsBanner" style="display:none;background:#fdf3e3;border-left:5px solid #d99a26;border-radius:8px;padding:12px 14px;margin:0 auto 14px;max-width:760px;font-size:14px;font-weight:600;"></div>
-    <!-- laudo + imagens lado a lado (imagens ficam fora do areaImpressao p/ não entrarem na impressão) -->
-    <div id="revLayout" style="display:flex;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap">
-      <div id="areaImpressao" style="flex:1 1 600px;min-width:0;max-width:790px"></div>
-      <div id="revMidiaImg" style="display:none;flex:0 0 200px;max-width:200px"></div>
-    </div>
+    </div><!-- /revFerramentas -->
+        <!-- imagens do exame (fora do areaImpressao p/ não entrarem na impressão) -->
+        <div id="revMidiaImg" style="display:none"></div>
+      </div><!-- /revLateral -->
+    </div><!-- /revLayout -->
   </main>
+  <!-- pré-visualização grande da imagem (abre sobre o laudo, nunca corta) -->
+  <div id="revZoom"><img id="revZoomImg" src="" alt=""></div>
 </div>
 
 <script src="dados.js"></script>
@@ -2595,8 +2608,16 @@ function abrirRevisao(exId, semTela){
   window.__revTextoInicial = textoEditadoLaudo();
   }
 }
-function revImgMove(e,img){ var r=img.getBoundingClientRect(); var w=r.width||1, h=r.height||1; var x=(e.clientX-r.left)/w, y=(e.clientY-r.top)/h; var m=0.35; if(x<m||x>1-m||y<m||y>1-m){ img.classList.remove('zoom'); } else { img.classList.add('zoom'); } }
-function revImgLeave(img){ img.classList.remove('zoom'); }
+/* zoom da imagem na revisão: painel fixo sobre o laudo, imagem SEMPRE inteira na tela */
+function revZoomMostrar(img){
+  var z=document.getElementById('revZoom'), zi=document.getElementById('revZoomImg');
+  if(!z||!zi||!img) return;
+  zi.src=img.src; z.style.display='block';
+}
+function revZoomEsconder(){ var z=document.getElementById('revZoom'); if(z){ z.style.display='none'; } }
+/* compatibilidade: laudos antigos no histórico ainda chamam estas funções */
+function revImgMove(e,img){ revZoomMostrar(img); }
+function revImgLeave(img){ revZoomEsconder(); }
 function revToggleLiberados(){ window.__revMostrarLiberados=!window.__revMostrarLiberados; renderRevisao(); }
 function renderRevisao(){
   const div=document.getElementById("listaRevisao"); if(!div) return;
@@ -2612,7 +2633,7 @@ function renderRevisao(){
     const auds=audios.filter(function(a){return a.exameId===ex.id;});
     const nome=(ex.paciente||"(sem nome)")+(ex.subExame?" - "+ex.subExame:"");
     const players=auds.length?auds.map(function(a){return '<div style="margin-top:4px">'+(a.url?playerLinha(a.url):"(áudio indisponível)")+"</div>";}).join(""):'<p class="aviso">Sem áudio vinculado.</p>';
-    const imgs=(ex.imagens||[]).length?ex.imagens.map(function(d){return '<img class="revImg" onmousemove="revImgMove(event,this)" onmouseleave="revImgLeave(this)" src="'+d+'" style="max-width:120px;max-height:120px;margin:4px;border:1px solid #c8d0da;border-radius:6px">';}).join(""):'<p class="aviso">Sem imagens.</p>';
+    const imgs=(ex.imagens||[]).length?ex.imagens.map(function(d){return '<img class="revImg" onmouseenter="revZoomMostrar(this)" onmouseleave="revZoomEsconder()" src="'+d+'" style="max-width:120px;max-height:120px;margin:4px;border:1px solid #c8d0da;border-radius:6px">';}).join(""):'<p class="aviso">Sem imagens.</p>';
     return '<div style="border:1px solid #c8d0da;border-radius:10px;padding:10px;margin-top:8px">'
       +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:120px">'+nome+(ex._liberado?' <span style="background:#1f7a3d;color:#fff;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600">✅ liberado</span>':'')+"</b>"
       +'<button class="btn peq sec" data-act="ver" data-ex="'+ex.id+'">📄 Ver / editar</button>'
@@ -2731,7 +2752,7 @@ function montarRevMidia(exId){
   var imgs=(ex&&ex.imagens)||[];
   di.innerHTML=imgs.length
     ? '<div class="aviso" style="font-weight:600;margin-bottom:4px">🖼 Imagens ('+imgs.length+')</div>'
-      +imgs.map(function(d){return '<img class="revImg" onmousemove="revImgMove(event,this)" onmouseleave="revImgLeave(this)" src="'+d+'" style="width:100%;margin-bottom:6px;border:1px solid #c8d0da;border-radius:6px;cursor:zoom-in">';}).join('')
+      +imgs.map(function(d){return '<img class="revImg" onmouseenter="revZoomMostrar(this)" onmouseleave="revZoomEsconder()" src="'+d+'" style="width:100%;margin-bottom:6px;border:1px solid #c8d0da;border-radius:6px;cursor:zoom-in">';}).join('')
     : '';
   di.style.display=imgs.length?'block':'none';
 }
@@ -3391,7 +3412,7 @@ function calcIg(){
 
 /* ===== Abas (estilo Excel) ===== */
 function mostrarAba(nome){
-  ['acumulados','gravar','loco','captura','exames','revisao','calc'].forEach(function(n){
+  ['acumulados','gravar','captura','exames','revisao','calc'].forEach(function(n){
     var p=document.getElementById('pane-'+n); if(p) p.style.display=(n===nome)?'block':'none';
     var t=document.getElementById('aba-'+n); if(t) t.classList.toggle('ativa', n===nome);
   });

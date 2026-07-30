@@ -519,6 +519,13 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       </div>
       <div class="calcRes" id="igRes"></div>
       <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('igRes')">📋 Copiar</button></div>
+      <div style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
+        <b style="font-size:13px">Margem de erro da idade gestacional</b><br>
+        <span class="aviso">Definida pela IG da <b>primeira</b> ultrassonografia — e só se a paciente a trouxe. Vale para os exames seguintes.</span>
+        <div style="margin-top:6px"><label>IG na primeira ultrassonografia (semanas)</label>
+          <input type="number" id="megSem" step="0.1" min="0" style="width:130px" placeholder="ex.: 8" oninput="calcMargemIG()"></div>
+        <div class="calcRes" id="megRes"></div>
+      </div>
     </div>
   </details>
 </div>
@@ -1702,8 +1709,10 @@ async function gerarLaudo(exId){
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
 (regrasAprend ? "REGRAS APRENDIDAS COM AS CORREÇÕES DO MÉDICO (cumpra à risca; têm prioridade sobre o estilo padrão quando houver conflito):\n"+regrasAprend+"\n\n" : "")+
+(EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — MARGEM DE ERRO: preencha o campo 'obstetrico' com o que o médico DITOU sobre a ultrassonografia INICIAL (de primeiro trimestre) da paciente: trouxe_usg_primeiro_trimestre (true se ela trouxe/apresentou o exame inicial ou se o médico informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito) e ig_primeiro_usg_semanas (a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame — número; use 0 se não foi ditada). NUNCA invente esses dados. NÃO calcule nem escreva a margem de erro em dias: deixe os pontilhados de '(com variação de até +/- ..... dias)' como estão — o aplicativo calcula pela tabela oficial e substitui. Mantenha também a frase da idade gestacional como está no modelo; o aplicativo a ajusta quando houver exame inicial.\n\n" : "")+
 (ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\""+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")+"}"
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\""+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
++(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0}":"")+"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
     const resp = await openai(partes);
@@ -1714,6 +1723,14 @@ async function gerarLaudo(exId){
         const tri = processarTirads(resp.tirads, trans);
         if(tri.linhas.length) conclusaoFinal = (conclusaoFinal?conclusaoFinal+'\n':'')+tri.linhas.join('\n');
         if(tri.obs.length) obsFinal = (obsFinal?obsFinal+' | ':'')+tri.obs.join(' ');
+      }catch(e){}
+    }
+    // Obstétrico 2º/3º trimestre: margem de erro pela IG do 1º USG (código calcula, IA só extrai)
+    if(EX_OBST_SEQ[ex.tipo]){
+      try{
+        const ob = processarObstetrico(resp.obstetrico, ex.tipo);
+        if(ob.margem!=null) conclusaoFinal = obstAplicarNaConclusao(conclusaoFinal, ob.margem);
+        if(ob.obs.length) obsFinal = (obsFinal?obsFinal+' | ':'')+ob.obs.join(' ');
       }catch(e){}
     }
     ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal};
@@ -3263,6 +3280,79 @@ async function copiarCalc(id){
   catch(e){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); log('Resultado copiado.'); }catch(e2){ log('Não consegui copiar: '+e2.message, true); } ta.remove(); }
 }
 /* ---- TI-RADS: núcleo determinístico compartilhado (calculadora manual + cálculo automático do laudo) ---- */
+/* ============ Obstetrícia: margem de erro da idade gestacional ============
+   A margem é definida pela IG da PRIMEIRA ultrassonografia e vale para as seguintes —
+   mas só se a paciente trouxe esse primeiro exame. Sem ele, não há como calcular:
+   fica apenas a IG estimada pela biometria.
+   Intervalos meio-abertos [inferior, superior): 9 semanas cai em ±5 dias (o mais conservador). */
+// exames obstétricos sequenciais (2º/3º trim.): são os que usam margem de erro do 1º USG
+const EX_OBST_SEQ = {obst23:true, obst_gemelar:true};
+const MARGEM_IG = [
+  {de:6,  ate:9,  dias:3},
+  {de:9,  ate:12, dias:5},
+  {de:12, ate:18, dias:7},
+  {de:18, ate:24, dias:10},
+  {de:24, ate:30, dias:15},
+  {de:30, ate:39, dias:20}
+];
+function margemErroIG(semanas){
+  var s=parseFloat(semanas);
+  if(!isFinite(s)) return null;
+  for(var i=0;i<MARGEM_IG.length;i++){
+    var f=MARGEM_IG[i];
+    if(s>=f.de && s<f.ate) return {dias:f.dias, faixa:f.de+'–'+f.ate+' semanas'};
+  }
+  if(s>=39) return {dias:20, faixa:'30–39 semanas (acima da tabela — usada a última faixa)'};
+  return null;   // abaixo de 6 semanas: fora da tabela
+}
+/* Aplica na conclusão: preenche a variação em dias e corrige a frase da IG.
+   Quando a paciente trouxe o 1º USG, a IG é CORRIGIDA por ele — não "estimada pela biometria". */
+function calcMargemIG(){
+  var el=document.getElementById('megRes'); if(!el) return;
+  var v=(document.getElementById('megSem')||{}).value;
+  if(v==='' || v==null){ el.textContent=''; return; }
+  var m=margemErroIG(v);
+  el.innerHTML = m
+    ? '<b>± '+m.dias+' dias</b> <span class="aviso">(faixa '+m.faixa+')</span><br><span class="aviso">Conclusão: “…(com variação de até +/- '+m.dias+' dias)”. Com o exame inicial em mãos, a frase correta é “A idade gestacional corrigida pela ultrassonografia de primeiro trimestre é de …”.</span>'
+    : '<span class="erro">Fora da tabela (6 a 39 semanas).</span>';
+}
+function processarObstetrico(ob, tipo){
+  var res={conclusao:null, obs:[]};
+  if(!ob || typeof ob!=='object') return res;
+  var trouxe = ob.trouxe_usg_primeiro_trimestre===true || ob.trouxe_usg_primeiro_trimestre==='true';
+  var semanas = parseFloat(ob.ig_primeiro_usg_semanas);
+  if(!trouxe){
+    res.obs.push('Margem de erro não calculada: a paciente não trouxe/não informou a ultrassonografia inicial. A conclusão traz apenas a idade gestacional estimada pela biometria.');
+    return res;
+  }
+  if(!isFinite(semanas)){
+    res.obs.push('A paciente trouxe a ultrassonografia inicial, mas a idade gestacional daquele exame não foi ditada — dite-a para eu calcular a margem de erro.');
+    return res;
+  }
+  var m=margemErroIG(semanas);
+  if(!m){
+    res.obs.push('Idade gestacional do primeiro exame ('+semanas+' semanas) fora da tabela de margem de erro (6–39 semanas) — confira.');
+    return res;
+  }
+  res.margem=m.dias; res.faixa=m.faixa; res.igPrimeiro=semanas;
+  res.obs.push('Margem de erro de ±'+m.dias+' dias aplicada pela IG de '+semanas+' semanas na ultrassonografia inicial (faixa '+m.faixa+').');
+  return res;
+}
+/* troca as frases da conclusão gerada pela IA */
+function obstAplicarNaConclusao(txt, margemDias){
+  var t=String(txt||'');
+  // 1) IG corrigida pelo 1º trimestre (em vez de "estimada pela biometria")
+  t=t.replace(/A biometria fetal estima que a idade gestacional m[eé]dia seja de/gi,
+              'A idade gestacional corrigida pela ultrassonografia de primeiro trimestre é de');
+  t=t.replace(/A idade gestacional (?:m[eé]dia )?estimada (?:pela biometria )?[eé] de/gi,
+              'A idade gestacional corrigida pela ultrassonografia de primeiro trimestre é de');
+  // 2) preenche a variação em dias (aceita pontilhados, número já posto ou vazio)
+  if(margemDias!=null){
+    t=t.replace(/\(com varia[çc][ãa]o de at[eé]\s*\+\/?\s*-?\s*[^)]*\)/gi,
+                '(com variação de até +/- '+margemDias+' dias)');
+  }
+  return t;
+}
 function tiradsCategoria(pts){ if(pts<=1) return {tr:1,desc:'benigno'}; if(pts===2) return {tr:2,desc:'não suspeito'}; if(pts===3) return {tr:3,desc:'levemente suspeito'}; if(pts<=6) return {tr:4,desc:'moderadamente suspeito'}; return {tr:5,desc:'altamente suspeito'}; }
 function tiradsConduta(tr, tam){
   if(tr<=2) return 'sem indicação de PAAF ou seguimento pela classificação';

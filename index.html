@@ -203,6 +203,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <label>Modelo auxiliar (tarefas simples — ex.: aprendizado)</label>
   <input type="text" id="cfgModeloAux" placeholder="ex.: gpt-5-mini (vazio = usa o modelo acima)">
   <span class="aviso">Modelo barato usado só na extração de regras do aprendizado. Se vazio, usa o modelo principal.</span>
+  <div id="cfgDadosStatus" style="margin:8px 0"></div>
   <label>Motor de transcrição local (opcional)</label>
   <input type="text" id="cfgAgenteLocal" placeholder="ex.: http://127.0.0.1:8977 (vazio = transcreve na OpenAI)">
   <span class="aviso">Serviço que roda no computador da clínica. Se preenchido e ativo, a <b>transcrição</b> é feita nele (melhor vocabulário médico, áudio não sai da máquina); se estiver fora do ar, cai automaticamente na OpenAI. A busca de exames por <b>DICOM</b> usa este endereço (ou <span class="mono">http://127.0.0.1:8977</span> quando vazio).</span>
@@ -656,7 +657,7 @@ document.getElementById('cfgAss').addEventListener('change', function(e){
       }
       x.putImageData(d, 0, 0);
       cfg.assinatura = c.toDataURL('image/png');
-      try{ localStorage.setItem('gass', cfg.assinatura); }
+      try{ dadoSalvar('gass', cfg.assinatura); }
       catch(err){ log('Imagem grande demais para guardar — use uma foto menor.', true); cfg.assinatura=''; }
       mostrarAssPrev();
     };
@@ -681,8 +682,8 @@ function salvarConfig(){
   cfg.medico = document.getElementById('cfgMedico').value.trim();
   cfg.crm = document.getElementById('cfgCrm').value.trim();
   localStorage.setItem('gagente',cfg.agenteLocal);
-  localStorage.setItem('gmk',cfg.chave); localStorage.setItem('gmodelo',cfg.modelo); localStorage.setItem('gmodaux',cfg.modeloAux);
-  localStorage.setItem('gmedico',cfg.medico); localStorage.setItem('gcrm',cfg.crm);
+  localStorage.setItem('gmk',cfg.chave); dadoSalvar('gmodelo',cfg.modelo); dadoSalvar('gmodaux',cfg.modeloAux);
+  dadoSalvar('gmedico',cfg.medico); dadoSalvar('gcrm',cfg.crm);
   document.getElementById('cardConfig').style.display='none';
   log('Configurações salvas.');
 }
@@ -746,6 +747,62 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
 /* Agente local (decisão 2026-07-21: web fala com serviço local, cai na nuvem se ausente).
    Faz duas coisas: transcrição com dicionário de USG e ponte com o Orthanc (DICOM).
    http://127.0.0.1 é permitido a partir de páginas HTTPS (exceção de loopback); LAN/iPhone exige HTTPS+cert. */
+/* ====== Dados do médico guardados no AGENTE (disco), não só no navegador ======
+   Modelos, dizeres, regras aprendidas, histórico, assinatura e config passam a viver em
+   arquivos no computador. Limpar o cache do Chrome não apaga mais nada. O navegador segue
+   funcionando sozinho quando o agente está desligado (localStorage continua como cópia).
+   Cada chave tem carimbo de tempo; na sincronia o MAIS RECENTE vence (o médico também usa
+   o iPhone, onde não há agente). A chave da API fica DE FORA de propósito. */
+const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux'];
+function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
+function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
+/* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
+function dadoSalvar(chave, valor){
+  var ok=true;
+  try{ localStorage.setItem(chave, valor); }catch(e){ ok=false; }
+  dadoMarcar(chave);
+  if(DADOS_SINCRONIZADOS.indexOf(chave)>=0){
+    try{
+      fetch(agenteBase()+'/dados/'+chave, {method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({valor:valor, ts:dadoTs(chave)})}).catch(function(){});
+    }catch(e){}
+  }
+  return ok;
+}
+/* Na abertura: compara o que está no disco com o que está no navegador e fica com o mais novo. */
+async function sincronizarDados(){
+  var base=agenteBase();
+  var man;
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},2500);
+    var r=await fetch(base+'/dados',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json(); if(!j||!j.ok) return null;
+    man=j.dados||{};
+  }catch(e){ return null; }   // agente desligado: segue com o navegador, sem barulho
+  var baixados=[], enviados=[];
+  for(var i=0;i<DADOS_SINCRONIZADOS.length;i++){
+    var ch=DADOS_SINCRONIZADOS[i];
+    var tsLocal=dadoTs(ch), temLocal=localStorage.getItem(ch)!=null;
+    var tsDisco=(man[ch]&&man[ch].ts)||0;
+    try{
+      if(tsDisco>tsLocal){                                   // disco mais novo -> traz
+        var rr=await fetch(base+'/dados/'+ch); var jj=await rr.json();
+        if(jj&&jj.ok&&jj.valor!=null){ localStorage.setItem(ch, jj.valor); localStorage.setItem(ch+'__ts', String(jj.ts||tsDisco)); baixados.push(ch); }
+      } else if(temLocal && tsLocal>tsDisco){                // navegador mais novo -> envia
+        await fetch(base+'/dados/'+ch,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({valor:localStorage.getItem(ch), ts:tsLocal||Date.now()})});
+        if(!tsLocal) dadoMarcar(ch);
+        enviados.push(ch);
+      } else if(temLocal && !tsDisco){                       // 1ª vez: leva tudo p/ o disco
+        var ts0=tsLocal||Date.now(); localStorage.setItem(ch+'__ts', String(ts0));
+        await fetch(base+'/dados/'+ch,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({valor:localStorage.getItem(ch), ts:ts0})});
+        enviados.push(ch);
+      }
+    }catch(e){}
+  }
+  return {baixados:baixados, enviados:enviados};
+}
 const AGENTE_PADRAO = 'http://127.0.0.1:8977';
 function agenteBase(){ return ((cfg.agenteLocal||'').trim().replace(/\/+$/,'')) || AGENTE_PADRAO; }
 var _agenteLocalOk=null;   // null=não checado · true/false=cache da sessão
@@ -2026,7 +2083,7 @@ function negrito(t){
 }
 /* ============ Loop de aprendizado: regras das correções do médico (localStorage) ============ */
 function lerRegras(){ try{ return JSON.parse(localStorage.getItem('gregras')||'[]'); }catch(e){ return []; } }
-function gravarRegras(arr){ try{ localStorage.setItem('gregras', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar os aprendizados: '+e.message, true); } }
+function gravarRegras(arr){ try{ dadoSalvar('gregras', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar os aprendizados: '+e.message, true); } }
 function regrasParaPrompt(tipo){
   var rs=lerRegras().filter(function(r){ return r.escopo==='global' || r.escopo===tipo; });
   if(!rs.length) return '';
@@ -2294,7 +2351,7 @@ function salvarBizus(){
   });
   var secoes=cont.__nomes.map(function(nome,i){ return {nome:nome, corpo:(corpos[i]||[]).join('\n\n')}; });
   var novo=bizusMontar(cont.__preamble, secoes);
-  try{ localStorage.setItem('gbizus', novo); log('BIZUS salvos — serão usados nos próximos laudos.'); var st=document.getElementById('bizusStatus'); if(st) st.textContent='✔ personalizados salvos'; }
+  try{ dadoSalvar('gbizus', novo); log('BIZUS salvos — serão usados nos próximos laudos.'); var st=document.getElementById('bizusStatus'); if(st) st.textContent='✔ personalizados salvos'; }
   catch(e){ log('Não consegui salvar os BIZUS (armazenamento cheio?): '+e.message,true); }
 }
 function restaurarBizus(){
@@ -2367,7 +2424,7 @@ function salvarModelos(){
     novo[key]=m;
   });
   if(!Object.keys(novo).length){ log('Nenhum modelo para salvar.', true); return; }
-  try{ localStorage.setItem('gmodelos', JSON.stringify(novo)); }catch(e){ log('Não consegui salvar os modelos (armazenamento cheio?): '+e.message, true); return; }
+  try{ dadoSalvar('gmodelos', JSON.stringify(novo)); }catch(e){ log('Não consegui salvar os modelos (armazenamento cheio?): '+e.message, true); return; }
   Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, novo);
   var st=document.getElementById('modelosStatus'); if(st) st.textContent='✔ personalizados salvos';
   log('Modelos salvos — '+Object.keys(novo).length+' modelo(s) ativos.');
@@ -2389,13 +2446,21 @@ function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')|
    (o laudo já foi salvo em PDF/pasta; o histórico é conveniência, não é o arquivo legal) */
 function gravarHistorico(arr){
   var lista=arr.slice().sort(function(a,b){ return (a.ts||0)-(b.ts||0); });   // antigos primeiro
+  // 1) DISCO (agente): guarda o histórico COMPLETO — disco não tem a cota do navegador
+  try{
+    dadoMarcar('glaudos');
+    fetch(agenteBase()+'/dados/glaudos',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({valor:JSON.stringify(lista), ts:dadoTs('glaudos')})}).catch(function(){});
+  }catch(e){}
+  // 2) NAVEGADOR: pode não caber -> vai podando os mais antigos (só a cópia local encolhe)
+  var copia=lista.slice();
   for(var tent=0; tent<12; tent++){
-    try{ localStorage.setItem('glaudos', JSON.stringify(lista)); return true; }
+    try{ localStorage.setItem('glaudos', JSON.stringify(copia)); return true; }
     catch(e){
-      if(lista.length<=1){ log('Não consegui salvar no histórico: '+e.message, true); return false; }
-      var fora=Math.max(1, Math.floor(lista.length*0.2));                      // corta 20% dos mais antigos
-      lista=lista.slice(fora);
-      log('Histórico cheio — removi '+fora+' laudo(s) antigo(s) para caber o novo (os PDFs salvos não são afetados).', true);
+      if(copia.length<=1){ log('Não consegui salvar no histórico do navegador: '+e.message, true); return false; }
+      var fora=Math.max(1, Math.floor(copia.length*0.2));
+      copia=copia.slice(fora);
+      log('Histórico cheio no navegador — mantive '+copia.length+' laudo(s) aqui (no computador, o agente guarda todos).', true);
     }
   }
   return false;
@@ -3513,6 +3578,28 @@ function mostrarAba(nome){
   window.scrollTo(0,0);
 }
 window.addEventListener('DOMContentLoaded', function(){ mostrarAba('captura'); });
+/* Ao abrir: traz do computador o que estiver mais novo (e leva o que só existe aqui).
+   Sem agente, nada acontece — o app segue funcionando só com o navegador. */
+window.addEventListener('DOMContentLoaded', async function(){
+  var r=null;
+  try{ r=await sincronizarDados(); }catch(e){}
+  var el=document.getElementById('cfgDadosStatus');
+  if(!r){ if(el) el.innerHTML='<span class="aviso">⚠️ Agente desligado — seus dados estão <b>só neste navegador</b>. Ligue o agente para guardá-los no computador.</span>'; return; }
+  if(r.baixados.length){
+    // reaplica o que veio do disco (o app já tinha lido o navegador na inicialização)
+    cfg.medico=localStorage.getItem('gmedico')||cfg.medico;
+    cfg.crm=localStorage.getItem('gcrm')||cfg.crm;
+    cfg.modelo=localStorage.getItem('gmodelo')||cfg.modelo;
+    cfg.modeloAux=localStorage.getItem('gmodaux')||cfg.modeloAux;
+    cfg.assinatura=localStorage.getItem('gass')||cfg.assinatura;
+    try{ var s=localStorage.getItem('gmodelos'); if(s){ var o=JSON.parse(s);
+      if(o&&typeof o==='object'&&Object.keys(o).length){ Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS,o); } } }catch(e){}
+    try{ mostrarAssPrev(); }catch(e){}
+    log('Dados carregados do computador: '+r.baixados.join(', ')+'.');
+  }
+  if(r.enviados.length) log('Seus dados foram copiados para o computador (proteção contra perda): '+r.enviados.join(', ')+'.');
+  if(el) el.innerHTML='<span class="aviso" style="color:#1f7a3d;font-weight:600">✔ Seus modelos, dizeres, aprendizados e histórico estão guardados no computador (com backup diário).</span>';
+});
 
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{ try{ fsGetHandle('laudo').then(function(h){ pastaLaudoH=h; atualizarPastaInfoRev(); }); }catch(e){}

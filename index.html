@@ -360,7 +360,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 <div class="aba-conteudo" id="pane-calc" style="display:none">
 <div class="card">
   <h2>🧮 Calculadoras ultrassonográficas</h2>
-  <p class="aviso">Ferramentas de apoio à decisão — confira sempre os documentos oficiais (ACR TI-RADS 2017, BI-RADS 5ª ed., O-RADS US v2022, Bosniak v2019). A classificação final é responsabilidade do médico.</p>
+  <p class="aviso">Ferramentas de apoio à decisão — confira sempre os documentos oficiais (ACR TI-RADS 2017, BI-RADS® v2025 Manual, O-RADS US v2022, Bosniak v2019). A classificação final é responsabilidade do médico.</p>
 
   <details class="calcBloco">
     <summary>Tireoide — ACR TI-RADS</summary>
@@ -407,17 +407,27 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <details class="calcBloco">
     <summary>Mama — BI-RADS (descritores US)</summary>
     <div class="calcCorpo" id="blocoBirads" onchange="calcBirads()">
-      <label>Caso especial (se houver, ignora os descritores abaixo)</label>
+      <label>Caso especial ou situação que dispensa os descritores</label>
       <select id="biEsp" onchange="calcBirads()">
         <option value="">— nenhum: usar descritores —</option>
-        <option value="cistoSimples">Cisto simples</option>
-        <option value="cistoComplicado">Cisto complicado (debris, sem sólido/fluxo)</option>
-        <option value="microcistos">Microcistos agrupados</option>
-        <option value="linfonodo">Linfonodo intramamário típico</option>
+        <optgroup label="Avaliação incompleta">
+          <option value="cat0a">0a — necessita imagem adicional</option>
+          <option value="cat0b">0b — necessita exames prévios para comparação</option>
+        </optgroup>
+        <optgroup label="Casos especiais">
+          <option value="cistoSimples">Cisto simples</option>
+          <option value="cistoComplicado">Cisto complicado (debris, sem sólido/fluxo)</option>
+          <option value="microcistos">Microcistos agrupados</option>
+          <option value="linfonodo">Linfonodo intramamário típico</option>
+        </optgroup>
+        <optgroup label="Malignidade já comprovada">
+          <option value="cat6">6 — malignidade comprovada por biópsia</option>
+        </optgroup>
       </select>
       <label>Forma</label>
       <div class="calcOpts">
         <label><input type="radio" name="biForma" value="oval">Oval</label>
+        <label><input type="radio" name="biForma" value="lobulada">Lobulada</label>
         <label><input type="radio" name="biForma" value="redonda">Redonda</label>
         <label><input type="radio" name="biForma" value="irregular">Irregular</label>
       </div>
@@ -434,11 +444,27 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <label><input type="radio" name="biMarg" value="microlobulada">Microlobulada</label>
         <label><input type="radio" name="biMarg" value="espiculada">Espiculada</label>
       </div>
+      <label>Padrão ecogênico (opcional)</label>
+      <select id="biEco" onchange="calcBirads()">
+        <option value="">— não avaliado —</option>
+        <option value="anecoico">Anecoico</option>
+        <option value="hiperecoico">Hiperecoico</option>
+        <option value="hipoecoico">Hipoecoico</option>
+        <option value="isoecoico">Isoecoico</option>
+        <option value="heterogeneo">Heterogêneo</option>
+        <option value="cisticoComplexo">Cístico complexo e sólido (parede espessa, septado ou com nódulo mural)</option>
+        <option value="misto">Misto sólido e cístico (contém claramente os dois componentes)</option>
+      </select>
       <label>Acústico posterior</label>
       <div class="calcOpts">
         <label><input type="radio" name="biPost" value="nenhum">Sem alteração</label>
         <label><input type="radio" name="biPost" value="reforco">Reforço</label>
         <label><input type="radio" name="biPost" value="sombra">Sombra</label>
+        <label><input type="radio" name="biPost" value="combinado">Padrão combinado</label>
+      </div>
+      <label>Achados associados</label>
+      <div class="calcOpts">
+        <label><input type="checkbox" id="biHalo" onchange="calcBirads()">Halo ecogênico (<i>echogenic rind</i>) — incluir na medida da lesão</label>
       </div>
       <div class="calcRes" id="biRes"></div>
       <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('biRes')">📋 Copiar</button></div>
@@ -3478,25 +3504,40 @@ function calcTirads(){
 function calcBirads(){
   var esp=(document.getElementById('biEsp')||{}).value||'';
   if(esp){
-    var mapa={cistoSimples:['2','Cisto simples — achado benigno. Rotina.'], cistoComplicado:['3','Cisto complicado — provavelmente benigno. Seguimento em 6 meses (ou aspiração se sintomático).'], microcistos:['3','Microcistos agrupados — provavelmente benigno. Seguimento em 6 meses.'], linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.']};
+    var mapa={
+      cat0a:['0a','Avaliação incompleta — necessita imagem adicional. Complementar antes de atribuir categoria final.'],
+      cat0b:['0b','Avaliação incompleta — necessita exames prévios para comparação. Recuperar e comparar antes de atribuir categoria final.'],
+      cistoSimples:['2','Cisto simples — achado benigno. Rotina.'],
+      cistoComplicado:['3','Cisto complicado — provavelmente benigno. Seguimento em 6, 12 e 24 meses (ou aspiração se sintomático).'],
+      microcistos:['3','Microcistos agrupados — provavelmente benigno. Seguimento em 6, 12 e 24 meses.'],
+      linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.'],
+      cat6:['6','Malignidade comprovada por biópsia. Seguimento clínico e terapia local definitiva, conforme a conduta oncológica adotada.']
+    };
     var r=mapa[esp]; calcOut('biRes','BI-RADS '+r[0]+'. '+r[1]); return;
   }
   var forma=calcRadio('blocoBirads','biForma'), ori=calcRadio('blocoBirads','biOri'), marg=calcRadio('blocoBirads','biMarg'), post=calcRadio('blocoBirads','biPost');
+  var eco=(document.getElementById('biEco')||{}).value||'', halo=!!(document.getElementById('biHalo')||{}).checked;
   if(!forma||!ori||!marg){ calcOut('biRes',''); return; }
-  var susp=[], cat, cond;
+  var susp=[], notas=[], cat, cond;
   if(forma==='irregular') susp.push('forma irregular');
+  if(forma==='lobulada') notas.push('forma lobulada é discretamente mais suspeita que oval — não converte por si só em categoria 4, mas não é neutra');
   if(ori==='nao') susp.push('orientação não paralela');
   if(marg!=='circ') susp.push('margem '+({indistinta:'indistinta',angular:'angular',microlobulada:'microlobulada',espiculada:'espiculada'})[marg]);
+  if(eco==='heterogeneo') susp.push('padrão ecogênico heterogêneo');
+  if(eco==='cisticoComplexo') susp.push('massa cística complexa e sólida');
+  if(eco==='misto') susp.push('massa mista sólido-cística');
   if(post==='sombra') susp.push('sombra acústica posterior');
+  if(post==='combinado') susp.push('padrão acústico posterior combinado');
+  if(halo){ susp.push('halo ecogênico'); notas.push('incluir o halo ecogênico na medida da lesão'); }
   var n=susp.length;
-  if(n===0){ cat='3'; cond='Provavelmente benigno (≤ 2% de risco) — seguimento em 6, 12 e 24 meses; estabilidade ≥ 2–3 anos permite reclassificar como BI-RADS 2.'; }
+  if(n===0){ cat='3'; cond='Provavelmente benigno (≤ 2% de risco) — seguimento em 6, 12 e 24 meses; 2 anos de estabilidade documentada permitem reclassificar como BI-RADS 2.'; }
   else if(marg==='espiculada' && n>=2){ cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
   else if(marg==='espiculada'){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
   else if(n===1){ cat='4A'; cond='Suspeita baixa (2–10%) — biópsia/PAAF.'; }
   else if(n===2){ cat='4B'; cond='Suspeita moderada (10–50%) — biópsia.'; }
   else if(n===3){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
   else { cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
-  calcOut('biRes','BI-RADS '+cat+(n?' — descritores suspeitos: '+susp.join(', ')+'.':' — descritores benignos (oval/redonda, paralela, circunscrita).')+'\n'+cond+'\n(Apoio por descritores — a categoria final considera o conjunto clínico-radiológico.)');
+  calcOut('biRes','BI-RADS '+cat+(n?' — descritores suspeitos: '+susp.join(', ')+'.':' — descritores benignos (margem circunscrita, orientação paralela, sem sombra acústica).')+'\n'+cond+(notas.length?'\nNotas: '+notas.join('; ')+'.':'')+'\n(Apoio por descritores — a categoria final considera o conjunto clínico-radiológico.)');
 }
 function calcOrads(){
   var t=(document.getElementById('orTipo')||{}).value||'';

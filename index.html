@@ -230,8 +230,9 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <span class="aviso">Serviço que roda no computador da clínica. Se preenchido e ativo, a <b>transcrição</b> é feita nele (melhor vocabulário médico, áudio não sai da máquina); se estiver fora do ar, cai automaticamente na OpenAI. A busca de exames por <b>DICOM</b> usa este endereço (ou <span class="mono">http://127.0.0.1:8977</span> quando vazio).</span>
   <label>💾 Pasta de backup (fora deste computador)</label>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-    <input type="text" id="cfgBackupPasta" style="flex:1;min-width:240px" placeholder="ex.: C:\Users\serru\OneDrive\Backup Laudos">
-    <button class="btn sec" type="button" onclick="salvarPastaBackup()">Salvar pasta</button>
+    <input type="text" id="cfgBackupPasta" style="flex:1;min-width:220px" placeholder="escolha pelo botão ao lado">
+    <button class="btn" type="button" id="btnEscolherBackup" onclick="escolherPastaBackup()">📁 Escolher pasta…</button>
+    <button class="btn sec" type="button" onclick="salvarPastaBackup()">Salvar caminho digitado</button>
     <button class="btn sec" type="button" onclick="backupAgora()">Fazer backup agora</button>
   </div>
   <span class="aviso">O backup diário de hoje mora no <b>mesmo disco</b> dos dados: se este computador falhar, os dois se perdem juntos. Aponte aqui uma pasta do <b>OneDrive</b>, de um HD externo ou da rede — o agente copia os dados uma vez por dia e guarda 60 dias de histórico. Cole o caminho da pasta (ela precisa já existir).</span>
@@ -763,6 +764,27 @@ async function atualizarEstadoBackup(){
       : '<span style="color:#1f7a3d">✔ Backup em <b>'+esc(j.pasta)+'</b></span>'
         +(j.ultimoDia?(' · último: '+esc(j.ultimoDia)+' ('+j.arquivos+' arquivo(s), '+(j.bytes/1048576).toFixed(1)+' MB)'):' · ainda não copiado hoje')+gb;
   }catch(e){ el.textContent='Agente fora do ar — não dá para conferir o backup agora.'; }
+}
+/* O navegador não pode saber o CAMINHO de uma pasta (só um apelido), então quem abre
+   o seletor do Windows é o agente, que é programa nativo. A janela pode demorar (o
+   médico procurando), por isso sem tempo limite curto aqui. */
+async function escolherPastaBackup(){
+  var el=document.getElementById('backupEstado'), b=document.getElementById('btnEscolherBackup');
+  el.innerHTML='📁 Abri a janela de pastas <b>no computador da clínica</b> — se não estiver à vista, procure na barra de tarefas.';
+  if(b){ b.disabled=true; b.textContent='Escolhendo…'; }
+  try{
+    var r=await fetch(agenteBase()+'/backup/escolher',{method:'POST'});
+    var j=await r.json();
+    if(j.cancelado){ el.textContent='Escolha cancelada.'; atualizarEstadoBackup(); return; }
+    if(!j.ok){ el.innerHTML='<b style="color:#b3261e">⚠️ '+esc(j.erro||'não consegui usar essa pasta')+'</b>'; return; }
+    document.getElementById('cfgBackupPasta').value=j.pasta||'';
+    log('Pasta de backup: '+j.pasta+(j.primeiraCopia&&j.primeiraCopia.arquivos!=null?(' — copiei '+j.primeiraCopia.arquivos+' arquivo(s) agora'):''));
+    atualizarEstadoBackup();
+  }catch(e){
+    el.innerHTML='<b style="color:#b3261e">⚠️ Agente fora do ar ('+esc(e.message)+'). Ligue o agente no computador da clínica.</b>';
+  }finally{
+    if(b){ b.disabled=false; b.textContent='📁 Escolher pasta…'; }
+  }
 }
 async function salvarPastaBackup(){
   var inp=document.getElementById('cfgBackupPasta'), el=document.getElementById('backupEstado');

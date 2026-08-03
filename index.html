@@ -209,6 +209,12 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <h2>Configurações</h2>
   <label>Chave da API da OpenAI</label>
   <input type="password" id="cfgChave" placeholder="Cole aqui sua chave (sk-...)">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+    <button class="btn" type="button" onclick="guardarChaveNoAgente()">🔒 Guardar a chave no computador</button>
+    <button class="btn sec" type="button" onclick="removerChaveDoNavegador()">Apagar a chave deste navegador</button>
+  </div>
+  <div id="iaEstado" class="aviso" style="margin-top:4px"></div>
+  <span class="aviso">A chave guardada <b>no navegador</b> pode ser copiada por quem abrir o console. Guardando <b>no computador</b> (no agente), o app passa a pedir os laudos através dele e a chave nunca mais aparece aqui.</span>
   <label>Modelo</label>
   <select id="cfgModelo">
     <option value="chat-latest">chat-latest (recomendado)</option>
@@ -688,6 +694,55 @@ function alternarConfig(){
   document.getElementById('cfgCrm').value = cfg.crm;
   renderRegras();
   atualizarEstadoBackup();
+  atualizarEstadoIA();
+}
+/* ---- Chave da OpenAI guardada no agente (2026-08-03) ----
+   Tira a chave do navegador, onde qualquer um que abrisse o console a copiava.
+   O app passa a pedir os laudos pelo agente, que injeta a chave no caminho. */
+async function atualizarEstadoIA(){
+  var el=document.getElementById('iaEstado'); if(!el) return;
+  var temLocal=!!(cfg.chave||'').trim();
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},2000);
+    var r=await fetch(agenteBase()+'/ia/estado',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json();
+    if(j.configurada){
+      el.innerHTML='<span style="color:#1f7a3d">🔒 A chave está guardada <b>no computador</b> (final '+esc(j.final)+'). Os laudos passam pelo agente.</span>'
+        +(j.chamadas?(' · '+j.chamadas+' chamada(s) hoje'+(j.erros?', '+j.erros+' erro(s)':'')):'')
+        +(temLocal?'<br><b style="color:#b3261e">⚠️ Ainda existe uma cópia da chave NESTE navegador.</b> Toque em "Apagar a chave deste navegador".':'');
+    } else {
+      el.innerHTML = temLocal
+        ? '<b style="color:#b3261e">⚠️ A chave está só no navegador</b> — quem abrir o console copia. Toque em "Guardar a chave no computador".'
+        : '<b style="color:#b3261e">⚠️ Nenhuma chave configurada.</b> Cole a chave acima e guarde no computador.';
+    }
+  }catch(e){
+    el.innerHTML = temLocal
+      ? 'Agente fora do ar — usando a chave deste navegador por enquanto.'
+      : '<b style="color:#b3261e">⚠️ Agente fora do ar e sem chave neste dispositivo: a IA não vai funcionar.</b>';
+  }
+}
+async function guardarChaveNoAgente(){
+  var inp=document.getElementById('cfgChave');
+  var k=(inp.value||cfg.chave||'').trim();
+  if(!k){ log('Cole a chave no campo acima antes de guardar.', true); return; }
+  try{
+    var r=await fetch(agenteBase()+'/ia/chave',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chave:k})});
+    var j=await r.json();
+    if(!j.ok){ log('Não consegui guardar a chave: '+(j.erro||'erro'), true); return; }
+    // guardou lá: some com a cópia daqui, que é o ponto de tudo isto
+    cfg.chave=''; try{ localStorage.setItem('gmk',''); }catch(e){}
+    inp.value=''; _iaAgente={ok:null,quando:0};
+    log('🔒 Chave guardada no computador e apagada deste navegador.');
+    atualizarEstadoIA();
+  }catch(e){ log('Agente fora do ar — não deu para guardar a chave lá ('+e.message+').', true); }
+}
+function removerChaveDoNavegador(){
+  cfg.chave=''; try{ localStorage.setItem('gmk',''); }catch(e){}
+  var inp=document.getElementById('cfgChave'); if(inp) inp.value='';
+  _iaAgente={ok:null,quando:0};
+  log('Chave apagada deste navegador.');
+  atualizarEstadoIA();
 }
 /* ---- Backup externo (2026-08-03) ----
    A pasta vive no AGENTE, não no navegador: é ele quem copia, e assim a configuração
@@ -774,7 +829,20 @@ function salvarConfig(){
   cfg.medico = document.getElementById('cfgMedico').value.trim();
   cfg.crm = document.getElementById('cfgCrm').value.trim();
   localStorage.setItem('gagente',cfg.agenteLocal);
-  localStorage.setItem('gmk',cfg.chave); dadoSalvar('gmodelo',cfg.modelo); dadoSalvar('gmodaux',cfg.modeloAux);
+  // Se o agente está no ar, a chave vai para LÁ e não fica aqui — senão o médico
+  // colaria a chave, salvaria pelo botão comum e ela voltaria para o navegador.
+  if(cfg.chave && _iaAgente.ok!==false){
+    var kk=cfg.chave;
+    fetch(agenteBase()+'/ia/chave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chave:kk})})
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j&&j.ok){ cfg.chave=''; try{localStorage.setItem('gmk','');}catch(e){}
+        _iaAgente={ok:null,quando:0}; log('🔒 Chave guardada no computador (não ficou neste navegador).'); atualizarEstadoIA(); }
+        else { localStorage.setItem('gmk',kk); atualizarEstadoIA(); } })
+      .catch(function(){ localStorage.setItem('gmk',kk); atualizarEstadoIA(); });
+  } else {
+    localStorage.setItem('gmk',cfg.chave);
+  }
+  dadoSalvar('gmodelo',cfg.modelo); dadoSalvar('gmodaux',cfg.modeloAux);
   dadoSalvar('gmedico',cfg.medico); dadoSalvar('gcrm',cfg.crm);
   document.getElementById('cardConfig').style.display='none';
   log('Configurações salvas.');
@@ -814,7 +882,21 @@ async function fetchRetentativa(fazerFetch, rotulo, maxTent){
   }
 }
 async function openai(conteudo, querJson=true, opts){
-  if(!cfg.chave) throw new Error('Configure sua chave da API em ⚙︎ Configurações.');
+  // A chave mora no AGENTE (computador da clínica), não aqui: quem abrisse o console
+  // do navegador copiava. Só quando o agente não responde é que se usa a chave local —
+  // caso do iPhone fora do alcance dele, para não deixar o médico sem IA no meio do dia.
+  if(await iaPeloAgente()){
+    const rp = await fetchRetentativa(function(){
+      return fetch(agenteBase()+'/ia/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)});
+    }, (opts&&opts.rotulo)||'IA');
+    const jp = await rp.json();
+    try{ if(jp && jp.usage) registrarUso(modelo, jp.usage); }catch(e){}
+    const tp = jp.choices && jp.choices[0] && jp.choices[0].message && jp.choices[0].message.content;
+    if(!tp) throw new Error('Resposta vazia da API'+(jp.error&&jp.error.message?': '+jp.error.message:'.'));
+    return querJson ? extrairJson(tp) : tp;
+  }
+  if(!cfg.chave) throw new Error('A IA está indisponível: o agente não respondeu e não há chave guardada neste dispositivo. Ligue o agente no computador da clínica.');
   const modelo = (opts && opts.modelo) ? opts.modelo : cfg.modelo;
   const body = {model: modelo, messages:[{role:'user', content: conteudo}]};
   if(querJson) body.response_format = {type:'json_object'};
@@ -931,6 +1013,19 @@ async function agenteLocalDisponivel(){
   }catch(e){ _agenteLocalOk=false; }
   return _agenteLocalOk;
 }
+/* A IA passa pelo agente? Só se ele responder E tiver a chave guardada.
+   Resposta em cache por 30 s: esta pergunta acontece a cada chamada de IA. */
+var _iaAgente={ok:null, quando:0};
+async function iaPeloAgente(){
+  if(_iaAgente.ok!==null && (Date.now()-_iaAgente.quando)<30000) return _iaAgente.ok;
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},1500);
+    var r=await fetch(agenteBase()+'/ia/estado',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json();
+    _iaAgente={ok:!!(j&&j.ok&&j.configurada), quando:Date.now()};
+  }catch(e){ _iaAgente={ok:false, quando:Date.now()}; }
+  return _iaAgente.ok;
+}
 async function transcreverLocal(wavBlob){
   var base=(cfg.agenteLocal||'').trim().replace(/\/+$/,'');
   var b64=await new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=function(){rej(fr.error);}; fr.readAsDataURL(wavBlob); });
@@ -947,7 +1042,8 @@ async function transcreverAudio(arquivoOuBlob){
     try{ var tl=await transcreverLocal(wav); if(tl && tl.trim()) texto=tl; }
     catch(e){ ultimoErro='local: '+((e&&e.message)||e); _agenteLocalOk=null; /* revalida na próxima; cai na OpenAI agora */ }
   }
-  // 2) fallback OpenAI
+  // 2) fallback OpenAI — passando pelo agente se ele estiver no ar (a chave vive lá)
+  if(texto===null) await iaPeloAgente();
   if(texto===null) for(const m of MODELOS_TRANSCRICAO){
     try{
       const r = await fetchRetentativa(function(){
@@ -957,6 +1053,8 @@ async function transcreverAudio(arquivoOuBlob){
         fd.append('language', 'pt');
         fd.append('prompt', PROMPT_TRANSCRICAO_USG);
         fd.append('response_format', 'json');
+        // pelo agente quando ele estiver no ar (a chave fica lá); senão, direto
+        if(_iaAgente.ok) return fetch(agenteBase()+'/ia/transcrever',{method:'POST', body:fd});
         return fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+cfg.chave}, body:fd});
       }, 'transcrição ('+m+')');
       const j = await r.json(); texto = j.text||''; break;

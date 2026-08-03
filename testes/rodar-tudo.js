@@ -22,6 +22,7 @@ const SUITE = [
   { arq: 'teste-buffer.py', o: 'fita de audio do agente', py: true },
   { arq: 'teste-cache.py', o: 'cache da listagem DICOM', py: true },
   { arq: 'teste-backup.js', o: 'backup externo (precisa do agente no ar)', agente: true },
+  { arq: 'teste-chave.js', o: 'chave da OpenAI no agente (precisa do agente no ar)', agente: true },
 ];
 
 let ok = 0, falhou = 0, pulou = 0;

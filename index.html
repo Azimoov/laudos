@@ -772,11 +772,34 @@ async function openai(conteudo, querJson=true, opts){
     body: JSON.stringify(body)
   }); }, (opts&&opts.rotulo)||'IA');
   const j = await r.json();
+  try{ if(j && j.usage) registrarUso(modelo, j.usage); }catch(e){}   // custo real, não estimado
   const texto = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
   if(!texto) throw new Error('Resposta vazia da API.');
   if(!querJson) return texto;
-  const limpo = texto.replace(/^```json\s*/i,'').replace(/```\s*$/,'');
-  return JSON.parse(limpo);
+  return extrairJson(texto);
+}
+/* A IA às vezes devolve o JSON embrulhado (cercas ```, frase antes/depois). Antes,
+   qualquer enfeite derrubava o laudo inteiro com um erro de parse seco. */
+function extrairJson(texto){
+  const limpo = String(texto||'').replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  try{ return JSON.parse(limpo); }
+  catch(e){
+    const m = limpo.match(/\{[\s\S]*\}/);            // maior bloco {...} da resposta
+    if(m){ try{ return JSON.parse(m[0]); }catch(e2){} }
+    throw new Error('A IA respondeu fora do formato JSON ('+e.message+'). Começo da resposta: "'+limpo.slice(0,140)+'…"');
+  }
+}
+/* Consumo por dia e por modelo, com o campo usage que a API já devolvia e era descartado.
+   Vai para o disco (chave sincronizada) — vira a base da tabela uso_ia na F2. */
+function registrarUso(modelo, u){
+  var g={}; try{ g=JSON.parse(localStorage.getItem('guso')||'{}'); }catch(e){}
+  var dia=new Date().toISOString().slice(0,10);
+  var d=g[dia]||(g[dia]={});
+  var m=d[modelo]||(d[modelo]={n:0,entrada:0,saida:0});
+  m.n++; m.entrada+=(u.prompt_tokens||0); m.saida+=(u.completion_tokens||0);
+  var dias=Object.keys(g).sort();
+  while(dias.length>90) delete g[dias.shift()];     // 90 dias bastam; o backup diário guarda o resto
+  dadoSalvar('guso', JSON.stringify(g));
 }
 
 const MODELOS_TRANSCRICAO = ['gpt-4o-transcribe','gpt-4o-mini-transcribe','whisper-1'];
@@ -793,7 +816,7 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
    funcionando sozinho quando o agente está desligado (localStorage continua como cópia).
    Cada chave tem carimbo de tempo; na sincronia o MAIS RECENTE vence (o médico também usa
    o iPhone, onde não há agente). A chave da API fica DE FORA de propósito. */
-const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux'];
+const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -2124,6 +2147,10 @@ function negrito(t){
   const esc = (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return esc.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
 }
+/* Escapa texto que vai para innerHTML. Nome de paciente vem do worksheet do aparelho
+   e volta pelo JSON da IA — se alguém cadastrar um nome com HTML na recepção, sem isto
+   ele executaria dentro do app (e o app guarda a chave da OpenAI). */
+function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 /* ============ Loop de aprendizado: regras das correções do médico (localStorage) ============ */
 function lerRegras(){ try{ return JSON.parse(localStorage.getItem('gregras')||'[]'); }catch(e){ return []; } }
 function gravarRegras(arr){ try{ dadoSalvar('gregras', JSON.stringify(arr)); }catch(e){ log('Não foi possível salvar os aprendizados: '+e.message, true); } }
@@ -2738,8 +2765,8 @@ function abrirRevisao(exId, semTela){
   var _folhaAbre = '<div class="laudoFolha'+(_temFundo?' comFundo':'')+'"'+(_temFundo?' style="padding-top:'+(_fnd.padTopMm||30)+'mm;padding-bottom:'+(_fnd.padBottomMm||20)+'mm"':'')+'>'+(_temFundo?'<img class="fundoLaudo" src="'+_fnd.img+'" alt="">':'');
   document.getElementById('areaImpressao').innerHTML =
   _folhaAbre
-  +'<div class="laudoCab"><div contenteditable="true"><b>Nome do Paciente:</b>'+(c.nome||'')+'<br><b>Idade:</b> '+(c.idade||'')+'<br><b>Realizado em:</b> '+(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+(c.dados_clinicos||'')+'</div></div>'
-  +'<div class="laudoCorpoBox"><div class="laudoTitulo" contenteditable="true">'+L.titulo+'</div>'
+  +'<div class="laudoCab"><div contenteditable="true"><b>Nome do Paciente:</b>'+esc(c.nome||'')+'<br><b>Idade:</b> '+esc(c.idade||'')+'<br><b>Realizado em:</b> '+esc(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+esc(c.dados_clinicos||'')+'</div></div>'
+  +'<div class="laudoCorpoBox"><div class="laudoTitulo" contenteditable="true">'+esc(L.titulo)+'</div>'
   +'<div class="laudoTexto" contenteditable="true">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n'))
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')
@@ -2787,7 +2814,7 @@ function renderRevisao(){
   if(!lista.length){ div.innerHTML=rodapeLib+(nLib?'<p class="aviso">Todos os laudos foram liberados (ocultos — toque em "mostrar liberados"; também estão no Histórico).</p>':'<p class="aviso">Gere os laudos para revisar aqui.</p>'); return; }
   div.innerHTML=rodapeLib+lista.map(function(ex){
     const auds=audios.filter(function(a){return a.exameId===ex.id;});
-    const nome=(ex.paciente||"(sem nome)")+(ex.subExame?" - "+ex.subExame:"");
+    const nome=esc((ex.paciente||"(sem nome)")+(ex.subExame?" - "+ex.subExame:""));
     const players=auds.length?auds.map(function(a){return '<div style="margin-top:4px">'+(a.url?playerLinha(a.url):"(áudio indisponível)")+"</div>";}).join(""):'<p class="aviso">Sem áudio vinculado.</p>';
     const imgs=(ex.imagens||[]).length?ex.imagens.map(function(d){return '<img class="revImg" onmouseenter="revZoomMostrar(this)" onmouseleave="revZoomEsconder()" src="'+d+'" style="max-width:120px;max-height:120px;margin:4px;border:1px solid #c8d0da;border-radius:6px">';}).join(""):'<p class="aviso">Sem imagens.</p>';
     return '<div style="border:1px solid #c8d0da;border-radius:10px;padding:10px;margin-top:8px">'
@@ -3053,7 +3080,12 @@ async function capOrtListar(){
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'resposta inválida');
   return j.estudos||[];
 }
+var capOrtLigando=false;
 async function capOrtToggle(){
+  // Trava de reentrada: a conexão leva segundos, e um 2º toque nesse meio-tempo caía
+  // no ramo de LIGAR de novo (capOrtWatching ainda era false) — deixava microfone
+  // aberto e espera "fantasma". Detectado em teste real em 03/08.
+  if(capOrtLigando) return;
   var b=document.getElementById('btnCapOrt');
   if(capOrtWatching){
     capOrtWatching=false; if(capOrtTimer) clearInterval(capOrtTimer); capOrtTimer=null;
@@ -3061,6 +3093,7 @@ async function capOrtToggle(){
     try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(e){}
     capAgenteMic=false; micMonitorParar(); capOrtStatusTxt('Espera parada — microfone do agente desligado.'); return;
   }
+  capOrtLigando=true;
   capOrtStatusTxt('Conectando ao agente…');
   try{
     var lista=await capOrtListar();
@@ -3079,6 +3112,8 @@ async function capOrtToggle(){
     micMonitorIniciar();   // gráfico de ondas: prova que o microfone está capturando de fato
   }catch(e){
     capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+'). Ele precisa estar rodando no computador.');
+  }finally{
+    capOrtLigando=false;
   }
 }
 var _capOrtCiclo=0;
@@ -3190,6 +3225,12 @@ async function micPulso(){
   var sec=document.getElementById('capMicSec'), txt=document.getElementById('capMicEstado');
   if(!j||!j.ok){ if(txt){ txt.textContent='⚠️ sem contato com o agente'; txt.style.color='#e05c4b'; } return; }
   micRelAgente=j.relogioAgente||0; micRecebidoEm=Date.now();
+  // Relógio do navegador × relógio do agente: o recorte do áudio é todo baseado em hora.
+  // Um desvio grande (fuso errado, relógio manual) racharia as janelas sem sintoma claro.
+  if(!window.__avisoRelogio && j.relogioAgente && Math.abs(Date.now()/1000-j.relogioAgente)>120){
+    window.__avisoRelogio=true;
+    log('⚠️ O relógio deste dispositivo difere do computador do agente em '+Math.round(Math.abs(Date.now()/1000-j.relogioAgente))+'s. O recorte do ditado pode sair deslocado — confira data/hora dos dois.', true);
+  }
   (j.niveis||[]).forEach(function(p){ if(p[0]>micUltAmostra()) micNiveis.push(p); });
   if(micNiveis.length>900) micNiveis.splice(0, micNiveis.length-900);
   if(sec) sec.style.display=j.microfone?'flex':'none';

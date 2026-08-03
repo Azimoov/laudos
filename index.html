@@ -66,13 +66,28 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 .aviso{font-size:var(--fs-1);color:var(--texto-2);margin-top:8px;}
 .erro{color:var(--vermelho);font-weight:600;}
 #telaRevisao{display:none;}
-.revImg{cursor:zoom-in;}
+/* A miniatura sob o mouse se destaca: é ela que responde "qual imagem está aberta?".
+   O painel diz O QUE está ampliado; o anel diz DE ONDE veio. */
+.revImg{cursor:zoom-in;transition:transform .13s ease, box-shadow .13s ease, border-color .13s ease;}
+.revImg:hover{transform:translateY(-2px) scale(1.03);border-color:#2f6fb5!important;
+  box-shadow:0 5px 16px rgba(47,111,181,.4);position:relative;z-index:2;}
 /* zoom da imagem: painel FIXO que abre sobre o laudo, sempre inteiro na tela
-   (antes era transform:scale(5), que estourava a borda direita e cortava a imagem) */
-#revZoom{display:none;position:fixed;right:222px;top:50%;transform:translateY(-50%);z-index:200;
-  background:#0b131e;padding:6px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);pointer-events:none;}
+   (antes era transform:scale(5), que estourava a borda direita e cortava a imagem).
+   Animação (31/07): display:none não anima, então entra por opacidade + escala.
+   Cresce a partir da DIREITA, que é o lado onde ficam as miniaturas. */
+#revZoom{position:fixed;right:222px;top:50%;z-index:200;
+  background:#0b131e;padding:6px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);pointer-events:none;
+  opacity:0;visibility:hidden;transform-origin:right center;
+  transform:translateY(-50%) translateX(14px) scale(.93);
+  transition:opacity .12s ease, transform .16s cubic-bezier(.22,.9,.28,1), visibility 0s linear .16s;}
+#revZoom.aberto{opacity:1;visibility:visible;transform:translateY(-50%) translateX(0) scale(1);
+  transition:opacity .11s ease, transform .17s cubic-bezier(.22,.9,.28,1), visibility 0s;}
 #revZoom img{display:block;max-height:88vh;max-width:58vw;border-radius:6px;}
 @media (max-width:900px){ #revZoom{right:12px;left:12px;} #revZoom img{max-width:100%;} }
+@media (prefers-reduced-motion:reduce){
+  .revImg,#revZoom{transition-duration:.01ms!important;}
+  .revImg:hover{transform:none;}
+}
 /* revisão: laudo à esquerda começando no TOPO; ferramentas (IA, áudio) e imagens numa
    coluna lateral. Antes tudo isso ficava empilhado acima e empurrava o laudo p/ baixo. */
 #obsBanner{max-width:1104px;margin:0 auto 8px;}
@@ -304,7 +319,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 <div class="aba-conteudo" id="pane-captura" style="display:block">
 <div class="card" id="cardCaptura" style="border:2px solid #1f7a3d">
   <h2>🔴 Captura ao vivo — grave agora, a imagem chega depois</h2>
-  <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando as imagens chegarem na pasta vigiada, o app vincula ao ditado e gera o laudo. Atalho: durante a gravação, a <b>barra de espaço</b> pausa/retoma.<br><b>Não precisa dizer o nome do paciente</b> — ele vem do worksheet do exame. Dite os achados; se quiser, diga o <b>tipo do exame</b> (ex.: "abdome total") para o laudo sair automático.</p>
+  <p class="aviso">Grave o ditado <b>durante o exame</b> (pode pausar e retomar) e toque <b>✅ Finalizar ditado</b>. Quando o exame chegar do aparelho, o app vincula ao ditado e gera o laudo. Atalho: durante a gravação, a <b>barra de espaço</b> pausa/retoma.<br><b>Não precisa dizer o nome do paciente</b> — ele vem do worksheet do exame. Dite os achados; se quiser, diga o <b>tipo do exame</b> (ex.: "abdome total") para o laudo sair automático.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px">
     <button class="btn" id="btnCapRec" onclick="capToggleRec()">🎙 Gravar ditado</button>
     <button class="btn" id="btnCapFinalizar" onclick="capFinalizar()" style="display:none;background:#1f7a3d">✅ Finalizar ditado</button>
@@ -320,14 +335,13 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <label style="font-weight:400;display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="capOrtAuto" checked> gerar o laudo automaticamente</label>
       <span class="aviso" id="capOrtStatus">Grave o ditado, toque aqui e envie o exame no aparelho.</span>
     </div>
-  </div>
-  <div id="capFolderSec" style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="btn sec" onclick="capEscolherPasta()">📁 Escolher pasta a vigiar</button>
-      <button class="btn" id="btnCapVigiar" onclick="capToggleVigia()" style="display:none">▶ Iniciar captura</button>
-      <span class="aviso" id="capPastaInfo">Nenhuma pasta escolhida.</span>
+    <div id="capMicSec" style="display:none;margin-top:8px;gap:10px;align-items:center;flex-wrap:wrap">
+      <canvas id="vuAgente" width="320" height="44" title="O traço ANDANDO significa que o microfone está capturando. Linha reta parada = microfone morto." style="background:#0f1c28;border-radius:8px;border:1px solid #24384a"></canvas>
+      <span class="aviso" id="capMicEstado" style="font-weight:600"></span>
+      <label class="aviso" style="display:flex;gap:5px;align-items:center;font-weight:400;cursor:pointer" title="Toca um bipe curto se o microfone reiniciar ou parar. O microfone grava o próprio bipe, por isso ele é curto.">
+        <input type="checkbox" id="capMicSom" onchange="micAlternarSom(this)"> 🔔 avisar por som
+      </label>
     </div>
-    <div id="capStatus" class="aviso" style="margin-top:6px"></div>
   </div>
   <div id="capExamesNovos" style="margin-top:8px"></div>
 </div>
@@ -2751,9 +2765,12 @@ function abrirRevisao(exId, semTela){
 function revZoomMostrar(img){
   var z=document.getElementById('revZoom'), zi=document.getElementById('revZoomImg');
   if(!z||!zi||!img) return;
-  zi.src=img.src; z.style.display='block';
+  // só troca a fonte se mudou: reatribuir a mesma imagem faz ela piscar ao reentrar
+  if(zi.getAttribute('src')!==img.src) zi.src=img.src;
+  z.style.display='';            // limpa o display inline de versões antigas do app
+  z.classList.add('aberto');
 }
-function revZoomEsconder(){ var z=document.getElementById('revZoom'); if(z){ z.style.display='none'; } }
+function revZoomEsconder(){ var z=document.getElementById('revZoom'); if(z) z.classList.remove('aberto'); }
 /* compatibilidade: laudos antigos no histórico ainda chamam estas funções */
 function revImgMove(e,img){ revZoomMostrar(img); }
 function revImgLeave(img){ revZoomEsconder(); }
@@ -2921,17 +2938,16 @@ document.addEventListener('keydown', function(e){
   else { log('Todos os laudos foram liberados.'); fecharRevisao(); renderRevisao(); }
 }
 /* ============================================================
-   Captura ao vivo: grava o ditado PRIMEIRO, vigia a pasta de
-   export do aparelho, vincula a imagem que chega ao ditado e
-   gera o laudo. Reaproveita transcreverAudio, arquivoParaImagens,
-   metaDoPdf, gerarLaudo, abrirRevisao, renderExames, File System.
+   Captura ao vivo: grava o ditado PRIMEIRO, recebe as imagens do
+   aparelho por DICOM, vincula a imagem que chega ao ditado e gera
+   o laudo. Reaproveita transcreverAudio, arquivoParaImagens,
+   gerarLaudo, abrirRevisao e renderExames.
+   (A vigilancia de PASTA foi removida em 31/07: era o plano anterior
+   ao DICOM, e a importacao manual de pasta ja cobre o mesmo caso.)
    ============================================================ */
-let capWatchH=null, capWatching=false, capTimer=null, capVarrendo=false, capArmado=false;
-let capSeen=new Set(), capProcessadas=new Set(), capStable={};
+let capArmado=false;
 let capMR=null, capChunks=[], capStream=null, capTimer2=null, capSeg=0;
 
-function capStatusTxt(t){ var s=document.getElementById('capStatus'); if(s) s.textContent=t; }
-function capEhMidia(nome){ return /\.(jpe?g|png|bmp|pdf)$/i.test(nome); }
 
 /* ---- gravação do ditado (máquina de estados explícita: idle|rec|pause) ---- */
 let capEstado='idle';
@@ -3043,7 +3059,7 @@ async function capOrtToggle(){
     capOrtWatching=false; if(capOrtTimer) clearInterval(capOrtTimer); capOrtTimer=null;
     if(b) b.textContent='▶ Aguardar exame do aparelho';
     try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(e){}
-    capAgenteMic=false; capOrtStatusTxt('Espera parada — microfone do agente desligado.'); return;
+    capAgenteMic=false; micMonitorParar(); capOrtStatusTxt('Espera parada — microfone do agente desligado.'); return;
   }
   capOrtStatusTxt('Conectando ao agente…');
   try{
@@ -3060,6 +3076,7 @@ async function capOrtToggle(){
       : ' (sem microfone no agente — grave o ditado pelo botão acima)';
     capOrtStatusTxt('Aguardando… ('+capOrtSeen.size+' exame(s) anterior(es) ignorado(s)). Envie o exame no aparelho.'+extra);
     capOrtTimer=setInterval(capOrtVarrer, 4000);
+    micMonitorIniciar();   // gráfico de ondas: prova que o microfone está capturando de fato
   }catch(e){
     capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+'). Ele precisa estar rodando no computador.');
   }
@@ -3072,7 +3089,9 @@ async function capOrtVarrer(){
     // a cada ~20s confere o agente: se ele reiniciou (ou perdeu o microfone), reabre o pré-buffer
     if((++_capOrtCiclo % 5)===0){
       var st=await capAgenteEstado();
-      if(st && !st.microfone && capOrtWatching){
+      // "capturando" (chega audio), nao "microfone" (objeto existe): foi essa confusao
+      // que deixou o microfone morto por 16 min em 31/07 sem ninguem religar.
+      if(st && !st.capturando && capOrtWatching){
         try{
           await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:true})});
           await capAgenteEstado();
@@ -3103,6 +3122,115 @@ async function capAgenteEstado(){
     var r=await fetch(agenteBase()+'/gravacao/estado',{signal:ctrl.signal}); clearTimeout(t);
     var j=await r.json(); capAgenteMic=!!(j&&j.ok&&j.microfone); return j;
   }catch(e){ capAgenteMic=false; return null; }
+}
+
+/* ---- Monitor do microfone do agente (2026-07-31) ----
+   Em 31/07 o microfone ficou 16 min parado enquanto o agente respondia "aberto",
+   e dois exames perderam o ditado. O gráfico existe para isso NUNCA mais passar
+   despercebido. Detalhe que importa: sala em silêncio também desenha linha reta —
+   o que prova que está vivo é o traço ANDAR. Por isso o eixo do tempo é o relógio
+   do próprio agente, e o traço rola mesmo sem som nenhum. */
+var micNiveis=[], micRelAgente=0, micRecebidoEm=0, micTimer=null, micDesenho=null, micUltAviso=0;
+var micAudioCtx=null, micUltReinicios=null, micUltBipMorto=0;
+function micSomLigado(){ try{ return localStorage.getItem('gsomalerta')!=='0'; }catch(e){ return true; } }
+/* Aviso sonoro (2026-07-31, pedido do médico): você está de costas para a tela, com o
+   paciente na maca — um aviso só na tela não adianta. Sem arquivo de som: o app é um
+   arquivo único, então os tons são gerados na hora.
+   Curtos e puros DE PROPÓSITO: o microfone está gravando e vai captar o próprio bipe;
+   tom limpo de 0,3 s o VAD do transcritor descarta, fala sintetizada não. */
+function micSom(tipo){
+  if(!micSomLigado()) return;
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    if(!micAudioCtx) micAudioCtx=new AC();
+    if(micAudioCtx.state==='suspended') micAudioCtx.resume();
+    var t0=micAudioCtx.currentTime;
+    // reinício: dois tons descendentes, discreto. morto: três tons, mais insistente.
+    var notas=(tipo==='morto')?[[494,0],[392,0.20],[330,0.40]]:[[880,0],[660,0.15]];
+    notas.forEach(function(n){
+      var o=micAudioCtx.createOscillator(), g=micAudioCtx.createGain();
+      o.type='sine'; o.frequency.value=n[0];
+      // envelope: sem ele o tom estala no início e no fim
+      g.gain.setValueAtTime(0.0001, t0+n[1]);
+      g.gain.exponentialRampToValueAtTime(tipo==='morto'?0.20:0.13, t0+n[1]+0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+n[1]+0.13);
+      o.connect(g); g.connect(micAudioCtx.destination);
+      o.start(t0+n[1]); o.stop(t0+n[1]+0.15);
+    });
+  }catch(e){}
+}
+function micAlternarSom(el){ try{ localStorage.setItem('gsomalerta', el.checked?'1':'0'); }catch(e){} if(el.checked) micSom('reinicio'); }
+function micAgoraAgente(){ return micRelAgente + (Date.now()-micRecebidoEm)/1000; }
+function micDesenhar(){
+  var c=document.getElementById('vuAgente'); if(!c) return;
+  var g=c.getContext('2d'), W=c.width, H=c.height, JAN=6;   // 6 s de janela
+  g.clearRect(0,0,W,H);
+  g.fillStyle='#0f1c28'; g.fillRect(0,0,W,H);
+  var t1=micAgoraAgente(), t0=t1-JAN;
+  g.strokeStyle='#1e3346'; g.lineWidth=1; g.beginPath();
+  for(var s=Math.ceil(t0);s<t1;s++){ var xg=((s-t0)/JAN)*W; g.moveTo(xg,0); g.lineTo(xg,H); }
+  g.stroke();
+  g.strokeStyle='#2b4a63'; g.beginPath(); g.moveTo(0,H/2); g.lineTo(W,H/2); g.stroke();
+  var vivo=(t1-micUltAmostra())<3;
+  g.strokeStyle=vivo?'#3ddc84':'#e05c4b'; g.lineWidth=2; g.beginPath();
+  var primeiro=true;
+  for(var i=0;i<micNiveis.length;i++){
+    var t=micNiveis[i][0], v=micNiveis[i][1];
+    if(t<t0) continue;
+    var x=((t-t0)/JAN)*W, y=H/2-(v*(H/2-3));
+    if(primeiro){ g.moveTo(x,y); primeiro=false; } else g.lineTo(x,y);
+    g.lineTo(x, H/2+(v*(H/2-3)));
+    g.moveTo(x,y);
+  }
+  g.stroke();
+}
+function micUltAmostra(){ return micNiveis.length?micNiveis[micNiveis.length-1][0]:0; }
+async function micPulso(){
+  var j=await capAgenteEstado();
+  var sec=document.getElementById('capMicSec'), txt=document.getElementById('capMicEstado');
+  if(!j||!j.ok){ if(txt){ txt.textContent='⚠️ sem contato com o agente'; txt.style.color='#e05c4b'; } return; }
+  micRelAgente=j.relogioAgente||0; micRecebidoEm=Date.now();
+  (j.niveis||[]).forEach(function(p){ if(p[0]>micUltAmostra()) micNiveis.push(p); });
+  if(micNiveis.length>900) micNiveis.splice(0, micNiveis.length-900);
+  if(sec) sec.style.display=j.microfone?'flex':'none';
+  // Reinício do microfone: alguns segundos do ditado se foram. Toca e escreve no diário.
+  // Na 1ª leitura só memoriza o número — senão bipava ao abrir o app por reinícios antigos.
+  if(micUltReinicios!==null && (j.reinicios||0)>micUltReinicios){
+    micSom('reinicio');
+    log('🔔 Microfone reiniciado — alguns segundos do ditado se perderam. Confira este exame.', true);
+  }
+  micUltReinicios=(j.reinicios||0);
+  if(txt){
+    if(j.capturando){
+      txt.textContent='🎙 capturando — '+Math.round(j.prebufferDisponivelSeg||0)+'s guardados'
+        +((j.reinicios>0)?'  ·  '+j.reinicios+' reinício(s) hoje':'');
+      txt.style.color='#1f7a3d';
+    } else {
+      txt.textContent='⛔ microfone PARADO há '+(j.paradoHaSeg==null?'?':Math.round(j.paradoHaSeg))+'s — o ditado NÃO está sendo gravado';
+      txt.style.color='#e05c4b';
+      // parado é pior que reiniciado: insiste a cada 8 s enquanto não voltar
+      if(Date.now()-micUltBipMorto>8000){ micUltBipMorto=Date.now(); micSom('morto'); }
+      if(Date.now()-micUltAviso>60000){ micUltAviso=Date.now();
+        log('⛔ O microfone do agente parou de capturar. O ditado deste exame pode se perder.', true); }
+    }
+  }
+}
+function micMonitorIniciar(){
+  if(micTimer) return;
+  micNiveis=[]; micUltReinicios=null;
+  var ck=document.getElementById('capMicSom'); if(ck) ck.checked=micSomLigado();
+  // O navegador só deixa tocar som depois de um gesto do usuário. Esta função é chamada
+  // pelo clique em "Aguardar exame do aparelho", então é aqui que o áudio é destravado.
+  try{ var AC=window.AudioContext||window.webkitAudioContext;
+       if(AC){ if(!micAudioCtx) micAudioCtx=new AC(); if(micAudioCtx.state==='suspended') micAudioCtx.resume(); } }catch(e){}
+  micPulso();
+  micTimer=setInterval(micPulso, 500);
+  micDesenho=setInterval(micDesenhar, 100);
+}
+function micMonitorParar(){
+  if(micTimer) clearInterval(micTimer); micTimer=null;
+  if(micDesenho) clearInterval(micDesenho); micDesenho=null;
+  var sec=document.getElementById('capMicSec'); if(sec) sec.style.display='none';
 }
 async function capAgenteIniciar(){
   var r=await fetch(agenteBase()+'/gravacao/iniciar',{method:'POST'});
@@ -3151,8 +3279,8 @@ async function capOrtProcessar(est){
         log('Ditado do agente ('+res.origem+', '+res.segundos+'s de áudio): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
         if(res.aviso) log('Aviso do agente: '+res.aviso, true);
       } else {
-        capOrtStatusTxt('⚠️ '+ex.paciente+': não havia áudio no período do exame — grave o ditado e vincule.');
-        log('O agente não achou áudio para este exame'+(res.aviso?' ('+res.aviso+')':'')+'.', true);
+        capOrtStatusTxt('⛔ '+ex.paciente+': SEM DITADO — '+(res.aviso||'não havia áudio no período')+'. Grave e vincule.');
+        log('⛔ '+ex.paciente+' ficou SEM DITADO: '+(res.aviso||'não havia áudio no período do exame')+'.', true);
       }
     }catch(e){ log('Falha ao fechar o exame no agente: '+((e&&e.message)||e), true); }
     capRenderPendentes();
@@ -3250,72 +3378,6 @@ async function capAutoVincular(ex){
     abrirRevisao(ex.id);
   }catch(e){ capOrtStatusTxt('Falha ao gerar o laudo de '+ex.paciente+': '+((e&&e.message)||e)); }
 }
-/* ---- vigiar a pasta de export ---- */
-async function capEscolherPasta(){
-  if(!suportaFS()){ log('A vigilância de pasta funciona no Chrome/Edge do computador.',true); return; }
-  try{ var h=await window.showDirectoryPicker(); capWatchH=h; await fsSetHandle('watch',h); capPastaInfo(); var b=document.getElementById('btnCapVigiar'); if(b) b.style.display='inline-block'; }catch(e){}
-}
-function capPastaInfo(){ var s=document.getElementById('capPastaInfo'); if(s) s.innerHTML=capWatchH?('Pasta vigiada: <b>'+String(capWatchH.name||'(definida)').replace(/</g,'&lt;')+'</b>'):'Nenhuma pasta escolhida.'; }
-async function capToggleVigia(){
-  if(capWatching){ capWatching=false; if(capTimer) clearInterval(capTimer); capTimer=null; var b0=document.getElementById('btnCapVigiar'); if(b0) b0.textContent='▶ Iniciar captura'; capStatusTxt('Captura parada.'); return; }
-  if(!capWatchH){ log('Escolha a pasta a vigiar primeiro.',true); return; }
-  if(!(await fsPermissao(capWatchH))){ log('Sem permissão de leitura na pasta vigiada.',true); return; }
-  capSeen=new Set(); capProcessadas=new Set(); capStable={};
-  try{ for await (const ent of capWatchH.entries()){ if(ent[1].kind==='directory') capSeen.add(ent[0]); } }
-  catch(e){ log('Falha ao ler a pasta: '+e.message,true); return; }
-  capWatching=true; capArmado=true;
-  var b=document.getElementById('btnCapVigiar'); if(b) b.textContent='⏸ Parar captura';
-  capStatusTxt('Vigiando… '+capSeen.size+' pasta(s) antiga(s) ignorada(s). Aguardando exames novos.');
-  capTimer=setInterval(capVarrer, 3000);
-}
-async function capVarrer(){
-  if(!capWatching||!capWatchH||capVarrendo) return;
-  capVarrendo=true;
-  try{
-    for await (const ent of capWatchH.entries()){
-      var nome=ent[0], handle=ent[1];
-      if(handle.kind!=='directory') continue;
-      if(capSeen.has(nome)||capProcessadas.has(nome)) continue;
-      var n=await capContarArquivos(handle);
-      var st=capStable[nome]||{n:-1,ciclos:0};
-      if(n===st.n){ st.ciclos++; } else { st.n=n; st.ciclos=0; }
-      capStable[nome]=st;
-      if(n>0 && st.ciclos>=2){ capProcessadas.add(nome); delete capStable[nome]; await capProcessarPasta(nome, handle); }
-      else if(n>0){ capStatusTxt('Recebendo "'+nome+'"… ('+n+' arquivo(s))'); }
-    }
-  }catch(e){ capStatusTxt('Erro ao varrer: '+e.message); }
-  capVarrendo=false;
-}
-async function capContarArquivos(dirH){
-  var n=0;
-  async function walk(h){ for await (const ent of h.entries()){ if(ent[1].kind==='directory'){ await walk(ent[1]); } else if(capEhMidia(ent[0])){ n++; } } }
-  try{ await walk(dirH); }catch(e){}
-  return n;
-}
-async function capProcessarPasta(nome, dirH){
-  capStatusTxt('🆕 Novo exame: '+nome+' — lendo imagens…');
-  var imagens=[], pdfMeta=null, subNome='';
-  async function walk(h){
-    for await (const ent of h.entries()){
-      var nm=ent[0], hd=ent[1];
-      if(hd.kind==='directory'){ if(!subNome) subNome=nm; await walk(hd); continue; }
-      if(!capEhMidia(nm)) continue;
-      var file; try{ file=await hd.getFile(); }catch(e){ continue; }
-      if(/\.pdf$/i.test(nm)){ try{ var meta=metaDoPdf(await pdfTextoPag1(file)); if(meta&&(meta.paciente||meta.data||meta.idade)) pdfMeta=meta; }catch(e){} }
-      else { try{ imagens=imagens.concat(await arquivoParaImagens(file)); }catch(e){} }
-    }
-  }
-  try{ await walk(dirH); }catch(e){ log('Falha ao ler '+nome+': '+e.message,true); }
-  if(!imagens.length){ capStatusTxt('Pasta "'+nome+'" sem imagens utilizáveis — ignorada.'); return; }
-  var paciente=(pdfMeta&&pdfMeta.paciente)?capNome(pdfMeta.paciente):limparPaciente(nome);
-  var ex={id:0, nomeArquivo:'', paciente:paciente||nome, subExame:limparExame(subNome), imagens:imagens, tipo:'', audios:[], laudo:null, metaConf:1, dataExame:(pdfMeta&&pdfMeta.data)||'', idadeExame:(pdfMeta&&pdfMeta.idade)||'', _captura:true};
-  ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
-  exames.push(ex);
-  capStatusTxt('🆕 Exame de '+ex.paciente+' pronto ('+imagens.length+' imagens). Vincule o ditado abaixo.');
-  log('Exame capturado: '+ex.paciente+' ('+imagens.length+' imagens).');
-  renderExames(); capRenderNovos();
-}
-
 /* ---- vínculo imagem ↔ ditado + geração ---- */
 function capMelhorDitadoIdx(ex, pend){
   if(!pend.length) return -1;
@@ -3374,8 +3436,6 @@ function capRemover(exId){ var ex=exames.find(function(e){return e.id===exId;});
 
 function capInit(){
   if(!document.getElementById('cardCaptura')) return;
-  if(!suportaFS()){ var fp=document.getElementById('capFolderSec'); if(fp) fp.innerHTML='<span class="aviso">A vigilância de pasta funciona no Chrome/Edge do computador. No iPad, use o fluxo "Processar".</span>'; }
-  else { try{ fsGetHandle('watch').then(function(h){ if(h){ capWatchH=h; capPastaInfo(); var b=document.getElementById('btnCapVigiar'); if(b) b.style.display='inline-block'; } }); }catch(e){} }
   document.addEventListener('keydown', function(e){
     if(e.code!=='Space') return;
     if(window.__abaAtual!=='captura') return;               // só na aba Captura ao vivo

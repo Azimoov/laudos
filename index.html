@@ -1920,8 +1920,52 @@ async function gerarLaudo(exId){
     if(ex.laudo.obs) log('Observações da IA sobre '+ex.paciente+': '+ex.laudo.obs, true);
   }catch(e){
     log('Erro ao gerar laudo de '+ex.paciente+': '+e.message, true);
+    // Falha transitória (rede caiu, IA fora do ar, 429) não pode exigir clique manual
+    // no meio do atendimento: entra na fila e o app tenta de novo sozinho.
+    if(ehFalhaTransitoria(e)) filaEnfileirar(ex.id, e.message);
+    else log('   ↳ não é falha temporária — confira o exame e gere de novo quando puder.', true);
   }
   if(btn){ btn.disabled = false; btn.textContent = ex.laudo ? 'Refazer laudo' : 'Gerar laudo'; }
+}
+
+/* ============ Fila de reprocessamento (2026-08-03) ============
+   Antes, laudo que falhava ficava parado esperando o médico notar e clicar de novo.
+   Em uso comercial isso vira exame esquecido. A fila persiste na sessão, então
+   sobrevive a recarregar a página. */
+var _fila=[], _filaTimer=null;
+function ehFalhaTransitoria(e){
+  var m=String((e&&e.message)||e||'').toLowerCase();
+  // "timed out" (com espaço) é como o Chrome reporta AbortSignal.timeout — "timeout"
+  // sozinho não pegava, e o teste flagrou.
+  return /failed to fetch|networkerror|load failed|timeout|timed out|abort|429|500|502|503|504|rate limit|overloaded|temporariamente|conexão|connection/.test(m);
+}
+function filaEnfileirar(exId, motivo){
+  var j=_fila.find(function(x){return x.exId===exId;});
+  if(j){ j.tentativas++; } else { j={exId:exId, tentativas:1, motivo:motivo}; _fila.push(j); }
+  if(j.tentativas>4){
+    _fila=_fila.filter(function(x){return x.exId!==exId;});
+    var ex=exames.find(function(e){return e.id===exId;});
+    log('⚠️ Desisti de gerar o laudo de '+((ex&&ex.paciente)||'exame '+exId)+' após 4 tentativas ('+motivo+'). Gere manualmente.', true);
+    return;
+  }
+  var espera=Math.min(60, Math.pow(2, j.tentativas)*5);   // 10s, 20s, 40s, 60s
+  var ex2=exames.find(function(e){return e.id===exId;});
+  log('↻ '+((ex2&&ex2.paciente)||'exame '+exId)+' entrou na fila — nova tentativa em '+espera+'s (tentativa '+j.tentativas+' de 4).');
+  filaAgendar(espera*1000);
+  try{ agendarSalvarSessao(); }catch(_){}
+}
+function filaAgendar(ms){
+  if(_filaTimer) return;
+  _filaTimer=setTimeout(async function(){
+    _filaTimer=null;
+    var item=_fila[0]; if(!item) return;
+    var ex=exames.find(function(e){return e.id===item.exId;});
+    if(!ex || ex.laudo){ _fila.shift(); if(_fila.length) filaAgendar(3000); return; }   // já resolvido
+    log('↻ tentando de novo: '+ex.paciente+'…');
+    _fila.shift();
+    await gerarLaudo(item.exId);           // sucesso não reenfileira; falha reenfileira com espera maior
+    if(_fila.length) filaAgendar(5000);
+  }, ms);
 }
 
 /* ============ Medidor de microfone (barras ao vivo) ============ */
@@ -2594,11 +2638,21 @@ function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')|
 function gravarHistorico(arr){
   var lista=arr.slice().sort(function(a,b){ return (a.ts||0)-(b.ts||0); });   // antigos primeiro
   // 1) DISCO (agente): guarda o histórico COMPLETO — disco não tem a cota do navegador
+  // O disco é a cópia BOA (a do navegador é podada). Falha aqui não pode ser muda:
+  // era o único caminho em que um laudo sumia sem ninguém saber.
+  var discoOk=false;
   try{
     dadoMarcar('glaudos');
     fetch(agenteBase()+'/dados/glaudos',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({valor:JSON.stringify(lista), ts:dadoTs('glaudos')})}).catch(function(){});
-  }catch(e){}
+      body:JSON.stringify({valor:JSON.stringify(lista), ts:dadoTs('glaudos')})})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); discoOk=true; })
+      .catch(function(err){
+        log('⚠️ O histórico NÃO foi gravado no computador ('+(err&&err.message||err)+'). '
+           +'Só existe a cópia do navegador, que é podada quando enche. Confira se o agente está no ar.', true);
+      });
+  }catch(e){
+    log('⚠️ Não consegui falar com o agente para gravar o histórico: '+e.message, true);
+  }
   // 2) NAVEGADOR: pode não caber -> vai podando os mais antigos (só a cópia local encolhe)
   var copia=lista.slice();
   for(var tent=0; tent<12; tent++){
@@ -2920,7 +2974,7 @@ async function gerarTodos(soFaltantes){
   finally{ _gerandoEmLote=false; }
   if(btn){ btn.disabled=false; btn.textContent="⚙️ Gerar todos os laudos"; }
   if(btnF) btnF.disabled=false;
-  try{ salvarSessao(); }catch(e){}   // save final garantido (fora do throttle)
+  try{ salvarSessao(); }catch(e){ log('Nao consegui salvar a sessao: '+e.message+' — se recarregar a pagina, pode perder os exames em andamento.', true); }   // save final garantido
   setTimeout(function(){ if(prog) prog.style.display='none'; },4000);
   if(falhas.length){
     var nomes=falhas.map(function(e){return e.paciente||('#'+e.id);});
@@ -2939,7 +2993,7 @@ async function salvarExameRev(exId){
   if(suportaFS() && !pastaLaudoH){ await garantirPasta(); if(!pastaLaudoH){ log("Salvar cancelado: escolha a pasta de destino.", true); return; } }
   abrirRevisao(exId, true);
   await salvarLaudoPasta();
-  try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
+  try{ salvarLaudoHistorico(window.__revAtual); }catch(e){ log('FALHA AO GUARDAR NO HISTORICO: '+e.message+' — o laudo pode nao estar salvo. Confira o Historico antes de fechar.', true); }
   ex._liberado=true;   // aprovado = liberado: sai da lista de revisão (fica no Histórico)
   agendarSalvarSessao();
   renderRevisao();
@@ -2952,7 +3006,7 @@ async function salvarTodosRev(){
   log("Salvos "+lista.length+" laudo(s).");
 }
 function fecharRevisao(){
-  try{ if(window.__revAtual) salvarLaudoHistorico(window.__revAtual); }catch(e){}
+  try{ if(window.__revAtual) salvarLaudoHistorico(window.__revAtual); }catch(e){ log('FALHA AO GUARDAR NO HISTORICO ao fechar: '+e.message+' — confira o Historico.', true); }
   document.title = 'Laudos USG — Dr. Daniel Serruya';
   document.getElementById('telaRevisao').style.display='none';
   document.querySelector('main').style.display='block';
@@ -3008,7 +3062,7 @@ document.addEventListener('keydown', function(e){
   // 1ª ação do gesto: garantir pasta se necessário (antes de qualquer await de longa duração)
   if(suportaFS()&&!pastaLaudoH){ await garantirPasta(); if(!pastaLaudoH){ log('Liberar cancelado: escolha a pasta de destino.',true); return; } }
   await salvarLaudoPasta();
-  try{ salvarLaudoHistorico(window.__revAtual); }catch(e){}
+  try{ salvarLaudoHistorico(window.__revAtual); }catch(e){ log('FALHA AO GUARDAR NO HISTORICO: '+e.message+' — o laudo pode nao estar salvo. Confira o Historico antes de fechar.', true); }
   var exAtual=exames.find(function(e){return e.id===exId;}); if(exAtual){ exAtual._liberado=true; agendarSalvarSessao(); }
   // aprendizado agora é manual (botão "🧠 Aprender com minhas correções"), não automático aqui
   // próximo laudo com laudo gerado e ainda não liberado

@@ -633,6 +633,8 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <div id="areaImpressao" style="flex:1 1 600px;min-width:0;max-width:790px"></div>
       <div id="revLateral">
     <div id="revFerramentas">
+    <!-- exame anterior do paciente (F2b): aviso e atalhos. Fora do areaImpressao = fora do papel. -->
+    <div id="revAnterior" style="display:none;padding:8px 10px;background:#f4f7fa;border-radius:10px"></div>
     <!-- IA na revisão: trocar modelo + pedir ajustes por texto -->
     <div id="revIaWrap" style="display:none;padding:8px 10px;background:#f4f7fa;border-radius:10px">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -658,6 +660,17 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   </main>
   <!-- pré-visualização grande da imagem (abre sobre o laudo, nunca corta) -->
   <div id="revZoom"><img id="revZoomImg" src="" alt=""></div>
+  <!-- laudo do exame ANTERIOR, para conferir lado a lado e confirmar o paciente -->
+  <div id="antVer" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:60;align-items:flex-start;justify-content:center;padding:18px;overflow:auto">
+    <div style="background:var(--superficie,#fff);color:var(--texto,#111);border-radius:12px;max-width:860px;width:100%;padding:14px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+        <div id="antVerCab" style="flex:1;font-size:13px"></div>
+        <button class="btn peq sec" onclick="fecharExameAnterior()">✕ Fechar</button>
+      </div>
+      <div id="antVerPergunta" style="background:#fdf3e3;border-left:5px solid #d99a26;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:8px;color:#5a4410"></div>
+      <div id="antVerCorpo" style="max-height:68vh;overflow:auto;background:#fff;border-radius:8px"></div>
+    </div>
+  </div>
 </div>
 
 <script src="dados.js"></script>
@@ -972,7 +985,7 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
    funcionando sozinho quando o agente está desligado (localStorage continua como cópia).
    Cada chave tem carimbo de tempo; na sincronia o MAIS RECENTE vence (o médico também usa
    o iPhone, onde não há agente). A chave da API fica DE FORA de propósito. */
-const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso'];
+const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -1414,6 +1427,10 @@ var EXT_AUDIO = /\.(m4a|m4b|mp3|wav|wave|ogg|oga|webm|weba|aac|opus|flac|caf|amr
 /* ====== Exames do aparelho via DICOM (agente local → Orthanc) ======
    O Orthanc não envia CORS, por isso o navegador fala com o AGENTE, que faz a ponte. */
 var dicomEstudos=[], dicomProntos=[];   // listados · importados (viram exames no Processar)
+/* Código do paciente no aparelho: é o que distingue dois homônimos com segurança.
+   O agente pode devolvê-lo com nomes diferentes conforme a versão — aceita todos,
+   e se não vier nenhum o app cai no nome + confirmação do médico. */
+function codDoEstudo(e){ return String((e&&(e.codigo||e.codPaciente||e.patientId||e.PatientID||e.pid))||'').trim(); }
 function dicomInfoTxt(t){ var s=document.getElementById('dicomInfo'); if(s) s.textContent=t; }
 async function dicomBuscar(){
   dicomInfoTxt('Procurando exames…');
@@ -1471,7 +1488,7 @@ async function dicomImportar(){
       feitas++; progVincStep(0); _progFeito=feitas; progVincSet();
     }
     if(!imagens.length){ log('Exame de '+(e.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
-    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens});
+    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens, codigo:codDoEstudo(e)});
   }
   progVincHide();
   dicomInfoTxt(dicomProntos.length+' exame(s) do aparelho prontos — toque em Processar.');
@@ -1576,7 +1593,7 @@ async function processar(){
     exames = agruparItens(flatItens);
     for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:(g.paciente||fo), subExame:(g.subExame||''), imagens:g.imagens, tipo:g.tipo||'', lateralidade:normLateralidade(g.subExame||''), audios:[], laudo:null, metaConf:1, dataExame:g.data||'', idadeExame:g.idade||''}); }
     // exames vindos do aparelho (DICOM): cadastro já veio das tags — nenhuma leitura de legenda por IA
-    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', _dicom:true}); }
+    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', _dicom:true}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s)'+(dicomProntos.length?' + '+dicomProntos.length+' exame(s) do aparelho':'')+' em '+exames.length+' exame(s).');
     // 2. transcrever áudios
@@ -1620,6 +1637,8 @@ async function processar(){
     renderExames();
     mostrarAba('exames');
     log('Pronto. Confira as associações abaixo e gere os laudos.');
+    // marca no cartão quem já foi examinado aqui — antes do ditado, que é quando ainda serve
+    try{ marcarExamesAnteriores(); }catch(_){}
   }catch(e){
     progVincHide();
     log('Erro: '+e.message, true);
@@ -1650,7 +1669,8 @@ function renderExames(){
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+(ex.subExame?' - '+ex.subExame:'')+(ex.lateralidade?' · '+ex.lateralidade:'')+' <span class="tag">'+ex.imagens.length+' pág.</span>'
       +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')
-      +(ex._falhou?'<span class="tag" style="background:#fde8e8;color:#b3261e">⚠️ laudo falhou — refazer</span>':'')+'</div>'
+      +(ex._falhou?'<span class="tag" style="background:#fde8e8;color:#b3261e">⚠️ laudo falhou — refazer</span>':'')
+      +(ex._antInfo?('<span class="tag" style="cursor:pointer;'+(ex._antInfo.pend?'background:#fdf3e3;color:#9a6b14':'background:#e7f0ff;color:#1c4e9c')+'" onclick="abrirExameAnterior('+ex.id+')">🔁 '+(ex._antInfo.pend?'já examinado aqui? confirmar':'já examinado aqui · '+(ex._antInfo.data||'sem data'))+'</span>'):'')+'</div>'
       +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
       +(audios.length?'<div style="margin-top:8px"><button class="btn peq sec" onclick="alternarAudios('+ex.id+')">🔗 Áudios deste paciente ('+audiosDoExame.length+' marcado'+(audiosDoExame.length===1?'':'s')+') ▾</button><div id="auds'+ex.id+'" style="display:'+(audsAbertos[ex.id]?'block':'none')+';margin-top:6px;background:#f4f7fa;border-radius:10px;padding:8px">'+listaAudios+'</div></div>':'')
       +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
@@ -1958,7 +1978,12 @@ function ampliarImg(el){
   if(el.dataset.amp==='1'){ el.dataset.amp=''; el.style.height='90px'; el.style.width=''; }
   else { el.dataset.amp='1'; el.style.height='auto'; el.style.width='100%'; }
 }
-function mudarTipo(id, v){ var e=exames.find(function(x){return x.id===id;}); if(e) e.tipo = v; }
+function mudarTipo(id, v){
+  var e=exames.find(function(x){return x.id===id;}); if(!e) return;
+  e.tipo = v;
+  // o exame anterior é procurado pelo MESMO tipo: mudar o tipo muda o que existe antes
+  try{ marcarExamesAnteriores(); }catch(_){}
+}
 function excluirExame(id){
   if(!confirm('Excluir este exame e seu laudo? (não afeta seus arquivos)')) return;
   audios.forEach(function(a){ if(a.exameId===id) a.exameId=null; });
@@ -1990,10 +2015,22 @@ async function gerarLaudo(exId){
     const mod = MODELOS[ex.tipo];
     const trans = audios.filter(a=>a.exameId===exId).map(a=>a.transcricao).filter(Boolean).join('\n---\n');
     const regrasAprend = regrasParaPrompt(ex.tipo);
-    const anterior = exameAnteriorDoPaciente(ex.paciente, ex.tipo, ex.id);
+    const ant = examesAnterioresDoPaciente(await histParaBusca(), ex.paciente, ex.tipo, ex.codPac, ex.histKey);
+    ex._antInfo = ant.lista.length ? {n:ant.lista.length, data:ant.lista[0].data||'', pend:false}
+                : (ant.pendentes.length ? {n:ant.pendentes.length, data:ant.pendentes[0].data||'', pend:true} : null);
+    ex._antPend = ant.pendentes.slice(0,1);
+    ex._antTodos = ant.lista.length;
+    const usados = ant.lista.slice(0, Math.max(1, ex._antQuantos||1));   // 1 por padrão; o botão da lateral sobe p/ 3
+    const anterior = usados[0] || null;
+    ex._antUsados = usados.map(function(L){ return {id:L.id, data:L.data||''}; });
     const regrasSeg = anterior ? regrasDeSeguimento(ex.tipo) : '';
-    const anteriorTxt = anterior ? textoDoLaudoAnterior(anterior) : '';
-    if(anteriorTxt) log('Exame anterior de '+ex.paciente+' localizado ('+(anterior.data||'sem data')+') — entrou no laudo como comparação.');
+    const anteriorTxt = usados.map(function(L,i){
+      var t=textoDoLaudoAnterior(L, Math.floor(9000/usados.length));
+      return t ? ('--- EXAME ANTERIOR '+(i+1)+' de '+usados.length+' — realizado em '+(L.data||'data não registrada')+' ---\n'+t) : '';
+    }).filter(Boolean).join('\n\n');
+    if(anteriorTxt) log('Exame anterior de '+ex.paciente+' localizado ('+usados.map(function(L){return L.data||'sem data';}).join(', ')+') — entrou no laudo como comparação.');
+    else if(ant.pendentes.length) log('⚠️ '+ex.paciente+' pode já ter exame aqui ('+(ant.pendentes[0].data||'sem data')+'), mas falta confirmar se é a mesma pessoa — laudo saiu SEM comparação.', true);
+    else if(histBuscaIncompleta()) log('⚠️ Busca de exame anterior INCOMPLETA ('+_histDiscoErro+'): procurei só na cópia do navegador, que é podada. Ligue o agente para procurar no computador.', true);
     const cadastro = [ ex.paciente?('Nome: '+ex.paciente):'', ex.dataExame?('Data do exame: '+ex.dataExame):'', ex.idadeExame?('Idade: '+ex.idadeExame+' anos'):'' ].filter(Boolean).join(' | ');
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
@@ -2005,7 +2042,8 @@ async function gerarLaudo(exId){
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
 (regrasAprend ? "REGRAS APRENDIDAS COM AS CORREÇÕES DO MÉDICO (cumpra à risca; têm prioridade sobre o estilo padrão quando houver conflito):\n"+regrasAprend+"\n\n" : "")+
-(anteriorTxt ? "EXAME ANTERIOR DO MESMO PACIENTE — LAUDO PRÉVIO NA ÍNTEGRA (mesmo tipo de exame, realizado em "+(anterior.data||'data não registrada')+"):\n"+anteriorTxt+"\n\n"+
+(anteriorTxt ? "EXAME ANTERIOR DO MESMO PACIENTE — "+(usados.length>1?("OS "+usados.length+" LAUDOS PRÉVIOS NA ÍNTEGRA, do mais recente para o mais antigo"):("LAUDO PRÉVIO NA ÍNTEGRA, realizado em "+(anterior.data||'data não registrada')))+" (mesmo tipo de exame):\n"+anteriorTxt+"\n\n"+
+(usados.length>1 ? "Com mais de um exame anterior, a REFERÊNCIA PRINCIPAL é o mais recente ("+(anterior.data||'data não registrada')+"); os mais antigos servem só para descrever a evolução ao longo do tempo, sempre citando a data de cada um.\n" : "")+
 "COMO USAR O EXAME ANTERIOR (leia antes de escrever qualquer comparação):\n- O bloco acima é REFERÊNCIA do passado. O laudo de HOJE descreve exclusivamente o que está no DITADO DE HOJE e nas IMAGENS DE HOJE.\n- PROIBIDO trazer para o laudo de hoje qualquer lesão, medida, órgão alterado ou diagnóstico que exista SÓ no laudo anterior. Se o médico não ditou hoje e não está legível nas imagens de hoje, não entra — nem no corpo, nem na conclusão.\n- Só escreva evolução (estável, aumentou, diminuiu, novo, em involução) quando o achado existir NOS DOIS exames. Compare medida com medida; se faltar a medida de um dos lados, descreva o achado de hoje e NÃO julgue a evolução.\n- Ao comparar, cite a data do exame anterior — ex.: 'estável em relação ao exame de "+(anterior.data||'data não registrada')+"'.\n- Achado que estava no laudo anterior e não foi citado hoje: NÃO afirme que desapareceu nem que persiste. Registre em 'observacoes_para_o_medico' que o exame anterior descrevia esse achado e que ele não foi mencionado hoje.\n- Divergência entre o laudo anterior e o ditado de hoje: vale sempre o ditado de hoje, e o conflito vai para 'observacoes_para_o_medico'.\n- NÃO copie a redação do laudo anterior: escreva o laudo de hoje a partir do modelo e do ditado de hoje.\n\n" : "")+
 (regrasSeg ? "PACIENTE JÁ EXAMINADO NESTE SERVIÇO — REGRAS DE SEGUIMENTO (este bloco só aparece quando existe exame anterior do mesmo paciente e do mesmo tipo; use-o APENAS para comparar com o exame prévio, e só se o ditado ou as imagens trouxerem o achado correspondente):\n"+regrasSeg+"\n"+(anteriorTxt ? "O laudo anterior completo está no bloco EXAME ANTERIOR, acima — use-o como fonte da comparação, respeitando as travas daquele bloco." : "Exame anterior encontrado no histórico: "+(anterior.data||'data não registrada')+" — mas o CONTEÚDO dele não está disponível. NÃO invente o conteúdo desse exame: se o ditado não disser como a lesão estava antes, não afirme estabilidade nem crescimento.")+"\n\n" : "")+
 (EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — MARGEM DE ERRO: preencha o campo 'obstetrico' com o que o médico DITOU sobre a ultrassonografia INICIAL (de primeiro trimestre) da paciente: trouxe_usg_primeiro_trimestre (true se ela trouxe/apresentou o exame inicial ou se o médico informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito) e ig_primeiro_usg_semanas (a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame — número; use 0 se não foi ditada). NUNCA invente esses dados. NÃO calcule nem escreva a margem de erro em dias: deixe os pontilhados de '(com variação de até +/- ..... dias)' como estão — o aplicativo calcula pela tabela oficial e substitui. Mantenha também a frase da idade gestacional como está no modelo; o aplicativo a ajusta quando houver exame inicial.\n\n" : "")+
@@ -2390,19 +2428,162 @@ function regrasDeSeguimento(tipo){
   if(!rs.length) return '';
   return rs.map(function(r,i){ return (i+1)+'- '+r.texto; }).join('\n');
 }
-/* Procura no histórico um laudo anterior do mesmo paciente e do mesmo tipo de exame.
-   Reusa o simNome() do agrupamento por DICOM: 2+ partes do nome batendo já é forte. */
-function exameAnteriorDoPaciente(nome, tipo, idAtual){
-  var toks=tokensNome(nome||'');
-  if(toks.length<2) return null;            // nome curto demais: não arrisca falso positivo
-  var achados=lerHistorico().filter(function(L){
-    if(idAtual && L.id===idAtual) return false;
-    if(tipo && L.tipo && L.tipo!==tipo) return false;
-    return simNome(toks, L.paciente||'')>=0.85;
-  });
-  if(!achados.length) return null;
-  achados.sort(function(a,b){ return (b.ts||0)-(a.ts||0); });   // mais recente primeiro
-  return achados[0];
+/* ---- Onde procurar: a cópia COMPLETA do histórico, que fica no computador ----
+   O navegador PODA o histórico quando enche (de propósito: o disco é a cópia boa).
+   Procurar exame anterior só no navegador perdia justamente o paciente antigo, que
+   é o caso em que a comparação importa. Baixa uma vez por sessão e guarda na memória
+   da aba — memória de aba não tem a cota que trava o armazenamento do navegador. */
+var _histDisco=null, _histDiscoErro='', _histDiscoTentou=false;
+async function histParaBusca(){
+  if(_histDisco) return _histDisco;
+  if(_histDiscoTentou) return lerHistorico();      // já falhou nesta sessão: não trava o laudo
+  _histDiscoTentou=true;
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},8000);
+    var r=await fetch(agenteBase()+'/dados/glaudos',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json();
+    if(!j||!j.ok||j.valor==null) throw new Error('o agente não devolveu o histórico');
+    var arr=JSON.parse(j.valor);
+    if(!Array.isArray(arr)) throw new Error('histórico do disco fora do formato');
+    _histDisco=arr; _histDiscoErro='';
+    return _histDisco;
+  }catch(e){
+    _histDiscoErro=(e&&e.name==='AbortError')?'o agente não respondeu a tempo':((e&&e.message)||String(e));
+    return lerHistorico();
+  }
+}
+function histBuscaIncompleta(){ return !_histDisco; }
+function histRecarregar(){ _histDisco=null; _histDiscoTentou=false; return histParaBusca(); }
+/* Laudo recém-salvo tem que entrar na cópia em memória, senão só apareceria amanhã. */
+function histDiscoAtualizar(reg){
+  if(!_histDisco||!reg) return;
+  var i=_histDisco.findIndex(function(x){ return x.id===reg.id; });
+  if(i>=0) _histDisco[i]=reg; else _histDisco.push(reg);
+}
+
+/* ---- É a mesma pessoa? ----
+   Nome sozinho não basta: com homônimo, o laudo de um viraria referência do outro —
+   e agora o CONTEÚDO do laudo antigo vai para a IA, então o erro seria clínico.
+   Regra: o código que o aparelho manda decide quando os dois lados o têm; faltando
+   código, vale o nome e o médico confirma UMA vez — a resposta fica guardada. */
+function idNomeChave(nome){ return tokensNome(nome||'').slice().sort().join(' '); }
+function idDecisoes(){ try{ return JSON.parse(localStorage.getItem('gpacid')||'{}'); }catch(e){ return {}; } }
+function idDecidir(nome, cod, resposta){
+  var k=idNomeChave(nome); if(!k) return;
+  var d=idDecisoes(); d[k]={r:resposta, cod:String(cod||''), ts:Date.now()};
+  try{ dadoSalvar('gpacid', JSON.stringify(d)); }catch(e){}
+}
+function idEsquecer(nome){
+  var k=idNomeChave(nome); if(!k) return;
+  var d=idDecisoes(); delete d[k];
+  try{ dadoSalvar('gpacid', JSON.stringify(d)); }catch(e){}
+}
+/* 'sim' = pode comparar · 'nao' = pessoas diferentes · 'perguntar' = falta o médico decidir */
+function mesmoPaciente(codAtual, nomeAtual, L){
+  var cA=String(codAtual||'').trim(), cL=String((L&&L.cod)||'').trim();
+  if(cA && cL) return cA===cL ? 'sim' : 'nao';       // código dos dois lados: decide sozinho
+  var d=idDecisoes()[idNomeChave(nomeAtual)];
+  if(d && d.r==='nao') return 'nao';
+  if(d && d.r==='sim'){
+    // apareceu depois um código diferente do que foi confirmado: a confirmação não vale mais
+    if(cA && d.cod && cA!==d.cod) return 'perguntar';
+    return 'sim';
+  }
+  return 'perguntar';
+}
+/* Laudos anteriores do mesmo paciente e do mesmo tipo, do mais recente para o mais antigo.
+   'lista' já pode ser usada; 'pendentes' espera o médico dizer se é a mesma pessoa. */
+function examesAnterioresDoPaciente(hist, nome, tipo, cod, idAtual){
+  var out={lista:[], pendentes:[]};
+  var toks=tokensNome(nome||''), cA=String(cod||'').trim();
+  if(!toks.length && !cA) return out;
+  for(var i=0;i<(hist||[]).length;i++){
+    var L=hist[i]; if(!L) continue;
+    if(idAtual && L.id===idAtual) continue;
+    if(tipo && L.tipo && L.tipo!==tipo) continue;
+    var cL=String(L.cod||'').trim();
+    var casa = (cA && cL) ? (cA===cL)
+             : (toks.length>=2 && simNome(toks, L.paciente||'')>=0.85);   // nome curto demais não arrisca
+    if(!casa) continue;
+    var q=mesmoPaciente(cA, nome, L);
+    if(q==='sim') out.lista.push(L);
+    else if(q==='perguntar') out.pendentes.push(L);
+  }
+  var recente=function(a,b){ return (b.ts||0)-(a.ts||0); };
+  out.lista.sort(recente); out.pendentes.sort(recente);
+  return out;
+}
+
+/* ---- Aviso na TELA (nada disto entra no papel: tudo vive fora do #areaImpressao) ----
+   Momento 1: assim que o exame entra na lista, a etiqueta do cartão avisa que aquele
+   paciente já foi examinado aqui — antes do ditado, que é quando ainda dá para usar. */
+async function marcarExamesAnteriores(){
+  var hist; try{ hist=await histParaBusca(); }catch(e){ return; }
+  var mudou=false;
+  for(var i=0;i<exames.length;i++){
+    var ex=exames[i];
+    var a=examesAnterioresDoPaciente(hist, ex.paciente, ex.tipo, ex.codPac, ex.histKey);
+    ex._antPend=a.pendentes.slice(0,1); ex._antTodos=a.lista.length;
+    var novo = a.lista.length ? {n:a.lista.length, data:a.lista[0].data||'', pend:false}
+             : (a.pendentes.length ? {n:a.pendentes.length, data:a.pendentes[0].data||'', pend:true} : null);
+    if(JSON.stringify(novo||null)!==JSON.stringify(ex._antInfo||null)){ ex._antInfo=novo; mudou=true; }
+  }
+  if(mudou) renderExames();
+}
+async function abrirExameAnterior(exId){
+  var ex=exames.find(function(e){return e.id===exId;}); if(!ex) return;
+  var a=examesAnterioresDoPaciente(await histParaBusca(), ex.paciente, ex.tipo, ex.codPac, ex.histKey);
+  var L=a.lista[0]||a.pendentes[0];
+  if(!L){ log('Não achei o laudo anterior deste paciente.', true); return; }
+  var pendente=!a.lista.length;
+  document.getElementById('antVerCab').innerHTML='<b>Laudo anterior — '+esc(L.paciente||'(sem nome)')+'</b> · '
+    +esc(L.data||'sem data')+(L.cod?(' · código do aparelho '+esc(L.cod)):' · <i>sem código do aparelho</i>');
+  document.getElementById('antVerCorpo').innerHTML=L.html||'<div class="aviso">laudo sem conteúdo guardado</div>';
+  var p=document.getElementById('antVerPergunta');
+  p.innerHTML = pendente
+    ? '<b>É a mesma pessoa do exame de hoje?</b> Confira o nome e a data acima antes de responder.<br>'
+      +'<button class="btn peq" style="margin-top:6px" onclick="antResponder('+exId+',true)">✅ É a mesma pessoa</button> '
+      +'<button class="btn peq sec" style="margin-top:6px;color:#b3261e" onclick="antResponder('+exId+',false)">❌ É outra pessoa</button>'
+    : '<button class="btn peq sec" style="color:#b3261e" onclick="antResponder('+exId+',false)">❌ Não é a mesma pessoa — parar de comparar</button>';
+  document.getElementById('antVer').style.display='flex';
+}
+function fecharExameAnterior(){ var b=document.getElementById('antVer'); if(b) b.style.display='none'; }
+/* A resposta fica guardada (e vai para o computador): só se pergunta uma vez por paciente.
+   Não refaz o laudo sozinho — refazer custa dinheiro, então fica num botão à vista. */
+async function antResponder(exId, sim){
+  var ex=exames.find(function(e){return e.id===exId;}); if(!ex) return;
+  idDecidir(ex.paciente, ex.codPac, sim?'sim':'nao');
+  fecharExameAnterior();
+  await marcarExamesAnteriores();
+  log(sim ? 'Confirmado: é a mesma pessoa. Use "Refazer com a comparação" para o laudo já sair comparado.'
+          : 'Anotado: são pessoas diferentes. Este paciente não será mais comparado com aquele laudo.');
+  var tela=document.getElementById('telaRevisao');
+  if(ex.laudo && tela && tela.style.display==='block') montarRevAnterior(ex);
+}
+/* Momento 3: bloco na coluna da ESQUERDA da revisão, junto das outras ferramentas. */
+function montarRevAnterior(ex){
+  var box=document.getElementById('revAnterior'); if(!box||!ex) return;
+  var usados=ex._antUsados||[], pend=(ex._antPend||[])[0], total=ex._antTodos||0, h='';
+  if(usados.length){
+    h='<div style="font-weight:700;font-size:12.5px">🔁 Comparado com o exame de '
+      +esc(usados.map(function(u){ return u.data||'sem data'; }).join(', '))+'</div>'
+      +'<button class="btn peq sec" style="margin-top:6px" onclick="abrirExameAnterior('+ex.id+')">📄 Ver laudo anterior</button>';
+    if(total>usados.length) h+='<button class="btn peq sec" style="margin-top:6px" onclick="revTrazerMais('+ex.id+',3)">➕ Trazer os '+Math.min(3,total)+' últimos e refazer</button>';
+  } else if(pend){
+    h='<div style="font-weight:700;font-size:12.5px;color:#9a6b14">🔁 Pode haver exame anterior · '+esc(pend.data||'sem data')+'</div>'
+      +'<div class="aviso" style="margin-top:2px">O laudo saiu <b>sem comparação</b> até você confirmar se é a mesma pessoa.</div>'
+      +'<button class="btn peq" style="margin-top:6px" onclick="abrirExameAnterior('+ex.id+')">👤 Conferir e responder</button>';
+  } else if(total){
+    h='<div style="font-weight:700;font-size:12.5px">🔁 Este paciente tem '+total+' exame(s) anterior(es)</div>'
+      +'<button class="btn peq" style="margin-top:6px" onclick="revTrazerMais('+ex.id+',1)">🔁 Refazer com a comparação</button>';
+  }
+  box.innerHTML=h; box.style.display=h?'block':'none';
+}
+async function revTrazerMais(exId, quantos){
+  var ex=exames.find(function(e){return e.id===exId;}); if(!ex) return;
+  ex._antQuantos=Math.max(1, quantos||1);
+  await gerarLaudo(ex.id);
+  abrirRevisao(ex.id);
 }
 /* F2b — transforma o laudo guardado no histórico (HTML da folha impressa) em texto
    puro, para entrar no prompt como referência do exame anterior.
@@ -2828,9 +3009,12 @@ function salvarLaudoHistorico(meta){
   const fundo = window.__fundo || 'branco';
   const arr = lerHistorico();
   const i = arr.findIndex(function(x){return x.id===meta.id;});
-  const reg = {id:meta.id, paciente:meta.paciente||'(sem nome)', tipo:meta.tipo||'', data:meta.data||'', obs:meta.obs||'', html:html, fundo:fundo, ts:Date.now()};
+  // 'cod' = código do paciente no aparelho: é ele que, no próximo exame, diz com
+  // segurança que é a mesma pessoa (nome igual não prova nada — homônimo existe).
+  const reg = {id:meta.id, paciente:meta.paciente||'(sem nome)', tipo:meta.tipo||'', data:meta.data||'', obs:meta.obs||'', cod:meta.cod||'', html:html, fundo:fundo, ts:Date.now()};
   if(i>=0) arr[i]=reg; else arr.push(reg);
   gravarHistorico(arr);
+  histDiscoAtualizar(reg);   // entra já na cópia em memória, senão só valeria amanhã
 }
 function alternarHistorico(){
   const c=document.getElementById('cardHistorico');
@@ -3016,7 +3200,7 @@ function abrirRevisao(exId, semTela){
   if(!ex || !ex.laudo){ log('Gere o laudo antes de abrir a revisão.', true); return; }
   const L = ex.laudo; const c = L.cab||{};
   if(!ex.histKey) ex.histKey='L'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-  window.__revAtual = {id:ex.histKey, exId:ex.id, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||''};
+  window.__revAtual = {id:ex.histKey, exId:ex.id, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||'', cod:ex.codPac||''};
   var _fnd = FUNDOS[window.__fundo||'branco'] || FUNDOS.branco;
   var _temFundo = !!(_fnd && _fnd.img);
   var _folhaAbre = '<div class="laudoFolha'+(_temFundo?' comFundo':'')+'"'+(_temFundo?' style="padding-top:'+(_fnd.padTopMm||30)+'mm;padding-bottom:'+(_fnd.padBottomMm||20)+'mm"':'')+'>'+(_temFundo?'<img class="fundoLaudo" src="'+_fnd.img+'" alt="">':'');
@@ -3038,6 +3222,7 @@ function abrirRevisao(exId, semTela){
   document.getElementById('telaRevisao').style.display='block';
   window.scrollTo(0,0);
   montarRevMidia(exId);
+  montarRevAnterior(ex);
   revPreencherModelos(ex.tipo||'');
   _mostrarBotoesRev(true);
   atualizarPastaInfoRev();   // o botão 📁 mostra a pasta de destino atual
@@ -3559,11 +3744,12 @@ async function capOrtProcessar(est){
   }
   if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), _captura:true, _dicom:true, _estudoId:est.id};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
   renderExames(); capRenderNovos();
+  try{ marcarExamesAnteriores(); }catch(_){}
   // o agente estava gravando (ou tem pré-buffer): fecha o exame e traz o ditado já transcrito
   if(capAgenteMic){
     capOrtStatusTxt('🎧 Recortando e transcrevendo o ditado de '+ex.paciente+'…');

@@ -125,6 +125,29 @@ ok(/"avisos":\[\{\\"tipo\\":\\"\\",\\"texto\\":\\"\\"\}\]/.test(HTML) || /avisos
   ok(new RegExp('- ' + t + ':').test(HTML), 'a IA sabe o que e "' + t + '"'));
 ok(/NUNCA use os tipos 'anterior' nem 'calculo'/.test(HTML), 'a IA nao invade o que o app preenche');
 
+console.log('=== apagada e menor que acesa ===');
+const css = HTML.slice(HTML.indexOf('#painelAlertas{'), HTML.indexOf('/* ===== calculadoras'));
+const esq = s => s.replace(/[.#]/g, c => '\\' + c);
+const regra = sel => (css.match(new RegExp(esq(sel) + '\\{[^}]*\\}')) || [''])[0];
+const num = (r, prop) => { const m = r.match(new RegExp(prop + ':\\s*(\\d+)')); return m ? +m[1] : null; };
+const apagada = regra('.alerta'), acesa = regra('.alerta.aceso');
+ok(apagada && acesa, 'existem as duas regras: apagada e acesa');
+ok(num(acesa, 'min-width') > num(apagada, 'min-width'),
+   'a acesa e mais larga (' + num(apagada, 'min-width') + 'px -> ' + num(acesa, 'min-width') + 'px)');
+ok(/flex:0 1 auto/.test(apagada) && /flex:1 1 \d+px/.test(acesa),
+   'a apagada encolhe ate o conteudo; a acesa cresce e toma o espaco');
+ok(num(acesa, 'padding') > num(apagada, 'padding'), 'a acesa tem mais respiro por dentro');
+ok(/max-width:212px/.test(apagada) && /max-width:none/.test(acesa), 'a apagada tem teto de largura; a acesa nao');
+ok(num(regra('.alerta.aceso .alertaLed'), 'width') > num(regra('.alertaLed'), 'width'), 'o LED da acesa e maior');
+ok(/font-size:10px/.test(regra('.alertaTit')) && /font-size:var\(--fs-0\)/.test(regra('.alerta.aceso .alertaTit')),
+   'o titulo da acesa e maior que o da apagada');
+ok(/font-size:var\(--fs-0\)/.test(regra('.alertaTxt')) && /font-size:var\(--fs-1\)/.test(regra('.alerta.aceso .alertaTxt')),
+   'o texto da acesa e maior que o da apagada');
+ok(/align-items:flex-start/.test(regra('#painelAlertas')),
+   'as caixas nao se esticam para a altura da vizinha — senao a apagada ficaria do tamanho da acesa');
+ok(/\.alerta\{flex:1 1 42%/.test(css.replace(/\s+/g, ' ').replace(/ \{/g, '{')) || /flex:1 1 42%/.test(css),
+   'no celular as apagadas ficam duas por linha e a acesa toma a linha inteira');
+
 console.log('=== nada disso sai no papel ===');
 // #areaImpressao e um <div></div> VAZIO no HTML (o laudo e injetado nele em tempo de
 // execucao): logo, tudo que esta escrito no arquivo esta necessariamente fora dele.

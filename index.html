@@ -95,19 +95,26 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
    e o quadro diz isso — o apagado também informa: prova que aquilo foi conferido.
    Aceso na cor da categoria = tem aviso, com o texto dentro. Ler cor é mais rápido
    que ler parágrafo, e nada disto entra no papel (vive fora do #areaImpressao). */
-#painelAlertas{max-width:1104px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:8px;}
-.alerta{flex:1 1 190px;min-width:168px;border:1px solid var(--borda);border-left:5px solid var(--borda);
-  border-radius:var(--rd-2);padding:7px 10px;background:var(--superficie);opacity:.45;
-  transition:opacity .15s ease,background .15s ease;}
-.alertaTit{font-size:var(--fs-0);font-weight:700;letter-spacing:.2px;text-transform:uppercase;
-  color:var(--texto-2);display:flex;align-items:center;gap:6px;}
-.alertaLed{width:9px;height:9px;border-radius:50%;background:currentColor;opacity:.3;flex:0 0 auto;}
-.alertaTxt{font-size:var(--fs-1);color:var(--texto-2);margin-top:3px;line-height:1.3;white-space:pre-wrap;}
-.alerta.aceso{opacity:1;background:var(--superficie-2);border-left-color:var(--corAlerta);box-shadow:var(--sombra-1);}
-.alerta.aceso .alertaTit{color:var(--corAlerta);}
-.alerta.aceso .alertaLed{opacity:1;box-shadow:0 0 6px currentColor;}
-.alerta.aceso .alertaTxt{color:var(--texto);font-weight:600;}
-@media (max-width:640px){ .alerta{flex:1 1 100%;} }
+#painelAlertas{max-width:1104px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;}
+/* APAGADA: pequena e discreta. Ocupa o mínimo — está ali só para provar que aquele
+   assunto foi conferido, não para disputar atenção com o que realmente acendeu. */
+.alerta{flex:0 1 auto;min-width:124px;max-width:212px;border:1px solid var(--borda);border-left:4px solid var(--borda);
+  border-radius:var(--rd-2);padding:5px 8px;background:var(--superficie);opacity:.45;
+  transition:opacity .15s ease,background .15s ease,padding .15s ease;}
+.alertaTit{font-size:10px;font-weight:700;letter-spacing:.2px;text-transform:uppercase;
+  color:var(--texto-2);display:flex;align-items:center;gap:5px;}
+.alertaLed{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.3;flex:0 0 auto;}
+.alertaTxt{font-size:var(--fs-0);color:var(--texto-2);margin-top:2px;line-height:1.25;white-space:pre-wrap;}
+/* ACESA: cresce, ganha cor, sombra e letra maior — é ela que tem que puxar o olho. */
+.alerta.aceso{flex:1 1 300px;min-width:248px;max-width:none;padding:8px 11px;border-left-width:5px;
+  opacity:1;background:var(--superficie-2);border-left-color:var(--corAlerta);box-shadow:var(--sombra-1);}
+.alerta.aceso .alertaTit{color:var(--corAlerta);font-size:var(--fs-0);}
+.alerta.aceso .alertaLed{width:9px;height:9px;opacity:1;box-shadow:0 0 6px currentColor;}
+.alerta.aceso .alertaTxt{font-size:var(--fs-1);color:var(--texto);font-weight:600;margin-top:3px;}
+@media (max-width:640px){
+  .alerta{flex:1 1 42%;max-width:none;}      /* celular: duas apagadas por linha */
+  .alerta.aceso{flex:1 1 100%;}              /* a acesa toma a linha inteira */
+}
 /* três colunas: FERRAMENTAS (IA + áudio) | LAUDO | IMAGENS */
 #revLateral{flex:0 0 260px;max-width:260px;display:flex;flex-direction:column;gap:10px;order:1;}
 #areaImpressao{order:2;}

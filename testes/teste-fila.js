@@ -1,6 +1,6 @@
 // Testa a fila de reprocessamento e o classificador de falha transitoria.
 const fs = require('fs');
-const HTML = fs.readFileSync('C:/Users/serru/OneDrive/Desktop/Projeto WBOT/_repo/index.html', 'utf8');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 function grab(n) {
   let i = HTML.indexOf('async function ' + n + '(');
   if (i < 0) i = HTML.indexOf('function ' + n + '(');

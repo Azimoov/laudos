@@ -1992,6 +1992,8 @@ async function gerarLaudo(exId){
     const regrasAprend = regrasParaPrompt(ex.tipo);
     const anterior = exameAnteriorDoPaciente(ex.paciente, ex.tipo, ex.id);
     const regrasSeg = anterior ? regrasDeSeguimento(ex.tipo) : '';
+    const anteriorTxt = anterior ? textoDoLaudoAnterior(anterior) : '';
+    if(anteriorTxt) log('Exame anterior de '+ex.paciente+' localizado ('+(anterior.data||'sem data')+') — entrou no laudo como comparação.');
     const cadastro = [ ex.paciente?('Nome: '+ex.paciente):'', ex.dataExame?('Data do exame: '+ex.dataExame):'', ex.idadeExame?('Idade: '+ex.idadeExame+' anos'):'' ].filter(Boolean).join(' | ');
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
@@ -2003,7 +2005,9 @@ async function gerarLaudo(exId){
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
 (regrasAprend ? "REGRAS APRENDIDAS COM AS CORREÇÕES DO MÉDICO (cumpra à risca; têm prioridade sobre o estilo padrão quando houver conflito):\n"+regrasAprend+"\n\n" : "")+
-(regrasSeg ? "PACIENTE JÁ EXAMINADO NESTE SERVIÇO — REGRAS DE SEGUIMENTO (este bloco só aparece quando existe exame anterior do mesmo paciente e do mesmo tipo; use-o APENAS para comparar com o exame prévio, e só se o ditado ou as imagens trouxerem o achado correspondente):\n"+regrasSeg+"\nExame anterior encontrado no histórico: "+(anterior.data||'data não registrada')+". NÃO invente o conteúdo desse exame: se o ditado não disser como a lesão estava antes, não afirme estabilidade nem crescimento.\n\n" : "")+
+(anteriorTxt ? "EXAME ANTERIOR DO MESMO PACIENTE — LAUDO PRÉVIO NA ÍNTEGRA (mesmo tipo de exame, realizado em "+(anterior.data||'data não registrada')+"):\n"+anteriorTxt+"\n\n"+
+"COMO USAR O EXAME ANTERIOR (leia antes de escrever qualquer comparação):\n- O bloco acima é REFERÊNCIA do passado. O laudo de HOJE descreve exclusivamente o que está no DITADO DE HOJE e nas IMAGENS DE HOJE.\n- PROIBIDO trazer para o laudo de hoje qualquer lesão, medida, órgão alterado ou diagnóstico que exista SÓ no laudo anterior. Se o médico não ditou hoje e não está legível nas imagens de hoje, não entra — nem no corpo, nem na conclusão.\n- Só escreva evolução (estável, aumentou, diminuiu, novo, em involução) quando o achado existir NOS DOIS exames. Compare medida com medida; se faltar a medida de um dos lados, descreva o achado de hoje e NÃO julgue a evolução.\n- Ao comparar, cite a data do exame anterior — ex.: 'estável em relação ao exame de "+(anterior.data||'data não registrada')+"'.\n- Achado que estava no laudo anterior e não foi citado hoje: NÃO afirme que desapareceu nem que persiste. Registre em 'observacoes_para_o_medico' que o exame anterior descrevia esse achado e que ele não foi mencionado hoje.\n- Divergência entre o laudo anterior e o ditado de hoje: vale sempre o ditado de hoje, e o conflito vai para 'observacoes_para_o_medico'.\n- NÃO copie a redação do laudo anterior: escreva o laudo de hoje a partir do modelo e do ditado de hoje.\n\n" : "")+
+(regrasSeg ? "PACIENTE JÁ EXAMINADO NESTE SERVIÇO — REGRAS DE SEGUIMENTO (este bloco só aparece quando existe exame anterior do mesmo paciente e do mesmo tipo; use-o APENAS para comparar com o exame prévio, e só se o ditado ou as imagens trouxerem o achado correspondente):\n"+regrasSeg+"\n"+(anteriorTxt ? "O laudo anterior completo está no bloco EXAME ANTERIOR, acima — use-o como fonte da comparação, respeitando as travas daquele bloco." : "Exame anterior encontrado no histórico: "+(anterior.data||'data não registrada')+" — mas o CONTEÚDO dele não está disponível. NÃO invente o conteúdo desse exame: se o ditado não disser como a lesão estava antes, não afirme estabilidade nem crescimento.")+"\n\n" : "")+
 (EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — MARGEM DE ERRO: preencha o campo 'obstetrico' com o que o médico DITOU sobre a ultrassonografia INICIAL (de primeiro trimestre) da paciente: trouxe_usg_primeiro_trimestre (true se ela trouxe/apresentou o exame inicial ou se o médico informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito) e ig_primeiro_usg_semanas (a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame — número; use 0 se não foi ditada). NUNCA invente esses dados. NÃO calcule nem escreva a margem de erro em dias: deixe os pontilhados de '(com variação de até +/- ..... dias)' como estão — o aplicativo calcula pela tabela oficial e substitui. Mantenha também a frase da idade gestacional como está no modelo; o aplicativo a ajusta quando houver exame inicial.\n\n" : "")+
 (ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
 "Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\""+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
@@ -2399,6 +2403,33 @@ function exameAnteriorDoPaciente(nome, tipo, idAtual){
   if(!achados.length) return null;
   achados.sort(function(a,b){ return (b.ts||0)-(a.ts||0); });   // mais recente primeiro
   return achados[0];
+}
+/* F2b — transforma o laudo guardado no histórico (HTML da folha impressa) em texto
+   puro, para entrar no prompt como referência do exame anterior.
+   O resultado é SÓ TEXTO e vai só para o prompt: nunca volta para a tela como HTML,
+   por isso limpar as tags aqui basta e não é preciso depender de DOM (roda no teste). */
+function textoDoLaudoAnterior(reg, limite){
+  if(!reg || !reg.html) return '';
+  var lim = limite || 9000;
+  var h = String(reg.html);
+  h = h.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  // assinatura e rodapé fecham toda folha e são iguais em todo laudo: só gastariam tokens
+  h = h.replace(/<div class="assin"[\s\S]*$/i, '');
+  h = h.replace(/<div class="rodapeLaudo"[\s\S]*?<\/div>/gi, '');
+  h = h.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|p|li|tr|h[1-6])\s*>/gi, '\n');
+  h = h.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]*>/g, '');
+  h = h.replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+       .replace(/&quot;/gi, '"').replace(/&#0*39;/g, "'")
+       .replace(/&#(\d+);/g, function(_, n){ return String.fromCharCode(+n); })
+       .replace(/&amp;/gi, '&');
+  h = h.replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n')
+       .replace(/\n{3,}/g, '\n\n').trim();
+  if(h.length > lim){
+    // a CONCLUSÃO fica no fim do laudo: corta o miolo, nunca o fecho
+    var cabeca = Math.floor(lim*0.6), cauda = lim-cabeca;
+    h = h.slice(0, cabeca)+'\n[...trecho do meio omitido por tamanho...]\n'+h.slice(h.length-cauda);
+  }
+  return h;
 }
 function textoBaseLaudo(L){
   if(!L) return '';

@@ -19,6 +19,7 @@ const SUITE = [
   { arq: 'teste-onda.js', o: 'grafico do microfone' },
   { arq: 'teste-bipe.js', o: 'aviso sonoro' },
   { arq: 'teste-birads.js', o: 'calculadora BI-RADS' },
+  { arq: 'teste-anterior.js', o: 'comparacao com o exame anterior (F2b)' },
   { arq: 'teste-buffer.py', o: 'fita de audio do agente', py: true },
   { arq: 'teste-cache.py', o: 'cache da listagem DICOM', py: true },
   { arq: 'teste-backup.js', o: 'backup externo (precisa do agente no ar)', agente: true },

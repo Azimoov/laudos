@@ -1,6 +1,6 @@
 // Harness: extrai calcBirads/calcRadio/calcOut do index.html e roda com DOM stub.
 const fs = require('fs');
-const HTML = fs.readFileSync('C:/Users/serru/OneDrive/Desktop/Projeto WBOT/_repo/index.html', 'utf8');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 
 function grab(name) {
   const i = HTML.indexOf('function ' + name + '(');

@@ -1,6 +1,6 @@
 // Testa QUANDO o bipe toca, extraindo micPulso() do index.html com o resto dublado.
 const fs = require('fs');
-const HTML = fs.readFileSync('C:/Users/serru/OneDrive/Desktop/Projeto WBOT/_repo/index.html', 'utf8');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 function grab(n) {
   let i = HTML.indexOf('async function ' + n + '(');       // preserva o "async"
   if (i < 0) i = HTML.indexOf('function ' + n + '(');

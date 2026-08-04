@@ -90,7 +90,24 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 }
 /* revisão: laudo à esquerda começando no TOPO; ferramentas (IA, áudio) e imagens numa
    coluna lateral. Antes tudo isso ficava empilhado acima e empurrava o laudo p/ baixo. */
-#obsBanner{max-width:1104px;margin:0 auto 8px;}
+/* ===== painel de alertas da revisão =====
+   Um quadro por categoria, SEMPRE na tela. Apagado = nada a relatar naquele assunto,
+   e o quadro diz isso — o apagado também informa: prova que aquilo foi conferido.
+   Aceso na cor da categoria = tem aviso, com o texto dentro. Ler cor é mais rápido
+   que ler parágrafo, e nada disto entra no papel (vive fora do #areaImpressao). */
+#painelAlertas{max-width:1104px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:8px;}
+.alerta{flex:1 1 190px;min-width:168px;border:1px solid var(--borda);border-left:5px solid var(--borda);
+  border-radius:var(--rd-2);padding:7px 10px;background:var(--superficie);opacity:.45;
+  transition:opacity .15s ease,background .15s ease;}
+.alertaTit{font-size:var(--fs-0);font-weight:700;letter-spacing:.2px;text-transform:uppercase;
+  color:var(--texto-2);display:flex;align-items:center;gap:6px;}
+.alertaLed{width:9px;height:9px;border-radius:50%;background:currentColor;opacity:.3;flex:0 0 auto;}
+.alertaTxt{font-size:var(--fs-1);color:var(--texto-2);margin-top:3px;line-height:1.3;white-space:pre-wrap;}
+.alerta.aceso{opacity:1;background:var(--superficie-2);border-left-color:var(--corAlerta);box-shadow:var(--sombra-1);}
+.alerta.aceso .alertaTit{color:var(--corAlerta);}
+.alerta.aceso .alertaLed{opacity:1;box-shadow:0 0 6px currentColor;}
+.alerta.aceso .alertaTxt{color:var(--texto);font-weight:600;}
+@media (max-width:640px){ .alerta{flex:1 1 100%;} }
 /* três colunas: FERRAMENTAS (IA + áudio) | LAUDO | IMAGENS */
 #revLateral{flex:0 0 260px;max-width:260px;display:flex;flex-direction:column;gap:10px;order:1;}
 #areaImpressao{order:2;}
@@ -155,7 +172,6 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #revIaWrap{background:var(--superficie-2)!important;color:var(--texto)!important;}
 #revIaWrap .aviso{color:var(--texto)!important;}
 #revIaWrap input,#revIaWrap select{background:var(--superficie)!important;color:var(--texto)!important;border-color:var(--borda)!important;}
-#obsBanner{background:#2a2410!important;color:#f0d089!important;border-left-color:var(--ambar)!important;}
 /* ===== página do laudo (espelha o modelo do Pages) ===== */
 .laudoFolha{position:relative;background:#fff;width:100%;max-width:760px;margin:0 auto;padding:22px 26px;border:1px solid #aaa;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.32;color:#000;}
 .fundoLaudo{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;}
@@ -628,7 +644,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
     </div>
     <!-- painel de trabalho: aviso da IA + ferramentas (IA e áudio) lado a lado.
          Fica FORA do areaImpressao, então nada disso entra no PDF/impressão. -->
-    <div id="obsBanner" style="display:none;background:#fdf3e3;border-left:5px solid #d99a26;border-radius:8px;padding:9px 12px;font-size:13.5px;font-weight:600;"></div>
+    <div id="painelAlertas"></div>
     <div id="revLayout" style="display:flex;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap">
       <div id="areaImpressao" style="flex:1 1 600px;min-width:0;max-width:790px"></div>
       <div id="revLateral">
@@ -2048,29 +2064,50 @@ async function gerarLaudo(exId){
 (regrasSeg ? "PACIENTE JÁ EXAMINADO NESTE SERVIÇO — REGRAS DE SEGUIMENTO (este bloco só aparece quando existe exame anterior do mesmo paciente e do mesmo tipo; use-o APENAS para comparar com o exame prévio, e só se o ditado ou as imagens trouxerem o achado correspondente):\n"+regrasSeg+"\n"+(anteriorTxt ? "O laudo anterior completo está no bloco EXAME ANTERIOR, acima — use-o como fonte da comparação, respeitando as travas daquele bloco." : "Exame anterior encontrado no histórico: "+(anterior.data||'data não registrada')+" — mas o CONTEÚDO dele não está disponível. NÃO invente o conteúdo desse exame: se o ditado não disser como a lesão estava antes, não afirme estabilidade nem crescimento.")+"\n\n" : "")+
 (EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — MARGEM DE ERRO: preencha o campo 'obstetrico' com o que o médico DITOU sobre a ultrassonografia INICIAL (de primeiro trimestre) da paciente: trouxe_usg_primeiro_trimestre (true se ela trouxe/apresentou o exame inicial ou se o médico informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito) e ig_primeiro_usg_semanas (a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame — número; use 0 se não foi ditada). NUNCA invente esses dados. NÃO calcule nem escreva a margem de erro em dias: deixe os pontilhados de '(com variação de até +/- ..... dias)' como estão — o aplicativo calcula pela tabela oficial e substitui. Mantenha também a frase da idade gestacional como está no modelo; o aplicativo a ajusta quando houver exame inicial.\n\n" : "")+
 (ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\""+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
+"AVISOS SEPARADOS POR ASSUNTO (campo 'avisos'): além de 'observacoes_para_o_medico', devolva CADA aviso como um item próprio, com 'tipo' sendo EXATAMENTE uma destas palavras:\n- identificacao: nome, idade ou data que não conferem entre o ditado, as imagens e o cadastro.\n- divergencia: o ditado diz uma coisa e as imagens mostram outra.\n- faltando: medida, dado ou legenda ausente/ilegível que deixou pontilhados no laudo.\n- iacriou: você escreveu a descrição de uma patologia a partir do seu conhecimento, por não haver dizer padrão do médico (diga qual patologia).\n- outros: aviso que não caiba em nenhum acima.\nUm assunto por item, 'texto' curto e direto. Nada a avisar: \"avisos\":[]. NUNCA use os tipos 'anterior' nem 'calculo' — esses o aplicativo preenche sozinho.\n\n"+
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}]"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
 +(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0}":"")+"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
     const resp = await openai(partes);
     let conclusaoFinal = resp.conclusao||mod.conclusao;
     let obsFinal = resp.observacoes_para_o_medico||'';
+    // avisos já separados por assunto pela IA; se ela só mandou o texto corrido
+    // (modelo antigo, ou resposta fora do formato), ele não se perde: vai para "outros".
+    const alertas = [];
+    (Array.isArray(resp.avisos)?resp.avisos:[]).forEach(function(a){
+      var txt=String((a&&a.texto)||'').trim();
+      if(txt) alertas.push({tipo:alertaTipoValido(a&&a.tipo), texto:txt});
+    });
+    if(!alertas.length && obsFinal) alertas.push({tipo:'outros', texto:obsFinal});
     if(ex.tipo==='tireoide' && resp.tirads){
       try{
         const tri = processarTirads(resp.tirads, trans);
-        if(tri.linhas.length) conclusaoFinal = (conclusaoFinal?conclusaoFinal+'\n':'')+tri.linhas.join('\n');
-        if(tri.obs.length) obsFinal = (obsFinal?obsFinal+' | ':'')+tri.obs.join(' ');
+        if(tri.linhas.length){ conclusaoFinal = (conclusaoFinal?conclusaoFinal+'\n':'')+tri.linhas.join('\n');
+          alertas.push({tipo:'calculo', texto:'TI-RADS calculado pelo app: '+tri.linhas.join(' | ')}); }
+        if(tri.obs.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+tri.obs.join(' ');
+          alertas.push({tipo:'calculo', texto:tri.obs.join(' ')}); }
       }catch(e){}
     }
     // Obstétrico 2º/3º trimestre: margem de erro pela IG do 1º USG (código calcula, IA só extrai)
     if(EX_OBST_SEQ[ex.tipo]){
       try{
         const ob = processarObstetrico(resp.obstetrico, ex.tipo);
-        if(ob.margem!=null) conclusaoFinal = obstAplicarNaConclusao(conclusaoFinal, ob.margem);
-        if(ob.obs.length) obsFinal = (obsFinal?obsFinal+' | ':'')+ob.obs.join(' ');
+        if(ob.margem!=null){ conclusaoFinal = obstAplicarNaConclusao(conclusaoFinal, ob.margem);
+          alertas.push({tipo:'calculo', texto:'Margem de erro da idade gestacional calculada pelo app: +/- '+ob.margem+' dias.'}); }
+        if(ob.obs.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+ob.obs.join(' ');
+          alertas.push({tipo:'calculo', texto:ob.obs.join(' ')}); }
       }catch(e){}
     }
-    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal};
+    // o que o APP sabe sobre o exame anterior (a IA não tem como saber): acende o
+    // quadro azul quando comparou, e o VERMELHO quando a identidade está em aberto
+    if(usados.length) alertas.push({tipo:'anterior', texto:'Comparado com o exame de '+usados.map(function(L){return L.data||'sem data';}).join(', ')+'.'});
+    if(ant.pendentes.length){
+      alertas.push({tipo:'anterior', texto:'Há laudo de '+(ant.pendentes[0].data||'sem data')+' com nome parecido, ainda NÃO usado.'});
+      alertas.push({tipo:'identificacao', texto:'Falta confirmar se o exame de '+(ant.pendentes[0].data||'sem data')+' é da mesma pessoa. O laudo saiu SEM comparação.'});
+    }
+    if(!usados.length && !ant.pendentes.length && histBuscaIncompleta()) alertas.push({tipo:'anterior', texto:'Busca incompleta ('+_histDiscoErro+'): procurei só na cópia do navegador, que é podada. Ligue o agente.'});
+    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas};
     ex._liberado=false;   // laudo novo = ainda não liberado (volta p/ a lista de revisão)
     ex._falhou=false;
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
@@ -2579,6 +2616,47 @@ function montarRevAnterior(ex){
   }
   box.innerHTML=h; box.style.display=h?'block':'none';
 }
+/* ---- Alertas da revisão, por categoria ----
+   Antes era uma faixa âmbar única com todo o texto da IA junto: para saber se havia
+   um erro de identificação era preciso LER o parágrafo inteiro. Agora cada assunto
+   tem seu quadro e sua cor, e o quadro fica na tela mesmo sem aviso — apagado, dizendo
+   o que foi conferido. 'anterior' e 'calculo' são preenchidos pelo app, não pela IA. */
+const ALERTAS = [
+  {k:'identificacao', nome:'Identificação',        cor:'#e5534b', vazio:'Nome, idade e data conferem'},
+  {k:'anterior',      nome:'Exame anterior',       cor:'#6db3ff', vazio:'Nenhum exame anterior deste paciente'},
+  {k:'divergencia',   nome:'Ditado × imagens',     cor:'#a78bfa', vazio:'Ditado e imagens batem'},
+  {k:'faltando',      nome:'Dados faltando',       cor:'#e3a93c', vazio:'Nenhuma medida ou dado em falta'},
+  {k:'iacriou',       nome:'Texto criado pela IA', cor:'#f06ab1', vazio:'Nenhum texto criado pela IA'},
+  {k:'calculo',       nome:'Cálculo do app',       cor:'#2eb35c', vazio:'Nenhum cálculo automático neste laudo'},
+  {k:'outros',        nome:'Outros avisos',        cor:'#98a3b3', vazio:'Nenhum outro aviso'}
+];
+/* Categoria desconhecida NUNCA some: cai em "outros". Aviso perdido é aviso não lido. */
+function alertaTipoValido(t){
+  var s=String(t||'').trim();
+  for(var i=0;i<ALERTAS.length;i++){ if(ALERTAS[i].k===s) return s; }
+  return 'outros';
+}
+/* Laudo antigo (guardado antes das categorias) só tem o texto corrido: vira "outros". */
+function alertasDoLaudo(L){
+  if(!L) return [];
+  if(Array.isArray(L.alertas) && L.alertas.length) return L.alertas;
+  return L.obs ? [{tipo:'outros', texto:String(L.obs)}] : [];
+}
+function montarAlertas(lista){
+  var box=document.getElementById('painelAlertas'); if(!box) return;
+  var porTipo={};
+  (lista||[]).forEach(function(a){
+    var txt=String((a&&a.texto)||'').trim(); if(!txt) return;
+    var t=alertaTipoValido(a&&a.tipo);
+    (porTipo[t]=porTipo[t]||[]).push(txt);
+  });
+  box.innerHTML=ALERTAS.map(function(A){
+    var msgs=porTipo[A.k]||[], aceso=msgs.length>0;
+    return '<div class="alerta'+(aceso?' aceso':'')+'" style="--corAlerta:'+A.cor+'">'
+      +'<div class="alertaTit"><span class="alertaLed"></span>'+esc(A.nome)+'</div>'
+      +'<div class="alertaTxt">'+esc(aceso?msgs.join('\n'):A.vazio)+'</div></div>';
+  }).join('');
+}
 async function revTrazerMais(exId, quantos){
   var ex=exames.find(function(e){return e.id===exId;}); if(!ex) return;
   ex._antQuantos=Math.max(1, quantos||1);
@@ -3011,7 +3089,7 @@ function salvarLaudoHistorico(meta){
   const i = arr.findIndex(function(x){return x.id===meta.id;});
   // 'cod' = código do paciente no aparelho: é ele que, no próximo exame, diz com
   // segurança que é a mesma pessoa (nome igual não prova nada — homônimo existe).
-  const reg = {id:meta.id, paciente:meta.paciente||'(sem nome)', tipo:meta.tipo||'', data:meta.data||'', obs:meta.obs||'', cod:meta.cod||'', html:html, fundo:fundo, ts:Date.now()};
+  const reg = {id:meta.id, paciente:meta.paciente||'(sem nome)', tipo:meta.tipo||'', data:meta.data||'', obs:meta.obs||'', cod:meta.cod||'', alertas:meta.alertas||null, html:html, fundo:fundo, ts:Date.now()};
   if(i>=0) arr[i]=reg; else arr.push(reg);
   gravarHistorico(arr);
   histDiscoAtualizar(reg);   // entra já na cópia em memória, senão só valeria amanhã
@@ -3060,9 +3138,8 @@ function abrirHistorico(id){
       ass.insertBefore(ia, ass.firstChild);
     }
   }catch(e){}
-  const ob = document.getElementById('obsBanner');
-  if(r.obs){ ob.style.display='block'; ob.textContent='⚠️ Aviso da IA — revise com atenção: '+r.obs; } else { ob.style.display='none'; }
-  window.__revAtual = {id:r.id, paciente:r.paciente, tipo:r.tipo, data:r.data, obs:r.obs};
+  montarAlertas(alertasDoLaudo(r));
+  window.__revAtual = {id:r.id, paciente:r.paciente, tipo:r.tipo, data:r.data, obs:r.obs, cod:r.cod||'', alertas:r.alertas||null};
   document.title = 'Laudo - '+(r.paciente||'paciente');
   document.querySelector('main').style.display='none';
   document.getElementById('telaRevisao').style.display='block';
@@ -3200,7 +3277,7 @@ function abrirRevisao(exId, semTela){
   if(!ex || !ex.laudo){ log('Gere o laudo antes de abrir a revisão.', true); return; }
   const L = ex.laudo; const c = L.cab||{};
   if(!ex.histKey) ex.histKey='L'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-  window.__revAtual = {id:ex.histKey, exId:ex.id, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||'', cod:ex.codPac||''};
+  window.__revAtual = {id:ex.histKey, exId:ex.id, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||'', cod:ex.codPac||'', alertas:L.alertas||null};
   var _fnd = FUNDOS[window.__fundo||'branco'] || FUNDOS.branco;
   var _temFundo = !!(_fnd && _fnd.img);
   var _folhaAbre = '<div class="laudoFolha'+(_temFundo?' comFundo':'')+'"'+(_temFundo?' style="padding-top:'+(_fnd.padTopMm||30)+'mm;padding-bottom:'+(_fnd.padBottomMm||20)+'mm"':'')+'>'+(_temFundo?'<img class="fundoLaudo" src="'+_fnd.img+'" alt="">':'');
@@ -3215,8 +3292,7 @@ function abrirRevisao(exId, semTela){
   +'<div class="assin">'+(cfg.assinatura?'<img src="'+cfg.assinatura+'" style="height:62px;display:block;margin:0 auto -16px">':'')+'<span class="linha">'+cfg.medico+'<br>'+cfg.crm+'</span></div>'
   +'<div class="rodapeLaudo">Esclarecemos que a impressão diagnóstica em exames de imagem não é absoluta, devendo ser feita a correlação clínico laboratorial, além de outros exames de imagem. Somente o seu médico tem condições de interpretar corretamente o conjunto de todas essas informações.</div>'
   +'</div>';
-  const ob = document.getElementById('obsBanner');
-  if(L.obs){ ob.style.display='block'; ob.textContent='⚠️ Aviso da IA — revise com atenção: '+L.obs; } else { ob.style.display='none'; }
+  montarAlertas(alertasDoLaudo(L));
   document.title = 'Laudo - '+((c.nome||ex.paciente||'paciente').trim());
   if(!semTela){ document.querySelector('main').style.display='none';
   document.getElementById('telaRevisao').style.display='block';

@@ -21,6 +21,7 @@ const SUITE = [
   { arq: 'teste-birads.js', o: 'calculadora BI-RADS' },
   { arq: 'teste-anterior.js', o: 'comparacao com o exame anterior (F2b)' },
   { arq: 'teste-alertas.js', o: 'painel de alertas por categoria' },
+  { arq: 'teste-caixapreta.js', o: 'caixa-preta da gravacao (janela fechou)' },
   { arq: 'teste-buffer.py', o: 'fita de audio do agente', py: true },
   { arq: 'teste-cache.py', o: 'cache da listagem DICOM', py: true },
   { arq: 'teste-backup.js', o: 'backup externo (precisa do agente no ar)', agente: true },

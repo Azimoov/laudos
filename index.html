@@ -289,6 +289,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <p class="aviso">A chave fica salva somente neste navegador (localStorage). As imagens e áudios são enviados apenas à API da OpenAI para análise.</p>
 </div>
 
+<!-- gravação que ficou pela metade (a janela fechou antes do "parar"): fica no topo,
+     acima das abas, até o médico recuperar ou descartar. -->
+<div id="cpRecuperar" style="display:none;background:#3a1512;border-left:5px solid #e5534b;border-radius:9px;padding:10px 12px;margin:10px auto;max-width:1104px"></div>
+
 <div id="abas">
   <button id="aba-acumulados" onclick="mostrarAba('acumulados')">📥 Arquivos acumulados</button>
   <button id="aba-gravar" onclick="mostrarAba('gravar')">🎙 Gravar ditados</button>
@@ -1922,6 +1926,7 @@ async function gravarParaExame(id){
   let mime=''; if(MediaRecorder.isTypeSupported('audio/mp4')) mime='audio/mp4'; else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
   mediaRecE = new MediaRecorder(recStreamE, mime?{mimeType:mime}:undefined);
   recChunksE=[];
+  const cpSesE = cpLigar(mediaRecE, 'exame');
   mediaRecE.ondataavailable=function(e){ if(e.data&&e.data.size>0) recChunksE.push(e.data); };
   mediaRecE.onstop=async function(){
     const blob=new Blob(recChunksE,{type:mediaRecE.mimeType||'audio/mp4'});
@@ -1940,8 +1945,9 @@ async function gravarParaExame(id){
     }catch(e){ log('Falha na transcrição da regravação: '+e.message, true); }
     renderExames();
     const d=document.getElementById('det'+id); if(d) d.style.display='block';
+    cpApagarSessao(cpSesE);   // gravação fechada em paz: a caixa-preta não é mais necessária
   };
-  mediaRecE.start(); recSegE=0;
+  mediaRecE.start(CP_FATIA_MS); recSegE=0;
   vuIniciar(recStreamE, 'vuEx'+id);
   setRecExUI(id,'rec');
   recTimerE=setInterval(function(){ if(!mediaRecE||mediaRecE.state!=='recording')return; recSegE++; const b=document.getElementById('btnRegrav'+id); if(b) b.textContent='⏹ Parar ('+recSegE+'s)'; },1000);
@@ -2209,7 +2215,161 @@ function vuParar(canvasId){
 }
 
 /* ============ Ditados acumulados (guardados no aparelho) ============ */
-function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',3);r.onupgradeneeded=function(ev){const db=r.result;if(!db.objectStoreNames.contains('gravacoes'))db.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('sessoes'))db.createObjectStore('sessoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('audiosSessao'))db.createObjectStore('audiosSessao',{keyPath:'idx'});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+function dbOpen(){return new Promise(function(res,rej){const r=indexedDB.open('laudosDB',4);r.onupgradeneeded=function(ev){const db=r.result;if(!db.objectStoreNames.contains('gravacoes'))db.createObjectStore('gravacoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('sessoes'))db.createObjectStore('sessoes',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('audiosSessao'))db.createObjectStore('audiosSessao',{keyPath:'idx'});if(!db.objectStoreNames.contains('caixaPreta'))db.createObjectStore('caixaPreta',{keyPath:'k'});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+
+/* ============ Caixa-preta da gravação ============
+   O MediaRecorder guardava a gravação INTEIRA na memória até o "parar". Se a janela
+   do Chrome fechasse no meio do exame — sem querer, ou sozinha — perdia-se o ditado
+   completo, não um pedaço: em 03/08 foi exatamente isso.
+   Agora o gravador entrega o áudio em fatias de 5 s e CADA fatia vai para o disco do
+   navegador assim que chega. Fechar a janela custa, no máximo, a última fatia.
+   Ao reabrir, o app acha as fatias órfãs e devolve a gravação. */
+const CP_FATIA_MS = 5000;
+var _cpAtivas = {};   // sessões gravando agora nesta aba (para o aviso de fechar)
+function cpNovaSessao(marca){
+  return 'G'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+'|'+String(marca||'ditado');
+}
+function cpMarcaDaSessao(s){ var i=String(s||'').indexOf('|'); return i<0?'ditado':String(s).slice(i+1); }
+function cpQuandoDaSessao(s){ var m=String(s||'').match(/^G(\d+)_/); return m?parseInt(m[1],10):0; }
+async function cpGravarFatia(sessao, i, blob, mime){
+  try{
+    var db=await dbOpen();
+    await new Promise(function(res,rej){
+      var tx=db.transaction('caixaPreta','readwrite');
+      // i com zeros à esquerda: a ordem da chave TEM que ser a ordem do áudio
+      tx.objectStore('caixaPreta').put({k:sessao+'#'+('000000'+i).slice(-6), sessao:sessao, i:i,
+                                        blob:blob, mime:mime||'', quando:Date.now()});
+      tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);};
+    });
+  }catch(e){
+    // falhar aqui não pode derrubar a gravação em curso — ela ainda está na memória
+    if(!cpGravarFatia._avisou){ cpGravarFatia._avisou=true; log('⚠️ Não consegui guardar a gravação no disco do navegador ('+((e&&e.message)||e)+'). Se a janela fechar agora, o ditado se perde.', true); }
+  }
+}
+async function cpFatias(){
+  try{
+    var db=await dbOpen();
+    return await new Promise(function(res,rej){
+      var rq=db.transaction('caixaPreta').objectStore('caixaPreta').getAll();
+      rq.onsuccess=function(){ res(rq.result||[]); }; rq.onerror=function(){ rej(rq.error); };
+    });
+  }catch(e){ return []; }
+}
+async function cpApagarSessao(sessao){
+  try{
+    var todas=await cpFatias(); var db=await dbOpen();
+    await new Promise(function(res){
+      var tx=db.transaction('caixaPreta','readwrite'), st=tx.objectStore('caixaPreta');
+      todas.forEach(function(f){ if(f.sessao===sessao) st.delete(f.k); });
+      tx.oncomplete=function(){res();}; tx.onerror=function(){res();};
+    });
+  }catch(e){}
+  delete _cpAtivas[sessao];
+}
+/* Sessões que ficaram para trás: gravações que nunca chegaram no "parar". */
+async function cpOrfas(){
+  var todas=await cpFatias(), porSessao={};
+  todas.forEach(function(f){
+    if(_cpAtivas[f.sessao]) return;                 // esta aba ainda está gravando nela
+    var s=porSessao[f.sessao]=porSessao[f.sessao]||{sessao:f.sessao, n:0, mime:f.mime||'', fatias:[]};
+    s.n++; s.fatias.push(f); if(!s.mime && f.mime) s.mime=f.mime;
+  });
+  return Object.keys(porSessao).map(function(k){
+    var s=porSessao[k];
+    s.fatias.sort(function(a,b){ return a.i-b.i; });
+    s.segundos=Math.round(s.n*CP_FATIA_MS/1000);
+    s.quando=cpQuandoDaSessao(s.sessao);
+    s.marca=cpMarcaDaSessao(s.sessao);
+    return s;
+  }).sort(function(a,b){ return b.quando-a.quando; });
+}
+function cpMontarBlob(s){
+  return new Blob(s.fatias.map(function(f){ return f.blob; }), {type:s.mime||'audio/webm'});
+}
+/* Liga a caixa-preta num gravador já criado. Não substitui o ondataavailable dele:
+   os dois convivem — um monta o áudio no fim, o outro salva o pedaço na hora. */
+function cpLigar(rec, marca){
+  var sessao=cpNovaSessao(marca), i=0;
+  _cpAtivas[sessao]=true;
+  rec.addEventListener('dataavailable', function(e){
+    if(e.data && e.data.size>0) cpGravarFatia(sessao, i++, e.data, rec.mimeType||'');
+  });
+  return sessao;
+}
+function cpGravandoAgora(){ return Object.keys(_cpAtivas).length>0; }
+const CP_ROTULOS = {exame:'Nova gravação de um exame', ditado:'Ditado avulso',
+                    rapido:'Laudo rápido', captura:'Captura ao vivo'};
+function cpRotulo(m){ return CP_ROTULOS[m]||'Gravação'; }
+function cpQuandoTexto(ts){
+  if(!ts) return 'momento não registrado';
+  try{ var d=new Date(ts); return d.toLocaleDateString('pt-BR')+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return 'momento não registrado'; }
+}
+function cpDuracaoTexto(seg){
+  if(seg<60) return seg+' s';
+  return Math.floor(seg/60)+' min '+(seg%60?((seg%60)+' s'):'').trim();
+}
+/* Ao abrir o app: se sobrou gravação sem "parar", ela aparece em destaque no topo.
+   Não some sozinha e não é apagada sem o médico mandar — perder ditado é o pior
+   que pode acontecer aqui, então a recuperação é sempre uma decisão dele. */
+async function cpRenderRecuperacao(){
+  var box=document.getElementById('cpRecuperar'); if(!box) return;
+  var orfas=await cpOrfas();
+  if(!orfas.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.innerHTML='<div style="font-weight:700;margin-bottom:6px">🎙️ '+orfas.length+' gravação(ões) interrompida(s) — a janela fechou antes de você parar a gravação</div>'
+    +orfas.map(function(s){
+      return '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12)">'
+        +'<span style="flex:1;min-width:200px;font-size:13px">'+esc(cpRotulo(s.marca))+' · <b>'+esc(cpDuracaoTexto(s.segundos))+'</b> · '+esc(cpQuandoTexto(s.quando))+'</span>'
+        +'<button class="btn peq" onclick="cpRecuperarSessao(\''+esc(s.sessao)+'\')">💾 Recuperar e transcrever</button>'
+        +'<button class="btn peq sec" onclick="cpBaixarSessao(\''+esc(s.sessao)+'\')">⬇ Só baixar o áudio</button>'
+        +'<button class="btn peq sec" style="color:#b3261e" onclick="cpDescartarSessao(\''+esc(s.sessao)+'\')">🗑 Descartar</button>'
+        +'</div>';
+    }).join('');
+  box.style.display='block';
+}
+async function _cpAchar(sessao){
+  var orfas=await cpOrfas();
+  for(var i=0;i<orfas.length;i++){ if(orfas[i].sessao===sessao) return orfas[i]; }
+  return null;
+}
+async function cpRecuperarSessao(sessao){
+  var s=await _cpAchar(sessao); if(!s){ log('Essa gravação não está mais guardada.', true); return; }
+  var blob=cpMontarBlob(s);
+  log('Recuperando gravação de '+cpDuracaoTexto(s.segundos)+' — transcrevendo…');
+  var metaG={};
+  try{
+    var r=await transcreverAudio(blob);
+    metaG={transcricao:r.transcricao||'', nome_paciente:r.nome_paciente||'', tipo_exame:r.tipo_exame||'',
+           lateralidade:r.lateralidade||'', nome:nomeAudio(r.nome_paciente, r.tipo_exame, r.lateralidade)||'Gravação recuperada'};
+    log('Gravação recuperada: '+(metaG.nome||'(sem nome)'));
+  }catch(e){
+    log('Recuperei o áudio, mas a transcrição falhou ('+e.message+'). Ele fica guardado em "Arquivos acumulados" para você transcrever depois.', true);
+  }
+  // guarda mesmo sem transcrição: o áudio é o que não pode se perder
+  try{ await gravSalvar(blob, metaG); }catch(e){ log('Não consegui guardar a gravação recuperada: '+e.message, true); }
+  try{ salvarAudioAuto(blob, metaG.nome||'gravacao-recuperada', (blob.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){}
+  await cpApagarSessao(sessao);
+  await cpRenderRecuperacao();
+  try{ renderAcum(); }catch(e){}
+}
+function cpBaixarSessao(sessao){
+  _cpAchar(sessao).then(function(s){
+    if(!s){ log('Essa gravação não está mais guardada.', true); return; }
+    var blob=cpMontarBlob(s), url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.download='gravacao-recuperada-'+(s.quando||'')+((blob.type||'').indexOf('webm')>=0?'.webm':'.m4a');
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
+    log('Áudio baixado. Ele continua guardado aqui até você descartar.');
+  });
+}
+async function cpDescartarSessao(sessao){
+  var s=await _cpAchar(sessao);
+  if(!confirm('Descartar de vez esta gravação de '+(s?cpDuracaoTexto(s.segundos):'?')+'? Não dá para desfazer.')) return;
+  await cpApagarSessao(sessao);
+  await cpRenderRecuperacao();
+  log('Gravação descartada.');
+}
 /* ---- áudios da sessão: blobs guardados 1× no IndexedDB p/ sobreviverem ao reload (validade 24h) ---- */
 async function audsBlobSalvarTodos(){
   try{ var db=await dbOpen(); await new Promise(function(res,rej){ var tx=db.transaction('audiosSessao','readwrite'); var st=tx.objectStore('audiosSessao'); st.clear(); audios.forEach(function(a){ if(a.blob) st.put({idx:a.idx, blob:a.blob, quando:Date.now()}); }); tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }catch(e){}
@@ -2295,6 +2455,7 @@ async function gravarAcumulado(btnId, vuId){
   let mime=''; if(MediaRecorder.isTypeSupported('audio/mp4')) mime='audio/mp4'; else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
   mediaRecA = new MediaRecorder(recStreamA, mime?{mimeType:mime}:undefined);
   recChunksA=[];
+  const cpSesA = cpLigar(mediaRecA, 'ditado');
   mediaRecA.ondataavailable=function(e){ if(e.data&&e.data.size>0) recChunksA.push(e.data); };
   mediaRecA.onstop=async function(){
     const blob=new Blob(recChunksA,{type:mediaRecA.mimeType||'audio/mp4'});
@@ -2307,8 +2468,9 @@ async function gravarAcumulado(btnId, vuId){
     catch(e){ log('Não consegui transcrever o ditado agora (será transcrito no Processar): '+e.message, true); }
     try{ await gravSalvar(blob, metaG); try{ salvarAudioAuto(blob, metaG.nome||'ditado', (blob.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){} }catch(e){ log('Não consegui guardar a gravação neste aparelho: '+e.message, true); }
     renderAcum();
+    cpApagarSessao(cpSesA);
   };
-  mediaRecA.start(); recSegA=0;
+  mediaRecA.start(CP_FATIA_MS); recSegA=0;
   vuIniciar(recStreamA, vuId);
   if(btn){ btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e'; }
   recTimerA=setInterval(function(){if(mediaRecA&&mediaRecA.state==='paused')return;recSegA++;if(btn)btn.textContent='⏹ Parar ('+recSegA+'s)';},1000);
@@ -2402,6 +2564,7 @@ async function alternarGravacao(){
   else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
   mediaRec = new MediaRecorder(recStream, mime?{mimeType:mime}:undefined);
   recChunks=[];
+  const cpSesL = cpLigar(mediaRec, 'rapido');
   mediaRec.ondataavailable = function(e){ if(e.data && e.data.size>0) recChunks.push(e.data); };
   mediaRec.onstop = function(){
     const blobG = new Blob(recChunks,{type:mediaRec.mimeType||'audio/mp4'});
@@ -2411,8 +2574,9 @@ async function alternarGravacao(){
     clearInterval(recTimer);
     btn.textContent='🎙 Gravar áudio'; btn.style.background='';
     renderLoko();
+    cpApagarSessao(cpSesL);
   };
-  mediaRec.start();
+  mediaRec.start(CP_FATIA_MS);
   vuIniciar(recStream, 'vuLoko');
   recSeg=0; btn.textContent='⏹ Parar (0s)'; btn.style.background='#b3261e';
   recTimer=setInterval(function(){ if(mediaRec&&mediaRec.state==='paused')return; recSeg++; btn.textContent='⏹ Parar ('+recSeg+'s)'; },1000);
@@ -3533,15 +3697,17 @@ async function capToggleRec(){
   var mime=''; if(MediaRecorder.isTypeSupported('audio/mp4')) mime='audio/mp4'; else if(MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
   capMR=new MediaRecorder(capStream, mime?{mimeType:mime}:undefined);
   capChunks=[];
+  var cpSesC = cpLigar(capMR, 'captura');
   capMR.ondataavailable=function(e){ if(e.data&&e.data.size>0) capChunks.push(e.data); };
   capMR.onstop=async function(){
     var blob=new Blob(capChunks,{type:capMR.mimeType||'audio/mp4'});
     try{ capStream.getTracks().forEach(function(t){t.stop();}); }catch(e){}
     vuParar('vuCap'); clearInterval(capTimer2); capEstado='idle'; capSetRecUI();
-    if(!blob || blob.size<1200){ log('Gravação muito curta/vazia — refaça o ditado.',true); return; }
+    if(!blob || blob.size<1200){ log('Gravação muito curta/vazia — refaça o ditado.',true); cpApagarSessao(cpSesC); return; }
     await capRegistrarDitado(blob);
+    cpApagarSessao(cpSesC);
   };
-  capMR.start(); capSeg=0; capEstado='rec'; vuIniciar(capStream,'vuCap'); capSetRecUI();
+  capMR.start(CP_FATIA_MS); capSeg=0; capEstado='rec'; vuIniciar(capStream,'vuCap'); capSetRecUI();
   capTimer2=setInterval(function(){ if(capEstado!=='rec') return; capSeg++; capSetRecUI(); },1000);
 }
 function capFinalizar(){ if(capMR && (capMR.state==='recording'||capMR.state==='paused')){ try{ capMR.stop(); }catch(e){ log('Falha ao finalizar: '+e.message,true); } } }
@@ -4274,6 +4440,16 @@ function mostrarAba(nome){
   window.scrollTo(0,0);
 }
 window.addEventListener('DOMContentLoaded', function(){ mostrarAba('captura'); });
+/* Gravação interrompida: mostra assim que o app abre. */
+window.addEventListener('DOMContentLoaded', function(){ cpRenderRecuperacao().catch(function(){}); });
+/* Fechar a janela no meio de uma gravação: o Chrome pergunta antes. Não impede um
+   fechamento forçado, mas pega o clique sem querer — que foi o caso de 03/08.
+   Mesmo se fechar assim, a caixa-preta já guardou tudo menos a última fatia. */
+window.addEventListener('beforeunload', function(ev){
+  if(!cpGravandoAgora()) return;
+  ev.preventDefault(); ev.returnValue='';   // o texto é do navegador, não dá para escolher
+  return '';
+});
 /* Ao abrir: traz do computador o que estiver mais novo (e leva o que só existe aqui).
    Sem agente, nada acontece — o app segue funcionando só com o navegador. */
 window.addEventListener('DOMContentLoaded', async function(){

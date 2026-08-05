@@ -3934,12 +3934,37 @@ async function capToggleRec(){
     }
   }
   if(capEstado==='agente'){   // parar manualmente a gravação do agente
-    try{ await fetch(agenteBase()+'/gravacao/parar',{method:'POST'}); }catch(e){}
-    // fecha o microfone que ELE abriu — a menos que o modo de espera o esteja usando
+    // O agente agora RECORTA, TRANSCREVE e devolve o texto neste "parar". Antes a resposta
+    // era ignorada e o ditado se perdia: só /exame/fechar (que exige exame do DICOM) tinha
+    // caminho de volta. Por isso o teste real de 05/08 gravava e não voltava nada.
+    capOrtStatusTxt('⏳ Encerrando e transcrevendo o ditado no agente…');
+    var resP=null;
+    try{
+      var rP=await fetch(agenteBase()+'/gravacao/parar',{method:'POST'});
+      resP=await rP.json();
+    }catch(e){ log('Falha ao encerrar a gravação no agente: '+((e&&e.message)||e), true); }
     if(!capOrtWatching){ try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(e){} }
     agLimparAtiva();
     capEstado='idle'; clearInterval(capTimer2); capSetRecUI();
-    capOrtStatusTxt('Gravação do agente encerrada.');
+    if(resP && resP.texto && resP.texto.trim()){
+      var aP=capAudioDoAgente(resP.texto, 'botao');
+      if(resP.ditadoId) aP.url=agenteBase()+'/exame/audio/'+resP.ditadoId;
+      try{
+        var mP=await capClassificarDitado(resP.texto, '');
+        aP.nomePaciente=mP.nome_paciente||''; aP.tipoExame=mP.tipo_exame||'';
+        aP.lateralidade=mP.lateralidade||''; aP.tiposCitados=mP.tipos_citados||[];
+        aP.motivoTipo=mP.motivo||'';
+        aP.nome=nomeAudio(mP.nome_paciente, mP.tipo_exame, mP.lateralidade)||aP.nome;
+      }catch(e){}
+      if(resP.aviso) log('Aviso do agente: '+resP.aviso, true);
+      log('Ditado do agente ('+resP.segundos+'s): '+resP.texto.slice(0,90)+(resP.texto.length>90?'…':''));
+      capOrtStatusTxt('✅ Ditado de '+resP.segundos+'s transcrito — vincule ao exame abaixo.');
+      capRenderPendentes(); renderExames(); agendarSalvarSessao();
+    } else {
+      var pq=(resP&&resP.aviso)?(' — '+resP.aviso):'';
+      log('A gravação do agente terminou SEM ditado'+pq+'.', true);
+      capOrtStatusTxt('⛔ Gravação encerrada, mas sem ditado'+pq+'.');
+    }
     return;
   }
   if(capEstado==='rec'){ if(capMR && capMR.state==='recording'){ try{ capMR.pause(); }catch(e){} } capEstado='pause'; capSetRecUI(); return; }

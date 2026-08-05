@@ -105,7 +105,9 @@ app, e não mais a cargo da IA.
 
 - [ ] Paciente que **NÃO trouxe** o USG de primeiro trimestre: a conclusão deve
       dizer *"A biometria fetal estima que a idade gestacional média seja de ..."*
-      com o valor do campo **AUA** da worksheet, e a data do parto do **EDD(AUA)**.
+      com o valor do campo **AUA** da worksheet, e a linha da data provável do parto
+      deve ser substituída por *"Não contamos com ultrassonografia de primeiro
+      trimestre para correta datação da gestação."* (a variação em dias sai junto).
 - [ ] Paciente que **TROUXE**: a conclusão deve dizer *"A idade gestacional
       corrigida pela ultrassonografia de primeiro trimestre é de ..."* com o valor
       do campo **GA**, e a data do parto do **EDD(EDD)**.
@@ -114,10 +116,9 @@ app, e não mais a cargo da IA.
 - [ ] Worksheet ilegível: os pontilhados devem **ficar** no laudo, e a caixa
       **âmbar** deve dizer qual campo faltou. Nada pode ser inventado.
 
-**Confirmar comigo:** eu emparelhei a data provável do parto com a idade
-gestacional (EDD(AUA) com AUA, EDD(EDD) com GA), porque misturar deixaria a
-conclusão contradizendo a si mesma. Se no seu aparelho essas colunas significarem
-outra coisa, me diga.
+**Confirmar comigo:** quando a paciente TROUXE o exame inicial, a data provável
+do parto vem do **EDD(EDD)**, para casar com o GA. Se no seu aparelho essa coluna
+significar outra coisa, me diga.
 
 **Também:** mantive a redação exata do seu modelo ("A biometria fetal estima que a
 idade gestacional média seja de..."). Você escreveu "A biometria fetal estima

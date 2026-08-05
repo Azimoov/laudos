@@ -4307,8 +4307,7 @@ function processarObstetrico(ob, tipo){
   var trouxe = ob.trouxe_usg_primeiro_trimestre===true || ob.trouxe_usg_primeiro_trimestre==='true';
   res.trouxe=trouxe;
   var ig  = obstParseIG(trouxe ? ob.ga : ob.aua);
-  var edd = String((trouxe ? ob.edd_ga : ob.edd_aua)||'').trim();
-  var campoIg = trouxe?'GA':'AUA', campoEdd = trouxe?'EDD(EDD)':'EDD(AUA)';
+  var campoIg = trouxe?'GA':'AUA';
 
   if(ig){
     res.ig=ig;
@@ -4321,19 +4320,22 @@ function processarObstetrico(ob, tipo){
     res.faltando.push('Não consegui ler o campo '+campoIg+' da worksheet — a idade gestacional ficou com os pontilhados. '
                       +(trouxe?'(A paciente trouxe o primeiro exame, então vale o GA.)':'(A paciente não trouxe o primeiro exame, então vale o AUA.)'));
   }
+  /* Data provável do parto. Sem a ultrassonografia de primeiro trimestre não há
+     datação confiável, então a linha inteira sai do laudo e dá lugar à frase que
+     diz isso — informar uma DPP ali seria dar precisão que o exame não tem. */
+  if(!trouxe){
+    res.eddFrase='Não contamos com ultrassonografia de primeiro trimestre para correta datação da gestação.';
+    res.obs.push('Sem a ultrassonografia de primeiro trimestre: a linha da data provável do parto foi substituída pela frase padrão, e a margem de erro não se aplica.');
+    return res;
+  }
+  var edd = String(ob.edd_ga||'').trim();
   if(/^\d{2}\/\d{2}\/\d{4}$/.test(edd)){
     res.edd=edd;
-    res.obs.push('Data provável do parto lida do campo '+campoEdd+' ('+edd+'), para casar com a idade gestacional usada.');
+    res.obs.push('Data provável do parto lida do campo EDD(EDD) ('+edd+'), para casar com a idade gestacional usada.');
   } else if(edd){
-    res.faltando.push('O campo '+campoEdd+' veio em formato inesperado ("'+edd+'") — a data provável do parto ficou com os pontilhados.');
+    res.faltando.push('O campo EDD(EDD) veio em formato inesperado ("'+edd+'") — a data provável do parto ficou com os pontilhados.');
   } else {
-    res.faltando.push('Não consegui ler o campo '+campoEdd+' da worksheet — a data provável do parto ficou com os pontilhados.');
-  }
-
-  // margem de erro: só existe quando há o exame inicial E a IG daquele exame
-  if(!trouxe){
-    res.obs.push('Margem de erro não calculada: sem a ultrassonografia inicial não há com o que comparar.');
-    return res;
+    res.faltando.push('Não consegui ler o campo EDD(EDD) da worksheet — a data provável do parto ficou com os pontilhados.');
   }
   var semanas = parseFloat(ob.ig_primeiro_usg_semanas);
   if(!isFinite(semanas) || semanas<=0){
@@ -4363,7 +4365,18 @@ function obstAplicarNaConclusao(txt, dados){
       t=ls.join('\n');
     }
   }
-  if(d.edd){
+  if(d.eddFrase){
+    // linha da DPP trocada INTEIRA: some junto a "(com variação de até ...)", que
+    // também não faz sentido sem a datação de primeiro trimestre
+    var achouE=false;
+    t=t.replace(/^.*(?:data ecogr[áa]fica|prov[áa]vel do parto|Não contamos com ultrassonografia de primeiro trimestre).*$/gmi,
+                function(){ achouE=true; return d.eddFrase; });
+    if(!achouE){
+      var l2=t?t.split('\n'):[];
+      l2.splice(Math.min(2, l2.length), 0, d.eddFrase);
+      t=l2.join('\n');
+    }
+  } else if(d.edd){
     t=t.replace(/(aproximada para:\s*)(\.{2,}|\d{2}\/\d{2}\/\d{4})?/i, '$1'+d.edd);
   }
   if(d.margem!=null){

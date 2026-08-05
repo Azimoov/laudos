@@ -50,16 +50,22 @@ let r = processarObstetrico(Object.assign({ trouxe_usg_primeiro_trimestre: false
 ok(/34 semanas e 2 dias/.test(r.frase), 'usa o AUA (34w2d), nao o GA');
 ok(!/35 semanas/.test(r.frase), 'nao deixa o GA vazar para a conclusao');
 ok(/^A biometria fetal estima/.test(r.frase), 'frase da biometria');
-ok(r.edd === '25/07/2026', 'data provavel do parto vem do EDD(AUA), casando com o AUA');
+ok(r.edd === null, 'NAO informa data provavel do parto — sem datacao de 1o trimestre ela nao e confiavel');
+ok(r.eddFrase === 'Não contamos com ultrassonografia de primeiro trimestre para correta datação da gestação.',
+   'a linha da data do parto da lugar a frase que diz por que ela nao esta la');
 ok(r.margem === null, 'sem exame inicial nao ha margem de erro para calcular');
 let saida = obstAplicarNaConclusao(MODELO, r);
 ok(saida.includes('A biometria fetal estima que a idade gestacional média seja de 34 semanas e 2 dias.'),
    'a linha da idade gestacional sai preenchida');
 ok(!saida.includes('..... semanas'), 'nao sobra pontilhado da idade gestacional');
-ok(saida.includes('aproximada para: 25/07/2026'), 'a data do parto sai preenchida');
-ok(saida.includes('(com variação de até +/- ..... dias)'),
-   'a variacao FICA nos pontilhados — sem exame inicial nao da para calcular, e nao se inventa');
+ok(saida.includes('Não contamos com ultrassonografia de primeiro trimestre para correta datação da gestação.'),
+   'a frase entra no lugar da data provavel do parto');
+ok(!/data ecográfica|aproximada para/.test(saida), 'a linha antiga da data do parto sumiu de vez');
+ok(!/variação de até/.test(saida),
+   'a variacao em dias vai junto: sem datacao de 1o trimestre ela nao significa nada');
+ok(!/\.{3,}/.test(saida.split('\n')[2]), 'nao sobra pontilhado nenhum nessa linha');
 ok(saida.split('\n').length === MODELO.split('\n').length, 'nao criou nem perdeu linha da conclusao');
+ok(obstAplicarNaConclusao(saida, r) === saida, 'refazer o laudo nao duplica a frase');
 
 console.log('=== TROUXE o USG de primeiro trimestre -> GA ===');
 r = processarObstetrico(Object.assign({ trouxe_usg_primeiro_trimestre: true, ig_primeiro_usg_semanas: 12 }, FOTO));
@@ -91,12 +97,15 @@ ok(saida.includes('A biometria fetal estima que a idade gestacional média seja 
    'frase errada escrita pela IA tambem e trocada, nao so o numero');
 
 console.log('=== worksheet ilegivel: pontilhado fica, nada e inventado ===');
-r = processarObstetrico({ trouxe_usg_primeiro_trimestre: false, aua: '', edd_aua: '' });
-ok(r.frase === null && r.edd === null, 'sem os campos, o app nao monta frase nenhuma');
-ok(r.faltando.some(t => /AUA/.test(t)) && r.faltando.some(t => /EDD\(AUA\)/.test(t)),
-   'avisa exatamente qual campo faltou');
+r = processarObstetrico({ trouxe_usg_primeiro_trimestre: false, aua: '' });
+ok(r.frase === null, 'sem o AUA, o app nao monta frase de idade gestacional nenhuma');
+ok(r.faltando.some(t => /AUA/.test(t)), 'avisa que faltou o AUA');
+ok(!r.faltando.some(t => /EDD/.test(t)),
+   'nao cobra data provavel do parto: sem 1o trimestre ela nem entra no laudo');
 saida = obstAplicarNaConclusao(MODELO, r);
-ok(saida === MODELO, 'a conclusao sai igual ao modelo, com os pontilhados — nada inventado');
+ok(saida.includes('..... semanas e ..... dias'), 'a idade gestacional fica nos pontilhados — nada inventado');
+ok(saida.includes('Não contamos com ultrassonografia de primeiro trimestre'),
+   'mas a frase da data do parto entra do mesmo jeito: ela nao depende de ler a worksheet');
 r = processarObstetrico({ trouxe_usg_primeiro_trimestre: true, ga: '', edd_ga: '' });
 ok(r.faltando.some(t => /GA/.test(t) && /trouxe o primeiro exame/.test(t)),
    'quando trouxe, o campo cobrado e o GA — e o aviso explica por que');

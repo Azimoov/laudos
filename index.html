@@ -3669,21 +3669,30 @@ let capMR=null, capChunks=[], capStream=null, capTimer2=null, capSeg=0;
 let capEstado='idle';
 async function capToggleRec(){
   capArmado=true;
-  // se o agente nativo está com microfone, é ele quem grava (pré-buffer + recorte pela 1ª imagem)
+  /* Quem grava é o AGENTE sempre que ele estiver no ar — o navegador só comanda.
+     Antes isto só valia se o microfone do agente JÁ estivesse aberto, o que só
+     acontecia no modo "Aguardar exame": fora dele, quem gravava era o Chrome, e
+     fechar a janela matava o ditado. O navegador virou o plano B, não o A. */
   if(capEstado==='idle'){
-    await capAgenteEstado();
-    if(capAgenteMic){
+    var est=await capAgenteEstado();
+    if(est){
       try{
         await capAgenteIniciar();
+        agMarcarAtiva();                      // sobrevive a fechar o navegador
         capEstado='agente'; capSeg=0; capSetRecUI();
         capTimer2=setInterval(function(){ if(capEstado!=='agente'){ clearInterval(capTimer2); return; } capSeg++; capSetRecUI(); },1000);
-        capOrtStatusTxt('🔴 Gravando pelo agente — para sozinho quando o exame chegar.');
+        capOrtStatusTxt('🔴 Gravando pelo agente — pode fechar o navegador sem perder o ditado.');
         return;
-      }catch(e){ log('Agente não conseguiu gravar ('+((e&&e.message)||e)+') — usando o microfone do navegador.', true); }
+      }catch(e){
+        log('O agente está no ar mas não conseguiu gravar ('+((e&&e.message)||e)+') — vou gravar pelo navegador.', true);
+      }
+    } else {
+      log('⚠️ Agente fora do ar: quem vai gravar é o NAVEGADOR. Não feche esta janela até finalizar o ditado.', true);
     }
   }
   if(capEstado==='agente'){   // parar manualmente a gravação do agente
     try{ await fetch(agenteBase()+'/gravacao/parar',{method:'POST'}); }catch(e){}
+    agLimparAtiva();
     capEstado='idle'; clearInterval(capTimer2); capSetRecUI();
     capOrtStatusTxt('Gravação do agente encerrada.');
     return;
@@ -3714,9 +3723,10 @@ function capFinalizar(){ if(capMR && (capMR.state==='recording'||capMR.state==='
 function capSetRecUI(){
   var b=document.getElementById('btnCapRec'), f=document.getElementById('btnCapFinalizar'), info=document.getElementById('capRecInfo');
   if(!b) return;
-  if(capEstado==='agente'){ b.textContent='⏹ Parar gravação ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='none'; if(info)info.textContent='🔴 Gravando pelo agente — para sozinho quando o exame chegar pelo aparelho.'; return; }
-  if(capEstado==='rec'){ b.textContent='⏸ Pausar ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='inline-block'; if(info)info.textContent='🔴 Gravando… espaço pausa · Finalizar encerra.'; }
-  else if(capEstado==='pause'){ b.textContent='▶ Retomar ('+capSeg+'s)'; b.style.background='#a36a00'; if(f)f.style.display='inline-block'; if(info)info.textContent='⏸ Pausado em '+capSeg+'s. Espaço retoma · Finalizar encerra.'; }
+  // deixa explícito QUEM está com o microfone: é a diferença entre poder e não poder fechar a janela
+  if(capEstado==='agente'){ b.textContent='⏹ Parar gravação ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='none'; if(info)info.textContent='🔴 Gravando pelo AGENTE — pode fechar o navegador sem perder o ditado. Corta sozinho quando o exame chegar pelo aparelho.'; return; }
+  if(capEstado==='rec'){ b.textContent='⏸ Pausar ('+capSeg+'s)'; b.style.background='#b3261e'; if(f)f.style.display='inline-block'; if(info)info.textContent='🔴 Gravando pelo NAVEGADOR — NÃO feche esta janela. Espaço pausa · Finalizar encerra.'; }
+  else if(capEstado==='pause'){ b.textContent='▶ Retomar ('+capSeg+'s)'; b.style.background='#a36a00'; if(f)f.style.display='inline-block'; if(info)info.textContent='⏸ Pausado em '+capSeg+'s (navegador). Espaço retoma · Finalizar encerra.'; }
   else { b.textContent='🎙 Gravar ditado'; b.style.background=''; if(f)f.style.display='none'; if(info)info.textContent='Toque em Gravar para começar — durante a gravação, espaço pausa/retoma.'; }
 }
 async function capRegistrarDitado(blob){
@@ -3964,6 +3974,38 @@ function micMonitorParar(){
   if(micDesenho) clearInterval(micDesenho); micDesenho=null;
   var sec=document.getElementById('capMicSec'); if(sec) sec.style.display='none';
 }
+/* ---- A gravação do agente sobrevive ao navegador ----
+   O agente é um programa nativo: fechar o Chrome não o interrompe. O que se perdia
+   era a NOÇÃO de que ele estava gravando — ao reabrir, o app achava que não havia
+   nada em curso. A marca fica no navegador (e no computador, pela sincronia), então
+   reabrir reencontra a gravação em vez de começar outra por cima. */
+function agMarcarAtiva(){
+  try{ localStorage.setItem('gravag', JSON.stringify({desde:Date.now()})); }catch(e){}
+}
+function agLimparAtiva(){ try{ localStorage.removeItem('gravag'); }catch(e){} }
+function agAtiva(){
+  try{ var j=JSON.parse(localStorage.getItem('gravag')||'null'); return (j&&j.desde)?j:null; }catch(e){ return null; }
+}
+/* Ao abrir o app: se ficou gravação do agente em curso, volta a mostrá-la. */
+async function agReatar(){
+  var marca=agAtiva(); if(!marca) return;
+  var est=await capAgenteEstado();
+  if(!est){
+    log('⚠️ Havia uma gravação em curso no agente (desde '+cpQuandoTexto(marca.desde)+') e não consigo falar com ele agora. Não comece outra gravação antes de conferir — suba o agente e recarregue.', true);
+    return;
+  }
+  if(est.capturando===false && est.microfone===false){
+    log('A gravação que estava no agente (desde '+cpQuandoTexto(marca.desde)+') não está mais em curso. Confira em "Ditados guardados" se ela foi salva.', true);
+    agLimparAtiva(); return;
+  }
+  capEstado='agente';
+  capSeg=Math.max(0, Math.round((Date.now()-marca.desde)/1000));
+  capSetRecUI();
+  if(capTimer2) clearInterval(capTimer2);
+  capTimer2=setInterval(function(){ if(capEstado!=='agente'){ clearInterval(capTimer2); return; } capSeg++; capSetRecUI(); },1000);
+  capOrtStatusTxt('🔴 O agente continuou gravando enquanto o navegador esteve fechado (desde '+cpQuandoTexto(marca.desde)+').');
+  log('🔴 Gravação do agente reencontrada — em curso desde '+cpQuandoTexto(marca.desde)+'. Nada se perdeu com a janela fechada.');
+}
 async function capAgenteIniciar(){
   var r=await fetch(agenteBase()+'/gravacao/iniciar',{method:'POST'});
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao iniciar');
@@ -4004,6 +4046,9 @@ async function capOrtProcessar(est){
     capOrtStatusTxt('🎧 Recortando e transcrevendo o ditado de '+ex.paciente+'…');
     try{
       var res=await capAgenteFecharExame(est);
+      // o agente fechou o trecho deste exame: a gravação em curso terminou aqui
+      agLimparAtiva();
+      if(capEstado==='agente'){ capEstado='idle'; if(capTimer2) clearInterval(capTimer2); capSetRecUI(); }
       if(res.texto && res.texto.trim()){
         var a=capAudioDoAgente(res.texto, res.origem);
         var meta=await capClassificarDitado(res.texto);
@@ -4442,6 +4487,8 @@ function mostrarAba(nome){
 window.addEventListener('DOMContentLoaded', function(){ mostrarAba('captura'); });
 /* Gravação interrompida: mostra assim que o app abre. */
 window.addEventListener('DOMContentLoaded', function(){ cpRenderRecuperacao().catch(function(){}); });
+/* Gravação que ficou correndo no agente enquanto o navegador esteve fechado. */
+window.addEventListener('DOMContentLoaded', function(){ agReatar().catch(function(){}); });
 /* Fechar a janela no meio de uma gravação: o Chrome pergunta antes. Não impede um
    fechamento forçado, mas pega o clique sem querer — que foi o caso de 03/08.
    Mesmo se fechar assim, a caixa-preta já guardou tudo menos a última fatia. */

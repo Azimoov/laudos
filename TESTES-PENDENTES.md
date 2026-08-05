@@ -2,9 +2,8 @@
 
 ## ⚡ ORDEM DE ATAQUE (do mais importante para o menos)
 
-0. **Trazer o branch para o notebook** — sem isso nada existe aí:
-   `git fetch origin claude/laudos-usg-handoff-2g316v && git checkout claude/laudos-usg-handoff-2g316v`
-   e abrir o app local (`python -m http.server 8080` → http://localhost:8080).
+0. **Trazer o branch para o notebook** — passo a passo completo para leigo na
+   seção "PASSO 0 EM DETALHES", no fim deste arquivo.
 1. **Motor de transcrição local** (30 segundos) — para de pagar OpenAI à toa.
 2. **Teste da gravação pelo agente** (seção 1) — protege contra a pior perda possível.
 3. **Instalar o banco no agente** (seção 5 + `agente/INSTALAR-BANCO.md`) — reinício
@@ -185,3 +184,72 @@ SEM atendimento em curso, conferir).
       Python do ditado-local disponível**, para fechar as 4 suítes que não rodam
       fora da sua máquina.
 - [ ] Publicar só com o seu "pode publicar" (merge ff-only em `main` + push).
+
+---
+
+## PASSO 0 EM DETALHES — ver as novidades no notebook (para leigo)
+
+As mudanças estão numa **versão de rascunho** ("branch") que vive ao lado da
+versão oficial. O site normal ainda mostra a versão antiga — este passo abre o
+rascunho no seu Chrome, direto do seu computador, sem publicar nada.
+
+**1. Abrir o PowerShell**
+Menu Iniciar → digite `powershell` → Enter. Abre uma janela azul/preta de comandos.
+
+**2. Entrar na pasta do projeto** (cole a linha e Enter):
+```
+cd "C:\Users\serru\OneDrive\Desktop\Projeto WBOT\_repo"
+```
+
+**3. Conferir que está tudo limpo** (segurança):
+```
+git status
+```
+Esperado: uma frase com **"nothing to commit, working tree clean"** (ou
+"nada a submeter, árvore de trabalho limpa"). Se aparecer uma LISTA DE ARQUIVOS
+em vermelho, **pare aqui** e me diga o que apareceu — pode ser trabalho de outra
+sessão que não pode ser atropelado. (O `AUDITORIA-CBR.md` aparecendo sozinho é
+normal — ele fica de fora mesmo.)
+
+**4. Baixar o rascunho** (as duas linhas, uma de cada vez):
+```
+git fetch origin claude/laudos-usg-handoff-2g316v
+git checkout claude/laudos-usg-handoff-2g316v
+```
+Esperado na segunda: **"Switched to a new branch"** (mudou para o rascunho).
+Se disser "Already on ..." (já estava nele), rode `git pull` para atualizar.
+
+**5. Ligar o mini-servidor** (serve o app para o Chrome, sem internet):
+```
+python -m http.server 8080
+```
+Esperado: **"Serving HTTP on ... port 8080"** e o cursor fica parado — está
+funcionando. **Deixe essa janela aberta** enquanto testa; fechar a janela
+desliga o app local.
+- Se disser que `python` não é reconhecido, tente `py -m http.server 8080`.
+- Se ainda assim não for, use o Python do ditado-local:
+```
+& "C:\Users\serru\OneDrive\Desktop\Claude code\ditado-local\.venv\Scripts\python.exe" -m http.server 8080
+```
+(Não abra o index.html com dois cliques — sem o mini-servidor, microfone e
+pastas não funcionam direito no Chrome.)
+
+**6. Abrir no Chrome:** endereço `http://localhost:8080`
+
+**7. O que esperar na primeira abertura**
+O Chrome trata `localhost` como um site NOVO — a memória do navegador começa
+vazia ali. **Com o agente ligado, isso se resolve sozinho**: na abertura o app
+puxa do computador seus modelos, dizeres, histórico e a chave (que vive no
+agente). Confira em Configurações se apareceu a mensagem de dados sincronizados.
+Sem o agente ligado, o app vai parecer "zerado" — é normal, não é defeito.
+Duas coisas voltam a pedir clique na primeira vez: permissão do microfone e a
+pasta onde salvar laudos.
+
+**8. Quando terminar os testes**
+- Parar o mini-servidor: na janela do PowerShell, `Ctrl+C` (ou fechar a janela).
+- Voltar para a versão oficial: `git checkout main`
+- Publicar as novidades no site é OUTRO passo (o merge), que só acontece com o
+  seu "pode publicar".
+
+**Se qualquer passo der uma mensagem diferente do esperado:** não force o
+próximo — copie a mensagem e me mande.

@@ -71,6 +71,14 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 .revImg{cursor:zoom-in;transition:transform .13s ease, box-shadow .13s ease, border-color .13s ease;}
 .revImg:hover{transform:translateY(-2px) scale(1.03);border-color:#2f6fb5!important;
   box-shadow:0 5px 16px rgba(47,111,181,.4);position:relative;z-index:2;}
+/* Faixa de alerta quando a espera do aparelho está desligada e exames estão chegando.
+   Pisca de propósito: em 05/08 a espera ficou 1h11 desligada e ninguém notou. */
+@keyframes esperaPisca{0%,100%{background:#b3261e}50%{background:#7d1a15}}
+#bannerEspera{position:fixed;top:0;left:0;right:0;background:#b3261e;color:#fff;
+  padding:12px 18px;display:flex;align-items:center;gap:10px;z-index:10000;
+  font-size:15px;font-weight:600;box-shadow:0 2px 12px rgba(0,0,0,.3);flex-wrap:wrap;
+  animation:esperaPisca 1.4s ease-in-out infinite}
+#bannerEspera button{cursor:pointer;border-radius:6px;padding:6px 14px;font-weight:700}
 /* zoom da imagem: painel FIXO que abre sobre o laudo, sempre inteiro na tela
    (antes era transform:scale(5), que estourava a borda direita e cortava a imagem).
    Animação (31/07): display:none não anima, então entra por opacidade + escala.
@@ -1973,7 +1981,25 @@ function excluirExame(id){
   if(!confirm('Excluir este exame e seu laudo? (não afeta seus arquivos)')) return;
   audios.forEach(function(a){ if(a.exameId===id) a.exameId=null; });
   exames = exames.filter(function(e){ return e.id!==id; });
-  renderExames();
+  renderExames(); renderRevisao();
+  try{ salvarSessao(); }catch(e){}   // sem isto o exame apagado voltava ao recarregar
+}
+/* Excluir a partir da tela de REVISÃO (onde ficam os laudos prontos). A confirmação
+   mostra o NOME do paciente de propósito: os cartões da revisão são parecidos entre si
+   e apagar o laudo errado é fácil demais com um "tem certeza?" genérico. */
+function excluirExameRev(id){
+  var ex=exames.find(function(e){return e.id===id;});
+  if(!ex) return;
+  var nome=(ex.paciente||'(sem nome)')+(ex.subExame?' - '+ex.subExame:'');
+  var extra=ex._liberado ? '\n\nEste laudo JÁ FOI LIBERADO — ele continua guardado no Histórico.' : '';
+  if(!confirm('Excluir o laudo de:\n\n'+nome+extra+'\n\nIsto tira o exame desta lista. Não apaga nada no aparelho.')) return;
+  audios.forEach(function(a){ if(a.exameId===id) a.exameId=null; });
+  exames=exames.filter(function(e){return e.id!==id;});
+  renderExames(); renderRevisao();
+  // grava JÁ, sem esperar os 5s do agendamento: se a página for fechada logo depois,
+  // o laudo apagado não pode reaparecer.
+  try{ salvarSessao(); }catch(e){}
+  log('Laudo excluído da revisão: '+nome+'.');
 }
 function ligarAudio(aIdx, exId, marcado){
   const a = audios.find(x=>x.idx===aIdx);
@@ -2141,16 +2167,31 @@ async function audsBlobSalvarTodos(){
 }
 async function audsBlobLer(){ try{ var db=await dbOpen(); return await new Promise(function(res,rej){ var rq=db.transaction('audiosSessao').objectStore('audiosSessao').getAll(); rq.onsuccess=function(){res(rq.result||[]);}; rq.onerror=function(){rej(rq.error);}; }); }catch(e){ return []; } }
 async function audsBlobLimpar(){ try{ var db=await dbOpen(); await new Promise(function(res){ var tx=db.transaction('audiosSessao','readwrite'); tx.objectStore('audiosSessao').clear(); tx.oncomplete=function(){res();}; tx.onerror=function(){res();}; }); }catch(e){} }
+/* Vira true assim que esta página já teve laudo (gerado ou restaurado). É o que
+   diferencia "acabei de abrir, não mexa no que está guardado" de "apaguei tudo de
+   propósito, grave a lista vazia". */
+var _sessaoViva=false;
 async function salvarSessao(comImagens){
   // comImagens=false: snapshot leve (só texto) — usado DURANTE o lote p/ não reserializar
   // as imagens a cada laudo (travaria 100+ exames). comImagens!=false: snapshot completo (com
   // as fotos), usado em laudo avulso e no save final do lote — é o que a recuperação reexibe.
-  var comLaudo=exames.filter(function(e){return e.laudo;}); if(!comLaudo.length) return;
+  var comLaudo=exames.filter(function(e){return e.laudo;});
+  // Página recém-aberta e nada gerado ainda: NÃO mexe no que está guardado, senão o
+  // banner "Sessão anterior encontrada" nunca apareceria.
+  // Mas se JÁ houve laudo nesta página e a lista ficou vazia, é porque o médico apagou —
+  // aí a lista vazia tem de ser gravada, senão o laudo apagado voltava ao recarregar.
+  if(!comLaudo.length && !_sessaoViva) return;
+  if(comLaudo.length) _sessaoViva=true;
   try{
     var db=await dbOpen();
-    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice()}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
+    // _estudoId/_dicom/_captura PRECISAM entrar no snapshot: é por eles que a recuperação
+    // sabe que o exame já existe. Sem isso ela recriava tudo e o exame saía DUPLICADO.
+    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_dicom:!!e._dicom,_captura:!!e._captura}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
     var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||''}; });
-    await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();st.add({quando:Date.now(),exames:snap,audios:audsMeta});tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});
+    await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();
+      // lista vazia = apagou tudo: limpa e não grava nada (senão voltaria um "0 laudos")
+      if(snap.length) st.add({quando:Date.now(),exames:snap,audios:audsMeta});
+      tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});
   }catch(e){}
 }
 /* Throttle: no máx. 1×/5s. Durante o lote salva só texto (leve); fora do lote salva com as fotos. */
@@ -2184,6 +2225,7 @@ async function restaurarSessao(id){
     var sess=await new Promise(function(res,rej){var rq=db.transaction('sessoes').objectStore('sessoes').get(id);rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};});
     if(!sess) return;
     exames=sess.exames.map(function(e){return Object.assign({audios:[],imagens:[],metaConf:1,_liberado:false},e);});   // _liberado/audios salvos no snapshot sobrescrevem os defaults
+    _sessaoViva=true;   // restaurou: a partir daqui, apagar tudo tem de valer de verdade
     audios=[];
     var comSom=0;
     try{
@@ -3059,7 +3101,8 @@ function renderRevisao(){
       +'<button class="btn peq sec" data-act="ver" data-ex="'+ex.id+'">📄 Ver / editar</button>'
       +'<button class="btn peq sec" data-act="aud" data-ex="'+ex.id+'">🎙 Áudio</button>'
       +'<button class="btn peq sec" data-act="img" data-ex="'+ex.id+'">🖼 Imagens</button>'
-      +'<button class="btn peq" data-act="salvar" data-ex="'+ex.id+'">✅ Aprovar e salvar</button></div>'
+      +'<button class="btn peq" data-act="salvar" data-ex="'+ex.id+'">✅ Aprovar e salvar</button>'
+      +'<button class="btn peq sec" style="color:#b3261e" data-act="excluir" data-ex="'+ex.id+'" title="Remove este laudo da lista (não apaga o exame no aparelho)">🗑</button></div>'
       +'<div id="aud'+ex.id+'" style="display:none;margin-top:6px">'+players+"</div>"
       +'<div id="img'+ex.id+'" style="display:none;margin-top:6px">'+imgs+"</div>"
       +"</div>";
@@ -3069,6 +3112,7 @@ function renderRevisao(){
     const id=parseInt(b.getAttribute("data-ex"),10); const act=b.getAttribute("data-act");
     if(act==="ver") abrirRevisao(id);
     else if(act==="salvar") salvarExameRev(id);
+    else if(act==="excluir") excluirExameRev(id);
     else { const box=document.getElementById((act==="aud"?"aud":"img")+id); if(box) box.style.display=(box.style.display==="none"?"block":"none"); }
   };
 }
@@ -3531,7 +3575,67 @@ function capAudioDoAgente(texto, origem){
   audios.push(a);
   return a;
 }
+/* ---- VIGIA DA ESPERA ----------------------------------------------------------
+   Em 05/08 a página foi recarregada no meio do atendimento e a espera não foi religada:
+   das 12:17 às 13:29 entraram 9 exames no aparelho e NENHUM foi captado. O agente estava
+   bom, o microfone estava ligado — só ninguém pediu o recorte. Passou o dia inteiro
+   despercebido. Esta faixa existe para isso não se repetir em silêncio.
+   Só olha as ~2 horas mais recentes: exames antigos do dia já foram resolvidos de outro
+   jeito e ficariam cutucando à toa. */
+var _esperaTimer=null, _esperaDispensados=new Set(), _esperaAvisou=false;
+var ESPERA_JANELA_MS=2*3600*1000;
+
+function esperaBanner(ids){
+  var b=document.getElementById('bannerEspera');
+  if(!ids || !ids.length){ if(b) b.remove(); _esperaAvisou=false; return; }
+  if(!b){ b=document.createElement('div'); b.id='bannerEspera'; document.body.appendChild(b); }
+  b.innerHTML='<span style="flex:1;min-width:220px">⚠️ A ESPERA ESTÁ DESLIGADA — '+ids.length
+    +' exame(s) chegaram do aparelho e NÃO estão sendo captados.</span>'
+    +'<button id="btnEsperaLigar" style="background:#fff;color:#b3261e;border:0">▶ Ligar a espera agora</button>'
+    +'<button id="btnEsperaDispensar" style="background:transparent;color:#ffd9d5;border:1px solid #e8a09a;font-weight:400">dispensar</button>';
+  document.getElementById('btnEsperaLigar').onclick=function(){ esperaBanner(null); capOrtToggle(); };
+  document.getElementById('btnEsperaDispensar').onclick=function(){
+    ids.forEach(function(i){ _esperaDispensados.add(i); }); esperaBanner(null);
+  };
+  // toca UMA vez por episódio: alarme a cada 30s viraria ruído e seria ignorado
+  if(!_esperaAvisou){ _esperaAvisou=true; try{ micSom('morto'); }catch(e){} }
+}
+
+async function esperaVigiar(){
+  try{
+    if(capOrtWatching){ esperaBanner(null); return; }   // espera ligada: nada a avisar
+    var lista=await capOrtListar();                     // agente fora do ar -> cai no catch
+    var naLista={}; exames.forEach(function(e){ if(e._estudoId) naLista[e._estudoId]=true; });
+    var limite=Date.now()-ESPERA_JANELA_MS;
+    var faltando=lista.filter(function(e){
+      if(!e.nImagens || naLista[e.id] || _esperaDispensados.has(e.id)) return false;
+      var t=horaDoEstudoMs(e);
+      return t!==null && t>=limite;
+    });
+    esperaBanner(faltando.map(function(e){ return e.id; }));
+  }catch(e){ /* agente fora do ar já é sinalizado em outro lugar da tela */ }
+}
+
+/* AAAAMMDD + HHMMSS (relógio do aparelho) -> milissegundos */
+function horaDoEstudoMs(e){
+  var d=String(e.imgData||''), h=String(e.imgHora||'').split('.')[0];
+  if(d.length!==8 || h.length<6) return null;
+  var ms=new Date(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6,8),
+                  +h.slice(0,2), +h.slice(2,4), +h.slice(4,6)).getTime();
+  return isNaN(ms) ? null : ms;
+}
+
 async function capOrtProcessar(est){
+  // Já temos este exame do aparelho na lista? As listas de controle (capOrtSeen/capOrtFeitos)
+  // vivem só na memória e são zeradas ao RECARREGAR a página — sem esta conferência o mesmo
+  // exame entrava outra vez e o médico ficava com o exame duplicado.
+  var repetido=exames.find(function(e){ return e._estudoId && est.id && e._estudoId===est.id; });
+  if(repetido){
+    capOrtFeitos.add(est.id);
+    capOrtStatusTxt('Exame de '+(repetido.paciente||'?')+' já estava na lista — não dupliquei.');
+    log('Exame do aparelho já estava na lista ('+(repetido.paciente||'?')+') — ignorado para não duplicar.');
+    return;
+  }
   capOrtStatusTxt('🆕 Exame de '+(est.paciente||'?')+' chegou — baixando '+est.nImagens+' imagem(ns)…');
   var imagens=[];
   for(var i=0;i<(est.instancias||[]).length;i++){
@@ -4013,6 +4117,8 @@ document.addEventListener('DOMContentLoaded',()=>{ try{ fsGetHandle('laudo').the
   if(!cfg.chave) alternarConfig(); var _ip=document.getElementById('inpPasta'); if(_ip) _ip.addEventListener('change', renderPastaInfo); var _ipa=document.getElementById('inpPastaAudios'); if(_ipa) _ipa.addEventListener('change', renderPastaAudiosInfo); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
   renderAcum();
   verificarSessaoSalva();
+  // vigia da espera: confere a cada 30s se estão chegando exames sem ninguém captar
+  esperaVigiar(); _esperaTimer=setInterval(esperaVigiar, 30000);
 });
 </script>
 <div id="camOverlay" style="position:fixed;inset:0;z-index:99999;background:#000;display:none;flex-direction:column">

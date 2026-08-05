@@ -248,6 +248,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <input type="text" id="cfgModeloAux" placeholder="ex.: gpt-5-mini (vazio = usa o modelo acima)">
   <span class="aviso">Modelo barato usado só na extração de regras do aprendizado. Se vazio, usa o modelo principal.</span>
   <div id="cfgDadosStatus" style="margin:8px 0"></div>
+  <div id="bancoStatus" class="aviso" style="margin:4px 0 8px"></div>
   <label>Motor de transcrição local (opcional)</label>
   <input type="text" id="cfgAgenteLocal" placeholder="ex.: http://127.0.0.1:8977 (vazio = transcreve na OpenAI)">
   <span class="aviso">Serviço que roda no computador da clínica. Se preenchido e ativo, a <b>transcrição</b> é feita nele (melhor vocabulário médico, áudio não sai da máquina); se estiver fora do ar, cai automaticamente na OpenAI. A busca de exames por <b>DICOM</b> usa este endereço (ou <span class="mono">http://127.0.0.1:8977</span> quando vazio).</span>
@@ -2078,7 +2079,8 @@ async function gerarLaudo(exId){
 (EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — preencha o campo 'obstetrico'. Você SÓ COPIA os valores; quem escolhe qual entra na conclusão é o aplicativo:\n- trouxe_usg_primeiro_trimestre: true se o médico disse que a paciente trouxe/apresentou a ultrassonografia INICIAL (de primeiro trimestre), ou se ele informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito.\n- ig_primeiro_usg_semanas: a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame (número; 0 se não foi ditada).\n- aua: leia da worksheet do aparelho o campo AUA — a idade gestacional média estimada pela biometria de HOJE — copiada exatamente como está, ex.: \"34w2d\". Vazio se não estiver legível.\n- ga: leia da worksheet o campo GA — a idade gestacional já estabelecida para a paciente — copiada exatamente como está, ex.: \"35w3d\". Vazio se não estiver legível.\n- edd_aua: a data que está em EDD(AUA), no formato dia/mês/ano. Vazio se não estiver legível.\n- edd_ga: a data que está em EDD(EDD), no formato dia/mês/ano. Vazio se não estiver legível.\nNUNCA invente nenhum desses valores: copie da imagem ou deixe vazio. ATENÇÃO — AUA e GA são campos DIFERENTES da worksheet e costumam ter valores diferentes: não troque um pelo outro nem repita o mesmo nos dois.\nNA CONCLUSÃO: NÃO escreva a idade gestacional, NÃO escreva a data provável do parto e NÃO escreva a variação em dias — deixe os pontilhados do modelo como estão. O aplicativo preenche os três, e escolhe a frase certa conforme a paciente ter trazido ou não o exame inicial.\n\n" : "")+
 (ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
 "AVISOS SEPARADOS POR ASSUNTO (campo 'avisos'): além de 'observacoes_para_o_medico', devolva CADA aviso como um item próprio, com 'tipo' sendo EXATAMENTE uma destas palavras:\n- identificacao: nome, idade ou data que não conferem entre o ditado, as imagens e o cadastro.\n- divergencia: o ditado diz uma coisa e as imagens mostram outra.\n- faltando: medida, dado ou legenda ausente/ilegível que deixou pontilhados no laudo.\n- iacriou: você escreveu a descrição de uma patologia a partir do seu conhecimento, por não haver dizer padrão do médico (diga qual patologia).\n- outros: aviso que não caiba em nenhum acima.\nUm assunto por item, 'texto' curto e direto. Nada a avisar: \"avisos\":[]. NUNCA use os tipos 'anterior' nem 'calculo' — esses o aplicativo preenche sozinho.\n\n"+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}]"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
+"DADOS ESTRUTURADOS (campo 'dados_estruturados'): além do laudo, devolva os achados campo a campo, para o arquivo longitudinal do paciente. Regras:\n- Preencha APENAS com informação presente no ditado ou legível nas imagens. Campo sem informação = null (ou \"\" em texto). NUNCA invente medida, órgão ou classificação.\n- indicacao_clinica: os dados clínicos ditados, se houver.\n- conclusao_codigo: UMA palavra que resuma a conclusão — normal | benigno | provavelmente-benigno | suspeito | indeterminado | outro.\n- achados: um item por achado DESCRITO no laudo. orgao (ex.: 'mama-direita', 'figado', 'lobo-tireoidiano-esquerdo'), localizacao (ex.: 'QSE', 'terco medio'), tipo (ex.: 'nodulo', 'cisto', 'calculo', 'esteatose'), medidas em MILÍMETROS (medida_1_mm a medida_3_mm; converta de cm; null se não medida), caracteristicas (objeto livre: ecogenicidade, margens, sombra...), classificacao (ex.: 'BI-RADS 3'; \"\" se não se aplica), descricao (a frase do achado como está no laudo).\n- Exame normal, sem achados: \"achados\":[].\n\n"+
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
 +(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0,\"aua\":\"\",\"ga\":\"\",\"edd_aua\":\"\",\"edd_ga\":\"\"}":"")+"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
@@ -2126,6 +2128,8 @@ async function gerarLaudo(exId){
     ex._falhou=false;
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
     try{ agendarSalvarSessao(); }catch(_){}
+    // arquivo estruturado no computador (melhor-esforço: nunca atrasa o laudo)
+    try{ bancoEnviarExame(ex, resp); }catch(_){}
     if(!_gerandoEmLote){   // em lote, gerarTodos renderiza uma vez no fim (evita centenas de re-renders)
       renderExames();
       if(document.getElementById('cardRevisao')){ renderRevisao(); document.getElementById('cardRevisao').style.display='block'; }
@@ -3213,6 +3217,137 @@ function restaurarModelos(){
   try{ if(exames && exames.length) renderExames(); }catch(e){}
 }
 
+/* ============ Banco estruturado (SQLite no agente) ============
+   Cada laudo gerado vira também um registro ESTRUTURADO no computador: paciente,
+   achados campo a campo, versão da IA e versão final do médico. É a base do
+   arquivo longitudinal (comparação seriada, agente conferente, ajuste fino).
+   Regra de ouro: isto é melhor-esforço e NUNCA atrasa nem trava a emissão do
+   laudo. Agente fora do ar -> o envio espera numa fila e sai depois, sozinho. */
+const FILA_BANCO_CHAVE='filaExamesPendentes', FILA_BANCO_MAX=60;
+function bancoFilaLer(){ try{ var a=JSON.parse(localStorage.getItem(FILA_BANCO_CHAVE)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function bancoFilaGravar(arr){
+  var a=arr.slice();
+  if(a.length>FILA_BANCO_MAX){ console.warn('[banco] fila cheia: descartando '+(a.length-FILA_BANCO_MAX)+' registro(s) mais antigo(s)'); a=a.slice(a.length-FILA_BANCO_MAX); }
+  try{ localStorage.setItem(FILA_BANCO_CHAVE, JSON.stringify(a)); }catch(e){ console.warn('[banco] nao consegui gravar a fila: '+e.message); }
+}
+function bancoFilaUpsert(k, muda){
+  var fila=bancoFilaLer(), i=fila.findIndex(function(x){ return x.k===k; });
+  var ent=i>=0?fila[i]:{k:k, payload:null, final:null, ts:Date.now()};
+  muda(ent);
+  if(i>=0) fila[i]=ent; else fila.push(ent);
+  bancoFilaGravar(fila);
+}
+function bancoDataISO(d){
+  var s=String(d||'').trim();
+  var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m) return m[3]+'-'+m[2]+'-'+m[1];
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  var h=new Date();   // sem data legível: o exame é de hoje (o laudo é gerado no ato)
+  return h.getFullYear()+'-'+('0'+(h.getMonth()+1)).slice(-2)+'-'+('0'+h.getDate()).slice(-2);
+}
+/* Monta o corpo do POST /exames a partir do exame + resposta da IA.
+   codigo_aparelho é extensão nossa ao esquema: é a âncora de identidade que o
+   app já usa (nascimento e documento quase nunca estão disponíveis aqui). */
+function bancoMontarPayload(ex, resp){
+  var de=(resp&&typeof resp.dados_estruturados==='object'&&resp.dados_estruturados)||{};
+  var achados=[];
+  (Array.isArray(de.achados)?de.achados:[]).forEach(function(a){
+    if(!a||typeof a!=='object') return;
+    var tipo=String(a.tipo||'').trim(), orgao=String(a.orgao||'').trim();
+    if(!tipo||!orgao) return;                          // sem órgão+tipo não é um achado
+    var num=function(v){ var n=parseFloat(v); return isFinite(n)&&n>0?n:null; };
+    achados.push({orgao:orgao, localizacao:String(a.localizacao||'')||null, tipo:tipo,
+      medida_1_mm:num(a.medida_1_mm), medida_2_mm:num(a.medida_2_mm), medida_3_mm:num(a.medida_3_mm),
+      caracteristicas:JSON.stringify((a.caracteristicas&&typeof a.caracteristicas==='object')?a.caracteristicas:{}),
+      classificacao:String(a.classificacao||'')||null,
+      descricao:String(a.descricao||'')||null});
+  });
+  var CODIGOS={'normal':1,'benigno':1,'provavelmente-benigno':1,'suspeito':1,'indeterminado':1,'outro':1};
+  var cod=String(de.conclusao_codigo||'').trim().toLowerCase();
+  return {
+    paciente:{nome_completo:ex.paciente||'(sem nome)', documento:null, nascimento:null, sexo:null,
+              codigo_aparelho:String(ex.codPac||'')||null},
+    exame:{data_exame:bancoDataISO(ex.dataExame), tipo_exame:ex.tipo||'desconhecido',
+           indicacao_clinica:String(de.indicacao_clinica||'')||null,
+           study_uid:String(ex._estudoId||'')||null,
+           conclusao_codigo:CODIGOS[cod]?cod:'outro',
+           laudo_gerado:textoBaseLaudo(ex.laudo), json_gerado:JSON.stringify(resp||{}),
+           modelo_ia:cfg.modelo||'', custo_estimado_usd:null},
+    achados:achados
+  };
+}
+/* Envia a versão GERADA. Falhou -> fila. Nunca lança, nunca trava o laudo. */
+async function bancoEnviarExame(ex, resp){
+  try{
+    var payload=bancoMontarPayload(ex, resp);
+    ex._bancoPayload=payload;
+    var r=await fetch(agenteBase()+'/exames',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var j=await r.json();
+    if(!r.ok||!j||j.exame_id==null) throw new Error((j&&j.erro)||('HTTP '+r.status));
+    ex._bancoId=j.exame_id;
+    bancoFilaUpsert(ex.histKey||('ex'+ex.id), function(e){ e.payload=null; e.final=null; e._ok=true; });
+    bancoFilaGravar(bancoFilaLer().filter(function(e){ return !e._ok; }));
+    bancoStatusAtualizar();
+    bancoReenviarFila();
+  }catch(e){
+    console.warn('[banco] exame nao gravado agora ('+((e&&e.message)||e)+') — fica na fila');
+    if(ex._bancoPayload) bancoFilaUpsert(ex.histKey||('ex'+ex.id), function(en){ en.payload=ex._bancoPayload; });
+    bancoStatusAtualizar();
+  }
+}
+/* Envia a versão FINAL (texto que o médico salvou/assinou). */
+async function bancoEnviarFinal(ex, texto){
+  if(!texto) return;
+  try{
+    if(ex._bancoId==null) throw new Error('exame ainda sem id no banco');
+    var r=await fetch(agenteBase()+'/exames/'+ex._bancoId+'/final',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({laudo_final:texto})});
+    var j=await r.json();
+    if(!r.ok||!j||!j.ok) throw new Error((j&&j.erro)||('HTTP '+r.status));
+    bancoStatusAtualizar();
+  }catch(e){
+    console.warn('[banco] versao final na fila ('+((e&&e.message)||e)+')');
+    bancoFilaUpsert(ex.histKey||('ex'+ex.id), function(en){ if(!en.payload&&ex._bancoPayload) en.payload=ex._bancoPayload; en.final=texto; });
+    bancoStatusAtualizar();
+  }
+}
+/* Reenvio: na abertura do app e após cada envio que dá certo. Para no primeiro
+   erro de rede (agente fora do ar) — tentará de novo na próxima oportunidade. */
+var _bancoReenviando=false;
+async function bancoReenviarFila(){
+  if(_bancoReenviando) return; _bancoReenviando=true;
+  try{
+    var fila=bancoFilaLer();
+    for(var i=0;i<fila.length;i++){
+      var en=fila[i]; if(!en||!en.payload) { fila.splice(i,1); i--; continue; }
+      var r=await fetch(agenteBase()+'/exames',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(en.payload)});
+      var j=await r.json();
+      if(!r.ok||!j||j.exame_id==null) break;
+      if(en.final){
+        var r2=await fetch(agenteBase()+'/exames/'+j.exame_id+'/final',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({laudo_final:en.final})});
+        if(!r2.ok) break;
+      }
+      fila.splice(i,1); i--;
+      bancoFilaGravar(fila);
+      console.log('[banco] pendente enviado');
+    }
+  }catch(e){ /* agente fora do ar: fica para a próxima */ }
+  _bancoReenviando=false;
+  bancoStatusAtualizar();
+}
+/* Indicador discreto nas Configurações: OK / offline / N pendentes. */
+async function bancoStatusAtualizar(){
+  var el=document.getElementById('bancoStatus'); if(!el) return;
+  var pend=bancoFilaLer().length;
+  try{
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},2500);
+    var r=await fetch(agenteBase()+'/dados/saude',{signal:ctrl.signal}); clearTimeout(t);
+    var j=await r.json();
+    if(j&&j.ok) el.innerHTML='🗄️ Banco local: <b>OK</b> — '+(j.total_exames||0)+' exame(s) guardado(s)'+(pend?(' · <span class="aviso">'+pend+' pendente(s) na fila</span>'):'');
+    else throw new Error('resposta inválida');
+  }catch(e){
+    el.innerHTML='🗄️ Banco local: <span class="aviso">'+(pend?pend+' exame(s) aguardando o agente':'agente sem o banco ainda (rotina desta noite) ou fora do ar')+'</span>';
+  }
+}
+
 /* ============ Histórico de laudos (localStorage) ============ */
 function lerHistorico(){ try{ return JSON.parse(localStorage.getItem('glaudos')||'[]'); }catch(e){ return []; } }
 /* Nunca falhar por cota: se encher, descarta os laudos mais ANTIGOS até caber.
@@ -3265,6 +3400,11 @@ function salvarLaudoHistorico(meta){
   if(i>=0) arr[i]=reg; else arr.push(reg);
   gravarHistorico(arr);
   histDiscoAtualizar(reg);   // entra já na cópia em memória, senão só valeria amanhã
+  // versão FINAL para o banco estruturado: este é o texto que o médico assinou
+  try{
+    var exB=exames.find(function(e){ return e.histKey===meta.id; });
+    if(exB) bancoEnviarFinal(exB, textoEditadoLaudo());
+  }catch(_){}
 }
 function alternarHistorico(){
   const c=document.getElementById('cardHistorico');
@@ -4564,6 +4704,8 @@ window.addEventListener('DOMContentLoaded', function(){ mostrarAba('captura'); }
 window.addEventListener('DOMContentLoaded', function(){ cpRenderRecuperacao().catch(function(){}); });
 /* Gravação que ficou correndo no agente enquanto o navegador esteve fechado. */
 window.addEventListener('DOMContentLoaded', function(){ agReatar().catch(function(){}); });
+/* Banco estruturado: manda o que ficou pendente e mostra o estado nas Configurações. */
+window.addEventListener('DOMContentLoaded', function(){ bancoReenviarFila().catch(function(){}); });
 /* Fechar a janela no meio de uma gravação: o Chrome pergunta antes. Não impede um
    fechamento forçado, mas pega o clique sem querer — que foi o caso de 03/08.
    Mesmo se fechar assim, a caixa-preta já guardou tudo menos a última fatia. */

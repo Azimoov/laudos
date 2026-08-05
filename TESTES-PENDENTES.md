@@ -126,6 +126,25 @@ idade gestacional de" — se quiser essa redação mais curta, eu troco no model
 
 ---
 
+## 5. Banco estruturado de laudos (rotina da noite — roteiro próprio)
+
+O lado do app já está no branch; o lado do agente está pronto em
+`agente/banco.py`. **Siga o passo a passo de `agente/INSTALAR-BANCO.md`**
+(15 min: copiar 1 arquivo, ~8 linhas no agente-laudos.py, reiniciar o agente
+SEM atendimento em curso, conferir).
+
+- [ ] Instalar conforme `agente/INSTALAR-BANCO.md` e ver "🗄️ Banco local: OK"
+      nas Configurações.
+- [ ] Gerar um laudo de teste e ver o contador de exames subir.
+- [ ] Testar a fila: agente desligado → gerar laudo → religar → recarregar o
+      app → o pendente sobe sozinho.
+- [ ] (Opcional, recomendado) Ativar a cópia cifrada para o iCloud: 7-Zip +
+      arquivo de senha (seção 6 do roteiro). Guardar a senha FORA do computador.
+- [ ] Aproveitar a ida ao agente: fazer `/dicom/estudos` devolver o código do
+      paciente (PatientID) e a data de nascimento (seção 7 do roteiro).
+
+---
+
 ## Pendências antigas, ainda suas (do handoff de 03/08)
 
 - [ ] Preencher `http://127.0.0.1:8977` no campo **"Motor de transcrição local"**

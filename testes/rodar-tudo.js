@@ -24,8 +24,10 @@ const SUITE = [
   { arq: 'teste-caixapreta.js', o: 'caixa-preta da gravacao (janela fechou)' },
   { arq: 'teste-gravagente.js', o: 'gravacao continua pelo agente' },
   { arq: 'teste-obstetrico.js', o: 'idade gestacional (AUA x GA) do obstetrico' },
+  { arq: 'teste-fila-banco.js', o: 'banco estruturado - lado do app (payload e fila)' },
   { arq: 'teste-buffer.py', o: 'fita de audio do agente', py: true },
   { arq: 'teste-cache.py', o: 'cache da listagem DICOM', py: true },
+  { arq: 'teste-banco.py', o: 'banco estruturado - modulo SQLite do agente', py: true },
   { arq: 'teste-backup.js', o: 'backup externo (precisa do agente no ar)', agente: true },
   { arq: 'teste-chave.js', o: 'chave da OpenAI no agente (precisa do agente no ar)', agente: true },
 ];

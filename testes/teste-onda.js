@@ -1,7 +1,7 @@
 // Extrai as funcoes do grafico do index.html e testa a matemática do traço rolante,
 // com um canvas de mentira que so anota o que foi desenhado.
 const fs = require('fs');
-const HTML = fs.readFileSync('C:/Users/serru/OneDrive/Desktop/Projeto WBOT/_repo/index.html', 'utf8');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 
 function grab(nome) {
   const i = HTML.indexOf('function ' + nome + '(');

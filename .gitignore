@@ -1,0 +1,6 @@
+
+# banco de pacientes e cache do Python NUNCA vao para o git
+agente/dados/
+agente/__pycache__/
+__pycache__/
+*.db

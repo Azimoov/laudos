@@ -1,7 +1,7 @@
 // Checa a sintaxe de todos os blocos <script> inline do index.html.
 const fs = require('fs');
 const vm = require('vm');
-const HTML = fs.readFileSync('C:/Users/serru/OneDrive/Desktop/Projeto WBOT/_repo/index.html', 'utf8');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 const blocos = [...HTML.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
 console.log('blocos <script> inline:', blocos.length);
 let erros = 0;

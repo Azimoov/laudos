@@ -4,7 +4,7 @@
 const fs = require('fs');
 const AG = 'http://127.0.0.1:8977';
 const CONF = 'C:/Users/serru/AppData/Local/LaudosLocal/config-agente.json';
-const HTML = fs.readFileSync('C:/Users/serru/OneDrive/Desktop/Projeto WBOT/_repo/index.html', 'utf8');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FALHA ') + m); if (!c) falhas++; };

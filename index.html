@@ -1674,6 +1674,8 @@ function renderExames(){
       +((ex._tipoDuvida&&ex._tipoDuvida.length>1)?'<div style="margin-top:6px;background:#fdf0d5;border-left:4px solid #9a6b14;padding:7px 10px;border-radius:6px;color:#6b4a0d;font-size:13px;font-weight:600">⚠️ O ditado cita mais de um exame: '
           +ex._tipoDuvida.map(function(k){return esc((MODELOS[k]&&MODELOS[k].nome)||k);}).join(' · ')
           +'. Confira o tipo acima antes de gerar.</div>':'')
+      +(ex._motivoTipo?'<div class="aviso" style="margin-top:4px;font-size:12px">🤖 escolheu pelo ditado: <i>'+esc(ex._motivoTipo)+'</i>'
+          +(ex._foraDoPreset?' — <b>fora do preset do aparelho</b> (o ditado falou mais alto)':'')+'</div>':'')
       +(audios.length?'<div style="margin-top:8px"><button class="btn peq sec" onclick="alternarAudios('+ex.id+')">🔗 Áudios deste paciente ('+audiosDoExame.length+' marcado'+(audiosDoExame.length===1?'':'s')+') ▾</button><div id="auds'+ex.id+'" style="display:'+(audsAbertos[ex.id]?'block':'none')+';margin-top:6px;background:#f4f7fa;border-radius:10px;padding:8px">'+listaAudios+'</div></div>':'')
       +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
       +'<button class="btn peq" id="btnGerar'+ex.id+'" onclick="gerarLaudo('+ex.id+')">'+(ex.laudo?'Refazer laudo':'Gerar laudo')+'</button>'
@@ -3661,7 +3663,7 @@ async function capOrtProcessar(est){
         var a=capAudioDoAgente(res.texto, res.origem);
         var meta=await capClassificarDitado(res.texto, est.descricao);
         a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
-        a.tiposCitados=meta.tipos_citados||[];
+        a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
         a.nome=nomeAudio(meta.nome_paciente, meta.tipo_exame, meta.lateralidade)||a.nome;
         log('Ditado do agente ('+res.origem+', '+res.segundos+'s de áudio): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
         if(res.aviso) log('Aviso do agente: '+res.aviso, true);
@@ -3716,7 +3718,7 @@ async function capRecuperar(){
     if(dit.temAudio) a.url=agenteBase()+'/exame/audio/'+est.id;
     var meta=await capClassificarDitado(dit.texto||'', est.descricao);
     a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
-    a.tiposCitados=meta.tipos_citados||[];
+    a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
     renderExames();
     await capAutoVincular(ex);
     feitos++;
@@ -3745,20 +3747,35 @@ function presetInfo(p){
 }
 /* extrai tipo/lateralidade do texto já transcrito (o nome vem do DICOM, não precisa ditar) */
 async function capClassificarDitado(texto, preset){
-  if(!await temIA()) return {nome_paciente:'', tipo_exame:'', lateralidade:'', tipos_citados:[]};
+  if(!await temIA()) return {nome_paciente:'', tipo_exame:'', lateralidade:'', tipos_citados:[], motivo:''};
   try{
     var nomesTipos=Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
     var pi=presetInfo(preset);
-    var dica = pi ? ("\n\nIMPORTANTE — O APARELHO estava no preset \""+pi.sigla+"\" ("+pi.nome+"), que corresponde a estes exames: "
-        + pi.tipos.map(function(k){return MODELOS[k]?MODELOS[k].nome:'';}).filter(Boolean).join('; ') + ". "
-        + "É COMUM o médico fazer DOIS exames seguidos no mesmo paciente, e o ditado de um conter conversa do outro. "
-        + "Quando o ditado citar mais de um exame, escolha o que combina com o preset do aparelho. "
-        + "Só escolha fora dessa lista se o ditado deixar MUITO claro que o exame é outro.") : '';
-    var r=await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) NOME DO PACIENTE se citado (ou \"\"); (2) o TIPO DE EXAME: responda EXATAMENTE com um destes nomes quando corresponder: "+nomesTipos+"; se não estiver na lista, \"outro\"; se não der para saber, \"\". (3) LATERALIDADE: \"direito\", \"esquerdo\", \"bilateral\" ou \"\" — SOMENTE para ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles; nos demais responda \"\". (4) TODOS os tipos de exame CITADOS no ditado, mesmo os que você não escolheu, como lista de nomes da mesma lista acima (use [] se só houver um). Responda em JSON: {\"nome_paciente\":\"\",\"tipo_exame\":\"\",\"lateralidade\":\"\",\"tipos_citados\":[]}"+dica+"\n\nDITADO:\n"+texto}], true, {modelo: cfg.modeloAux||cfg.modelo});
+    var dica = '';
+    dica = pi ? ("\n\nPISTA DO APARELHO (não é regra): o ultrassom estava no preset \""+pi.sigla+"\" ("+pi.nome+"), "
+        + "que costuma ser usado para: " + pi.tipos.map(function(k){return MODELOS[k]?MODELOS[k].nome:'';}).filter(Boolean).join('; ') + ". "
+        + "ATENÇÃO: o médico MUITAS VEZES NÃO TROCA o preset, porque a sonda daquele preset já serve para o exame "
+        + "que ele vai fazer. Portanto o preset NÃO limita a resposta.\n"
+        + "Use esta ordem de evidência, da mais forte para a mais fraca:\n"
+        + "1) O QUE O MÉDICO DESCREVE — órgãos e estruturas examinados, medidas, achados, conduta. Isto MANDA. "
+        + "Ex.: se ele descreve hérnia inguinal, o exame é de parede abdominal, mesmo que o preset seja outro.\n"
+        + "2) O NOME do exame que ele diz.\n"
+        + "3) O PRESET do aparelho — use apenas para DESEMPATAR quando 1 e 2 não resolverem.\n"
+        + "Se a descrição apontar claramente um exame fora do preset, RESPONDA O EXAME DA DESCRIÇÃO.") : '';
+    // Regra de POSIÇÃO: a gravação deste exame termina no instante em que ele foi fechado.
+    // Logo, o fim do ditado é deste exame; o começo pode ser sobra do exame anterior do mesmo
+    // paciente (as janelas de dois exames seguidos se sobrepõem). Sem isto, o ditado do 2o
+    // exame da Rita (ombro descrito inteiro + transvaginal começando no fim) dava "ombro".
+    dica += "\n\nCOMO ESTE ÁUDIO FOI RECORTADO: a gravação vai de pouco antes da primeira imagem "
+        + "ATÉ O INSTANTE EM QUE ESTE exame foi encerrado. Portanto, se o ditado parecer conter DOIS "
+        + "exames, o exame DESTE laudo é o que aparece MAIS PERTO DO FIM — o começo costuma ser o "
+        + "resto do exame anterior do mesmo paciente. Um exame descrito por inteiro logo no começo e "
+        + "depois abandonado é quase sempre o exame ANTERIOR, não este.";
+    var r=await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) NOME DO PACIENTE se citado (ou \"\"); (2) o TIPO DE EXAME: responda EXATAMENTE com um destes nomes quando corresponder: "+nomesTipos+"; se não estiver na lista, \"outro\"; se não der para saber, \"\". (3) LATERALIDADE: \"direito\", \"esquerdo\", \"bilateral\" ou \"\" — SOMENTE para ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles; nos demais responda \"\". (4) TODOS os tipos de exame CITADOS no ditado, mesmo os que você não escolheu, como lista de nomes da mesma lista acima (use [] se só houver um). (5) MOTIVO: em até 12 palavras, o que no ditado te fez escolher esse tipo (cite a estrutura ou o achado). Responda em JSON: {\"nome_paciente\":\"\",\"tipo_exame\":\"\",\"lateralidade\":\"\",\"tipos_citados\":[],\"motivo\":\"\"}"+dica+"\n\nDITADO:\n"+texto}], true, {modelo: cfg.modeloAux||cfg.modelo});
     var cit=(Array.isArray(r.tipos_citados)?r.tipos_citados:[]).map(function(t){return mapTipo(t||'');}).filter(Boolean);
     return {nome_paciente:r.nome_paciente||'', tipo_exame:mapTipo(r.tipo_exame||''), lateralidade:r.lateralidade||'',
-            tipos_citados:cit.filter(function(t,i){return cit.indexOf(t)===i;})};
-  }catch(e){ return {nome_paciente:'', tipo_exame:'', lateralidade:'', tipos_citados:[]}; }
+            tipos_citados:cit.filter(function(t,i){return cit.indexOf(t)===i;}), motivo:String(r.motivo||'').slice(0,120)};
+  }catch(e){ return {nome_paciente:'', tipo_exame:'', lateralidade:'', tipos_citados:[], motivo:''}; }
 }
 async function capOrtBaixar(instanciaId){
   var r=await fetch(agenteBase()+'/dicom/imagem/'+instanciaId);
@@ -3783,6 +3800,11 @@ async function capAutoVincular(ex){
   // (ex.: rins e próstata, ambos URO) só o médico sabe qual é qual.
   var cit=(a.tiposCitados||[]).filter(function(t){ return t && t!=='outro'; });
   if(cit.length>1) ex._tipoDuvida=cit; else delete ex._tipoDuvida;
+  ex._motivoTipo=a.motivoTipo||'';
+  // A IA escolheu FORA da família do preset? Não é erro — o médico costuma não trocar o
+  // preset quando a sonda já serve. Só sinalizamos para ele poder conferir de relance.
+  var pf=presetInfo(ex._preset);
+  ex._foraDoPreset = !!(pf && ex.tipo && pf.tipos.indexOf(ex.tipo)<0);
   if(a.lateralidade && !ex.lateralidade) ex.lateralidade=normLateralidade(a.lateralidade);
   capRenderPendentes(); renderExames(); capRenderNovos();
   if(!ex.tipo){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado, mas o TIPO do exame não foi dito — escolha o tipo e gere.'); log('Diga o tipo do exame no ditado (ex.: "abdome total") para o laudo sair sozinho.',true); return; }

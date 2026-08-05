@@ -23,6 +23,9 @@ const SUITE = [
   { arq: 'teste-cache.py', o: 'cache da listagem DICOM', py: true },
   { arq: 'teste-backup.js', o: 'backup externo (precisa do agente no ar)', agente: true },
   { arq: 'teste-chave.js', o: 'chave da OpenAI no agente (precisa do agente no ar)', agente: true },
+  // Esta abre o programa INTEIRO num Chrome de verdade. As de cima testam funcoes soltas e
+  // por isso deixaram passar, com tudo verde, as falhas de montagem de 04-05/08.
+  { arq: 'teste-navegador.js', o: 'programa rodando no navegador (ponta a ponta)' },
 ];
 
 let ok = 0, falhou = 0, pulou = 0;

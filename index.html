@@ -79,6 +79,12 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   font-size:15px;font-weight:600;box-shadow:0 2px 12px rgba(0,0,0,.3);flex-wrap:wrap;
   animation:esperaPisca 1.4s ease-in-out infinite}
 #bannerEspera button{cursor:pointer;border-radius:6px;padding:6px 14px;font-weight:700}
+/* Relógio do aparelho fora de hora: âmbar e SEM piscar — é problema para resolver hoje,
+   não emergência do minuto, ao contrário da espera desligada. */
+#bannerRelogio{position:fixed;bottom:0;left:0;right:0;background:#8a5a00;color:#fff;
+  padding:11px 18px;display:flex;align-items:center;gap:10px;z-index:9998;
+  font-size:14px;box-shadow:0 -2px 12px rgba(0,0,0,.3);flex-wrap:wrap}
+#bannerRelogio button{cursor:pointer;border-radius:6px;padding:6px 12px}
 /* zoom da imagem: painel FIXO que abre sobre o laudo, sempre inteiro na tela
    (antes era transform:scale(5), que estourava a borda direita e cortava a imagem).
    Animação (31/07): display:none não anima, então entra por opacidade + escala.
@@ -3379,11 +3385,30 @@ function capRenderPendentes(){
 let capOrtWatching=false, capOrtTimer=null, capOrtVarrendo=false;
 let capOrtSeen=new Set(), capOrtFeitos=new Set(), capOrtStable={};
 function capOrtStatusTxt(t){ var s=document.getElementById('capOrtStatus'); if(s) s.textContent=t; }
+var _relogioAparelho={desvioSeg:null, suspeito:false, limiteSeg:900};
 async function capOrtListar(){
   var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},12000);
   var r=await fetch(agenteBase()+'/dicom/estudos',{signal:ctrl.signal}); clearTimeout(t);
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'resposta inválida');
+  if(j.relogio) _relogioAparelho=j.relogio;
+  relogioBanner();
   return j.estudos||[];
+}
+/* O recorte do áudio é ancorado na hora que o APARELHO carimba nas imagens. Se esse relógio
+   desandar, o agente procura o áudio no horário errado e o exame sai "sem ditado" — com o
+   médico tendo falado tudo. Aconteceu em 27/07 (aparelho 5h46 fora) e ninguém percebeu. */
+function relogioBanner(){
+  var b=document.getElementById('bannerRelogio');
+  if(!_relogioAparelho.suspeito){ if(b) b.remove(); return; }
+  if(!b){ b=document.createElement('div'); b.id='bannerRelogio'; document.body.appendChild(b); }
+  var s=_relogioAparelho.desvioSeg||0, a=Math.abs(s);
+  var quanto = a<120 ? (Math.round(a)+' segundos') : (a<7200 ? (Math.round(a/60)+' minutos') : ((a/3600).toFixed(1).replace('.',',')+' horas'));
+  b.innerHTML='<span style="flex:1;min-width:220px">🕐 O relógio do aparelho de ultrassom está <b>'
+    +quanto+' '+(s>0?'atrasado':'adiantado')+'</b> em relação a este computador. '
+    +'O ditado é recortado pela hora do aparelho — assim, os exames podem sair <b>sem ditado</b>. '
+    +'Acerte a hora no ultrassom.</span>'
+    +'<button id="btnRelogioOk" style="background:transparent;color:#ffe9b8;border:1px solid #d8b26e;font-weight:400">entendi, esconder</button>';
+  document.getElementById('btnRelogioOk').onclick=function(){ _relogioAparelho.suspeito=false; relogioBanner(); };
 }
 var capOrtLigando=false;
 async function capOrtToggle(){

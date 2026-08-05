@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """Testa o cache da listagem: 2a varredura nao deve rebuscar tags; TTL de 2 s;
 exame crescendo (imagens novas) so busca as tags NOVAS."""
+import os
 import re
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 
 ARQ = r"C:\Users\serru\AppData\Local\LaudosLocal\agente-laudos.py"
 src = open(ARQ, encoding="utf-8").read()
@@ -34,8 +36,12 @@ def orthanc_falso(caminho, binario=False, timeout=20):
     return BANCO[caminho]
 
 
+# o trecho recortado tambem monta o vigia do relogio do aparelho, que usa os/datetime e a
+# hora_do_aparelho (definida fora do recorte) — o ambiente falso precisa conhecer os dois
 ns = {"threading": threading, "time": time, "orthanc_get": orthanc_falso,
-      "_data_br": lambda s: s, "_idade": lambda a, b: "", "print": print}
+      "_data_br": lambda s: s, "_idade": lambda a, b: "", "print": print,
+      "os": os, "datetime": datetime, "timezone": timezone,
+      "hora_do_aparelho": lambda d, h: None}
 exec(compile(trecho, "listar", "exec"), ns)
 listar = ns["listar_estudos"]
 

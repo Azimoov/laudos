@@ -907,6 +907,14 @@ async function openai(conteudo, querJson=true, opts){
   // A chave mora no AGENTE (computador da clínica), não aqui: quem abrisse o console
   // do navegador copiava. Só quando o agente não responde é que se usa a chave local —
   // caso do iPhone fora do alcance dele, para não deixar o médico sem IA no meio do dia.
+  // modelo/body ficam ANTES do desvio para o agente: o caminho do agente também os usa.
+  // Declarados depois, o `const` fica inacessível lá dentro e TODA chamada de IA pelo
+  // agente morria com "Cannot access 'body' before initialization" — silenciosamente,
+  // porque quem chama costuma ter try/catch. Sintoma: o tipo do exame parava de ser
+  // identificado sozinho e /ia/estado ficava com "chamadas: 0".
+  const modelo = (opts && opts.modelo) ? opts.modelo : cfg.modelo;
+  const body = {model: modelo, messages:[{role:'user', content: conteudo}]};
+  if(querJson) body.response_format = {type:'json_object'};
   if(await iaPeloAgente()){
     const rp = await fetchRetentativa(function(){
       return fetch(agenteBase()+'/ia/chat',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -919,9 +927,6 @@ async function openai(conteudo, querJson=true, opts){
     return querJson ? extrairJson(tp) : tp;
   }
   if(!cfg.chave) throw new Error('A IA está indisponível: o agente não respondeu e não há chave guardada neste dispositivo. Ligue o agente no computador da clínica.');
-  const modelo = (opts && opts.modelo) ? opts.modelo : cfg.modelo;
-  const body = {model: modelo, messages:[{role:'user', content: conteudo}]};
-  if(querJson) body.response_format = {type:'json_object'};
   const r = await fetchRetentativa(function(){ return fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.chave},
@@ -1048,6 +1053,11 @@ async function iaPeloAgente(){
   }catch(e){ _iaAgente={ok:false, quando:Date.now()}; }
   return _iaAgente.ok;
 }
+/* Tem IA disponível? A chave normalmente mora no AGENTE; só fica neste navegador quando
+   o agente está fora de alcance (iPhone). Checar apenas cfg.chave dava "configure a chave"
+   com tudo funcionando — e, no caminho do exame ao vivo, fazia o tipo do exame voltar
+   vazio sem avisar ninguém. */
+async function temIA(){ return !!(cfg.chave||'').trim() || await iaPeloAgente(); }
 async function transcreverLocal(wavBlob){
   var base=(cfg.agenteLocal||'').trim().replace(/\/+$/,'');
   var b64=await new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=function(){rej(fr.error);}; fr.readAsDataURL(wavBlob); });
@@ -1517,7 +1527,7 @@ async function processar(){
   const fAu = Array.prototype.slice.call(document.getElementById('inpAudios').files).concat(audiosDaPastaSel());   // arquivos avulsos + pasta de áudios
   const fPasta = (document.getElementById('inpPasta')||{}).files||[];
   if(fEx.length===0 && fPasta.length===0 && !dicomProntos.length){ log('Selecione as fotos dos exames, uma pasta, ou importe os exames do aparelho.', true); return; }
-  if(!cfg.chave){ alternarConfig(); log('Antes de processar, cole sua chave da API em Configurações.', true); return; }
+  if(!await temIA()){ alternarConfig(); log('Antes de processar, ligue o agente na clínica ou cole sua chave da API em Configurações.', true); return; }
   document.getElementById('btnProcessar').disabled = true;
   exames = []; audios = [];
   progVincShow(fEx.length + fPasta.length + fAu.length);
@@ -2335,7 +2345,7 @@ async function alternarGravacao(){
 async function gerarInLoco(){
   if(mediaRec && mediaRec.state==='recording'){ log('Pare a gravação antes de gerar.', true); return; }
   if(lokoImgs.length===0 && lokoAudios.length===0){ log('Capture uma imagem ou grave o ditado primeiro.', true); return; }
-  if(!cfg.chave){ alternarConfig(); log('Cole sua chave da API em Configurações.', true); return; }
+  if(!await temIA()){ alternarConfig(); log('Ligue o agente na clínica ou cole sua chave da API em Configurações.', true); return; }
   const btn=document.getElementById('btnLoko'); btn.disabled=true; btn.textContent='Gerando...';
   try{
     const id = exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
@@ -2423,7 +2433,7 @@ async function aprenderComEdicao(exId){
   try{
     var ex=exames.find(function(e){return e.id===exId;});
     if(!ex||!ex.laudo||!ex.laudoBaseTexto){ log('Este laudo não pode ser analisado (gere o laudo antes).', true); return; }
-    if(!cfg.chave){ log('Configure a chave da API para analisar correções.', true); return; }
+    if(!await temIA()){ log('Sem IA disponível para analisar correções (agente fora do ar e sem chave local).', true); return; }
     var editado=textoEditadoLaudo(); if(!editado){ log('Não consegui ler o texto do laudo.', true); return; }
     var norm=function(s){ return String(s||'').replace(/\s+/g,' ').trim(); };
     if(norm(editado)===norm(ex.laudoBaseTexto)){ log('Nenhuma correção detectada neste laudo — nada a aprender.'); return; }
@@ -2948,7 +2958,7 @@ async function revChatEnviar(){
   var inp=document.getElementById('revChatTxt'); var inst=(inp&&inp.value||'').trim();
   var st=document.getElementById('revChatStatus'); var btn=document.getElementById('revChatBtn');
   if(!inst){ if(st) st.textContent='Escreva o pedido — ex.: "corrija a lateralidade para esquerdo" ou "gere o laudo de novo mais sucinto".'; return; }
-  if(!cfg.chave){ if(st) st.textContent='Configure a chave da API em Configurações para usar a IA.'; return; }
+  if(!await temIA()){ if(st) st.textContent='Sem IA: ligue o agente na clínica ou configure a chave da API.'; return; }
   if(btn) btn.disabled=true;
   if(st) st.textContent='🤖 Aplicando: “'+inst.slice(0,90)+(inst.length>90?'…':'')+'”';
   try{
@@ -3608,7 +3618,7 @@ async function capRecuperar(){
 }
 /* extrai tipo/lateralidade do texto já transcrito (o nome vem do DICOM, não precisa ditar) */
 async function capClassificarDitado(texto){
-  if(!cfg.chave) return {nome_paciente:'', tipo_exame:'', lateralidade:''};
+  if(!await temIA()) return {nome_paciente:'', tipo_exame:'', lateralidade:''};
   try{
     var nomesTipos=Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
     var r=await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) NOME DO PACIENTE se citado (ou \"\"); (2) o TIPO DE EXAME: responda EXATAMENTE com um destes nomes quando corresponder: "+nomesTipos+"; se não estiver na lista, \"outro\"; se não der para saber, \"\". (3) LATERALIDADE: \"direito\", \"esquerdo\", \"bilateral\" ou \"\" — SOMENTE para ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles; nos demais responda \"\". Responda em JSON: {\"nome_paciente\":\"\",\"tipo_exame\":\"\",\"lateralidade\":\"\"}\n\nDITADO:\n"+texto}], true, {modelo: cfg.modeloAux||cfg.modelo});
@@ -3637,7 +3647,7 @@ async function capAutoVincular(ex){
   capRenderPendentes(); renderExames(); capRenderNovos();
   if(!ex.tipo){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado, mas o TIPO do exame não foi dito — escolha o tipo e gere.'); log('Diga o tipo do exame no ditado (ex.: "abdome total") para o laudo sair sozinho.',true); return; }
   if(!auto){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado. Toque em gerar quando quiser.'); return; }
-  if(!cfg.chave){ capOrtStatusTxt('Configure a chave da API para gerar o laudo.'); return; }
+  if(!await temIA()){ capOrtStatusTxt('Sem IA: ligue o agente na clínica ou configure a chave da API.'); return; }
   capOrtStatusTxt('⚙️ Gerando o laudo de '+ex.paciente+'…');
   try{
     await gerarLaudo(ex.id);

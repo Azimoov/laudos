@@ -1668,8 +1668,12 @@ function renderExames(){
     html += '<div class="exame">'
       +'<div class="nome">'+ex.paciente+(ex.subExame?' - '+ex.subExame:'')+(ex.lateralidade?' · '+ex.lateralidade:'')+' <span class="tag">'+ex.imagens.length+' pág.</span>'
       +(audiosDoExame.length?'<span class="tag">🎙 '+audiosDoExame.length+' áudio(s)</span>':'<span class="tag" style="background:#fde8e8;color:#b3261e">sem áudio</span>')
-      +(ex._falhou?'<span class="tag" style="background:#fde8e8;color:#b3261e">⚠️ laudo falhou — refazer</span>':'')+'</div>'
+      +(ex._falhou?'<span class="tag" style="background:#fde8e8;color:#b3261e">⚠️ laudo falhou — refazer</span>':'')
+      +(presetInfo(ex._preset)?'<span class="tag" title="preset que você usou no aparelho de ultrassom">🩻 '+esc(presetInfo(ex._preset).sigla)+' · '+esc(presetInfo(ex._preset).nome)+'</span>':'')+'</div>'
       +'<label>Tipo de exame</label><select onchange="mudarTipo('+ex.id+',this.value)"><option value="">— escolher —</option>'+opcoesTipo+'</select>'
+      +((ex._tipoDuvida&&ex._tipoDuvida.length>1)?'<div style="margin-top:6px;background:#fdf0d5;border-left:4px solid #9a6b14;padding:7px 10px;border-radius:6px;color:#6b4a0d;font-size:13px;font-weight:600">⚠️ O ditado cita mais de um exame: '
+          +ex._tipoDuvida.map(function(k){return esc((MODELOS[k]&&MODELOS[k].nome)||k);}).join(' · ')
+          +'. Confira o tipo acima antes de gerar.</div>':'')
       +(audios.length?'<div style="margin-top:8px"><button class="btn peq sec" onclick="alternarAudios('+ex.id+')">🔗 Áudios deste paciente ('+audiosDoExame.length+' marcado'+(audiosDoExame.length===1?'':'s')+') ▾</button><div id="auds'+ex.id+'" style="display:'+(audsAbertos[ex.id]?'block':'none')+';margin-top:6px;background:#f4f7fa;border-radius:10px;padding:8px">'+listaAudios+'</div></div>':'')
       +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
       +'<button class="btn peq" id="btnGerar'+ex.id+'" onclick="gerarLaudo('+ex.id+')">'+(ex.laudo?'Refazer laudo':'Gerar laudo')+'</button>'
@@ -2186,7 +2190,7 @@ async function salvarSessao(comImagens){
     var db=await dbOpen();
     // _estudoId/_dicom/_captura PRECISAM entrar no snapshot: é por eles que a recuperação
     // sabe que o exame já existe. Sem isso ela recriava tudo e o exame saía DUPLICADO.
-    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_dicom:!!e._dicom,_captura:!!e._captura}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
+    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_dicom:!!e._dicom,_captura:!!e._captura,_preset:e._preset||''}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
     var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||''}; });
     await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();
       // lista vazia = apagou tudo: limpa e não grava nada (senão voltaria um "0 laudos")
@@ -3643,7 +3647,7 @@ async function capOrtProcessar(est){
   }
   if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _preset:est.descricao||''};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
@@ -3655,8 +3659,9 @@ async function capOrtProcessar(est){
       var res=await capAgenteFecharExame(est);
       if(res.texto && res.texto.trim()){
         var a=capAudioDoAgente(res.texto, res.origem);
-        var meta=await capClassificarDitado(res.texto);
+        var meta=await capClassificarDitado(res.texto, est.descricao);
         a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
+        a.tiposCitados=meta.tipos_citados||[];
         a.nome=nomeAudio(meta.nome_paciente, meta.tipo_exame, meta.lateralidade)||a.nome;
         log('Ditado do agente ('+res.origem+', '+res.segundos+'s de áudio): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
         if(res.aviso) log('Aviso do agente: '+res.aviso, true);
@@ -3702,15 +3707,16 @@ async function capRecuperar(){
     if(!imagens.length){ log('Recuperação: exame de '+(est.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
     var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
             tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
-            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id};
+            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _preset:est.descricao||''};
     ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
     exames.push(ex);
     // o ditado guardado volta como áudio do exame (com o WAV original p/ você poder ouvir)
     var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado');
     a.nome='Ditado recuperado ('+(dit.quandoTexto||'')+')';
     if(dit.temAudio) a.url=agenteBase()+'/exame/audio/'+est.id;
-    var meta=await capClassificarDitado(dit.texto||'');
+    var meta=await capClassificarDitado(dit.texto||'', est.descricao);
     a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
+    a.tiposCitados=meta.tipos_citados||[];
     renderExames();
     await capAutoVincular(ex);
     feitos++;
@@ -3720,14 +3726,39 @@ async function capRecuperar(){
   capOrtStatusTxt('✅ '+feitos+' exame(s) recuperado(s)'+(auto?' — laudos gerados':'')+'. Confira na revisão.');
   log('Recuperação concluída: '+feitos+' exame(s) com ditado restaurado(s) do disco.');
 }
+/* ---- PRESET DO APARELHO -------------------------------------------------------
+   O Mindray grava em StudyDescription o preset usado (GYN, URO, SMP, OB...). Não é o
+   tipo exato do laudo, mas diz a FAMÍLIA — e é exatamente o que faltava: quando o
+   paciente faz dois exames seguidos, o ditado de um acaba contendo conversa do outro e
+   a IA escolhia errado. Medido em 05/08: Rita fez ombro (SMP) e transvaginal (GYN), e
+   os dois ditados falavam de ombro. O aparelho já sabia separar; o app é que ignorava. */
+var PRESET_FAMILIA={
+  GYN:{nome:'ginecológico', tipos:['transvaginal','pelvica']},
+  OB: {nome:'obstétrico',   tipos:['obst_gemelar','pelvica']},
+  URO:{nome:'urinário',     tipos:['rins','prostata','bolsa_escrotal','penis']},
+  SMP:{nome:'partes moles', tipos:['tireoide','mama','axila','ombro','cotovelo','punho','mao','joelho','tornozelo','pe','partes_moles','parede_abdominal']},
+  ABD:{nome:'abdominal',    tipos:['abdominal','abdomen_superior','parede_abdominal']}
+};
+function presetInfo(p){
+  var k=String(p||'').trim().toUpperCase();
+  return PRESET_FAMILIA[k] ? {sigla:k, nome:PRESET_FAMILIA[k].nome, tipos:PRESET_FAMILIA[k].tipos} : null;
+}
 /* extrai tipo/lateralidade do texto já transcrito (o nome vem do DICOM, não precisa ditar) */
-async function capClassificarDitado(texto){
-  if(!await temIA()) return {nome_paciente:'', tipo_exame:'', lateralidade:''};
+async function capClassificarDitado(texto, preset){
+  if(!await temIA()) return {nome_paciente:'', tipo_exame:'', lateralidade:'', tipos_citados:[]};
   try{
     var nomesTipos=Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
-    var r=await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) NOME DO PACIENTE se citado (ou \"\"); (2) o TIPO DE EXAME: responda EXATAMENTE com um destes nomes quando corresponder: "+nomesTipos+"; se não estiver na lista, \"outro\"; se não der para saber, \"\". (3) LATERALIDADE: \"direito\", \"esquerdo\", \"bilateral\" ou \"\" — SOMENTE para ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles; nos demais responda \"\". Responda em JSON: {\"nome_paciente\":\"\",\"tipo_exame\":\"\",\"lateralidade\":\"\"}\n\nDITADO:\n"+texto}], true, {modelo: cfg.modeloAux||cfg.modelo});
-    return {nome_paciente:r.nome_paciente||'', tipo_exame:mapTipo(r.tipo_exame||''), lateralidade:r.lateralidade||''};
-  }catch(e){ return {nome_paciente:'', tipo_exame:'', lateralidade:''}; }
+    var pi=presetInfo(preset);
+    var dica = pi ? ("\n\nIMPORTANTE — O APARELHO estava no preset \""+pi.sigla+"\" ("+pi.nome+"), que corresponde a estes exames: "
+        + pi.tipos.map(function(k){return MODELOS[k]?MODELOS[k].nome:'';}).filter(Boolean).join('; ') + ". "
+        + "É COMUM o médico fazer DOIS exames seguidos no mesmo paciente, e o ditado de um conter conversa do outro. "
+        + "Quando o ditado citar mais de um exame, escolha o que combina com o preset do aparelho. "
+        + "Só escolha fora dessa lista se o ditado deixar MUITO claro que o exame é outro.") : '';
+    var r=await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) NOME DO PACIENTE se citado (ou \"\"); (2) o TIPO DE EXAME: responda EXATAMENTE com um destes nomes quando corresponder: "+nomesTipos+"; se não estiver na lista, \"outro\"; se não der para saber, \"\". (3) LATERALIDADE: \"direito\", \"esquerdo\", \"bilateral\" ou \"\" — SOMENTE para ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles; nos demais responda \"\". (4) TODOS os tipos de exame CITADOS no ditado, mesmo os que você não escolheu, como lista de nomes da mesma lista acima (use [] se só houver um). Responda em JSON: {\"nome_paciente\":\"\",\"tipo_exame\":\"\",\"lateralidade\":\"\",\"tipos_citados\":[]}"+dica+"\n\nDITADO:\n"+texto}], true, {modelo: cfg.modeloAux||cfg.modelo});
+    var cit=(Array.isArray(r.tipos_citados)?r.tipos_citados:[]).map(function(t){return mapTipo(t||'');}).filter(Boolean);
+    return {nome_paciente:r.nome_paciente||'', tipo_exame:mapTipo(r.tipo_exame||''), lateralidade:r.lateralidade||'',
+            tipos_citados:cit.filter(function(t,i){return cit.indexOf(t)===i;})};
+  }catch(e){ return {nome_paciente:'', tipo_exame:'', lateralidade:'', tipos_citados:[]}; }
 }
 async function capOrtBaixar(instanciaId){
   var r=await fetch(agenteBase()+'/dicom/imagem/'+instanciaId);
@@ -3747,6 +3778,11 @@ async function capAutoVincular(ex){
   exames.forEach(function(e){ e.audios=e.audios.filter(function(k){return k!==a.idx;}); });
   a.exameId=ex.id; a.pendente=false; ex.audios.push(a.idx);
   if(!ex.tipo){ var tt=mapTipo(a.tipoExame); if(tt) ex.tipo=tt; }
+  // Ditado citando MAIS DE UM exame: não deixa passar calado. O preset do aparelho já
+  // desempata na maioria dos casos, mas quando os dois exames são da mesma família
+  // (ex.: rins e próstata, ambos URO) só o médico sabe qual é qual.
+  var cit=(a.tiposCitados||[]).filter(function(t){ return t && t!=='outro'; });
+  if(cit.length>1) ex._tipoDuvida=cit; else delete ex._tipoDuvida;
   if(a.lateralidade && !ex.lateralidade) ex.lateralidade=normLateralidade(a.lateralidade);
   capRenderPendentes(); renderExames(); capRenderNovos();
   if(!ex.tipo){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado, mas o TIPO do exame não foi dito — escolha o tipo e gere.'); log('Diga o tipo do exame no ditado (ex.: "abdome total") para o laudo sair sozinho.',true); return; }

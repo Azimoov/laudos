@@ -3818,14 +3818,31 @@ async function capToggleRec(){
     var est=await capAgenteEstado();
     if(est){
       try{
+        // fora do modo "Aguardar exame" o microfone do agente fica FECHADO: abre
+        // primeiro (mesmo comando que o modo de espera usa), depois manda gravar
+        try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:true})}); }catch(e){}
         await capAgenteIniciar();
+        /* NÃO acredita na promessa: confere que o ÁUDIO ESTÁ CHEGANDO antes de
+           dizer "pode fechar o navegador". Em 05/08 o agente aceitou o comando,
+           o microfone não abriu, e a tela prometeu uma gravação que não existia. */
+        var chegou=false;
+        for(var tent=0; tent<3 && !chegou; tent++){
+          await new Promise(function(r){ setTimeout(r, 900); });
+          var st2=await capAgenteEstado();
+          chegou=!!(st2 && st2.capturando);
+        }
+        if(!chegou){
+          try{ await fetch(agenteBase()+'/gravacao/parar',{method:'POST'}); }catch(e){}
+          if(!capOrtWatching){ try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(e){} }
+          throw new Error('o agente aceitou o comando, mas o áudio não está chegando nele');
+        }
         agMarcarAtiva();                      // sobrevive a fechar o navegador
         capEstado='agente'; capSeg=0; capSetRecUI();
         capTimer2=setInterval(function(){ if(capEstado!=='agente'){ clearInterval(capTimer2); return; } capSeg++; capSetRecUI(); },1000);
-        capOrtStatusTxt('🔴 Gravando pelo agente — pode fechar o navegador sem perder o ditado.');
+        capOrtStatusTxt('🔴 Gravando pelo agente (áudio conferido) — pode fechar o navegador sem perder o ditado.');
         return;
       }catch(e){
-        log('O agente está no ar mas não conseguiu gravar ('+((e&&e.message)||e)+') — vou gravar pelo navegador.', true);
+        log('⚠️ O agente está no ar mas NÃO está gravando ('+((e&&e.message)||e)+') — vou gravar pelo NAVEGADOR. Não feche esta janela até finalizar. Me avise que isso aconteceu.', true);
       }
     } else {
       log('⚠️ Agente fora do ar: quem vai gravar é o NAVEGADOR. Não feche esta janela até finalizar o ditado.', true);
@@ -3833,6 +3850,8 @@ async function capToggleRec(){
   }
   if(capEstado==='agente'){   // parar manualmente a gravação do agente
     try{ await fetch(agenteBase()+'/gravacao/parar',{method:'POST'}); }catch(e){}
+    // fecha o microfone que ELE abriu — a menos que o modo de espera o esteja usando
+    if(!capOrtWatching){ try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(e){} }
     agLimparAtiva();
     capEstado='idle'; clearInterval(capTimer2); capSetRecUI();
     capOrtStatusTxt('Gravação do agente encerrada.');
@@ -4135,8 +4154,8 @@ async function agReatar(){
     log('⚠️ Havia uma gravação em curso no agente (desde '+cpQuandoTexto(marca.desde)+') e não consigo falar com ele agora. Não comece outra gravação antes de conferir — suba o agente e recarregue.', true);
     return;
   }
-  if(est.capturando===false && est.microfone===false){
-    log('A gravação que estava no agente (desde '+cpQuandoTexto(marca.desde)+') não está mais em curso. Confira em "Ditados guardados" se ela foi salva.', true);
+  if(!est.capturando){
+    log('⚠️ A gravação que estava no agente (desde '+cpQuandoTexto(marca.desde)+') NÃO está mais em curso. Confira em "Ditados guardados" se ela foi salva — e me avise que isso aconteceu, com o horário.', true);
     agLimparAtiva(); return;
   }
   capEstado='agente';

@@ -50,8 +50,19 @@ ok(toggle.indexOf('capAgenteIniciar()') < toggle.indexOf('navigator.mediaDevices
    'o agente e tentado ANTES do microfone do navegador');
 ok(/agMarcarAtiva\(\)/.test(toggle), 'ao iniciar pelo agente, deixa a marca');
 ok(/agLimparAtiva\(\)/.test(toggle), 'ao parar pelo agente, apaga a marca');
-ok(/O agente está no ar mas não conseguiu gravar/.test(toggle),
+ok(/O agente está no ar mas NÃO está gravando/.test(toggle),
    'se o agente falhar, o navegador assume — mas dizendo o porque');
+ok(/gravacao\/prebuffer[\s\S]{0,140}ligar:true/.test(toggle) &&
+   toggle.indexOf('prebuffer') < toggle.indexOf('capAgenteIniciar()'),
+   'abre o microfone do agente ANTES de mandar gravar (fora do modo de espera ele fica fechado)');
+ok(/for\(var tent=0; tent<3 && !chegou/.test(toggle) && /st2 && st2\.capturando/.test(toggle),
+   'NAO acredita na promessa: confere que o audio esta chegando antes de dizer "pode fechar"');
+ok(/if\(!chegou\)\{[\s\S]{0,300}throw new Error/.test(toggle),
+   'audio nao chegando = falha declarada, nunca promessa vazia (o furo do teste de 05/08)');
+ok(toggle.indexOf('agMarcarAtiva()') > toggle.indexOf('if(!chegou)'),
+   'a marca de "gravando" so e deixada DEPOIS da conferencia');
+ok(/if\(!capOrtWatching\)\{[\s\S]{0,160}ligar:false/.test(toggle),
+   'ao parar, fecha o microfone que abriu — sem derrubar o modo de espera se ele estiver ligado');
 ok(/Agente fora do ar: quem vai gravar é o NAVEGADOR/.test(toggle),
    'sem agente, avisa que a janela nao pode ser fechada');
 
@@ -66,8 +77,8 @@ ok(/não consigo falar com ele agora/.test(reatar),
    'agente fora do ar na volta: avisa em vez de fingir que nao havia nada');
 ok(/Não comece outra gravação antes de conferir/.test(reatar),
    'e orienta a nao gravar por cima');
-ok(/est\.capturando===false && est\.microfone===false/.test(reatar),
-   'se o agente diz que nao esta mais gravando, a marca e limpa');
+ok(/if\(!est\.capturando\)/.test(reatar),
+   'se o audio nao esta chegando no agente, a gravacao e dada como parada (marca limpa)');
 ok(/Confira em "Ditados guardados"/.test(reatar), 'nesse caso, aponta onde procurar o que foi gravado');
 ok(/DOMContentLoaded[\s\S]{0,120}agReatar\(\)/.test(HTML), 'isso roda assim que o app abre');
 

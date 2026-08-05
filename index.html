@@ -1276,6 +1276,24 @@ async function extrairMetaImagem(dataUrl){
   }
   return meta;
 }
+/* DESEMPATE PELA IMAGEM — só roda quando o ditado cita mais de um exame e o preset do
+   aparelho não resolve (ex.: rins e próstata, ambos URO). Imagem é cara (~76% do custo de
+   um laudo), por isso não entra na classificação normal: paga-se só na dúvida, e uma só.
+   O aparelho imprime o tipo do exame no cabeçalho da imagem — é isso que estamos lendo. */
+async function capDesempatarPelaImagem(dataUrl, candidatos){
+  if(!dataUrl || !(candidatos||[]).length) return '';
+  var nomes=candidatos.map(function(k){ return (MODELOS[k]&&MODELOS[k].nome)||k; });
+  try{
+    var p='Esta é uma imagem de ultrassom. Decida QUAL destes exames ela é: '+nomes.join('; ')+'. '
+      +'Use, nesta ordem: (1) o texto impresso pelo aparelho no cabeçalho da imagem (nome do exame, '
+      +'preset ou região); (2) a anatomia visível na imagem. Se não der para decidir com segurança, '
+      +'responda vazio — NÃO chute. Responda apenas JSON: {"exame":"<um dos nomes acima ou vazio>","porque":"<até 10 palavras>"}';
+    var r=await openai([{type:'text',text:p}, dataUrlParaParte(await reduzImagem(dataUrl,900))], true,
+                       {modelo: cfg.modeloAux||cfg.modelo, rotulo:'desempate por imagem'});
+    var k=mapTipo((r&&r.exame)||'');
+    return (k && candidatos.indexOf(k)>=0) ? k : '';   // só aceita se for um dos candidatos
+  }catch(e){ return ''; }
+}
 function agruparItens(itens){
   const grupos=[];
   for(const it of itens){
@@ -3565,10 +3583,34 @@ async function capAgenteIniciar(){
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao iniciar');
   return j;
 }
+/* Acha o exame ANTERIOR e o PRÓXIMO do MESMO paciente, para o agente cortar o áudio neles.
+   Sem isto, dois exames seguidos ficam com janelas sobrepostas e o ditado de um contém a
+   conversa do outro (medido em 05/08 na Rita: 190s de áudio idêntico nos dois). */
+async function capVizinhosDoExame(est){
+  var out={};
+  try{
+    var meu=horaDoEstudoMs(est); if(meu===null) return out;
+    var alvo=norm(est.paciente||''); if(!alvo) return out;
+    var prox=null, ant=null, tProx=null, tAnt=null;
+    (await capOrtListar()).forEach(function(e){
+      if(e.id===est.id || norm(e.paciente||'')!==alvo) return;
+      var t=horaDoEstudoMs(e); if(t===null) return;
+      if(t>meu && (tProx===null || t<tProx)){ prox=e; tProx=t; }
+      if(t<meu && (tAnt===null || t>tAnt)){ ant=e; tAnt=t; }
+    });
+    // do próximo interessa o COMEÇO; do anterior, o FIM
+    if(prox){ out.proxData=prox.imgData||''; out.proxHora=prox.imgHora||''; }
+    if(ant){ out.antData=ant.imgDataFim||ant.imgData||''; out.antHora=ant.imgHoraFim||ant.imgHora||''; }
+  }catch(e){}
+  return out;
+}
 async function capAgenteFecharExame(est){
+  var viz=await capVizinhosDoExame(est);
+  var corpo={estudoId:est.id||'', contentDate:est.imgData||'', contentTime:est.imgHora||'',
+             contentDateFim:est.imgDataFim||'', contentTimeFim:est.imgHoraFim||'', margemSeg:90};
+  Object.keys(viz).forEach(function(k){ corpo[k]=viz[k]; });
   var r=await fetch(agenteBase()+'/exame/fechar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({estudoId:est.id||'', contentDate:est.imgData||'', contentTime:est.imgHora||'',
-                         contentDateFim:est.imgDataFim||'', contentTimeFim:est.imgHoraFim||'', margemSeg:90})});
+    body:JSON.stringify(corpo)});
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao fechar o exame');
   return j;
 }
@@ -3665,7 +3707,7 @@ async function capOrtProcessar(est){
         a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
         a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
         a.nome=nomeAudio(meta.nome_paciente, meta.tipo_exame, meta.lateralidade)||a.nome;
-        log('Ditado do agente ('+res.origem+', '+res.segundos+'s de áudio): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
+        log('Ditado do agente ('+res.origem+', '+res.segundos+'s de áudio'+(res.corte?', recortado: '+res.corte:'')+'): '+res.texto.slice(0,90)+(res.texto.length>90?'…':''));
         if(res.aviso) log('Aviso do agente: '+res.aviso, true);
       } else {
         capOrtStatusTxt('⛔ '+ex.paciente+': SEM DITADO — '+(res.aviso||'não havia áudio no período')+'. Grave e vincule.');
@@ -3801,6 +3843,19 @@ async function capAutoVincular(ex){
   var cit=(a.tiposCitados||[]).filter(function(t){ return t && t!=='outro'; });
   if(cit.length>1) ex._tipoDuvida=cit; else delete ex._tipoDuvida;
   ex._motivoTipo=a.motivoTipo||'';
+  // Empate no ditado: aí sim vale pagar UMA imagem para o aparelho desempatar.
+  if(ex._tipoDuvida && (ex.imagens||[]).length){
+    capOrtStatusTxt('🔎 '+ex.paciente+': o ditado cita dois exames — conferindo na imagem…');
+    var kImg=await capDesempatarPelaImagem(ex.imagens[0], cit);
+    if(kImg){
+      var mudou=(ex.tipo!==kImg);
+      ex.tipo=kImg; delete ex._tipoDuvida;
+      ex._motivoTipo='confirmado pela imagem do aparelho'+(mudou?' (o ditado sugeria outro)':'');
+      log('Empate no ditado resolvido pela imagem: '+((MODELOS[kImg]&&MODELOS[kImg].nome)||kImg)+'.');
+    } else {
+      log('O ditado cita mais de um exame e a imagem não desempatou — confira o tipo de '+ex.paciente+'.', true);
+    }
+  }
   // A IA escolheu FORA da família do preset? Não é erro — o médico costuma não trocar o
   // preset quando a sonda já serve. Só sinalizamos para ele poder conferir de relance.
   var pf=presetInfo(ex._preset);

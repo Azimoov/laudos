@@ -112,7 +112,10 @@ ok(/if\(!alertas\.length && obsFinal\)/.test(HTML), 'se a IA so mandar texto cor
 
 console.log('=== o que o APP preenche sozinho ===');
 ok(/tipo:'calculo', texto:'TI-RADS calculado pelo app/.test(HTML), 'TI-RADS calculado acende a caixa de calculo');
-ok(/tipo:'calculo', texto:'Margem de erro da idade gestacional/.test(HTML), 'margem obstetrica acende a caixa de calculo');
+ok(/alertas\.push\(\{tipo:'calculo', texto:ob\.obs\.join/.test(HTML),
+   'o que o app decidiu no obstetrico (idade gestacional, data do parto, margem) acende a caixa de calculo');
+ok(/alertas\.push\(\{tipo:'faltando', texto:ob\.faltando\.join/.test(HTML),
+   'e o que faltou ler na worksheet acende a caixa de dados faltando');
 ok(/tipo:'anterior', texto:'Comparado com o exame de '/.test(HTML), 'comparacao feita acende a caixa azul');
 ok(/tipo:'identificacao', texto:'Falta confirmar se o exame de '/.test(HTML), 'identidade em aberto acende a caixa VERMELHA');
 ok(/tipo:'anterior', texto:'Busca incompleta \('/.test(HTML), 'busca incompleta acende a caixa do exame anterior');

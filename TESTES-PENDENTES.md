@@ -98,6 +98,33 @@ regras, e é rápida.
 
 ---
 
+## 4. Obstétrico 2º/3º trimestre — qual idade gestacional entra na conclusão
+
+**Por que importa:** no exame de 05/08 saiu o número errado. A regra agora está no
+app, e não mais a cargo da IA.
+
+- [ ] Paciente que **NÃO trouxe** o USG de primeiro trimestre: a conclusão deve
+      dizer *"A biometria fetal estima que a idade gestacional média seja de ..."*
+      com o valor do campo **AUA** da worksheet, e a data do parto do **EDD(AUA)**.
+- [ ] Paciente que **TROUXE**: a conclusão deve dizer *"A idade gestacional
+      corrigida pela ultrassonografia de primeiro trimestre é de ..."* com o valor
+      do campo **GA**, e a data do parto do **EDD(EDD)**.
+- [ ] Confira na caixa **verde** do painel de alertas: ela diz de qual campo da
+      worksheet cada número foi lido. É o jeito rápido de saber se a IA leu certo.
+- [ ] Worksheet ilegível: os pontilhados devem **ficar** no laudo, e a caixa
+      **âmbar** deve dizer qual campo faltou. Nada pode ser inventado.
+
+**Confirmar comigo:** eu emparelhei a data provável do parto com a idade
+gestacional (EDD(AUA) com AUA, EDD(EDD) com GA), porque misturar deixaria a
+conclusão contradizendo a si mesma. Se no seu aparelho essas colunas significarem
+outra coisa, me diga.
+
+**Também:** mantive a redação exata do seu modelo ("A biometria fetal estima que a
+idade gestacional média seja de..."). Você escreveu "A biometria fetal estima
+idade gestacional de" — se quiser essa redação mais curta, eu troco no modelo.
+
+---
+
 ## Pendências antigas, ainda suas (do handoff de 03/08)
 
 - [ ] Preencher `http://127.0.0.1:8977` no campo **"Motor de transcrição local"**

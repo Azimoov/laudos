@@ -2075,11 +2075,11 @@ async function gerarLaudo(exId){
 (usados.length>1 ? "Com mais de um exame anterior, a REFERÊNCIA PRINCIPAL é o mais recente ("+(anterior.data||'data não registrada')+"); os mais antigos servem só para descrever a evolução ao longo do tempo, sempre citando a data de cada um.\n" : "")+
 "COMO USAR O EXAME ANTERIOR (leia antes de escrever qualquer comparação):\n- O bloco acima é REFERÊNCIA do passado. O laudo de HOJE descreve exclusivamente o que está no DITADO DE HOJE e nas IMAGENS DE HOJE.\n- PROIBIDO trazer para o laudo de hoje qualquer lesão, medida, órgão alterado ou diagnóstico que exista SÓ no laudo anterior. Se o médico não ditou hoje e não está legível nas imagens de hoje, não entra — nem no corpo, nem na conclusão.\n- Só escreva evolução (estável, aumentou, diminuiu, novo, em involução) quando o achado existir NOS DOIS exames. Compare medida com medida; se faltar a medida de um dos lados, descreva o achado de hoje e NÃO julgue a evolução.\n- Ao comparar, cite a data do exame anterior — ex.: 'estável em relação ao exame de "+(anterior.data||'data não registrada')+"'.\n- Achado que estava no laudo anterior e não foi citado hoje: NÃO afirme que desapareceu nem que persiste. Registre em 'observacoes_para_o_medico' que o exame anterior descrevia esse achado e que ele não foi mencionado hoje.\n- Divergência entre o laudo anterior e o ditado de hoje: vale sempre o ditado de hoje, e o conflito vai para 'observacoes_para_o_medico'.\n- NÃO copie a redação do laudo anterior: escreva o laudo de hoje a partir do modelo e do ditado de hoje.\n\n" : "")+
 (regrasSeg ? "PACIENTE JÁ EXAMINADO NESTE SERVIÇO — REGRAS DE SEGUIMENTO (este bloco só aparece quando existe exame anterior do mesmo paciente e do mesmo tipo; use-o APENAS para comparar com o exame prévio, e só se o ditado ou as imagens trouxerem o achado correspondente):\n"+regrasSeg+"\n"+(anteriorTxt ? "O laudo anterior completo está no bloco EXAME ANTERIOR, acima — use-o como fonte da comparação, respeitando as travas daquele bloco." : "Exame anterior encontrado no histórico: "+(anterior.data||'data não registrada')+" — mas o CONTEÚDO dele não está disponível. NÃO invente o conteúdo desse exame: se o ditado não disser como a lesão estava antes, não afirme estabilidade nem crescimento.")+"\n\n" : "")+
-(EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — MARGEM DE ERRO: preencha o campo 'obstetrico' com o que o médico DITOU sobre a ultrassonografia INICIAL (de primeiro trimestre) da paciente: trouxe_usg_primeiro_trimestre (true se ela trouxe/apresentou o exame inicial ou se o médico informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito) e ig_primeiro_usg_semanas (a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame — número; use 0 se não foi ditada). NUNCA invente esses dados. NÃO calcule nem escreva a margem de erro em dias: deixe os pontilhados de '(com variação de até +/- ..... dias)' como estão — o aplicativo calcula pela tabela oficial e substitui. Mantenha também a frase da idade gestacional como está no modelo; o aplicativo a ajusta quando houver exame inicial.\n\n" : "")+
+(EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — preencha o campo 'obstetrico'. Você SÓ COPIA os valores; quem escolhe qual entra na conclusão é o aplicativo:\n- trouxe_usg_primeiro_trimestre: true se o médico disse que a paciente trouxe/apresentou a ultrassonografia INICIAL (de primeiro trimestre), ou se ele informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito.\n- ig_primeiro_usg_semanas: a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame (número; 0 se não foi ditada).\n- aua: leia da worksheet do aparelho o campo AUA — a idade gestacional média estimada pela biometria de HOJE — copiada exatamente como está, ex.: \"34w2d\". Vazio se não estiver legível.\n- ga: leia da worksheet o campo GA — a idade gestacional já estabelecida para a paciente — copiada exatamente como está, ex.: \"35w3d\". Vazio se não estiver legível.\n- edd_aua: a data que está em EDD(AUA), no formato dia/mês/ano. Vazio se não estiver legível.\n- edd_ga: a data que está em EDD(EDD), no formato dia/mês/ano. Vazio se não estiver legível.\nNUNCA invente nenhum desses valores: copie da imagem ou deixe vazio. ATENÇÃO — AUA e GA são campos DIFERENTES da worksheet e costumam ter valores diferentes: não troque um pelo outro nem repita o mesmo nos dois.\nNA CONCLUSÃO: NÃO escreva a idade gestacional, NÃO escreva a data provável do parto e NÃO escreva a variação em dias — deixe os pontilhados do modelo como estão. O aplicativo preenche os três, e escolhe a frase certa conforme a paciente ter trazido ou não o exame inicial.\n\n" : "")+
 (ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
 "AVISOS SEPARADOS POR ASSUNTO (campo 'avisos'): além de 'observacoes_para_o_medico', devolva CADA aviso como um item próprio, com 'tipo' sendo EXATAMENTE uma destas palavras:\n- identificacao: nome, idade ou data que não conferem entre o ditado, as imagens e o cadastro.\n- divergencia: o ditado diz uma coisa e as imagens mostram outra.\n- faltando: medida, dado ou legenda ausente/ilegível que deixou pontilhados no laudo.\n- iacriou: você escreveu a descrição de uma patologia a partir do seu conhecimento, por não haver dizer padrão do médico (diga qual patologia).\n- outros: aviso que não caiba em nenhum acima.\nUm assunto por item, 'texto' curto e direto. Nada a avisar: \"avisos\":[]. NUNCA use os tipos 'anterior' nem 'calculo' — esses o aplicativo preenche sozinho.\n\n"+
 "Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}]"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
-+(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0}":"")+"}"
++(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0,\"aua\":\"\",\"ga\":\"\",\"edd_aua\":\"\",\"edd_ga\":\"\"}":"")+"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
     const resp = await openai(partes);
@@ -2106,10 +2106,11 @@ async function gerarLaudo(exId){
     if(EX_OBST_SEQ[ex.tipo]){
       try{
         const ob = processarObstetrico(resp.obstetrico, ex.tipo);
-        if(ob.margem!=null){ conclusaoFinal = obstAplicarNaConclusao(conclusaoFinal, ob.margem);
-          alertas.push({tipo:'calculo', texto:'Margem de erro da idade gestacional calculada pelo app: +/- '+ob.margem+' dias.'}); }
+        conclusaoFinal = obstAplicarNaConclusao(conclusaoFinal, ob);
         if(ob.obs.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+ob.obs.join(' ');
-          alertas.push({tipo:'calculo', texto:ob.obs.join(' ')}); }
+          alertas.push({tipo:'calculo', texto:ob.obs.join('\n')}); }
+        if(ob.faltando.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+ob.faltando.join(' ');
+          alertas.push({tipo:'faltando', texto:ob.faltando.join('\n')}); }
       }catch(e){}
     }
     // o que o APP sabe sobre o exame anterior (a IA não tem como saber): acende o
@@ -4273,40 +4274,101 @@ function calcMargemIG(){
     ? '<b>± '+m.dias+' dias</b> <span class="aviso">(faixa '+m.faixa+')</span><br><span class="aviso">Conclusão: “…(com variação de até +/- '+m.dias+' dias)”. Com o exame inicial em mãos, a frase correta é “A idade gestacional corrigida pela ultrassonografia de primeiro trimestre é de …”.</span>'
     : '<span class="erro">Fora da tabela (6 a 39 semanas).</span>';
 }
+/* Lê a idade gestacional como o aparelho escreve na worksheet: "34w2d", "34w",
+   "34s2d", "34 semanas e 2 dias". Fora disso, devolve null em vez de chutar. */
+function obstParseIG(s){
+  var t=String(s||'').trim().toLowerCase();
+  if(!t) return null;
+  // "semanas" ANTES de "s": senão o "s" casaria sozinho e o resto da palavra
+  // comeria o número dos dias ("34 semanas e 2 dias" viraria 34 semanas e 0 dias)
+  var m=t.match(/(\d{1,2})\s*(?:sem(?:anas?)?|w|s)\s*(?:e\s*)?(?:(\d{1,2})\s*(?:d|dias?)?)?/);
+  if(!m) return null;
+  var sem=parseInt(m[1],10);
+  var dias=(m[2]!=null)?parseInt(m[2],10):0;
+  if(!isFinite(sem)||sem<4||sem>45) return null;      // fora disso não é idade gestacional
+  if(!isFinite(dias)||dias<0||dias>6) dias=0;
+  return {sem:sem, dias:dias};
+}
+function obstIgTexto(ig){
+  if(!ig) return '';
+  return ig.sem+' semanas'+(ig.dias?(' e '+ig.dias+' dia'+(ig.dias>1?'s':'')):'');
+}
+/* QUAL idade gestacional entra na conclusão — a correção pedida em 05/08:
+     - paciente NÃO trouxe o USG de primeiro trimestre  -> AUA (o que a biometria
+       de HOJE estima), com a frase "A biometria fetal estima...";
+     - paciente TROUXE                                  -> GA (a datação já corrigida
+       por aquele exame), com a frase "A idade gestacional corrigida...".
+   A data provável do parto acompanha o mesmo par: EDD(AUA) com AUA, EDD(EDD) com GA —
+   misturar os dois deixaria a conclusão contradizendo a si mesma.
+   O app escolhe; a IA só copia os números da worksheet. */
 function processarObstetrico(ob, tipo){
-  var res={conclusao:null, obs:[]};
+  var res={conclusao:null, obs:[], faltando:[], frase:null, edd:null, margem:null};
   if(!ob || typeof ob!=='object') return res;
   var trouxe = ob.trouxe_usg_primeiro_trimestre===true || ob.trouxe_usg_primeiro_trimestre==='true';
-  var semanas = parseFloat(ob.ig_primeiro_usg_semanas);
+  res.trouxe=trouxe;
+  var ig  = obstParseIG(trouxe ? ob.ga : ob.aua);
+  var edd = String((trouxe ? ob.edd_ga : ob.edd_aua)||'').trim();
+  var campoIg = trouxe?'GA':'AUA', campoEdd = trouxe?'EDD(EDD)':'EDD(AUA)';
+
+  if(ig){
+    res.ig=ig;
+    res.frase = trouxe
+      ? 'A idade gestacional corrigida pela ultrassonografia de primeiro trimestre é de '+obstIgTexto(ig)+'.'
+      : 'A biometria fetal estima que a idade gestacional média seja de '+obstIgTexto(ig)+'.';
+    res.obs.push('Idade gestacional da conclusão lida do campo '+campoIg+' da worksheet ('+obstIgTexto(ig)+')'
+                 +(trouxe?' — a paciente trouxe a ultrassonografia inicial.':' — a paciente não trouxe a ultrassonografia inicial.'));
+  } else {
+    res.faltando.push('Não consegui ler o campo '+campoIg+' da worksheet — a idade gestacional ficou com os pontilhados. '
+                      +(trouxe?'(A paciente trouxe o primeiro exame, então vale o GA.)':'(A paciente não trouxe o primeiro exame, então vale o AUA.)'));
+  }
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(edd)){
+    res.edd=edd;
+    res.obs.push('Data provável do parto lida do campo '+campoEdd+' ('+edd+'), para casar com a idade gestacional usada.');
+  } else if(edd){
+    res.faltando.push('O campo '+campoEdd+' veio em formato inesperado ("'+edd+'") — a data provável do parto ficou com os pontilhados.');
+  } else {
+    res.faltando.push('Não consegui ler o campo '+campoEdd+' da worksheet — a data provável do parto ficou com os pontilhados.');
+  }
+
+  // margem de erro: só existe quando há o exame inicial E a IG daquele exame
   if(!trouxe){
-    res.obs.push('Margem de erro não calculada: a paciente não trouxe/não informou a ultrassonografia inicial. A conclusão traz apenas a idade gestacional estimada pela biometria.');
+    res.obs.push('Margem de erro não calculada: sem a ultrassonografia inicial não há com o que comparar.');
     return res;
   }
-  if(!isFinite(semanas)){
-    res.obs.push('A paciente trouxe a ultrassonografia inicial, mas a idade gestacional daquele exame não foi ditada — dite-a para eu calcular a margem de erro.');
+  var semanas = parseFloat(ob.ig_primeiro_usg_semanas);
+  if(!isFinite(semanas) || semanas<=0){
+    res.faltando.push('A paciente trouxe a ultrassonografia inicial, mas a idade gestacional daquele exame não foi ditada — dite-a para eu calcular a margem de erro.');
     return res;
   }
   var m=margemErroIG(semanas);
   if(!m){
-    res.obs.push('Idade gestacional do primeiro exame ('+semanas+' semanas) fora da tabela de margem de erro (6–39 semanas) — confira.');
+    res.faltando.push('Idade gestacional do primeiro exame ('+semanas+' semanas) fora da tabela de margem de erro (6–39 semanas) — confira.');
     return res;
   }
   res.margem=m.dias; res.faixa=m.faixa; res.igPrimeiro=semanas;
-  res.obs.push('Margem de erro de ±'+m.dias+' dias aplicada pela IG de '+semanas+' semanas na ultrassonografia inicial (faixa '+m.faixa+').');
+  res.obs.push('Margem de erro de ±'+m.dias+' dias pela IG de '+semanas+' semanas na ultrassonografia inicial (faixa '+m.faixa+').');
   return res;
 }
-/* troca as frases da conclusão gerada pela IA */
-function obstAplicarNaConclusao(txt, margemDias){
-  var t=String(txt||'');
-  // 1) IG corrigida pelo 1º trimestre (em vez de "estimada pela biometria")
-  t=t.replace(/A biometria fetal estima que a idade gestacional m[eé]dia seja de/gi,
-              'A idade gestacional corrigida pela ultrassonografia de primeiro trimestre é de');
-  t=t.replace(/A idade gestacional (?:m[eé]dia )?estimada (?:pela biometria )?[eé] de/gi,
-              'A idade gestacional corrigida pela ultrassonografia de primeiro trimestre é de');
-  // 2) preenche a variação em dias (aceita pontilhados, número já posto ou vazio)
-  if(margemDias!=null){
+/* Escreve na conclusão o que o APP decidiu — não corrige o que a IA escreveu:
+   a linha da idade gestacional é trocada inteira, redação e número juntos. */
+function obstAplicarNaConclusao(txt, dados){
+  var t=String(txt||''), d=dados||{};
+  if(d.frase){
+    var achou=false;
+    t=t.replace(/^.*(?:A biometria fetal estima|A idade gestacional corrigida pela ultrassonografia|A idade gestacional (?:m[eé]dia )?estimada).*$/gmi,
+                function(){ achou=true; return d.frase; });
+    if(!achou){   // a IA não escreveu a linha: entra logo depois da primeira, não no fim
+      var ls=t?t.split('\n'):[];
+      ls.splice(Math.min(1, ls.length), 0, d.frase);
+      t=ls.join('\n');
+    }
+  }
+  if(d.edd){
+    t=t.replace(/(aproximada para:\s*)(\.{2,}|\d{2}\/\d{2}\/\d{4})?/i, '$1'+d.edd);
+  }
+  if(d.margem!=null){
     t=t.replace(/\(com varia[çc][ãa]o de at[eé]\s*\+\/?\s*-?\s*[^)]*\)/gi,
-                '(com variação de até +/- '+margemDias+' dias)');
+                '(com variação de até +/- '+d.margem+' dias)');
   }
   return t;
 }

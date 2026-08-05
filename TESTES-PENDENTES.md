@@ -1,5 +1,27 @@
 # Testes pendentes — a fazer no notebook da clínica
 
+## ⚡ ORDEM DE ATAQUE (do mais importante para o menos)
+
+0. **Trazer o branch para o notebook** — sem isso nada existe aí:
+   `git fetch origin claude/laudos-usg-handoff-2g316v && git checkout claude/laudos-usg-handoff-2g316v`
+   e abrir o app local (`python -m http.server 8080` → http://localhost:8080).
+1. **Motor de transcrição local** (30 segundos) — para de pagar OpenAI à toa.
+2. **Teste da gravação pelo agente** (seção 1) — protege contra a pior perda possível.
+3. **Instalar o banco no agente** (seção 5 + `agente/INSTALAR-BANCO.md`) — reinício
+   do agente SÓ sem atendimento.
+4. **PatientID + nascimento no `/dicom/estudos`** (seção 7 do roteiro) — na mesma
+   ida ao agente; destrava a identidade do F2b.
+5. **Bateria completa**: `node testes/rodar-tudo.js` com o agente no ar.
+6. **Comparação com exame anterior** (seção 2) — com um paciente real.
+7. **Obstétrico** (seção 4) — os dois casos (trouxe / não trouxe).
+8. **Painel de alertas + impressão limpa** (seção 3).
+9. **Decidir o "pode publicar".**
+10. Cópia cifrada para o iCloud (7-Zip + senha).
+11. GPU na transcrição (comparativo CPU × GPU).
+12. Avaliar o AUDITORIA-CBR.md.
+
+---
+
 Coisas que **só podem ser testadas na máquina real** (precisam do agente, do
 aparelho de ultrassom ou de um paciente com exame antigo). Estão prontas no
 código e passaram na bateria automática, mas ainda **não foram vistas

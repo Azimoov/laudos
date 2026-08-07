@@ -235,6 +235,27 @@ const VERIFICACOES = `(async () => {
   capOrtWatching = true; await esperaVigiar();
   diz('com a espera ligada o aviso some', !document.getElementById('bannerEspera'));
 
+  // 13) Aba Arquivos acumulados enxuta (2026-08-07): so os 4 botoes de selecao,
+  // cada um abrindo um input escondido. Se a poluicao voltar, isto acusa.
+  const idsAcum = ['inpAudios', 'inpPastaAudios', 'inpExames', 'inpPasta'];
+  const btnsAcum = Array.from(document.querySelectorAll('#pane-acumulados button'));
+  const temBotao = id => btnsAcum.some(b => ((b.getAttribute('onclick') || '').indexOf("'" + id + "'") >= 0));
+  diz('aba acumulados tem exatamente 4 botoes', btnsAcum.length === 4, 'botoes: ' + btnsAcum.length);
+  diz('cada seletor tem seu botao (pasta e avulsos, audio e imagem)', idsAcum.every(temBotao));
+  diz('os 4 seletores existem escondidos e aceitam varios arquivos',
+    idsAcum.every(id => { const el = document.getElementById(id); return !!el && el.type === 'file' && el.style.display === 'none' && el.hasAttribute('multiple'); }));
+  diz('os botoes de pasta selecionam pasta de verdade (webkitdirectory)',
+    ['inpPastaAudios', 'inpPasta'].every(id => { const el = document.getElementById(id); return !!el && el.hasAttribute('webkitdirectory'); }));
+  // escolher audios avulsos precisa avisar quantos entraram (o input sumiu da tela)
+  const dtA = new DataTransfer();
+  dtA.items.add(new File(['a'], 'dita1.m4a', { type: 'audio/mp4' }));
+  dtA.items.add(new File(['b'], 'dita2.mp3', { type: 'audio/mpeg' }));
+  const inpAud = document.getElementById('inpAudios');
+  inpAud.files = dtA.files;
+  inpAud.dispatchEvent(new Event('change'));
+  const avisoAud = (document.getElementById('audiosInfo') || {}).textContent || '';
+  diz('escolher audios avulsos mostra a contagem no aviso', avisoAud.indexOf('2') >= 0, avisoAud || '(vazio)');
+
   return R;
 })()`;
 

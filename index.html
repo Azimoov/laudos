@@ -320,38 +320,30 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 <div class="aba-conteudo" id="pane-acumulados" style="display:none">
 <div class="card">
   <h2>1 · Arquivos acumulados</h2>
-  <div class="filebox" id="boxDicom" style="border-color:#1f7a3d">
-    <b>🩻 Exames do aparelho (DICOM)</b><br>
-    <span class="aviso">As imagens que o ultrassom enviou chegam com <b>nome, idade e data</b> já preenchidos — sem precisar ler a legenda.</span>
-    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center">
-      <button class="btn" type="button" onclick="dicomBuscar()">🔍 Buscar exames do aparelho</button>
-      <span id="dicomInfo" class="aviso"></span>
+  <!-- Aba enxuta (2026-08-07, a pedido do médico): só os 4 botões de seleção.
+       Saíram daqui o "Buscar exames do aparelho" (as funções dicom* seguem no código),
+       a gravação rápida (existe igual na aba 🎙 Gravar ditados) e os textos longos —
+       o essencial deles virou title (aparece ao pousar o mouse). -->
+  <div class="filebox">
+    <b>🎙 Áudios ditados</b>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button class="btn" type="button" title="Todos os áudios da pasta (e subpastas) entram no Processar. No iPad/Safari não funciona." onclick="document.getElementById('inpPastaAudios').click()">📁 Selecionar pasta de áudios</button>
+      <button class="btn" type="button" title="Um ou mais arquivos (m4a, mp3, wav…)" onclick="document.getElementById('inpAudios').click()">🎵 Selecionar áudios</button>
     </div>
-    <div id="dicomLista" style="margin-top:8px"></div>
+    <div style="margin-top:6px"><span id="audiosInfo" class="aviso"></span> <span id="pastaAudiosInfo" class="aviso"></span></div>
+    <input type="file" id="inpAudios" accept="audio/*,.m4a" multiple style="display:none">
+    <input type="file" id="inpPastaAudios" webkitdirectory directory multiple style="display:none">
   </div>
   <div class="filebox">
-    <b>Fotos dos exames</b> (PDF ou foto — pode selecionar vários)
-    <input type="file" id="inpExames" accept="application/pdf,image/*" multiple>
-    <div id="prevExames" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
-    <div style="margin-top:10px;border-top:1px dashed #c8d0da;padding-top:8px">
-      <b>Ou carregue uma pasta (no computador)</b><br><span class="aviso">Cada subpasta com o nome do paciente; fotos e PDF juntos. No iPad/Safari não funciona.</span>
-      <div style="margin-top:6px"><button class="btn sec" type="button" onclick="document.getElementById('inpPasta').click()">📁 Selecionar pasta</button> <span id="pastaInfo" class="aviso"></span></div>
-      <input type="file" id="inpPasta" webkitdirectory directory multiple style="display:none">
+    <b>🖼 Imagens dos exames</b>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button class="btn" type="button" title="Cada subpasta com o nome do paciente; fotos e PDF juntos. No iPad/Safari não funciona." onclick="document.getElementById('inpPasta').click()">📁 Selecionar pasta de imagens</button>
+      <button class="btn" type="button" title="Uma ou mais fotos ou PDF" onclick="document.getElementById('inpExames').click()">🖼 Selecionar imagens</button>
     </div>
-  </div>
-  <div class="filebox">
-    <b>Áudios ditados</b> (m4a, mp3, wav — pode selecionar vários)
-    <input type="file" id="inpAudios" accept="audio/*,.m4a" multiple>
-    <div style="margin-top:10px;border-top:1px dashed #c8d0da;padding-top:8px">
-      <b>Ou carregue uma pasta de áudios (no computador)</b><br><span class="aviso">Todos os áudios da pasta (e subpastas) entram no Processar. No iPad/Safari não funciona.</span>
-      <div style="margin-top:6px"><button class="btn sec" type="button" onclick="document.getElementById('inpPastaAudios').click()">📁 Selecionar pasta</button> <span id="pastaAudiosInfo" class="aviso"></span></div>
-      <input type="file" id="inpPastaAudios" webkitdirectory directory multiple style="display:none">
-    </div>
-    <div style="margin-top:10px;border-top:1px dashed #c8d0da;padding-top:8px">
-      <b>Ou grave agora o áudio de um exame específico</b><br>
-      <span class="aviso">Fica guardado neste aparelho e entra automaticamente no Processar (também aparece na aba 🎙 Gravar ditados).</span>
-      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn sec btnPausa" onclick="pausarRec()" style="display:none">⏸ Pausar</button><button class="btn" id="btnGravarAcumRapido" onclick="gravarAcumulado('btnGravarAcumRapido','vuAcumRapido')">🎙 Gravar ditado</button><canvas id="vuAcumRapido" width="150" height="36" style="display:none;background:#0f1c28;border-radius:8px"></canvas></div>
-    </div>
+    <div style="margin-top:6px"><span id="pastaInfo" class="aviso"></span></div>
+    <div id="prevExames" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;justify-content:center"></div>
+    <input type="file" id="inpExames" accept="application/pdf,image/*" multiple style="display:none">
+    <input type="file" id="inpPasta" webkitdirectory directory multiple style="display:none">
   </div>
 </div>
 </div>
@@ -1495,7 +1487,10 @@ async function salvarTodosDitados(){
 var EXT_NAO_AUDIO = /\.(jpe?g|png|gif|bmp|webp|heic|heif|tiff?|svg|pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|7z|exe|dll|dcm|json|xml|html?|mp4|mov|avi|mkv|wmv)$/i;
 var EXT_AUDIO = /\.(m4a|m4b|mp3|wav|wave|ogg|oga|webm|weba|aac|opus|flac|caf|amr|3gp|3gpp|aiff?|aifc|wma|mpga|mpeg|mp2)$/i;
 /* ====== Exames do aparelho via DICOM (agente local → Orthanc) ======
-   O Orthanc não envia CORS, por isso o navegador fala com o AGENTE, que faz a ponte. */
+   O Orthanc não envia CORS, por isso o navegador fala com o AGENTE, que faz a ponte.
+   O botão "Buscar exames do aparelho" saiu da aba Arquivos acumulados em 2026-08-07
+   (a pedido, para limpar a aba); as funções ficam — o Processar segue lendo
+   dicomProntos e o botão pode voltar sem retrabalho. */
 var dicomEstudos=[], dicomProntos=[];   // listados · importados (viram exames no Processar)
 /* Código do paciente no aparelho: é o que distingue dois homônimos com segurança.
    O agente pode devolvê-lo com nomes diferentes conforme a versão — aceita todos,
@@ -1516,7 +1511,7 @@ async function dicomBuscar(){
     dicomEstudos=[]; dicomRender();
     var msg=(e&&e.name==='AbortError')?'o agente não respondeu a tempo':((e&&e.message)||e);
     dicomInfoTxt('Não consegui falar com o agente ('+msg+').');
-    document.getElementById('dicomLista').innerHTML='<div class="aviso" style="border:1px solid #d99a26;background:#fdf6e9;border-radius:8px;padding:8px 10px;color:#9a6b14">O agente local precisa estar rodando no computador da clínica (endereço em Configurações; padrão '+AGENTE_PADRAO+').</div>';
+    var dl=document.getElementById('dicomLista'); if(dl) dl.innerHTML='<div class="aviso" style="border:1px solid #d99a26;background:#fdf6e9;border-radius:8px;padding:8px 10px;color:#9a6b14">O agente local precisa estar rodando no computador da clínica (endereço em Configurações; padrão '+AGENTE_PADRAO+').</div>';
   }
 }
 function dicomRender(){
@@ -1584,6 +1579,11 @@ function renderPastaAudiosInfo(){
   var exts={}; Array.prototype.forEach.call(inp.files, function(f){ var e=extDe(f.name); exts[e]=(exts[e]||0)+1; });
   var lista=Object.keys(exts).map(function(e){ return e+' ('+exts[e]+')'; }).join(', ');
   span.textContent='Nenhum áudio reconhecido entre '+todos+' arquivo(s). Extensões encontradas: '+lista;
+}
+function renderAudiosInfo(){
+  var span=document.getElementById('audiosInfo'); if(!span) return;
+  var inp=document.getElementById('inpAudios'); var n=(inp&&inp.files)?inp.files.length:0;
+  span.textContent = n ? (n+' áudio(s) avulso(s) selecionado(s). Toque em Processar.') : '';
 }
 function renderPastaInfo(){
   const inp=document.getElementById('inpPasta'); const span=document.getElementById('pastaInfo'); if(!span) return;
@@ -2415,7 +2415,7 @@ async function cpRecuperarSessao(sessao){
            lateralidade:r.lateralidade||'', nome:nomeAudio(r.nome_paciente, r.tipo_exame, r.lateralidade)||'Gravação recuperada'};
     log('Gravação recuperada: '+(metaG.nome||'(sem nome)'));
   }catch(e){
-    log('Recuperei o áudio, mas a transcrição falhou ('+e.message+'). Ele fica guardado em "Arquivos acumulados" para você transcrever depois.', true);
+    log('Recuperei o áudio, mas a transcrição falhou ('+e.message+'). Ele fica guardado na aba "🎙 Gravar ditados" para você transcrever depois.', true);
   }
   // guarda mesmo sem transcrição: o áudio é o que não pode se perder
   try{ await gravSalvar(blob, metaG); }catch(e){ log('Não consegui guardar a gravação recuperada: '+e.message, true); }
@@ -5036,7 +5036,7 @@ window.addEventListener('DOMContentLoaded', async function(){
 
 /* corrige \n no corpo vindo do JSON */
 document.addEventListener('DOMContentLoaded',()=>{ try{ fsGetHandle('laudo').then(function(h){ pastaLaudoH=h; atualizarPastaInfoRev(); }); }catch(e){}
-  if(!cfg.chave) alternarConfig(); var _ip=document.getElementById('inpPasta'); if(_ip) _ip.addEventListener('change', renderPastaInfo); var _ipa=document.getElementById('inpPastaAudios'); if(_ipa) _ipa.addEventListener('change', renderPastaAudiosInfo); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
+  if(!cfg.chave) alternarConfig(); var _ip=document.getElementById('inpPasta'); if(_ip) _ip.addEventListener('change', renderPastaInfo); var _ipa=document.getElementById('inpPastaAudios'); if(_ipa) _ipa.addEventListener('change', renderPastaAudiosInfo); var _iau=document.getElementById('inpAudios'); if(_iau) _iau.addEventListener('change', renderAudiosInfo); var _ie=document.getElementById('inpExames'); if(_ie) _ie.addEventListener('change', function(){ fotosSel=Array.prototype.slice.call(_ie.files); renderPrevExames(); }); if(typeof suportaFS==='function'&&suportaFS()){var _cp=document.getElementById('cfgPastas'); if(_cp) _cp.style.display='block';}
   renderAcum();
   verificarSessaoSalva();
   // vigia da espera: confere a cada 30s se estão chegando exames sem ninguém captar

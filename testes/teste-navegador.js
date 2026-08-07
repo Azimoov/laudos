@@ -244,11 +244,14 @@ const VERIFICACOES = `(async () => {
   const { srv, porta } = await servir();
   const perfil = fs.mkdtempSync(path.join(os.tmpdir(), 'laudos-teste-'));
   const portaCDP = 9222 + Math.floor(Math.random() * 700);
-  const proc = spawn(chrome, [
+  const flags = [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     '--remote-debugging-port=' + portaCDP, '--user-data-dir=' + perfil,
-    'http://127.0.0.1:' + porta + '/index.html',
-  ], { stdio: 'ignore' });
+  ];
+  // Como root (maquina de teste em nuvem, nunca o Windows do consultorio) o Chrome
+  // se recusa a abrir sem --no-sandbox; process.getuid nem existe no Windows.
+  if (process.getuid && process.getuid() === 0) flags.push('--no-sandbox');
+  const proc = spawn(chrome, flags.concat('http://127.0.0.1:' + porta + '/index.html'), { stdio: 'ignore' });
 
   let cdp = null;
   try {

@@ -21,16 +21,17 @@ const localStorage = { getItem: k => (k in store ? store[k] : null),
                        setItem: (k, v) => { store[k] = v; } };
 const CONSTS = (HTML.match(/const FILA_BANCO_CHAVE='[^']+', FILA_BANCO_MAX=\d+;/) || [])[0];
 const cfg = { modelo: 'gpt-5.5' };
-const textoBaseLaudo = () => 'TEXTO DO LAUDO';
+// O payload usa a versao CLINICA do laudo (sem o cabecalho de identificacao).
+const textoClinicoLaudo = () => 'TEXTO DO LAUDO';
 const console2 = { warn: () => {}, log: () => {} };
-const app = new Function('localStorage', 'cfg', 'textoBaseLaudo', 'console',
+const app = new Function('localStorage', 'cfg', 'textoClinicoLaudo', 'console',
   CONSTS + '\n'
   + [ 'bancoFilaLer', 'bancoFilaGravar', 'bancoFilaUpsert', 'bancoDataISO', 'bancoNascISO',
       'bancoMontarPayload' ]
     .map(grab).join('\n')
   + '\n return {bancoFilaLer, bancoFilaGravar, bancoFilaUpsert, bancoDataISO, bancoNascISO,'
   + ' bancoMontarPayload, FILA_BANCO_MAX};')(
-  localStorage, cfg, textoBaseLaudo, console2);
+  localStorage, cfg, textoClinicoLaudo, console2);
 const { bancoFilaLer, bancoFilaGravar, bancoFilaUpsert, bancoDataISO, bancoNascISO,
         bancoMontarPayload, FILA_BANCO_MAX } = app;
 
@@ -39,6 +40,25 @@ ok(bancoDataISO('05/08/2026') === '2026-08-05', 'dd/mm/aaaa vira ISO');
 ok(bancoDataISO('2026-08-05') === '2026-08-05', 'ISO passa direto');
 ok(/^\d{4}-\d{2}-\d{2}$/.test(bancoDataISO('')), 'sem data legivel: usa hoje (o laudo e gerado no ato)');
 ok(/^\d{4}-\d{2}-\d{2}$/.test(bancoDataISO('lixo')), 'data ilegivel tambem cai em hoje, nao em lixo');
+
+console.log('=== identificacao FORA do texto do laudo ===');
+// O nome do paciente ficava dentro do corpo do laudo, no cabecalho. Quem e a
+// pessoa e o que foi visto no exame moravam no mesmo campo. Desde 10/08 o banco
+// recebe so a parte clinica; a identificacao fica na tabela de pacientes.
+const txt = new Function(['textoBaseLaudo', 'textoClinicoLaudo'].map(grab).join('\n')
+  + '\n return {textoBaseLaudo, textoClinicoLaudo};')();
+const L = { cab: { nome: 'Maria Silva Souza', idade: '42', realizado_em: '05/08/2026',
+                   dados_clinicos: 'nodulo palpavel' },
+            corpo: 'Figado de dimensoes normais.', conclusao: 'Exame dentro dos padroes.' };
+const naTela = txt.textoBaseLaudo(L), noBanco = txt.textoClinicoLaudo(L);
+ok(naTela.indexOf('Maria Silva Souza') >= 0,
+   'a versao da TELA continua com o cabecalho: nada mudou para o medico');
+ok(noBanco.indexOf('Maria Silva Souza') < 0, 'a versao do BANCO nao tem o nome do paciente');
+ok(noBanco.indexOf('42') < 0 && noBanco.indexOf('05/08/2026') < 0,
+   'nem idade nem data no texto: essas vivem em colunas proprias');
+ok(noBanco.indexOf('Figado de dimensoes normais') >= 0 && noBanco.indexOf('CONCLUS') >= 0,
+   'mas o corpo e a conclusao continuam inteiros');
+ok(txt.textoClinicoLaudo(null) === '', 'sem laudo: devolve vazio, nao quebra');
 
 console.log('=== data de nascimento vinda do DICOM ===');
 // Sem nascimento o banco nao consegue separar homonimos. Ate 10/08/2026 o app
@@ -78,6 +98,17 @@ const pSemNasc = bancoMontarPayload({ paciente: 'Sem Data', codPac: '', tipo: 'a
 ok(pSemNasc.paciente.nascimento === null && pSemNasc.paciente.sexo === null,
    'exame sem tags de paciente nao inventa nascimento nem sexo');
 ok(p.exame.data_exame === '2026-08-05' && p.exame.tipo_exame === 'mama', 'exame com data ISO e tipo');
+// indicacao_clinica vinha vazia em 82 dos 89 exames. O que o medico escreve no
+// cabecalho vale mais que o que a IA deduziu do ditado.
+ok(p.exame.indicacao_clinica === 'nodulo palpavel',
+   'sem cabecalho preenchido, cai no que a IA deduziu');
+const pCab = bancoMontarPayload(Object.assign({}, ex,
+  { laudo: { cab: { dados_clinicos: 'dor no hipocondrio direito' } } }), resp);
+ok(pCab.exame.indicacao_clinica === 'dor no hipocondrio direito',
+   'o que o medico escreveu no cabecalho tem prioridade sobre a IA');
+const pVazio = bancoMontarPayload(Object.assign({}, ex,
+  { laudo: { cab: { dados_clinicos: '   ' } } }), { dados_estruturados: {} });
+ok(pVazio.exame.indicacao_clinica === null, 'cabecalho so com espacos vira null');
 ok(p.exame.study_uid === 'st-9', 'vinculo com as imagens do Orthanc');
 ok(p.exame.conclusao_codigo === 'provavelmente-benigno', 'conclusao_codigo normalizado');
 ok(p.exame.laudo_gerado === 'TEXTO DO LAUDO' && p.exame.json_gerado.includes('dados_estruturados'),
@@ -121,8 +152,12 @@ ok(depois[0].k === 'k15', 'quando estoura, caem os mais ANTIGOS');
 console.log('=== ligacoes no fluxo do laudo ===');
 ok(/try\{ bancoEnviarExame\(ex, resp\); \}catch\(_\)\{\}/.test(HTML),
    'apos gerar: envia a versao GERADA, embrulhado para nunca derrubar o laudo');
-ok(/if\(exB\) bancoEnviarFinal\(exB, textoEditadoLaudo\(\)\)/.test(HTML),
-   'ao salvar/assinar: envia a versao FINAL (o texto que o medico editou)');
+ok(/if\(exB\) bancoEnviarFinal\(exB, textoEditadoLaudo\(true\)\)/.test(HTML),
+   'ao salvar/assinar: envia a versao FINAL, e SO A CLINICA (o true tira o cabecalho)');
+ok(/laudo_gerado:textoClinicoLaudo\(ex\.laudo\)/.test(HTML),
+   'a versao gerada tambem vai sem o cabecalho de identificacao');
+ok(/ex\.laudoBaseTexto ?= ?textoBaseLaudo\(/.test(HTML),
+   'o loop de aprendizado continua comparando com o texto INTEIRO (nao foi afetado)');
 ok(/DOMContentLoaded[\s\S]{0,140}bancoReenviarFila\(\)/.test(HTML),
    'ao abrir o app: tenta mandar o que ficou pendente');
 const envia = grab('bancoEnviarExame');

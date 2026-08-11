@@ -2963,8 +2963,26 @@ function textoBaseLaudo(L){
   var cab='Nome: '+(c.nome||'')+' | Idade: '+(c.idade||'')+' | Realizado em: '+(c.realizado_em||'')+' | Dados clínicos: '+(c.dados_clinicos||'');
   return (cab+'\n\n'+String(L.corpo||'').replace(/\*\*/g,'')+'\n\nCONCLUSÃO: '+String(L.conclusao||'').replace(/\*\*/g,'')).trim();
 }
-function textoEditadoLaudo(){
-  var cab=document.querySelector('#areaImpressao .laudoCab');
+/* O laudo SEM a identificação: só o conteúdo clínico. É esta versão que vai
+   para o banco (10/08/2026).
+
+   Por que separar: o nome do paciente estava DENTRO do texto do laudo, colado
+   no cabeçalho. Quem é a pessoa e o que foi visto no exame ficavam grudados no
+   mesmo campo, e não havia como usar um sem carregar o outro. A identificação
+   mora na tabela de pacientes; aqui fica só o achado clínico.
+
+   O cabeçalho não se perde: nome, nascimento e sexo estão em `pacientes`, a
+   data em `exames.data_exame`, e os dados clínicos em `indicacao_clinica`. */
+function textoClinicoLaudo(L){
+  if(!L) return '';
+  return (String(L.corpo||'').replace(/\*\*/g,'')
+          +'\n\nCONCLUSÃO: '+String(L.conclusao||'').replace(/\*\*/g,'')).trim();
+}
+/* Lê o laudo como o médico deixou na tela. Com soClinico=true, devolve só o
+   corpo — cabeçalho e corpo são elementos separados ali, então dá para dividir
+   sem recortar texto por adivinhação. */
+function textoEditadoLaudo(soClinico){
+  var cab=soClinico?null:document.querySelector('#areaImpressao .laudoCab');
   var corpo=document.querySelector('#areaImpressao .laudoTexto');
   var t1=cab?(cab.innerText||cab.textContent||''):'';
   var t2=corpo?(corpo.innerText||corpo.textContent||''):'';
@@ -3376,10 +3394,15 @@ function bancoMontarPayload(ex, resp){
               sexo:String(ex.sexoPac||'').trim().toUpperCase()||null,
               codigo_aparelho:String(ex.codPac||'')||null},
     exame:{data_exame:bancoDataISO(ex.dataExame), tipo_exame:ex.tipo||'desconhecido',
-           indicacao_clinica:String(de.indicacao_clinica||'')||null,
+           // O que o médico escreveu no cabeçalho vale mais que o que a IA
+           // deduziu do ditado. Este campo vinha vazio em 82 dos 89 exames:
+           // saía do texto do laudo (que agora não guarda cabeçalho) e ninguém
+           // o alimentava daqui.
+           indicacao_clinica:String((ex.laudo&&ex.laudo.cab&&ex.laudo.cab.dados_clinicos)
+                                    ||de.indicacao_clinica||'').trim()||null,
            study_uid:String(ex._estudoId||'')||null,
            conclusao_codigo:CODIGOS[cod]?cod:'outro',
-           laudo_gerado:textoBaseLaudo(ex.laudo), json_gerado:JSON.stringify(resp||{}),
+           laudo_gerado:textoClinicoLaudo(ex.laudo), json_gerado:JSON.stringify(resp||{}),
            modelo_ia:cfg.modelo||'', custo_estimado_usd:null,
            transcricao:String(ex._transcricao||'')||null},
     achados:achados
@@ -3513,7 +3536,8 @@ function salvarLaudoHistorico(meta){
   // versão FINAL para o banco estruturado: este é o texto que o médico assinou
   try{
     var exB=exames.find(function(e){ return e.histKey===meta.id; });
-    if(exB) bancoEnviarFinal(exB, textoEditadoLaudo());
+    // só o conteúdo clínico: a identificação do paciente não entra no texto
+    if(exB) bancoEnviarFinal(exB, textoEditadoLaudo(true));
   }catch(_){}
 }
 function alternarHistorico(){

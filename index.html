@@ -1553,7 +1553,10 @@ async function dicomImportar(){
       feitas++; progVincStep(0); _progFeito=feitas; progVincSet();
     }
     if(!imagens.length){ log('Exame de '+(e.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
-    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens, codigo:codDoEstudo(e)});
+    // nascimento e sexo vêm das tags DICOM (o agente já os entrega em cada estudo).
+    // Até 10/08/2026 eram descartados aqui, e o banco ficou com 74 pacientes sem
+    // data de nascimento — sem ela, dois homônimos viram a mesma pessoa.
+    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens, codigo:codDoEstudo(e), nascimento:e.nascimento||'', sexo:e.sexo||''});
   }
   progVincHide();
   dicomInfoTxt(dicomProntos.length+' exame(s) do aparelho prontos — toque em Processar.');
@@ -1663,7 +1666,7 @@ async function processar(){
     exames = agruparItens(flatItens);
     for(let i=0;i<folderOrder.length;i++){ const fo=folderOrder[i]; const g=folderMap[fo]; exames.push({id:0, nomeArquivo:'', paciente:(g.paciente||fo), subExame:(g.subExame||''), imagens:g.imagens, tipo:g.tipo||'', lateralidade:normLateralidade(g.subExame||''), audios:[], laudo:null, metaConf:1, dataExame:g.data||'', idadeExame:g.idade||''}); }
     // exames vindos do aparelho (DICOM): cadastro já veio das tags — nenhuma leitura de legenda por IA
-    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', _dicom:true}); }
+    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s)'+(dicomProntos.length?' + '+dicomProntos.length+' exame(s) do aparelho':'')+' em '+exames.length+' exame(s).');
     // 2. transcrever áudios
@@ -3327,9 +3330,25 @@ function bancoDataISO(d){
   var h=new Date();   // sem data legível: o exame é de hoje (o laudo é gerado no ato)
   return h.getFullYear()+'-'+('0'+(h.getMonth()+1)).slice(-2)+'-'+('0'+h.getDate()).slice(-2);
 }
+/* Data de nascimento do DICOM (AAAAMMDD) -> AAAA-MM-DD, o padrão do banco.
+   Devolve null se não der para confiar: nascimento errado é pior que vazio,
+   porque é ele que decide se dois homônimos são a mesma pessoa. */
+function bancoNascISO(v){
+  var s=String(v||'').replace(/[^0-9]/g,'');
+  if(s.length!==8) return null;
+  var a=s.slice(0,4), m=s.slice(4,6), d=s.slice(6,8);
+  if(a<'1900'||a>'2100'||m<'01'||m>'12'||d<'01'||d>'31') return null;
+  return a+'-'+m+'-'+d;
+}
 /* Monta o corpo do POST /exames a partir do exame + resposta da IA.
    codigo_aparelho é extensão nossa ao esquema: é a âncora de identidade que o
-   app já usa (nascimento e documento quase nunca estão disponíveis aqui). */
+   app já usa.
+   10/08/2026: nascimento e sexo passaram a ser enviados. O comentário antigo
+   dizia que "quase nunca estão disponíveis aqui" — estava ERRADO: o Orthanc
+   tem os dois em 100% dos estudos conferidos, o agente já os entrega e o
+   banco.py já sabia recebê-los (usa o nascimento para desempatar homônimos).
+   Eram descartados aqui, e só aqui. `documento` continua null: esse o
+   aparelho realmente não manda. */
 function bancoMontarPayload(ex, resp){
   var de=(resp&&typeof resp.dados_estruturados==='object'&&resp.dados_estruturados)||{};
   var achados=[];
@@ -3347,7 +3366,9 @@ function bancoMontarPayload(ex, resp){
   var CODIGOS={'normal':1,'benigno':1,'provavelmente-benigno':1,'suspeito':1,'indeterminado':1,'outro':1};
   var cod=String(de.conclusao_codigo||'').trim().toLowerCase();
   return {
-    paciente:{nome_completo:ex.paciente||'(sem nome)', documento:null, nascimento:null, sexo:null,
+    paciente:{nome_completo:ex.paciente||'(sem nome)', documento:null,
+              nascimento:bancoNascISO(ex.nascPac),
+              sexo:String(ex.sexoPac||'').trim().toUpperCase()||null,
               codigo_aparelho:String(ex.codPac||'')||null},
     exame:{data_exame:bancoDataISO(ex.dataExame), tipo_exame:ex.tipo||'desconhecido',
            indicacao_clinica:String(de.indicacao_clinica||'')||null,

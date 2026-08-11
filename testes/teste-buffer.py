@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Testa a fita circular do agente: preenchimento de silencio e mapeamento hora->posicao.
 Reproduz o caso real de 31/07 (microfone parou as 12:43, exame pediu janela as 12:54)."""
+import os
 import re
 import sys
 import threading
@@ -8,7 +9,9 @@ import time
 
 import numpy as np
 
-ARQ = r"C:\Users\serru\AppData\Local\LaudosLocal\agente-laudos.py"
+# 10/08/2026: a pasta do agente saiu do cache do app Claude, onde uma
+# reinstalacao levaria o banco de pacientes junto. Ver README do laudos-programa.
+ARQ = os.path.join(os.path.expanduser("~"), "Laudos USG", "agente", "agente-laudos.py")
 src = open(ARQ, encoding="utf-8").read()
 
 # extrai so as constantes e a classe, sem subir servidor nem thread

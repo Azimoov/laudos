@@ -3,7 +3,9 @@
 // usa uma chave falsa e confere que o erro vem da OpenAI, nao do agente).
 const fs = require('fs');
 const AG = 'http://127.0.0.1:8977';
-const CONF = 'C:/Users/serru/AppData/Local/LaudosLocal/config-agente.json';
+// 10/08/2026: a pasta do agente saiu do cache do app Claude, onde uma
+// reinstalacao levaria o banco de pacientes junto. Ver README do laudos-programa.
+const CONF = String(process.env.USERPROFILE || '').replace(/\\/g, '/') + '/Laudos USG/agente/config-agente.json';
 const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 
 let falhas = 0;

@@ -25,12 +25,14 @@ const textoBaseLaudo = () => 'TEXTO DO LAUDO';
 const console2 = { warn: () => {}, log: () => {} };
 const app = new Function('localStorage', 'cfg', 'textoBaseLaudo', 'console',
   CONSTS + '\n'
-  + [ 'bancoFilaLer', 'bancoFilaGravar', 'bancoFilaUpsert', 'bancoDataISO', 'bancoMontarPayload' ]
+  + [ 'bancoFilaLer', 'bancoFilaGravar', 'bancoFilaUpsert', 'bancoDataISO', 'bancoNascISO',
+      'bancoMontarPayload' ]
     .map(grab).join('\n')
-  + '\n return {bancoFilaLer, bancoFilaGravar, bancoFilaUpsert, bancoDataISO, bancoMontarPayload, FILA_BANCO_MAX};')(
+  + '\n return {bancoFilaLer, bancoFilaGravar, bancoFilaUpsert, bancoDataISO, bancoNascISO,'
+  + ' bancoMontarPayload, FILA_BANCO_MAX};')(
   localStorage, cfg, textoBaseLaudo, console2);
-const { bancoFilaLer, bancoFilaGravar, bancoFilaUpsert, bancoDataISO, bancoMontarPayload,
-        FILA_BANCO_MAX } = app;
+const { bancoFilaLer, bancoFilaGravar, bancoFilaUpsert, bancoDataISO, bancoNascISO,
+        bancoMontarPayload, FILA_BANCO_MAX } = app;
 
 console.log('=== data no formato do banco ===');
 ok(bancoDataISO('05/08/2026') === '2026-08-05', 'dd/mm/aaaa vira ISO');
@@ -38,8 +40,22 @@ ok(bancoDataISO('2026-08-05') === '2026-08-05', 'ISO passa direto');
 ok(/^\d{4}-\d{2}-\d{2}$/.test(bancoDataISO('')), 'sem data legivel: usa hoje (o laudo e gerado no ato)');
 ok(/^\d{4}-\d{2}-\d{2}$/.test(bancoDataISO('lixo')), 'data ilegivel tambem cai em hoje, nao em lixo');
 
+console.log('=== data de nascimento vinda do DICOM ===');
+// Sem nascimento o banco nao consegue separar homonimos. Ate 10/08/2026 o app
+// mandava null aqui e 74 pacientes ficaram sem ela. Nascimento ERRADO e pior
+// que vazio, entao o que nao for confiavel vira null.
+ok(bancoNascISO('19620113') === '1962-01-13', 'AAAAMMDD do DICOM vira ISO');
+ok(bancoNascISO('1962-01-13') === '1962-01-13', 'ja com tracos: continua valendo');
+ok(bancoNascISO('') === null, 'vazio: null, nao data de hoje');
+ok(bancoNascISO(null) === null, 'ausente: null');
+ok(bancoNascISO('1962011') === null, 'curta demais: null, nao adivinha');
+ok(bancoNascISO('19621301') === null, 'mes 13: null');
+ok(bancoNascISO('19620132') === null, 'dia 32: null');
+ok(bancoNascISO('18000101') === null, 'ano absurdo: null');
+
 console.log('=== montagem do envio ===');
 const ex = { paciente: 'Maria Silva', codPac: '123', tipo: 'mama', dataExame: '05/08/2026',
+             nascPac: '19871026', sexoPac: 'f',
              _estudoId: 'st-9', laudo: {} };
 const resp = { corpo: 'x', dados_estruturados: { indicacao_clinica: 'nodulo palpavel',
   conclusao_codigo: 'Provavelmente-Benigno',
@@ -54,6 +70,13 @@ const resp = { corpo: 'x', dados_estruturados: { indicacao_clinica: 'nodulo palp
 const p = bancoMontarPayload(ex, resp);
 ok(p.paciente.nome_completo === 'Maria Silva' && p.paciente.codigo_aparelho === '123',
    'paciente leva nome e o codigo do aparelho (a ancora de identidade)');
+ok(p.paciente.nascimento === '1987-10-26', 'paciente leva a data de nascimento em ISO');
+ok(p.paciente.sexo === 'F', 'sexo normalizado para maiuscula');
+ok(p.paciente.documento === null, 'documento segue null: o aparelho nao manda esse');
+const pSemNasc = bancoMontarPayload({ paciente: 'Sem Data', codPac: '', tipo: 'abdome',
+                                      dataExame: '05/08/2026', laudo: {} }, resp);
+ok(pSemNasc.paciente.nascimento === null && pSemNasc.paciente.sexo === null,
+   'exame sem tags de paciente nao inventa nascimento nem sexo');
 ok(p.exame.data_exame === '2026-08-05' && p.exame.tipo_exame === 'mama', 'exame com data ISO e tipo');
 ok(p.exame.study_uid === 'st-9', 'vinculo com as imagens do Orthanc');
 ok(p.exame.conclusao_codigo === 'provavelmente-benigno', 'conclusao_codigo normalizado');

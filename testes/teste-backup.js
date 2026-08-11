@@ -3,7 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const AG = 'http://127.0.0.1:8977';
-const DADOS = 'C:/Users/serru/AppData/Local/LaudosLocal/dados';
+// 10/08/2026: a pasta do agente saiu do cache do app Claude, onde uma
+// reinstalacao levaria o banco de pacientes junto. Ver README do laudos-programa.
+const DADOS = String(process.env.USERPROFILE || '').replace(/\\/g, '/') + '/Laudos USG/agente/dados';
 
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FALHA ') + m); if (!c) falhas++; };
@@ -55,7 +57,13 @@ const get = r => fetch(AG + r).then(x => x.json());
   console.log('=== 7. estado reportado ao app ===');
   const e = await get('/backup/estado');
   ok(e.pasta === alvo && e.existe === true, 'pasta e existencia corretas');
-  ok(e.ultimoDia === new Date().toISOString().slice(0, 10), 'data do ultimo backup: ' + e.ultimoDia);
+  // Dia LOCAL, nao o de Greenwich: o agente carimba a data com o relogio da
+  // maquina. Com toISOString() este teste falhava toda noite depois das 21h
+  // (em Londres ja era o dia seguinte) — defeito do teste, nunca do programa.
+  const d = new Date();
+  const hojeLocal = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2)
+                    + '-' + ('0' + d.getDate()).slice(-2);
+  ok(e.ultimoDia === hojeLocal, 'data do ultimo backup: ' + e.ultimoDia);
   ok(typeof e.espacoLivre === 'number' && e.espacoLivre > 0, 'espaco livre: ' + (e.espacoLivre / 1073741824).toFixed(1) + ' GB');
   ok(!e.erro, 'sem erro pendente');
 

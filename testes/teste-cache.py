@@ -8,7 +8,9 @@ import threading
 import time
 from datetime import datetime, timezone
 
-ARQ = r"C:\Users\serru\AppData\Local\LaudosLocal\agente-laudos.py"
+# 10/08/2026: a pasta do agente saiu do cache do app Claude, onde uma
+# reinstalacao levaria o banco de pacientes junto. Ver README do laudos-programa.
+ARQ = os.path.join(os.path.expanduser("~"), "Laudos USG", "agente", "agente-laudos.py")
 src = open(ARQ, encoding="utf-8").read()
 
 ini = src.index("# ---- caches da listagem")

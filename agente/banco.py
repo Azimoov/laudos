@@ -61,6 +61,14 @@ CREATE TABLE IF NOT EXISTS exames (
     json_gerado        TEXT,
     modelo_ia          TEXT,
     custo_estimado_usd REAL,
+    -- O DITADO QUE VIROU ESTE LAUDO (10/08/2026). E o texto que a IA leu para
+    -- escrever, exatamente como ela recebeu. Sem ele o banco guarda respostas
+    -- sem as perguntas, e nao serve para treinar nada.
+    -- NAO e a gravacao do dia inteiro: o agente grava a sala toda (recepcao,
+    -- conversa com o paciente) e isso NAO entra aqui. So o trecho recortado
+    -- para este exame, que foi o que gerou o laudo. Decisao do Dr. Daniel em
+    -- 10/08 depois de ver que a fita apanha a sala inteira.
+    transcricao        TEXT,
     criado_em          TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     finalizado_em      TEXT
 );
@@ -81,11 +89,54 @@ CREATE TABLE IF NOT EXISTS achados (
     descricao       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_achados_exame ON achados(exame_id);
+
+-- Historico completo do laudo. NADA aqui e apagado ou sobrescrito: cada versao
+-- assinada vira uma linha nova. Pedido do Dr. Daniel em 10/08/2026 ("as
+-- informacoes das mudancas dos laudos sao para serem mantidas indefinidamente").
+-- Antes existia so exames.laudo_final, um campo unico: corrigir o laudo pela
+-- segunda vez apagava a correcao anterior sem deixar rastro.
+-- exames.laudo_final continua existindo e aponta sempre para a versao mais
+-- recente — quem so quer o laudo valendo nao precisa saber que isto existe.
+CREATE TABLE IF NOT EXISTS laudo_versoes (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    exame_id INTEGER NOT NULL REFERENCES exames(id) ON DELETE CASCADE,
+    versao   INTEGER NOT NULL,        -- 1, 2, 3... na ordem em que foram assinadas
+    texto    TEXT NOT NULL,
+    origem   TEXT NOT NULL,           -- 'ia' (versao 1) | 'medico' (as correcoes)
+    motivo   TEXT,                    -- opcional: por que mudou (vale ouro p/ treino)
+    quando   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_versoes_exame ON laudo_versoes(exame_id, versao);
 """
 
 
 def _log(msg):
     print('[banco] ' + msg, flush=True)
+
+
+def _gravar_versao(con, exame_id, texto, origem, motivo=None):
+    """Empilha mais uma versao do laudo. Nunca sobrescreve, nunca apaga.
+
+    Texto igual ao da ultima versao NAO cria linha nova: a fila de reenvio do
+    app pode mandar o mesmo laudo duas vezes (foi feita assim de proposito, para
+    nao perder laudo quando o agente esta fora do ar), e versao repetida sujaria
+    o historico sem acrescentar informacao.
+
+    Devolve o numero da versao gravada (ou da existente, se era repetida).
+    """
+    texto = texto or ''
+    if not texto.strip():
+        return None
+    ult = con.execute(
+        'SELECT versao, texto FROM laudo_versoes WHERE exame_id=?'
+        ' ORDER BY versao DESC LIMIT 1', (exame_id,)).fetchone()
+    if ult is not None and (ult['texto'] or '') == texto:
+        return ult['versao']
+    prox = (ult['versao'] + 1) if ult is not None else 1
+    con.execute(
+        'INSERT INTO laudo_versoes (exame_id, versao, texto, origem, motivo)'
+        ' VALUES (?,?,?,?,?)', (exame_id, prox, texto, origem, motivo or None))
+    return prox
 
 
 def conectar(caminho=None):
@@ -97,7 +148,35 @@ def conectar(caminho=None):
     con = sqlite3.connect(caminho)
     con.row_factory = sqlite3.Row
     con.executescript(DDL)
+    _acrescentar_colunas(con)
     return con
+
+
+# Colunas que nasceram depois do banco. O "CREATE TABLE IF NOT EXISTS" acima NAO
+# acrescenta coluna em tabela que ja existe — ele so ve que a tabela esta la e
+# passa direto. Sem isto, um banco antigo continuaria sem os campos novos e as
+# gravacoes falhariam com "no such column".
+COLUNAS_NOVAS = {
+    'exames': [('transcricao', 'TEXT')],       # 10/08/2026
+}
+
+
+def _acrescentar_colunas(con):
+    """Poe as colunas que faltam. Roda a cada conexao; nao faz nada se ja estao la."""
+    for tabela, colunas in COLUNAS_NOVAS.items():
+        try:
+            existentes = {r['name'] for r in con.execute('PRAGMA table_info(%s)' % tabela)}
+        except Exception:  # noqa: BLE001
+            continue
+        for nome, tipo in colunas:
+            if nome in existentes:
+                continue
+            try:
+                con.execute('ALTER TABLE %s ADD COLUMN %s %s' % (tabela, nome, tipo))
+                con.commit()
+                _log('coluna %s.%s acrescentada' % (tabela, nome))
+            except Exception as ex:  # noqa: BLE001
+                _log('nao consegui acrescentar %s.%s: %s' % (tabela, nome, ex))
 
 
 def _norm_nome(s):
@@ -170,11 +249,16 @@ def gravar_exame(payload, caminho=None):
         cur = con.execute(
             'INSERT INTO exames (paciente_id, data_exame, tipo_exame, indicacao_clinica,'
             ' study_uid, conclusao_codigo, laudo_gerado, json_gerado, modelo_ia,'
-            ' custo_estimado_usd) VALUES (?,?,?,?,?,?,?,?,?,?)',
+            ' custo_estimado_usd, transcricao) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
             (pid, e.get('data_exame'), e.get('tipo_exame'), e.get('indicacao_clinica'),
              e.get('study_uid'), e.get('conclusao_codigo'), e.get('laudo_gerado'),
-             e.get('json_gerado'), e.get('modelo_ia'), e.get('custo_estimado_usd')))
+             e.get('json_gerado'), e.get('modelo_ia'), e.get('custo_estimado_usd'),
+             e.get('transcricao')))
         eid = cur.lastrowid
+
+        # versao 1 do historico = o que a IA escreveu. As correcoes do medico
+        # entram depois como 2, 3... pela rota /exames/<id>/final.
+        _gravar_versao(con, eid, e.get('laudo_gerado'), 'ia')
 
         # achados invalidos nao derrubam o exame: perder estrutura e aceitavel,
         # perder o laudo nao (regra das instrucoes)
@@ -201,20 +285,28 @@ def gravar_exame(payload, caminho=None):
         con.close()
 
 
-def gravar_final(exame_id, laudo_final, caminho=None):
-    """POST /exames/<id>/final — idempotente: repetir sobrescreve com aviso."""
+def gravar_final(exame_id, laudo_final, caminho=None, motivo=None):
+    """POST /exames/<id>/final — o laudo assinado pelo medico.
+
+    Desde 10/08/2026 NADA e perdido aqui: cada assinatura vira uma linha em
+    laudo_versoes. O campo exames.laudo_final continua existindo e passa a ser
+    um atalho para a versao mais recente (antes ele era o unico lugar, e a
+    correcao seguinte apagava a anterior).
+    """
     con = conectar(caminho)
     try:
         row = con.execute('SELECT laudo_final FROM exames WHERE id=?', (exame_id,)).fetchone()
         if row is None:
             raise LookupError('exame %s nao existe' % exame_id)
-        if row['laudo_final']:
-            _log('final do exame %s sobrescrito (nova versao assinada)' % exame_id)
+        versao = _gravar_versao(con, exame_id, laudo_final, 'medico', motivo)
         con.execute(
             "UPDATE exames SET laudo_final=?, finalizado_em=datetime('now','localtime')"
             ' WHERE id=?', (laudo_final, exame_id))
         con.commit()
-        return {'ok': True, 'exame_id': exame_id}
+        if row['laudo_final']:
+            _log('exame %s: nova versao assinada (v%s); a anterior continua guardada'
+                 % (exame_id, versao))
+        return {'ok': True, 'exame_id': exame_id, 'versao': versao}
     finally:
         con.close()
 
@@ -385,7 +477,10 @@ def responder(metodo, caminho, corpo):
             texto = (corpo or {}).get('laudo_final')
             if not texto:
                 return (400, {'erro': 'laudo_final obrigatorio'})
-            return (200, gravar_final(int(m.group(1)), texto))
+            # 'motivo' e opcional: o app ainda nao tem campo para ele, mas a
+            # rota ja aceita, para nao precisar mexer no agente depois.
+            return (200, gravar_final(int(m.group(1)), texto,
+                                      motivo=(corpo or {}).get('motivo')))
         if metodo == 'GET' and (caminho or '').startswith('/pacientes/buscar'):
             try:
                 from urllib.parse import parse_qs, urlparse

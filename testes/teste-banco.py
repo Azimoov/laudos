@@ -139,6 +139,78 @@ ok(banco.backup_nuvem(b1, sete_zip=sys.executable,
    'sem arquivo de senha: avisa e pula')
 ok(banco.backup_nuvem(None) is None, 'sem arquivo de backup: nada a fazer')
 
+print('=== historico de versoes do laudo (nada e sobrescrito) ===')
+p = payload(nome='Versoes Da Silva', cod='v-1')
+p['exame']['laudo_gerado'] = 'VERSAO DA IA'
+rv = banco.gravar_exame(p, caminho=DB)
+eid = rv['exame_id']
+con = sqlite3.connect(DB); con.row_factory = sqlite3.Row
+vs = lambda: con.execute('SELECT versao, origem, motivo, texto FROM laudo_versoes'
+                         ' WHERE exame_id=? ORDER BY versao', (eid,)).fetchall()
+v = vs()
+ok(len(v) == 1 and v[0]['origem'] == 'ia' and v[0]['texto'] == 'VERSAO DA IA',
+   'gravar o exame ja registra a versao 1, a da IA')
+banco.gravar_final(eid, 'PRIMEIRA do medico', caminho=DB)
+banco.gravar_final(eid, 'SEGUNDA do medico', caminho=DB, motivo='medida errada')
+v = vs()
+ok(len(v) == 3, 'tres versoes guardadas (a IA e as duas assinaturas)')
+ok(v[1]['texto'] == 'PRIMEIRA do medico' and v[2]['texto'] == 'SEGUNDA do medico',
+   'a correcao anterior NAO foi apagada pela seguinte')
+ok(v[2]['motivo'] == 'medida errada' and v[1]['motivo'] is None,
+   'motivo guardado so onde foi informado')
+banco.gravar_final(eid, 'SEGUNDA do medico', caminho=DB)
+ok(len(vs()) == 3, 'reenvio do MESMO texto nao cria versao repetida (a fila do app repete)')
+ok(con.execute('SELECT laudo_final FROM exames WHERE id=?', (eid,)).fetchone()[0]
+   == 'SEGUNDA do medico', 'laudo_final aponta para a versao mais recente')
+con.close()
+
+print('=== o ditado que virou o laudo fica guardado ===')
+p = payload(nome='Ditado Da Silva', cod='d-1')
+p['exame']['transcricao'] = 'figado de dimensoes normais, sem lesoes focais'
+rd = banco.gravar_exame(p, caminho=DB)
+con = sqlite3.connect(DB); con.row_factory = sqlite3.Row
+row = con.execute('SELECT transcricao FROM exames WHERE id=?', (rd['exame_id'],)).fetchone()
+ok(row['transcricao'] == 'figado de dimensoes normais, sem lesoes focais',
+   'a transcricao enviada pelo app e gravada junto com o laudo')
+p2 = payload(nome='Sem Ditado', cod='d-2')
+r2 = banco.gravar_exame(p2, caminho=DB)
+ok(con.execute('SELECT transcricao FROM exames WHERE id=?',
+               (r2['exame_id'],)).fetchone()[0] is None,
+   'exame sem ditado grava normalmente, com o campo vazio')
+con.close()
+
+print('=== banco ANTIGO ganha as colunas novas sozinho ===')
+# CREATE TABLE IF NOT EXISTS nao acrescenta coluna em tabela que ja existe: se a
+# migracao falhar, um banco de antes de 10/08 quebra com "no such column".
+velho = os.path.join(TMP, 'antigo.db')
+c = sqlite3.connect(velho)
+c.executescript("""CREATE TABLE pacientes (id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome_completo TEXT NOT NULL, documento TEXT, nascimento TEXT, sexo TEXT,
+  codigo_aparelho TEXT, criado_em TEXT);
+CREATE TABLE exames (id INTEGER PRIMARY KEY AUTOINCREMENT, paciente_id INTEGER NOT NULL,
+  data_exame TEXT NOT NULL, tipo_exame TEXT NOT NULL, indicacao_clinica TEXT,
+  study_uid TEXT, conclusao_codigo TEXT, laudo_gerado TEXT, laudo_final TEXT,
+  json_gerado TEXT, modelo_ia TEXT, custo_estimado_usd REAL, criado_em TEXT,
+  finalizado_em TEXT);
+CREATE TABLE achados (id INTEGER PRIMARY KEY AUTOINCREMENT, exame_id INTEGER NOT NULL,
+  orgao TEXT NOT NULL, localizacao TEXT, tipo TEXT NOT NULL, medida_1_mm REAL,
+  medida_2_mm REAL, medida_3_mm REAL, caracteristicas TEXT, classificacao TEXT,
+  descricao TEXT);""")
+c.commit(); c.close()
+con = banco.conectar(velho)
+cols = [r['name'] for r in con.execute('PRAGMA table_info(exames)')]
+ok('transcricao' in cols, 'a coluna transcricao foi acrescentada ao banco antigo')
+ok(cols.count('transcricao') == 1, 'nao duplicou a coluna')
+tabs = {r['name'] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+ok('laudo_versoes' in tabs, 'a tabela de versoes tambem nasce no banco antigo')
+con.close()
+con = banco.conectar(velho)      # de novo: tem de ser inofensivo
+ok([r['name'] for r in con.execute('PRAGMA table_info(exames)')].count('transcricao') == 1,
+   'abrir o banco outra vez nao acrescenta de novo')
+con.close()
+r3 = banco.gravar_exame(payload(nome='Depois Da Migracao', cod='m-1'), caminho=velho)
+ok(r3['exame_id'] >= 1, 'grava normalmente depois de migrado')
+
 print('=== saude ===')
 r = banco.saude(DB)
 ok(r['ok'] and r['total_exames'] >= 6, 'saude responde com o total de exames')

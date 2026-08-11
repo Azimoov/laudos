@@ -82,6 +82,14 @@ ok(p.exame.study_uid === 'st-9', 'vinculo com as imagens do Orthanc');
 ok(p.exame.conclusao_codigo === 'provavelmente-benigno', 'conclusao_codigo normalizado');
 ok(p.exame.laudo_gerado === 'TEXTO DO LAUDO' && p.exame.json_gerado.includes('dados_estruturados'),
    'texto integral + JSON bruto guardados');
+// O ditado que virou o laudo vai junto: e a PERGUNTA que gerou a resposta. Sem
+// ele o banco guarda laudo sem origem — nao serve para auditar nem para treinar.
+const pTrans = bancoMontarPayload(Object.assign({}, ex,
+  { _transcricao: 'figado sem lesoes focais' }), resp);
+ok(pTrans.exame.transcricao === 'figado sem lesoes focais',
+   'a transcricao do ditado viaja junto com o laudo');
+ok(p.exame.transcricao === null,
+   'exame sem ditado manda null, nao string vazia');
 ok(p.achados.length === 1, 'so o achado valido entra; lixo nao quebra nada');
 ok(p.achados[0].medida_2_mm === 6, 'medida em texto vira numero');
 ok(p.achados[0].caracteristicas === '{"margens":"circunscritas"}', 'caracteristicas viram JSON texto');

@@ -2113,6 +2113,11 @@ async function gerarLaudo(exId){
   try{
     const mod = MODELOS[ex.tipo];
     const trans = audios.filter(a=>a.exameId===exId).map(a=>a.transcricao).filter(Boolean).join('\n---\n');
+    // Guardado no banco junto com o laudo: é a PERGUNTA que gerou a resposta.
+    // Sem ela o banco fica com laudos sem o ditado que os originou — inútil
+    // para comparar, para auditar e para treinar. Só este trecho vai para o
+    // banco; a gravação da sala inteira continua fora dele.
+    ex._transcricao = trans;
     const regrasAprend = regrasParaPrompt(ex.tipo);
     const ant = examesAnterioresDoPaciente(await histParaBusca(), ex.paciente, ex.tipo, ex.codPac, ex.histKey);
     ex._antInfo = ant.lista.length ? {n:ant.lista.length, data:ant.lista[0].data||'', pend:false}
@@ -3375,7 +3380,8 @@ function bancoMontarPayload(ex, resp){
            study_uid:String(ex._estudoId||'')||null,
            conclusao_codigo:CODIGOS[cod]?cod:'outro',
            laudo_gerado:textoBaseLaudo(ex.laudo), json_gerado:JSON.stringify(resp||{}),
-           modelo_ia:cfg.modelo||'', custo_estimado_usd:null},
+           modelo_ia:cfg.modelo||'', custo_estimado_usd:null,
+           transcricao:String(ex._transcricao||'')||null},
     achados:achados
   };
 }

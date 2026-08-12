@@ -1074,7 +1074,22 @@ async function sincronizarDados(){
   }
   return {baixados:baixados, enviados:enviados};
 }
-const AGENTE_PADRAO = 'http://127.0.0.1:8977';
+/* Endereço do agente. O programa de mesa pode dizer qual usar na hora de abrir
+   (…/index.html?agente=http://127.0.0.1:8988), e é assim que a versão em
+   reforma conversa com um agente PRÓPRIO, de banco vazio, sem encostar no
+   agente que atende de verdade.
+
+   Por que pela URL e não pela configuração salva: o programa serve o app numa
+   porta sorteada a cada abertura, e a memória do navegador é por endereço —
+   ou seja, ela se perde toda vez. A URL chega junto com a página e não depende
+   de nada guardado.
+
+   Sem o parâmetro, nada muda: continua 8977, como sempre foi. */
+function _agenteDaURL(){
+  try{ return (new URLSearchParams(location.search).get('agente')||'').trim(); }
+  catch(e){ return ''; }
+}
+const AGENTE_PADRAO = _agenteDaURL().replace(/\/+$/,'') || 'http://127.0.0.1:8977';
 function agenteBase(){ return ((cfg.agenteLocal||'').trim().replace(/\/+$/,'')) || AGENTE_PADRAO; }
 var _agenteLocalOk=null;   // null=não checado · true/false=cache da sessão
 async function agenteLocalDisponivel(){

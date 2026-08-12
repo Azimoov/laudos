@@ -41,6 +41,19 @@ ok(bancoDataISO('2026-08-05') === '2026-08-05', 'ISO passa direto');
 ok(/^\d{4}-\d{2}-\d{2}$/.test(bancoDataISO('')), 'sem data legivel: usa hoje (o laudo e gerado no ato)');
 ok(/^\d{4}-\d{2}-\d{2}$/.test(bancoDataISO('lixo')), 'data ilegivel tambem cai em hoje, nao em lixo');
 
+console.log('=== o programa diz ao app com qual agente falar ===');
+// A versao 2.0 roda ao lado da estavel, com agente e banco proprios. O endereco
+// chega pela URL porque o programa serve o app numa porta sorteada a cada
+// abertura, e a memoria do navegador e por endereco: ela se perde toda vez.
+const agenteUrl = new Function('location',
+  grab('_agenteDaURL') + '\n return _agenteDaURL();');
+ok(agenteUrl({ search: '?agente=http://127.0.0.1:8988' }) === 'http://127.0.0.1:8988',
+   'com o parametro: usa o agente que o programa mandou');
+ok(agenteUrl({ search: '' }) === '', 'sem o parametro: nao inventa endereco');
+ok(agenteUrl({ search: '?outra=coisa' }) === '', 'parametro alheio nao vira endereco');
+ok(/const AGENTE_PADRAO = _agenteDaURL\(\)[^;]*'http:\/\/127\.0\.0\.1:8977'/.test(HTML),
+   'sem parametro, o padrao continua sendo 8977 (a estavel nao muda de comportamento)');
+
 console.log('=== identificacao FORA do texto do laudo ===');
 // O nome do paciente ficava dentro do corpo do laudo, no cabecalho. Quem e a
 // pessoa e o que foi visto no exame moravam no mesmo campo. Desde 10/08 o banco

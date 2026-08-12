@@ -430,6 +430,38 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <p class="ab-rodape" id="exRodape">ao tocar: teste de voz de 5 segundos e a gravação fica ligada até você encerrar</p>
     </div>
   </div>
+
+  <!-- cadastro de local novo -->
+  <div id="exCadLocal" style="display:none;position:fixed;inset:0;background:rgba(20,30,36,.55);
+       align-items:center;justify-content:center;z-index:9100">
+    <div style="background:#fff;border-radius:14px;max-width:520px;width:92%;padding:26px 28px">
+      <h2 style="margin:0 0 6px;font-size:19px;color:#1C2430">Cadastrar um local de atendimento</h2>
+      <p style="margin:0 0 20px;font-size:12.5px;color:#6B7480">
+        O nome aparece como botão nesta tela. O papel timbrado é a folha de fundo do laudo —
+        se você não tiver, o laudo sai em branco e dá para acrescentar depois.</p>
+
+      <label style="display:block;font-size:13px;color:#26303C;margin-bottom:6px">Nome do local</label>
+      <input id="exCadNome" type="text" placeholder="ex.: Clínica São Lucas — Belém"
+             style="width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #C6CDD4;
+                    border-radius:8px;font-size:14px;font-family:inherit">
+
+      <label style="display:block;font-size:13px;color:#26303C;margin:18px 0 6px">
+        Papel timbrado <span style="color:#8A93A0">(opcional — PNG ou JPG, até 4 MB)</span></label>
+      <input id="exCadArq" type="file" accept="image/*" onchange="exCadPreview(this)"
+             style="font-size:13px;font-family:inherit">
+      <img id="exCadPrev" alt="" style="display:none;max-width:100%;max-height:190px;margin-top:14px;
+           border:1px solid #E2E5EA;border-radius:8px">
+
+      <p id="exCadAviso" style="min-height:18px;margin:14px 0 0;font-size:12.5px;color:#C43B3B"></p>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button onclick="exCadFechar()" style="border:1px solid #C6CDD4;background:#fff;border-radius:20px;
+                padding:10px 22px;font-size:14px;cursor:pointer;font-family:inherit;color:#4A5560">Cancelar</button>
+        <button onclick="exCadSalvar()" style="border:0;background:#0E6E6B;color:#fff;border-radius:20px;
+                padding:10px 26px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Salvar local</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <header>
@@ -1228,7 +1260,10 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
    funcionando sozinho quando o agente está desligado (localStorage continua como cópia).
    Cada chave tem carimbo de tempo; na sincronia o MAIS RECENTE vence (o médico também usa
    o iPhone, onde não há agente). A chave da API fica DE FORA de propósito. */
-const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid'];
+// 'glocais' (2.0): locais de atendimento cadastrados pelo médico, com o papel
+// timbrado de cada um. Entra aqui para viver no computador e não só no
+// navegador — trocar de navegador não pode custar o timbrado da clínica.
+const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -4282,7 +4317,7 @@ function capSetRecUI(){
 async function capRegistrarDitado(blob){
   var novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
   var hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  var a={idx:novoIdx, nome:'Ditado '+hora, url:URL.createObjectURL(blob), transcricao:'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true, _transcrevendo:true};
+  var a={idx:novoIdx, nome:'Ditado '+hora, url:URL.createObjectURL(blob), transcricao:'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, quando:Date.now(), _captura:true, _transcrevendo:true};
   audios.push(a);
   capRenderPendentes();
   log('Transcrevendo ditado…');
@@ -4612,11 +4647,17 @@ async function capAgenteFecharExame(est){
   return j;
 }
 /* cria o "áudio" do exame a partir do texto que o agente transcreveu */
-function capAudioDoAgente(texto, origem){
+/* quandoSeg: a hora que o AGENTE carimbou no ditado (segundos). Vem do
+   /exame/ditados na recuperação. Sem ela, vale o momento de agora.
+   É esse carimbo que permite casar ditado e exame pelo relógio em vez de pelo
+   nome — e o nome, desde 12/08, o médico não diz mais. */
+function capAudioDoAgente(texto, origem, quandoSeg){
   var idx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-  var hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  var ms=(quandoSeg&&isFinite(quandoSeg))?Math.round(quandoSeg*1000):Date.now();
+  var hora=new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   var a={idx:idx, nome:'Ditado '+hora+(origem==='prebuffer'?' (recuperado)':''), url:null, blob:null,
-         transcricao:texto||'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true, _agente:true};
+         transcricao:texto||'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null,
+         quando:ms, _captura:true, _agente:true};
   audios.push(a);
   return a;
 }
@@ -4688,7 +4729,7 @@ async function capOrtProcessar(est){
   }
   if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), _captura:true, _dicom:true, _estudoId:est.id, _preset:est.descricao||''};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
@@ -4760,12 +4801,15 @@ async function capRecuperar(){
     if(!imagens.length){ log('Recuperação: exame de '+(est.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
     var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
             tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
-            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _preset:est.descricao||''};
+            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
     ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
     ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
     exames.push(ex);
     // o ditado guardado volta como áudio do exame (com o WAV original p/ você poder ouvir)
-    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado');
+    // dit.quando: a hora que o agente carimbou quando guardou este ditado.
+    // Sem ela, o ditado recuperado entraria com a hora de AGORA e o encaixe
+    // pelo relógio olharia para o momento errado.
+    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado', dit.quando);
     a.nome='Ditado recuperado ('+(dit.quandoTexto||'')+')';
     if(dit.temAudio) a.url=agenteBase()+'/exame/audio/'+est.id;
     var meta=await capClassificarDitado(dit.texto||'', est.descricao);
@@ -4900,10 +4944,51 @@ async function capAutoVincular(ex, aCerto){
   }catch(e){ capOrtStatusTxt('Falha ao gerar o laudo de '+ex.paciente+': '+((e&&e.message)||e)); }
 }
 /* ---- vínculo imagem ↔ ditado + geração ---- */
+/* Momento do exame no aparelho, em milissegundos.
+   dataOrdem vem do agente como AAAAMMDDHHMM (ex.: 202608121522). Sem ela,
+   monta a partir de data + hora. Zero quando não dá para saber. */
+function capQuandoDoEstudo(est){
+  var s=String((est&&est.dataOrdem)||'').replace(/\D/g,'');
+  if(s.length>=12){
+    var d=new Date(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8), +s.slice(8,10), +s.slice(10,12));
+    if(!isNaN(d.getTime())) return d.getTime();
+  }
+  var m=String((est&&est.data)||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  var h=String((est&&est.hora)||'').match(/^(\d{1,2}):(\d{2})/);
+  if(m){
+    var d2=new Date(+m[3], +m[2]-1, +m[1], h?+h[1]:0, h?+h[2]:0);
+    if(!isNaN(d2.getTime())) return d2.getTime();
+  }
+  return 0;
+}
+/* Quanto tempo separa exame e ditado antes de deixarem de ser "o mesmo
+   atendimento". 20 min cobre exame demorado com folga; além disso, não é. */
+var CAP_JANELA_MIN=20;
+
+/* Qual ditado é DESTE exame.
+   Até 12/08/2026 isto olhava SÓ semelhança de nome — e o relógio, que o
+   programa conhece dos dois lados, era ignorado. Com a regra nova ("não diga o
+   nome do paciente, ele chega sozinho pelo aparelho"), a semelhança dava ZERO
+   para todos e sobrava o primeiro da lista: virava sorteio. Foi isso que
+   embaralhou os exames do dia 12.
+   Agora o RELÓGIO manda, e o nome — quando dito — reforça. */
 function capMelhorDitadoIdx(ex, pend){
   if(!pend.length) return -1;
-  var alvo=tokensNome(ex.paciente||''); var best=pend[0].idx, bestS=-1;
-  for(var i=0;i<pend.length;i++){ var s=alvo.length?simNome(alvo, pend[i].nomePaciente||''):0; if(s>bestS){ bestS=s; best=pend[i].idx; } }
+  var alvo=tokensNome(ex.paciente||'');
+  var tEx=ex._quando||0;
+  var best=pend[0].idx, bestS=-Infinity;
+  for(var i=0;i<pend.length;i++){
+    var a=pend[i];
+    var sNome=alvo.length?simNome(alvo, a.nomePaciente||''):0;      // 0..1
+    var sTempo=0;                                                    // 0..1
+    if(tEx && a.quando){
+      var min=Math.abs(tEx-a.quando)/60000;
+      if(min<=CAP_JANELA_MIN) sTempo=1-(min/CAP_JANELA_MIN);
+    }
+    // o tempo pesa o dobro: é o sinal que existe sempre, mesmo em silêncio
+    var s=sTempo*2+sNome;
+    if(s>bestS){ bestS=s; best=a.idx; }
+  }
   return best;
 }
 function capRenderNovos(){
@@ -5419,21 +5504,38 @@ function abAtualizarTudo(){
    As duas escolhas valem o dia inteiro e ficam GUARDADAS: a tela promete que
    "a escolha de ontem já vem marcada", e antes disso o local voltava para
    'branco' a cada abertura do programa. */
+/* Locais de atendimento. Os dois primeiros já vinham prontos no programa; os
+   demais o médico cadastra em "Outro…", e ficam guardados no computador
+   (chave 'glocais'), não só neste navegador. */
 var EX_LOCAIS=[{k:'labita',rot:'Tailândia'},{k:'capanema',rot:'Capanema'}];
+function exLocaisExtra(){
+  try{ var v=JSON.parse(localStorage.getItem('glocais')||'[]'); return Array.isArray(v)?v:[]; }
+  catch(e){ return []; }
+}
+/* Põe os locais cadastrados dentro do FUNDOS, que é de onde o laudo tira o
+   timbrado. Roda na abertura e depois de cada cadastro. */
+function exAplicarLocaisExtra(){
+  exLocaisExtra().forEach(function(l){
+    if(l && l.k) FUNDOS[l.k]={nome:l.nome||l.k, img:l.img||null};
+  });
+}
+function exTodosLocais(){
+  return EX_LOCAIS.concat(exLocaisExtra().map(function(l){ return {k:l.k, rot:l.nome||l.k}; }));
+}
 function exLocalSalvo(){ try{ return localStorage.getItem('g20local')||''; }catch(e){ return ''; } }
 function exModo(){ try{ return localStorage.getItem('g20modo')||'lista'; }catch(e){ return 'lista'; } }
 
 function exRenderLocais(){
   var d=document.getElementById('exLocais'); if(!d) return;
   var atual=window.__fundo||exLocalSalvo()||'branco';
-  var h=EX_LOCAIS.map(function(l){
-    return '<button class="opt local'+(atual===l.k?' sel':'')+'" onclick="exEscolherLocal(\''+l.k+'\')">'
-      +l.rot+(atual===l.k?' ✓':'')+'</button>';
+  var esc=function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); };
+  var h=exTodosLocais().map(function(l){
+    return '<button class="opt local'+(atual===l.k?' sel':'')+'" onclick="exEscolherLocal(\''+esc(l.k)+'\')">'
+      +esc(l.rot)+(atual===l.k?' ✓':'')+'</button>';
   }).join('');
-  // "Outro…" abre a lista completa que ja existe (inclui o Branco sem timbrado)
-  var fora=(atual!=='branco' && !EX_LOCAIS.some(function(l){return l.k===atual;}));
-  h+='<button class="opt local'+(fora||atual==='branco'?' sel':'')+'" onclick="exOutroLocal()">Outro…'
-     +((fora||atual==='branco')?' ✓':'')+'</button>';
+  // "Outro…" cadastra um local NOVO (antes abria a lista velha de fundos, que
+  // não permitia acrescentar nada — só escolher entre os que já existiam).
+  h+='<button class="opt local" onclick="exNovoLocal()">Outro…</button>';
   d.innerHTML=h;
 }
 function exEscolherLocal(k){
@@ -5441,10 +5543,53 @@ function exEscolherLocal(k){
   try{ localStorage.setItem('g20local',k); }catch(e){}
   exRenderLocais();
 }
-async function exOutroLocal(){
-  try{ await escolherFundo(); }catch(e){}
-  try{ localStorage.setItem('g20local',window.__fundo||'branco'); }catch(e){}
-  exRenderLocais();
+
+/* ---- cadastro de um local novo ---- */
+function exNovoLocal(){
+  var ov=document.getElementById('exCadLocal'); if(!ov) return;
+  document.getElementById('exCadNome').value='';
+  document.getElementById('exCadArq').value='';
+  document.getElementById('exCadPrev').style.display='none';
+  document.getElementById('exCadPrev').removeAttribute('src');
+  document.getElementById('exCadAviso').textContent='';
+  ov.style.display='flex';
+  document.getElementById('exCadNome').focus();
+}
+function exCadFechar(){ var ov=document.getElementById('exCadLocal'); if(ov) ov.style.display='none'; }
+function exCadPreview(input){
+  var f=input.files&&input.files[0]; var av=document.getElementById('exCadAviso');
+  if(!f) return;
+  if(!/^image\//.test(f.type)){ av.textContent='Escolha uma imagem (PNG ou JPG).'; input.value=''; return; }
+  if(f.size>4*1024*1024){ av.textContent='Imagem muito grande (máx. 4 MB). Reduza e tente de novo.'; input.value=''; return; }
+  var fr=new FileReader();
+  fr.onload=function(){ var p=document.getElementById('exCadPrev'); p.src=fr.result; p.style.display='block'; av.textContent=''; };
+  fr.readAsDataURL(f);
+}
+function exCadSalvar(){
+  var nome=(document.getElementById('exCadNome').value||'').trim();
+  var av=document.getElementById('exCadAviso');
+  if(!nome){ av.textContent='Dê um nome ao local.'; return; }
+  // chave estável a partir do nome; cadastrar o MESMO nome de novo atualiza o
+  // que já estava (serve para trocar o timbrado sem criar um local repetido)
+  var k='loc-'+norm(nome).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  if(!k||k==='loc-'){ av.textContent='Nome inválido.'; return; }
+  // Comparar pelo NOME, não pela chave: a chave nova leva o prefixo 'loc-' e
+  // nunca seria igual à dos locais que já vêm no programa — na primeira versão
+  // isso deixou cadastrar um segundo "Capanema".
+  var nomeNorm=norm(nome);
+  if(EX_LOCAIS.some(function(l){ return norm(l.rot)===nomeNorm; })){
+    av.textContent='Esse local já vem no programa — é só clicar no botão dele.'; return;
+  }
+  var prev=document.getElementById('exCadPrev');
+  var img=(prev&&prev.style.display!=='none'&&prev.getAttribute('src'))||null;
+  var lista=exLocaisExtra().filter(function(l){ return l.k!==k; });
+  lista.push({k:k, nome:nome, img:img});
+  try{ dadoSalvar('glocais', JSON.stringify(lista)); }
+  catch(e){ av.textContent='Não consegui guardar: '+((e&&e.message)||e); return; }
+  exAplicarLocaisExtra();
+  exCadFechar();
+  exEscolherLocal(k);            // já deixa o local novo escolhido
+  log('Local "'+nome+'" cadastrado'+(img?' com papel timbrado.':' (sem timbrado).'));
 }
 function exEscolherModo(m){
   try{ localStorage.setItem('g20modo',m); }catch(e){}
@@ -5477,6 +5622,7 @@ async function exIniciar(){
 }
 
 function exAbrir(){
+  exAplicarLocaisExtra();      // os locais cadastrados entram no FUNDOS antes de desenhar
   var d=document.getElementById('exData');
   if(d) d.textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
   var salvo=exLocalSalvo(); if(salvo && !window.__fundoPerguntado){ window.__fundo=salvo; window.__fundoPerguntado=true; }

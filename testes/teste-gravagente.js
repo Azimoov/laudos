@@ -137,5 +137,45 @@ ok(/ex\._liberado=!!jaLiberados\[est\.id\]/.test(HTML),
 ok(/agente sem a rota ainda/.test(HTML),
    'agente sem essa rota nao trava a recuperacao (segue sem a marca)');
 
+console.log('\n=== laudo pronto NAO atropela o que esta na tela (2.0) ===');
+// Relato do Dr. Daniel em 12/08: quando um laudo ficava pronto ele TOMAVA a
+// tela, por cima do que estava sendo revisado. Agora quem manda e o laudo que o
+// medico esta lendo; o novo espera a vez.
+ok(/exLaudoPronto\(ex\.id, ex\.paciente\)/.test(HTML),
+   'a captura chama exLaudoPronto em vez de abrir a revisao direto');
+// So o caminho AUTOMATICO (o exame que chega do aparelho e gera o laudo
+// sozinho) e que nao pode tomar a tela. Quando o medico CLICA em gerar um laudo
+// especifico, abrir e justamente o que ele pediu — esses continuam abrindo.
+// sem os comentarios: o proprio comentario que explica a correcao cita a
+// chamada antiga, e o teste passava a acusar a si mesmo.
+const semComent = t => String(t).replace(/^\s*\/\/.*$/gm, '');
+const autoVinc = semComent(grab('capAutoVincular'));
+ok(!/abrirRevisao\(/.test(autoVinc),
+   'o caminho automatico nao abre a revisao direto (era o que atropelava)');
+ok(/exLaudoPronto\(/.test(autoVinc), 'ele passa pela decisao do modo do dia');
+ok(/abrirRevisao\(ex\.id\);/.test(grab('capVincularGerar')),
+   'ja o "Vincular e gerar" continua abrindo: foi o medico que pediu aquele laudo');
+ok(/function exTelaOcupada\(\)/.test(HTML), 'existe a checagem de tela ocupada');
+ok(/if\(exTelaOcupada\(\)\)\{[\s\S]{0,240}?entrou na fila/.test(HTML),
+   'com a tela ocupada, o laudo novo entra na fila em vez de abrir');
+ok(/pendentes\.length\)\{ abrirRevisao\(pendentes\[0\]\.id\); \}/.test(HTML),
+   'ao liberar, o proximo da fila abre sozinho (isso ja existia)');
+ok(/m==='arquivo'/.test(HTML) && /m==='lista'/.test(HTML),
+   'os tres modos de revisao estao implementados, nao so escritos na tela');
+
+console.log('\n=== as escolhas do dia ficam guardadas ===');
+// A tela promete "a escolha de ontem ja vem marcada". Antes, o local voltava
+// para 'branco' a cada abertura do programa.
+ok(/localStorage\.setItem\('g20local'/.test(HTML), 'o local de atendimento e guardado');
+ok(/localStorage\.setItem\('g20modo'/.test(HTML), 'o modo de revisao e guardado');
+ok(/window\.__fundo=k/.test(HTML), 'escolher o local ja troca o timbrado que sai no laudo');
+
+console.log('\n=== a regra do "corrigindo" chegou ao pedido feito a IA ===');
+// A tela escreve isso como orientacao ao medico. Antes, NADA no pedido a IA
+// falava em correcao de fala: funcionava por sorte do modelo.
+ok(/CORREÇÃO FALADA/.test(HTML), 'a regra existe no pedido');
+ok(/DESCARTE por completo o que ele disse antes/.test(HTML), 'manda descartar a versao anterior');
+ok(/nunca escreva a palavra 'corrigindo' no laudo/.test(HTML), 'e a palavra nao vaza para o laudo');
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

@@ -392,6 +392,51 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaExames .ab-iniciar:hover{background:#0B5A57}
 #telaExames .ab-iniciar:disabled{background:#7FA5A3;cursor:default}
 #telaExames .ab-rodape{text-align:center;font-size:12px;color:#8A93A0;margin-top:16px}
+
+/* Caixas de diálogo das telas novas.
+   ⚠️ NÃO usar style="background:#fff;border-radius:1..." aqui: existe uma regra
+   no CSS antigo do app ([style*="background:#fff;border-radius:1"]) que converte
+   isso para o tema ESCURO com !important. Foi o que aconteceu na primeira
+   versão: a caixa virava grafite e os textos, escritos para fundo branco,
+   sumiam. Por isso tudo aqui é por CLASSE, com as cores declaradas. */
+.ab-mod{display:none;position:fixed;inset:0;background:rgba(10,16,20,.62);z-index:9100;
+  align-items:center;justify-content:center;overflow:auto;padding:20px;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif}
+.ab-mod.aberto{display:flex}
+.ab-mod-cx{background:#FFFFFF;color:#101720;border:1px solid #DCE2E8;border-radius:14px;max-width:520px;
+  width:100%;padding:26px 28px;max-height:88vh;overflow:auto}
+.ab-mod-t{margin:0 0 6px;font-size:19px;font-weight:700;color:#101720}
+.ab-mod-s{margin:0 0 20px;font-size:12.5px;color:#5B6472;line-height:1.5}
+.ab-mod-l{display:block;font-size:13px;font-weight:600;color:#1C2430;margin:18px 0 6px}
+.ab-mod-l:first-of-type{margin-top:0}
+.ab-mod-op{font-size:12px;color:#6B7480;font-weight:400}
+/* input[type=text] do CSS antigo tem especificidade maior que uma classe sozinha
+   e pintava o campo de grafite (fundo escuro) com o texto claro — dentro de uma
+   caixa branca. Repetindo o elemento no seletor, esta regra ganha. */
+.ab-mod input.ab-mod-i,
+.ab-mod textarea.ab-mod-i{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #B9C2CC;
+  border-radius:8px;font-size:14px;font-family:inherit;background:#FFFFFF;color:#101720;resize:vertical}
+.ab-mod input.ab-mod-i:focus,
+.ab-mod textarea.ab-mod-i:focus{outline:2px solid #0E6E6B;outline-offset:-1px;border-color:#0E6E6B;
+  box-shadow:none}
+.ab-mod .ab-mod-i::placeholder{color:#98A2AE}
+.ab-mod-arq{display:inline-flex;align-items:center;gap:8px;background:#F3F6F8;border:1px solid #B9C2CC;
+  border-radius:8px;padding:9px 16px;font-size:13.5px;color:#1C2430;cursor:pointer;font-family:inherit}
+.ab-mod-arq:hover{background:#E8EEF2}
+.ab-mod-ia{display:block;width:100%;margin-top:12px;background:#EFEAFB;border:1px solid #C9B8F0;
+  border-radius:8px;padding:11px 16px;font-size:13.5px;font-weight:600;color:#4B2E9E;cursor:pointer;
+  font-family:inherit}
+.ab-mod-ia:hover{background:#E5DCF8}
+.ab-mod-prev{display:none;max-width:100%;max-height:190px;margin-top:14px;border:1px solid #DCE2E8;
+  border-radius:8px;background:#fff}
+.ab-mod-av{min-height:18px;margin:14px 0 0;font-size:12.5px;color:#B3261E;line-height:1.45}
+.ab-mod-acoes{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.ab-mod-b{border:0;background:#0E6E6B;color:#FFFFFF;border-radius:20px;padding:10px 26px;font-size:14px;
+  font-weight:600;cursor:pointer;font-family:inherit}
+.ab-mod-b:hover{background:#0B5A57}
+.ab-mod-b.sec{background:#FFFFFF;border:1px solid #B9C2CC;color:#3B4552;font-weight:400}
+.ab-mod-b.sec:hover{background:#F1F4F7}
+.ab-mod-b:disabled{background:#8FB2B0;cursor:default}
 </style>
 
 <div id="telaExames">
@@ -437,33 +482,72 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   </div>
 
   <!-- cadastro de local novo -->
-  <div id="exCadLocal" style="display:none;position:fixed;inset:0;background:rgba(20,30,36,.55);
-       align-items:center;justify-content:center;z-index:9100">
-    <div style="background:#fff;border-radius:14px;max-width:520px;width:92%;padding:26px 28px">
-      <h2 style="margin:0 0 6px;font-size:19px;color:#1C2430">Cadastrar um local de atendimento</h2>
-      <p style="margin:0 0 20px;font-size:12.5px;color:#6B7480">
-        O nome aparece como botão nesta tela. O papel timbrado é a folha de fundo do laudo —
-        se você não tiver, o laudo sai em branco e dá para acrescentar depois.</p>
+  <div id="exCadLocal" class="ab-mod">
+    <div class="ab-mod-cx">
+      <h2 class="ab-mod-t">Cadastrar um local de atendimento</h2>
+      <p class="ab-mod-s">O nome aparece como botão nesta tela. O papel timbrado é a folha de fundo
+        do laudo — se você não tiver, dá para criar uma com a ajuda da IA aqui embaixo.</p>
 
-      <label style="display:block;font-size:13px;color:#26303C;margin-bottom:6px">Nome do local</label>
-      <input id="exCadNome" type="text" placeholder="ex.: Clínica São Lucas — Belém"
-             style="width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #C6CDD4;
-                    border-radius:8px;font-size:14px;font-family:inherit">
+      <label class="ab-mod-l" for="exCadNome">Nome do local</label>
+      <input id="exCadNome" class="ab-mod-i" type="text" placeholder="ex.: Clínica São Lucas — Belém">
 
-      <label style="display:block;font-size:13px;color:#26303C;margin:18px 0 6px">
-        Papel timbrado <span style="color:#8A93A0">(opcional — PNG ou JPG, até 4 MB)</span></label>
-      <input id="exCadArq" type="file" accept="image/*" onchange="exCadPreview(this)"
-             style="font-size:13px;font-family:inherit">
-      <img id="exCadPrev" alt="" style="display:none;max-width:100%;max-height:190px;margin-top:14px;
-           border:1px solid #E2E5EA;border-radius:8px">
+      <label class="ab-mod-l">Papel timbrado <span class="ab-mod-op">(opcional — PNG ou JPG, até 4 MB)</span></label>
+      <input id="exCadArq" type="file" accept="image/*" onchange="exCadPreview(this)" style="display:none">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="ab-mod-arq" onclick="document.getElementById('exCadArq').click()">
+          <span style="font-size:16px">📁</span> Escolher arquivo…</button>
+        <span class="ab-mod-op" id="exCadArqNome">nenhum arquivo escolhido</span>
+      </div>
+      <button class="ab-mod-ia" onclick="exIaAbrir()">✨ Criar máscara com IA</button>
 
-      <p id="exCadAviso" style="min-height:18px;margin:14px 0 0;font-size:12.5px;color:#C43B3B"></p>
+      <img id="exCadPrev" alt="" class="ab-mod-prev">
+      <p id="exCadAviso" class="ab-mod-av"></p>
 
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
-        <button onclick="exCadFechar()" style="border:1px solid #C6CDD4;background:#fff;border-radius:20px;
-                padding:10px 22px;font-size:14px;cursor:pointer;font-family:inherit;color:#4A5560">Cancelar</button>
-        <button onclick="exCadSalvar()" style="border:0;background:#0E6E6B;color:#fff;border-radius:20px;
-                padding:10px 26px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Salvar local</button>
+      <div class="ab-mod-acoes">
+        <button class="ab-mod-b sec" onclick="exCadFechar()">Cancelar</button>
+        <button class="ab-mod-b" onclick="exCadSalvar()">Salvar local</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- máscara criada com IA -->
+  <div id="exIaLocal" class="ab-mod">
+    <div class="ab-mod-cx" style="max-width:600px">
+      <h2 class="ab-mod-t">Criar máscara com IA</h2>
+      <p class="ab-mod-s">Diga o que deve aparecer no papel timbrado. A IA desenha o cabeçalho e o
+        rodapé; o miolo fica livre para o laudo.</p>
+
+      <label class="ab-mod-l" for="exIaClinica">Nome da clínica</label>
+      <input id="exIaClinica" class="ab-mod-i" type="text" placeholder="ex.: Clínica São Lucas">
+
+      <label class="ab-mod-l" for="exIaEnd">Endereço</label>
+      <input id="exIaEnd" class="ab-mod-i" type="text" placeholder="ex.: Av. Central, 1200 — Belém/PA">
+
+      <label class="ab-mod-l" for="exIaTel">Telefone</label>
+      <input id="exIaTel" class="ab-mod-i" type="text" placeholder="ex.: (91) 3222-0000 · WhatsApp (91) 98888-0000">
+
+      <label class="ab-mod-l" for="exIaInfo">Outras informações que devem aparecer</label>
+      <textarea id="exIaInfo" class="ab-mod-i" rows="3"
+        placeholder="ex.: CNPJ, site, redes sociais, nome e CRM do responsável técnico, horário de atendimento"></textarea>
+
+      <label class="ab-mod-l">Logo ou imagem de fundo <span class="ab-mod-op">(opcional)</span></label>
+      <input id="exIaArq" type="file" accept="image/*" onchange="exIaLogo(this)" style="display:none">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="ab-mod-arq" onclick="document.getElementById('exIaArq').click()">
+          <span style="font-size:16px">📁</span> Escolher imagem…</button>
+        <span class="ab-mod-op" id="exIaArqNome">nenhuma imagem escolhida</span>
+      </div>
+
+      <p id="exIaAviso" class="ab-mod-av"></p>
+      <div id="exIaPrevBox" style="display:none;margin-top:16px">
+        <div class="ab-mod-op" style="margin-bottom:6px">Prévia da folha (o laudo é escrito por cima):</div>
+        <img id="exIaPrev" alt="" style="width:100%;border:1px solid #DCE2E8;border-radius:8px;background:#fff">
+      </div>
+
+      <div class="ab-mod-acoes">
+        <button class="ab-mod-b sec" onclick="exIaFechar()">Cancelar</button>
+        <button class="ab-mod-b sec" id="exIaBtnGerar" onclick="exIaGerar()">Gerar máscara</button>
+        <button class="ab-mod-b" id="exIaBtnOk" onclick="exIaAprovar()" style="display:none">Aprovar e usar</button>
       </div>
     </div>
   </div>
@@ -5661,21 +5745,132 @@ function exNovoLocal(){
   var ov=document.getElementById('exCadLocal'); if(!ov) return;
   document.getElementById('exCadNome').value='';
   document.getElementById('exCadArq').value='';
+  document.getElementById('exCadArqNome').textContent='nenhum arquivo escolhido';
   document.getElementById('exCadPrev').style.display='none';
   document.getElementById('exCadPrev').removeAttribute('src');
   document.getElementById('exCadAviso').textContent='';
-  ov.style.display='flex';
+  ov.classList.add('aberto');
   document.getElementById('exCadNome').focus();
 }
-function exCadFechar(){ var ov=document.getElementById('exCadLocal'); if(ov) ov.style.display='none'; }
+function exCadFechar(){ var ov=document.getElementById('exCadLocal'); if(ov) ov.classList.remove('aberto'); }
 function exCadPreview(input){
   var f=input.files&&input.files[0]; var av=document.getElementById('exCadAviso');
   if(!f) return;
   if(!/^image\//.test(f.type)){ av.textContent='Escolha uma imagem (PNG ou JPG).'; input.value=''; return; }
   if(f.size>4*1024*1024){ av.textContent='Imagem muito grande (máx. 4 MB). Reduza e tente de novo.'; input.value=''; return; }
+  document.getElementById('exCadArqNome').textContent=f.name;
   var fr=new FileReader();
   fr.onload=function(){ var p=document.getElementById('exCadPrev'); p.src=fr.result; p.style.display='block'; av.textContent=''; };
   fr.readAsDataURL(f);
+}
+
+/* ---- máscara criada com IA ----
+   A IA desenha em SVG, não em imagem gerada por pixel. Motivo prático: o texto
+   de um timbrado (nome da clínica, endereço, telefone) tem de sair EXATO, e
+   modelo que gera imagem escreve texto errado com frequência. Em SVG o texto é
+   texto de verdade — sai certo, e ainda fica nítido em qualquer tamanho.
+   O logo que o médico escolhe NÃO é enviado à IA: entra depois, no lugar da
+   marca __LOGO__. Além de mais barato, evita mandar imagem para fora à toa. */
+var _exIaLogo=null, _exIaPng=null;
+function exIaAbrir(){
+  var ov=document.getElementById('exIaLocal'); if(!ov) return;
+  var nomeJa=(document.getElementById('exCadNome').value||'').trim();
+  if(nomeJa && !document.getElementById('exIaClinica').value) document.getElementById('exIaClinica').value=nomeJa;
+  document.getElementById('exIaAviso').textContent='';
+  document.getElementById('exIaPrevBox').style.display='none';
+  document.getElementById('exIaBtnOk').style.display='none';
+  _exIaPng=null;
+  ov.classList.add('aberto');
+  document.getElementById('exIaClinica').focus();
+}
+function exIaFechar(){ var ov=document.getElementById('exIaLocal'); if(ov) ov.classList.remove('aberto'); }
+function exIaLogo(input){
+  var f=input.files&&input.files[0]; var av=document.getElementById('exIaAviso');
+  if(!f) return;
+  if(!/^image\//.test(f.type)){ av.textContent='Escolha uma imagem (PNG ou JPG).'; input.value=''; return; }
+  if(f.size>4*1024*1024){ av.textContent='Imagem muito grande (máx. 4 MB).'; input.value=''; return; }
+  document.getElementById('exIaArqNome').textContent=f.name;
+  var fr=new FileReader();
+  fr.onload=function(){ _exIaLogo=fr.result; av.textContent=''; };
+  fr.readAsDataURL(f);
+}
+/* SVG -> PNG, para o timbrado virar uma imagem como as outras (é assim que o
+   laudo já sabe usar). Passa pelo canvas; o logo é data: URI, mesma origem,
+   então não contamina o canvas. */
+function exSvgParaPng(svg, larg, alt){
+  return new Promise(function(res, rej){
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var c=document.createElement('canvas'); c.width=larg; c.height=alt;
+        var x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,larg,alt);
+        x.drawImage(img,0,0,larg,alt);
+        res(c.toDataURL('image/png'));
+      }catch(e){ rej(e); }
+    };
+    img.onerror=function(){ rej(new Error('não consegui desenhar a máscara')); };
+    img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  });
+}
+async function exIaGerar(){
+  var av=document.getElementById('exIaAviso'), bt=document.getElementById('exIaBtnGerar');
+  var clinica=(document.getElementById('exIaClinica').value||'').trim();
+  if(!clinica){ av.textContent='Diga pelo menos o nome da clínica.'; return; }
+  if(!await temIA()){ av.textContent='Sem IA disponível: ligue o agente ou configure a chave.'; return; }
+  bt.disabled=true; bt.textContent='desenhando…'; av.textContent='';
+  try{
+    var dados=[
+      'Nome da clínica: '+clinica,
+      'Endereço: '+((document.getElementById('exIaEnd').value||'').trim()||'(não informado)'),
+      'Telefone: '+((document.getElementById('exIaTel').value||'').trim()||'(não informado)'),
+      'Outras informações: '+((document.getElementById('exIaInfo').value||'').trim()||'(nenhuma)'),
+      'Logo enviado pelo médico: '+(_exIaLogo?'SIM':'não')
+    ].join('\n');
+    var p='Desenhe o PAPEL TIMBRADO de uma clínica de ultrassonografia, em SVG.\n\n'
+      +'REGRAS OBRIGATÓRIAS:\n'
+      +'- SVG único, com width="794" height="1123" viewBox="0 0 794 1123" (folha A4 em pé).\n'
+      +'- CABEÇALHO na faixa de y=0 a y=175 e RODAPÉ de y=1010 a y=1123. O MIOLO (y=175 a y=1010) '
+      +'fica VAZIO: é onde o texto do laudo será escrito por cima. Nada de moldura fechando o miolo, '
+      +'nada de linhas horizontais no miolo.\n'
+      +'- Fundo branco. Sóbrio e profissional, como papel timbrado de consultório médico: uma faixa ou '
+      +'filete de cor, tipografia limpa, muito espaço em branco. NADA de ícones de desenho animado, '
+      +'gradientes berrantes ou imagens decorativas grandes.\n'
+      +'- Use APENAS as informações abaixo. NÃO invente endereço, telefone, CNPJ, CRM nem nome de médico. '
+      +'Informação não fornecida simplesmente não aparece.\n'
+      +'- Fontes: use font-family="Helvetica, Arial, sans-serif". Todo texto deve caber na largura da folha.\n'
+      +(_exIaLogo
+        ? '- O médico enviou um LOGO. Inclua exatamente um elemento <image href="__LOGO__" .../> no cabeçalho, '
+          +'com preserveAspectRatio="xMidYMid meet", altura entre 60 e 110. Escreva literalmente __LOGO__ no href.\n'
+        : '- Não há logo: não use nenhum elemento <image>.\n')
+      +'\nINFORMAÇÕES:\n'+dados
+      +'\n\nResponda SOMENTE em JSON: {"svg":"<svg ...>...</svg>"}';
+    var r=await openai([{type:'text',text:p}]);
+    var svg=(r&&r.svg)||'';
+    if(!/<svg[\s\S]*<\/svg>/i.test(svg)) throw new Error('a IA não devolveu um desenho válido');
+    if(_exIaLogo) svg=svg.split('__LOGO__').join(_exIaLogo);
+    else svg=svg.replace(/<image\b[^>]*>/gi,'');     // sem logo, nenhuma imagem entra
+    _exIaPng=await exSvgParaPng(svg, 794, 1123);
+    document.getElementById('exIaPrev').src=_exIaPng;
+    document.getElementById('exIaPrevBox').style.display='block';
+    document.getElementById('exIaBtnOk').style.display='';
+    bt.textContent='Gerar de novo';
+    av.textContent='';
+  }catch(e){
+    av.textContent='Não consegui criar a máscara: '+((e&&e.message)||e)+'. Tente de novo ou descreva de outro jeito.';
+    bt.textContent='Gerar máscara';
+  }
+  bt.disabled=false;
+}
+function exIaAprovar(){
+  if(!_exIaPng) return;
+  var clinica=(document.getElementById('exIaClinica').value||'').trim();
+  var cad=document.getElementById('exCadNome');
+  if(cad && !cad.value.trim()) cad.value=clinica;
+  var p=document.getElementById('exCadPrev'); p.src=_exIaPng; p.style.display='block';
+  document.getElementById('exCadArqNome').textContent='máscara criada com IA';
+  document.getElementById('exCadAviso').textContent='';
+  exIaFechar();
+  log('Máscara criada. Confira o nome do local e toque em "Salvar local".');
 }
 function exCadSalvar(){
   var nome=(document.getElementById('exCadNome').value||'').trim();

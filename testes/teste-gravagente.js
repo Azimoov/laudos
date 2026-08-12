@@ -289,5 +289,42 @@ ok(/AB_DESVIO_ATENCAO=120/.test(HTML),
 ok(/pode ir para o exame errado/.test(apar), 'o aviso diz a CONSEQUENCIA, nao so o numero');
 ok(/Acerte a hora no ultrassom/.test(apar), 'e diz o que fazer');
 
+console.log('\n=== a caixa de cadastro nao cai no tema escuro do app antigo ===');
+// O app tem tema ESCURO por desenho, e ainda um remendo que converte caixas
+// claras antigas: [style*="background:#fff;border-radius:1"] vira grafite com
+// !important. A primeira versao do cadastro usava exatamente esse estilo em
+// linha: a caixa virava escura e os textos, escritos para fundo branco, sumiam.
+// Relatado pelo Dr. Daniel: "o texto esta com muito pouco contraste".
+ok(!/id="exCadLocal" style="display:none;position:fixed/.test(HTML),
+   'a caixa nao usa mais estilo em linha (era o que caia no remendo do tema escuro)');
+ok(/<div id="exCadLocal" class="ab-mod">/.test(HTML), 'ela tem classe propria');
+ok(/\.ab-mod input\.ab-mod-i,/.test(HTML),
+   'os campos repetem o ELEMENTO no seletor para vencer input[type=text] do CSS antigo');
+ok(/\.ab-mod-cx\{background:#FFFFFF;color:#101720/.test(HTML),
+   'a caixa declara fundo E cor de texto, sem depender de heranca');
+
+console.log('\n=== botao de arquivo e criacao de mascara com IA ===');
+ok(/id="exCadArq"[^>]*style="display:none"/.test(HTML), 'o seletor de arquivo cru fica escondido');
+ok(/class="ab-mod-arq"[\s\S]{0,220}📁/.test(HTML), 'no lugar dele, um botao com a pasta');
+ok(/id="exCadArqNome"/.test(HTML), 'e o nome do arquivo escolhido aparece ao lado');
+const ia = semComent(grab('exIaGerar'));
+ok(/viewBox="0 0 794 1123"/.test(ia), 'a IA e instruida a desenhar em A4 de pe');
+// a frase e montada em pedacos no codigo-fonte, entao a busca ignora o que ha entre eles
+ok(/O MIOLO \(y=175 a y=1010\)[\s\S]{0,40}fica VAZIO/.test(ia),
+   'e a deixar o miolo vazio — e ali que o laudo e escrito por cima');
+ok(/NÃO invente endereço, telefone, CNPJ, CRM nem nome de médico/.test(ia),
+   'proibida de inventar dado que o medico nao deu');
+ok(/svg=svg\.split\('__LOGO__'\)\.join\(_exIaLogo\)/.test(ia),
+   'o logo entra DEPOIS, no lugar de uma marca: nao e enviado a IA');
+ok(/svg\.replace\(\/<image\\b\[\^>\]\*>\/gi,''\)/.test(ia),
+   'sem logo, nenhuma imagem sobra no desenho');
+ok(/exSvgParaPng/.test(ia), 'o desenho vira PNG, que e o formato que o laudo ja sabe usar');
+ok(/desenho em SVG, não em imagem gerada por pixel/.test(HTML) ||
+   /A IA desenha em SVG, não em imagem gerada por pixel/.test(HTML),
+   'esta escrito no codigo POR QUE e SVG: texto de timbrado tem de sair exato');
+const apr = semComent(grab('exIaAprovar'));
+ok(/if\(!_exIaPng\) return;/.test(apr), 'so aprova o que foi realmente gerado');
+ok(/exIaFechar\(\)/.test(apr), 'aprovar devolve para o cadastro, que e onde se salva');
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

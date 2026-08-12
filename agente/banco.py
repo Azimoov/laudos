@@ -398,6 +398,30 @@ def liberados(caminho=None):
         con.close()
 
 
+def resumo_do_dia(dia=None, caminho=None):
+    """GET /exames/resumo — quantos laudos do dia foram feitos, assinados e faltam.
+
+    Alimenta a etiqueta "N pendentes" da tela de abertura. Vem do BANCO, e nao da
+    tela, de proposito: assim o numero sobrevive a fechar a janela — que foi
+    exatamente o que se perdeu em 12/08.
+    """
+    con = conectar(caminho)
+    try:
+        dia = dia or time.strftime('%Y-%m-%d')
+        uma = lambda sql: con.execute(sql, (dia,)).fetchone()[0]  # noqa: E731
+        gerados = uma('SELECT COUNT(*) FROM exames WHERE data_exame=?')
+        liberados = uma('SELECT COUNT(*) FROM exames WHERE data_exame=?'
+                        ' AND finalizado_em IS NOT NULL')
+        return {'dia': dia, 'gerados': gerados, 'liberados': liberados,
+                'pendentes': gerados - liberados,
+                # o total ignora a data: serve para o caso de sobrar coisa de
+                # outro dia sem assinar, que a etiqueta do dia nao mostraria
+                'pendentesTotal': con.execute(
+                    'SELECT COUNT(*) FROM exames WHERE finalizado_em IS NULL').fetchone()[0]}
+    finally:
+        con.close()
+
+
 def buscar_paciente(filtros, caminho=None):
     """GET /pacientes/buscar — exames anteriores com achados estruturados."""
     con = conectar(caminho)
@@ -570,6 +594,13 @@ def responder(metodo, caminho, corpo):
                                       motivo=(corpo or {}).get('motivo')))
         if metodo == 'GET' and caminho == '/exames/liberados':
             return (200, liberados())
+        if metodo == 'GET' and (caminho or '').startswith('/exames/resumo'):
+            try:
+                from urllib.parse import parse_qs, urlparse
+                dia = (parse_qs(urlparse(caminho).query).get('dia') or [None])[0]
+            except Exception:  # noqa: BLE001
+                dia = None
+            return (200, resumo_do_dia(dia))
         if metodo == 'GET' and (caminho or '').startswith('/pacientes/buscar'):
             try:
                 from urllib.parse import parse_qs, urlparse

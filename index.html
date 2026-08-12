@@ -4518,6 +4518,14 @@ async function capRecuperar(){
   }catch(e){ capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+').'); return; }
 
   var hoje=new Date(); var dh=('0'+hoje.getDate()).slice(-2)+'/'+('0'+(hoje.getMonth()+1)).slice(-2)+'/'+hoje.getFullYear();
+  // Quais exames o médico JA liberou. Sem isto, um exame ja assinado voltava
+  // como "nao liberado" e ele perdia a conta do que faltava (12/08/2026).
+  var jaLiberados={};
+  try{
+    var rl=await fetch(agenteBase()+'/exames/liberados');
+    var jl=await rl.json();
+    (jl&&jl.uids||[]).forEach(function(u){ jaLiberados[u]=true; });
+  }catch(e){ /* agente sem a rota ainda: segue sem a marca, nunca trava */ }
   var jaTem={}; exames.forEach(function(e){ if(e._estudoId) jaTem[e._estudoId]=true; });
   var alvo=estudos.filter(function(e){ return e.data===dh && ditados[e.id] && !jaTem[e.id]; });
   if(!alvo.length){
@@ -4540,6 +4548,7 @@ async function capRecuperar(){
             tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
             idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _preset:est.descricao||''};
     ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
+    ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
     exames.push(ex);
     // o ditado guardado volta como áudio do exame (com o WAV original p/ você poder ouvir)
     var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado');
@@ -4549,7 +4558,10 @@ async function capRecuperar(){
     a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
     a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
     renderExames();
-    await capAutoVincular(ex);
+    // O agente guardou ESTE ditado etiquetado com ESTE exame (ditados[est.id]).
+    // Passar `a` explicitamente impede que a função escolha por semelhança
+    // entre todos os ditados soltos — que foi o que embaralhou tudo em 12/08.
+    await capAutoVincular(ex, a);
     feitos++;
   }
   capRenderPendentes(); capRenderNovos(); renderExames();
@@ -4614,13 +4626,23 @@ async function capOrtBaixar(instanciaId){
   return imgs[0];
 }
 /* vincula o ditado pendente ao exame que chegou e (se possível) gera o laudo */
-async function capAutoVincular(ex){
+/* aCerto: o ditado que comprovadamente é DESTE exame — usado na recuperação,
+   onde o agente guardou cada ditado etiquetado com o número do exame. Sem ele,
+   a função escolhe por semelhança entre TODOS os ditados soltos, e aí um exame
+   pode ficar com o ditado de outro (aconteceu em 12/08, ao recuperar vários
+   exames de uma vez: o vínculo existia e era jogado fora). */
+async function capAutoVincular(ex, aCerto){
   var auto=(document.getElementById('capOrtAuto')||{}).checked;
-  var pend=audios.filter(function(a){return a._captura && a.exameId==null;});
-  if(!pend.length){ capOrtStatusTxt('🆕 Exame de '+ex.paciente+' pronto — aguardando o ditado. Grave e finalize.'); return; }
-  var aIdx=capMelhorDitadoIdx(ex, pend);
-  var a=audios.find(function(x){return x.idx===aIdx;});
-  if(!a){ capOrtStatusTxt('🆕 Exame de '+ex.paciente+' pronto — vincule o ditado abaixo.'); return; }
+  var a;
+  if(aCerto){
+    a=aCerto;                       // vínculo conhecido: não há o que adivinhar
+  }else{
+    var pend=audios.filter(function(a){return a._captura && a.exameId==null;});
+    if(!pend.length){ capOrtStatusTxt('🆕 Exame de '+ex.paciente+' pronto — aguardando o ditado. Grave e finalize.'); return; }
+    var aIdx=capMelhorDitadoIdx(ex, pend);
+    a=audios.find(function(x){return x.idx===aIdx;});
+    if(!a){ capOrtStatusTxt('🆕 Exame de '+ex.paciente+' pronto — vincule o ditado abaixo.'); return; }
+  }
   exames.forEach(function(e){ e.audios=e.audios.filter(function(k){return k!==a.idx;}); });
   a.exameId=ex.id; a.pendente=false; ex.audios.push(a.idx);
   if(!ex.tipo){ var tt=mapTipo(a.tipoExame); if(tt) ex.tipo=tt; }

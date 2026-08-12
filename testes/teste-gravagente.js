@@ -109,5 +109,33 @@ ok(/gravacao\/iniciar/.test(HTML) && /gravacao\/parar/.test(HTML) && /exame\/fec
 ok(/capMR\.start\(CP_FATIA_MS\)/.test(HTML),
    'o plano B (navegador) continua com a caixa-preta ligada');
 
+console.log('\n=== recuperar exames: o vinculo volta pronto ===');
+// 12/08/2026, relato do Dr. Daniel: ao recuperar os exames depois de fechar a
+// janela sem querer, o vinculo entre ditado e exame se perdia. Ficava "um monte
+// de audio a definir" e ele tinha de refazer tudo na mao — e ai um exame ficava
+// com o ditado de outro. A causa: o agente guarda cada ditado ETIQUETADO com o
+// numero do exame (ditados[est.id]); a recuperacao usava a etiqueta para achar o
+// ditado certo e entao a jogava fora, mandando adivinhar por semelhanca entre
+// TODOS os ditados soltos.
+ok(/await capAutoVincular\(ex, a\)/.test(HTML),
+   'a recuperacao entrega o ditado certo em vez de mandar adivinhar');
+ok(/async function capAutoVincular\(ex, aCerto\)/.test(HTML),
+   'capAutoVincular aceita um ditado ja conhecido');
+ok(/if\(aCerto\)\{[\s\S]{0,80}?a=aCerto;/.test(HTML),
+   'com o ditado conhecido, nao passa pela escolha por semelhanca');
+ok(/capMelhorDitadoIdx\(ex, pend\)/.test(HTML),
+   'sem ditado conhecido, a escolha por semelhanca continua existindo (fluxo normal)');
+
+console.log('\n=== recuperar exames: o que ja foi assinado volta assinado ===');
+// Mesmo relato: exames JA liberados voltavam como "nao liberados", e ele perdia
+// a conta de quais faltava assinar. O app nao tem como saber sozinho — o
+// historico que ele guarda no navegador nao registra de qual exame do aparelho
+// cada laudo veio. O banco do agente registra (study_uid + finalizado_em).
+ok(/\/exames\/liberados/.test(HTML), 'a recuperacao pergunta ao agente quais ja foram assinados');
+ok(/ex\._liberado=!!jaLiberados\[est\.id\]/.test(HTML),
+   'o exame volta ja marcado como liberado quando for o caso');
+ok(/agente sem a rota ainda/.test(HTML),
+   'agente sem essa rota nao trava a recuperacao (segue sem a marca)');
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

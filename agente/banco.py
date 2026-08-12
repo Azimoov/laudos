@@ -375,6 +375,29 @@ def gravar_final(exame_id, laudo_final, caminho=None, motivo=None):
         con.close()
 
 
+def liberados(caminho=None):
+    """GET /exames/liberados — study_uid dos exames que ja foram assinados.
+
+    Existe por causa de um estrago real (12/08/2026): ao recuperar os exames
+    depois de fechar a janela sem querer, os que o medico JA tinha liberado
+    voltavam como "nao liberados". Ele perdia a conta de quais faltavam assinar.
+
+    O app nao tem como saber sozinho — a lista de laudos assinados que ele
+    guarda no navegador nao registra de qual exame do aparelho cada um veio. O
+    banco registra: study_uid + finalizado_em. Devolve so os identificadores,
+    nada de nome nem de texto.
+    """
+    con = conectar(caminho)
+    try:
+        linhas = con.execute(
+            "SELECT DISTINCT study_uid FROM exames"
+            " WHERE finalizado_em IS NOT NULL AND study_uid IS NOT NULL"
+            " AND study_uid <> ''").fetchall()
+        return {'uids': [r['study_uid'] for r in linhas]}
+    finally:
+        con.close()
+
+
 def buscar_paciente(filtros, caminho=None):
     """GET /pacientes/buscar — exames anteriores com achados estruturados."""
     con = conectar(caminho)
@@ -545,6 +568,8 @@ def responder(metodo, caminho, corpo):
             # rota ja aceita, para nao precisar mexer no agente depois.
             return (200, gravar_final(int(m.group(1)), texto,
                                       motivo=(corpo or {}).get('motivo')))
+        if metodo == 'GET' and caminho == '/exames/liberados':
+            return (200, liberados())
         if metodo == 'GET' and (caminho or '').startswith('/pacientes/buscar'):
             try:
                 from urllib.parse import parse_qs, urlparse

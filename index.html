@@ -4068,7 +4068,7 @@ function capSetRecUI(){
 async function capRegistrarDitado(blob){
   var novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
   var hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  var a={idx:novoIdx, nome:'Ditado '+hora, url:URL.createObjectURL(blob), transcricao:'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true, _transcrevendo:true};
+  var a={idx:novoIdx, nome:'Ditado '+hora, url:URL.createObjectURL(blob), transcricao:'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, quando:Date.now(), _captura:true, _transcrevendo:true};
   audios.push(a);
   capRenderPendentes();
   log('Transcrevendo ditado…');
@@ -4398,11 +4398,17 @@ async function capAgenteFecharExame(est){
   return j;
 }
 /* cria o "áudio" do exame a partir do texto que o agente transcreveu */
-function capAudioDoAgente(texto, origem){
+/* quandoSeg: a hora que o AGENTE carimbou no ditado (segundos). Vem do
+   /exame/ditados na recuperacao. Sem ela, vale o momento de agora.
+   E esse carimbo que permite casar ditado e exame pelo relogio em vez de pelo
+   nome — e o nome o medico nem sempre diz. */
+function capAudioDoAgente(texto, origem, quandoSeg){
   var idx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-  var hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  var ms=(quandoSeg&&isFinite(quandoSeg))?Math.round(quandoSeg*1000):Date.now();
+  var hora=new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   var a={idx:idx, nome:'Ditado '+hora+(origem==='prebuffer'?' (recuperado)':''), url:null, blob:null,
-         transcricao:texto||'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null, _captura:true, _agente:true};
+         transcricao:texto||'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null,
+         quando:ms, _captura:true, _agente:true};
   audios.push(a);
   return a;
 }
@@ -4474,7 +4480,7 @@ async function capOrtProcessar(est){
   }
   if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), _captura:true, _dicom:true, _estudoId:est.id, _preset:est.descricao||''};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
@@ -4546,12 +4552,15 @@ async function capRecuperar(){
     if(!imagens.length){ log('Recuperação: exame de '+(est.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
     var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
             tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
-            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _preset:est.descricao||''};
+            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
     ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
     ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
     exames.push(ex);
     // o ditado guardado volta como áudio do exame (com o WAV original p/ você poder ouvir)
-    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado');
+    // dit.quando: a hora que o agente carimbou quando guardou este ditado.
+    // Sem ela, o ditado recuperado entraria com a hora de AGORA e o encaixe
+    // pelo relogio olharia para o momento errado.
+    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado', dit.quando);
     a.nome='Ditado recuperado ('+(dit.quandoTexto||'')+')';
     if(dit.temAudio) a.url=agenteBase()+'/exame/audio/'+est.id;
     var meta=await capClassificarDitado(dit.texto||'', est.descricao);
@@ -4683,10 +4692,51 @@ async function capAutoVincular(ex, aCerto){
   }catch(e){ capOrtStatusTxt('Falha ao gerar o laudo de '+ex.paciente+': '+((e&&e.message)||e)); }
 }
 /* ---- vínculo imagem ↔ ditado + geração ---- */
+/* Momento do exame no aparelho, em milissegundos.
+   dataOrdem vem do agente como AAAAMMDDHHMM (ex.: 202608121522). Sem ela,
+   monta a partir de data + hora. Zero quando não dá para saber. */
+function capQuandoDoEstudo(est){
+  var s=String((est&&est.dataOrdem)||'').replace(/\D/g,'');
+  if(s.length>=12){
+    var d=new Date(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8), +s.slice(8,10), +s.slice(10,12));
+    if(!isNaN(d.getTime())) return d.getTime();
+  }
+  var m=String((est&&est.data)||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  var h=String((est&&est.hora)||'').match(/^(\d{1,2}):(\d{2})/);
+  if(m){
+    var d2=new Date(+m[3], +m[2]-1, +m[1], h?+h[1]:0, h?+h[2]:0);
+    if(!isNaN(d2.getTime())) return d2.getTime();
+  }
+  return 0;
+}
+/* Quanto tempo separa exame e ditado antes de deixarem de ser "o mesmo
+   atendimento". 20 min cobre exame demorado com folga; além disso, não é. */
+var CAP_JANELA_MIN=20;
+
+/* Qual ditado é DESTE exame.
+   Até 12/08/2026 isto olhava SÓ semelhança de nome — e o relógio, que o
+   programa conhece dos dois lados, era ignorado. Quando o médico NÃO diz o nome
+   do paciente (que é o normal: o nome chega sozinho pelo aparelho), a
+   semelhança dava ZERO para todos e sobrava o primeiro da lista: virava
+   sorteio. Foi isso que embaralhou os exames do dia 12.
+   Agora o RELÓGIO manda, e o nome — quando dito — reforça. */
 function capMelhorDitadoIdx(ex, pend){
   if(!pend.length) return -1;
-  var alvo=tokensNome(ex.paciente||''); var best=pend[0].idx, bestS=-1;
-  for(var i=0;i<pend.length;i++){ var s=alvo.length?simNome(alvo, pend[i].nomePaciente||''):0; if(s>bestS){ bestS=s; best=pend[i].idx; } }
+  var alvo=tokensNome(ex.paciente||'');
+  var tEx=ex._quando||0;
+  var best=pend[0].idx, bestS=-Infinity;
+  for(var i=0;i<pend.length;i++){
+    var a=pend[i];
+    var sNome=alvo.length?simNome(alvo, a.nomePaciente||''):0;      // 0..1
+    var sTempo=0;                                                    // 0..1
+    if(tEx && a.quando){
+      var min=Math.abs(tEx-a.quando)/60000;
+      if(min<=CAP_JANELA_MIN) sTempo=1-(min/CAP_JANELA_MIN);
+    }
+    // o tempo pesa o dobro: é o sinal que existe sempre, mesmo em silêncio
+    var s=sTempo*2+sNome;
+    if(s>bestS){ bestS=s; best=a.idx; }
+  }
   return best;
 }
 function capRenderNovos(){

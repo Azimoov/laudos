@@ -137,5 +137,49 @@ ok(/ex\._liberado=!!jaLiberados\[est\.id\]/.test(HTML),
 ok(/agente sem a rota ainda/.test(HTML),
    'agente sem essa rota nao trava a recuperacao (segue sem a marca)');
 
+console.log('\n=== qual ditado e de qual exame: o RELOGIO passou a contar ===');
+// Ate 12/08 isto olhava so semelhanca de NOME. Com a regra nova ("nao diga o
+// nome do paciente"), a semelhanca dava ZERO para todos e sobrava o primeiro da
+// lista — virava sorteio. Foi o que embaralhou os exames daquele dia.
+const CONSTJ = (HTML.match(/var CAP_JANELA_MIN=\d+;/) || [])[0];
+const M = new Function(CONSTJ + '\n'
+  + ['norm', 'levenshtein', 'tokensNome', 'simNome', 'capQuandoDoEstudo', 'capMelhorDitadoIdx']
+      .map(grab).join('\n')
+  + '\n return {capMelhorDitadoIdx, capQuandoDoEstudo};')();
+const T = (h, m) => new Date(2026, 7, 12, h, m).getTime();
+
+ok(M.capQuandoDoEstudo({ dataOrdem: '202608121522' }) === T(15, 22),
+   'a hora do exame sai do dataOrdem do aparelho (AAAAMMDDHHMM)');
+ok(M.capQuandoDoEstudo({ data: '12/08/2026', hora: '15:22' }) === T(15, 22),
+   'sem dataOrdem, monta a hora a partir de data + hora');
+ok(M.capQuandoDoEstudo({}) === 0, 'sem nada: zero, e o criterio cai no nome');
+
+ok(M.capMelhorDitadoIdx({ paciente: 'Maria Silva', _quando: T(14, 10) },
+   [{ idx: 1, nomePaciente: '', quando: T(11, 5) },
+    { idx: 2, nomePaciente: '', quando: T(14, 12) },
+    { idx: 3, nomePaciente: '', quando: T(16, 40) }]) === 2,
+   'NINGUEM disse o nome: escolhe o ditado da hora do exame (era sorteio antes)');
+ok(M.capMelhorDitadoIdx({ paciente: 'Ana', _quando: T(9, 0) },
+   [{ idx: 1, nomePaciente: '', quando: T(9, 14) },
+    { idx: 2, nomePaciente: '', quando: T(9, 2) }]) === 2,
+   'entre dois ditados proximos, ganha o mais perto do exame');
+ok(M.capMelhorDitadoIdx({ paciente: 'Maria Silva', _quando: T(14, 10) },
+   [{ idx: 1, nomePaciente: 'Joao Souza', quando: T(11, 5) },
+    { idx: 2, nomePaciente: 'Maria Silva', quando: T(14, 12) }]) === 2,
+   'nome dito e horario concordando: escolhe o mesmo');
+ok(M.capMelhorDitadoIdx({ paciente: 'Maria Silva Souza', _quando: T(14, 10) },
+   [{ idx: 1, nomePaciente: 'Maria Silva Souza', quando: T(8, 0) },
+    { idx: 2, nomePaciente: 'Carlos Lima', quando: T(19, 0) }]) === 1,
+   'nome forte ainda vence quando nenhum horario esta dentro da janela');
+ok(M.capMelhorDitadoIdx({ paciente: 'Maria Silva' },
+   [{ idx: 1, nomePaciente: 'Joao Souza' },
+    { idx: 2, nomePaciente: 'Maria Silva Souza' }]) === 2,
+   'sem horario dos dois lados, decide pelo nome — o jeito antigo segue valendo');
+
+ok(/_quando:capQuandoDoEstudo\(est\)/.test(HTML), 'o exame guarda a hora do aparelho');
+ok(/quando:ms, _captura:true, _agente:true/.test(HTML), 'o ditado do agente guarda a hora dele');
+ok(/capAudioDoAgente\(dit\.texto\|\|'', dit\.origem\|\|'recuperado', dit\.quando\)/.test(HTML),
+   'na recuperacao, vale a hora que o AGENTE carimbou, nao a de agora');
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

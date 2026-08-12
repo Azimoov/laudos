@@ -235,7 +235,119 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
      Existe por seguranca: as duas janelas sao iguais por dentro, e um laudo de
      verdade escrito por engano na 2.0 iria para o banco de testes. -->
 <div id="faixaReforma" style="display:none">VERSÃO EM REFORMA · banco de testes · nada aqui vale como laudo</div>
+
+<!-- ======================= TELA DE ABERTURA (2.0) =======================
+     A porta de entrada: o sistema confere sozinho se está tudo em ordem e
+     pergunta qual é a atividade do dia. Cada botão leva a uma aba que já
+     existe; o "voltar" traz de volta para cá.
+     Tudo aqui usa prefixo ab- para não esbarrar no CSS antigo. -->
+<style>
+#telaAbertura{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif}
+#telaAbertura .ab-folha{max-width:920px;margin:20px auto;background:#FAFBFC;
+  border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
+#telaAbertura .ab-topo{background:#0E3A40;color:#fff;padding:16px 28px;
+  display:flex;align-items:center;justify-content:space-between}
+#telaAbertura .ab-marca{font-size:16px;font-weight:700}
+#telaAbertura .ab-data{font-size:12.5px;color:#B9D6D4}
+#telaAbertura .ab-corpo{padding:26px 24px 24px}
+#telaAbertura .ab-eb{font-size:11.5px;font-weight:700;color:#0E6E6B;letter-spacing:1.3px;
+  margin:0 0 12px 4px}
+#telaAbertura .ab-card{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:6px 4px}
+#telaAbertura .ab-linha{display:flex;align-items:center;gap:14px;padding:13px 20px}
+#telaAbertura .ab-bola{flex:0 0 22px;height:22px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;
+  background:#CBD4DC}
+#telaAbertura .ab-bola.ok{background:#1E8E5A}
+#telaAbertura .ab-bola.ruim{background:#C0392B}
+#telaAbertura .ab-txt{flex:1;font-size:14px;color:#26303C}
+#telaAbertura .ab-vu{display:flex;align-items:flex-end;gap:5px;height:22px}
+#telaAbertura .ab-vu i{width:6px;background:#CBD4DC;border-radius:1px;height:6px;
+  transition:height .12s linear,background .12s linear}
+#telaAbertura .ab-mini{border:1px solid #C6CDD4;background:#fff;border-radius:14px;
+  padding:4px 12px;font-size:12px;color:#4A5560;cursor:pointer}
+#telaAbertura .ab-mini:hover{background:#F1F4F7}
+#telaAbertura .ab-titulo{text-align:center;font-size:21px;font-weight:700;color:#1C2430;
+  margin:34px 0 22px}
+#telaAbertura .ab-botao{display:flex;align-items:center;gap:22px;width:100%;text-align:left;
+  background:#fff;border:1px solid #DCE2E8;border-radius:12px;padding:18px 22px;margin-bottom:16px;
+  cursor:pointer;font:inherit}
+#telaAbertura .ab-botao:hover{border-color:#0E6E6B;box-shadow:0 2px 10px rgba(14,110,107,.10)}
+#telaAbertura .ab-icone{flex:0 0 52px;height:52px;border-radius:50%;background:#E7F1F0;
+  display:flex;align-items:center;justify-content:center;font-size:23px}
+#telaAbertura .ab-nome{font-size:17px;font-weight:700;color:#1C2430}
+#telaAbertura .ab-sub{font-size:12.5px;color:#6B7480;margin-top:5px}
+#telaAbertura .ab-selo{background:#FBF3E1;border:1px solid #E4C983;color:#8A6A1F;
+  border-radius:13px;padding:5px 14px;font-size:12px;white-space:nowrap}
+#telaAbertura .ab-seta{color:#9AA3AF;font-size:20px}
+#telaAbertura .ab-rodape{display:flex;justify-content:flex-end;margin-top:28px}
+#telaAbertura .ab-cfg{border:1px solid #C6CDD4;background:#fff;border-radius:20px;
+  padding:9px 20px;font-size:13.5px;color:#4A5560;cursor:pointer}
+#telaAbertura .ab-cfg:hover{background:#F1F4F7}
+#btnVoltarInicio{display:none;margin-right:8px}
+</style>
+
+<div id="telaAbertura">
+  <div class="ab-folha">
+    <div class="ab-topo"><span class="ab-marca">Laudos USG</span><span class="ab-data" id="abData"></span></div>
+    <div class="ab-corpo">
+      <div class="ab-eb">O SISTEMA CONFERE SOZINHO</div>
+      <div class="ab-card">
+        <div class="ab-linha">
+          <span class="ab-bola" id="abMicBola">…</span>
+          <span class="ab-txt" id="abMicTxt">Procurando o microfone…</span>
+          <button class="ab-mini" id="abMicTestar" onclick="abTestarMicrofone()" style="display:none">testar</button>
+          <span class="ab-vu" id="abVu"><i></i><i></i><i></i><i></i><i></i></span>
+        </div>
+        <div class="ab-linha">
+          <span class="ab-bola" id="abOrtBola">…</span>
+          <span class="ab-txt" id="abOrtTxt">Procurando o aparelho de ultrassom…</span>
+        </div>
+        <div class="ab-linha">
+          <span class="ab-bola" id="abAsrBola">…</span>
+          <span class="ab-txt" id="abAsrTxt">Carregando a transcrição…</span>
+        </div>
+      </div>
+
+      <h2 class="ab-titulo">Qual a atividade de hoje?</h2>
+
+      <button class="ab-botao" onclick="abEscolher('acumulados')">
+        <span class="ab-icone">🗂</span>
+        <span style="flex:1">
+          <span class="ab-nome">Fazer laudos com fotos e áudios antigos</span>
+          <span class="ab-sub" style="display:block">processa material já gravado e monta os laudos para revisão</span>
+        </span>
+        <span class="ab-seta">›</span>
+      </button>
+
+      <button class="ab-botao" onclick="abEscolher('captura')">
+        <span class="ab-icone">🎙</span>
+        <span style="flex:1">
+          <span class="ab-nome">Realizar exames</span>
+          <span class="ab-sub" style="display:block">liga a gravação contínua — o dia inteiro guiado pela voz</span>
+        </span>
+        <span class="ab-seta">›</span>
+      </button>
+
+      <button class="ab-botao" onclick="abEscolher('revisao')">
+        <span class="ab-icone">📄</span>
+        <span style="flex:1">
+          <span class="ab-nome">Liberar laudos</span>
+          <span class="ab-sub" style="display:block">revisar, assinar e entregar os laudos prontos</span>
+        </span>
+        <span class="ab-selo" id="abPendentes" style="display:none"></span>
+        <span class="ab-seta">›</span>
+      </button>
+
+      <div class="ab-rodape">
+        <button class="ab-cfg" onclick="abEscolher(null); alternarConfig();">⚙︎ Configurações</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <header>
+  <button id="btnVoltarInicio" class="btn peq sec" onclick="abVoltarInicio()">‹ Início</button>
   <h1>Laudos USG</h1>
   <button class="btn peq sec" onclick="alternarConfig()">⚙︎ Configurações</button>
   <button class="btn peq sec" onclick="alternarHistorico()">📁 Histórico</button>
@@ -5078,7 +5190,140 @@ function mostrarAba(nome){
   window.__abaAtual=nome;
   window.scrollTo(0,0);
 }
-window.addEventListener('DOMContentLoaded', function(){ mostrarAba('captura'); });
+/* ===================== TELA DE ABERTURA (2.0) — comportamento =====================
+   As três conferências saem de dados REAIS do agente, não de enfeite:
+     microfone  -> /microfone/existe   (só pergunta se existe; NÃO abre nada)
+     aparelho   -> /health + /dicom/estudos (conectado + hora da última imagem)
+     transcrição-> /transcritor/carregar   (carrega o motor agora, para o primeiro
+                   ditado do dia não levar 15s — pedido do Dr. Daniel)
+   O contador de pendentes vem do BANCO (/exames/resumo), não da tela: assim ele
+   sobrevive a fechar a janela, que foi o que se perdeu em 12/08.
+*/
+function abBola(id, estado, simbolo){
+  var b=document.getElementById(id); if(!b) return;
+  b.className='ab-bola'+(estado==='ok'?' ok':(estado==='ruim'?' ruim':''));
+  b.textContent=simbolo||(estado==='ok'?'✓':(estado==='ruim'?'!':'…'));
+}
+function abTxt(id, t){ var e=document.getElementById(id); if(e) e.textContent=t; }
+
+async function abConferirMicrofone(){
+  try{
+    var r=await fetch(agenteBase()+'/microfone/existe');
+    var j=await r.json();
+    if(j&&j.existe){
+      abBola('abMicBola','ok');
+      abTxt('abMicTxt','Microfone pronto — '+(j.nome||'entrada de áudio')+'. Clique em testar e fale.');
+      var t=document.getElementById('abMicTestar'); if(t) t.style.display='';
+    }else{
+      abBola('abMicBola','ruim');
+      abTxt('abMicTxt','Nenhum microfone encontrado'+(j&&j.erro?' ('+j.erro+')':'')+'.');
+    }
+  }catch(e){ abBola('abMicBola','ruim'); abTxt('abMicTxt','Não consegui falar com o agente.'); }
+}
+
+/* Abre o microfone por 5 segundos, mostra a barra mexer e FECHA. O microfone
+   fica fechado fora do modo exame — é regra do projeto, por privacidade. */
+var _abTestando=false;
+async function abTestarMicrofone(){
+  if(_abTestando) return; _abTestando=true;
+  var btn=document.getElementById('abMicTestar'); if(btn){ btn.disabled=true; btn.textContent='ouvindo…'; }
+  var barras=document.querySelectorAll('#abVu i');
+  try{
+    await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:true})});
+    var ate=Date.now()+5000, viuSom=false;
+    while(Date.now()<ate){
+      try{
+        var e=await (await fetch(agenteBase()+'/gravacao/estado')).json();
+        var n=(e&&e.niveis&&e.niveis.length)?e.niveis.slice(-5):[];
+        for(var i=0;i<barras.length;i++){
+          var v=n.length?(n[Math.max(0,n.length-barras.length+i)]||[0,0])[1]:0;
+          if(v>0.06) viuSom=true;
+          barras[i].style.height=Math.max(6,Math.round(6+v*20))+'px';
+          barras[i].style.background=v>0.06?'#1E8E5A':'#CBD4DC';
+        }
+      }catch(_){}
+      await new Promise(function(r){setTimeout(r,150);});
+    }
+    abTxt('abMicTxt', viuSom ? 'Microfone testado — o som chegou. Tudo certo.'
+                             : 'Microfone pronto, mas não chegou som no teste. Fale mais perto e teste de novo.');
+    abBola('abMicBola', viuSom?'ok':'ruim');
+  }catch(e){ abTxt('abMicTxt','Não consegui testar: '+((e&&e.message)||e)); }
+  finally{
+    try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(_){}
+    for(var k=0;k<barras.length;k++){ barras[k].style.height='6px'; barras[k].style.background='#CBD4DC'; }
+    if(btn){ btn.disabled=false; btn.textContent='testar'; }
+    _abTestando=false;
+  }
+}
+
+async function abConferirAparelho(){
+  try{
+    var h=await (await fetch(agenteBase()+'/health')).json();
+    if(!h||!h.orthanc){ abBola('abOrtBola','ruim'); abTxt('abOrtTxt','Aparelho de ultrassom NÃO conectado.'); return; }
+    var quando='';
+    try{
+      var j=await (await fetch(agenteBase()+'/dicom/estudos')).json();
+      var lista=(j&&j.estudos)||[];
+      var top=lista.slice().sort(function(a,b){ return String(b.dataOrdem||'').localeCompare(String(a.dataOrdem||'')); })[0];
+      if(top&&top.data) quando=' — última imagem recebida: '+top.data+(top.hora?(' às '+top.hora):'');
+    }catch(_){}
+    abBola('abOrtBola','ok');
+    abTxt('abOrtTxt','Aparelho de ultrassom conectado'+quando);
+  }catch(e){ abBola('abOrtBola','ruim'); abTxt('abOrtTxt','Não consegui falar com o agente.'); }
+}
+
+async function abCarregarTranscricao(){
+  abBola('abAsrBola','');
+  abTxt('abAsrTxt','Carregando a transcrição… (só na primeira vez do dia, uns 15 segundos)');
+  try{
+    var j=await (await fetch(agenteBase()+'/transcritor/carregar')).json();
+    if(j&&j.carregado){
+      abBola('abAsrBola','ok');
+      abTxt('abAsrTxt','Transcrição pronta — '+(j.modelo||'')+(j.termos?(' · '+j.termos+' termos de USG'):''));
+    }else{
+      abBola('abAsrBola','ruim');
+      abTxt('abAsrTxt','Transcrição indisponível'+(j&&j.erro?(': '+j.erro):'')+'.');
+    }
+  }catch(e){ abBola('abAsrBola','ruim'); abTxt('abAsrTxt','Não consegui carregar a transcrição.'); }
+}
+
+async function abContarPendentes(){
+  try{
+    var j=await (await fetch(agenteBase()+'/exames/resumo')).json();
+    var n=(j&&j.pendentes)||0;
+    var s=document.getElementById('abPendentes'); if(!s) return;
+    if(n>0){ s.style.display=''; s.textContent=n+(n===1?' pendente':' pendentes'); }
+    else{ s.style.display='none'; }
+  }catch(e){}
+}
+
+function abAtualizarTudo(){
+  var d=document.getElementById('abData');
+  if(d) d.textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  abConferirMicrofone(); abConferirAparelho(); abContarPendentes();
+  abCarregarTranscricao();     // pedido: carregar já aqui, para conferir que está ok
+}
+
+/* aba=null apenas fecha a tela (usado pelo botão de Configurações). */
+function abEscolher(aba){
+  var t=document.getElementById('telaAbertura'); if(t) t.style.display='none';
+  // display='inline-block', e NAO '': limpar o estilo do elemento devolve o
+  // controle para a folha de estilo, que diz display:none — e o botao de voltar
+  // simplesmente nao aparecia. Sem ele, entrar numa aba era um caminho sem volta.
+  var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='inline-block';
+  if(aba) mostrarAba(aba);
+}
+function abVoltarInicio(){
+  var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';
+  var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
+  abContarPendentes();         // o número pode ter mudado enquanto ele trabalhava
+  window.scrollTo(0,0);
+}
+
+window.addEventListener('DOMContentLoaded', function(){
+  mostrarAba('captura');       // deixa uma aba pronta atrás da tela de abertura
+  abAtualizarTudo();
+});
 /* Gravação interrompida: mostra assim que o app abre. */
 window.addEventListener('DOMContentLoaded', function(){ cpRenderRecuperacao().catch(function(){}); });
 /* Gravação que ficou correndo no agente enquanto o navegador esteve fechado. */

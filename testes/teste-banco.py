@@ -156,12 +156,54 @@ v = vs()
 ok(len(v) == 3, 'tres versoes guardadas (a IA e as duas assinaturas)')
 ok(v[1]['texto'] == 'PRIMEIRA do medico' and v[2]['texto'] == 'SEGUNDA do medico',
    'a correcao anterior NAO foi apagada pela seguinte')
-ok(v[2]['motivo'] == 'medida errada' and v[1]['motivo'] is None,
-   'motivo guardado so onde foi informado')
+ok(v[2]['motivo'] == 'medida errada', 'motivo informado guardado como foi escrito')
+ok(v[1]['motivo'] and 'medida errada' not in v[1]['motivo'],
+   'a assinatura sem motivo escrito ganha o resumo automatico (ver bloco do motivo)')
 banco.gravar_final(eid, 'SEGUNDA do medico', caminho=DB)
 ok(len(vs()) == 3, 'reenvio do MESMO texto nao cria versao repetida (a fila do app repete)')
 ok(con.execute('SELECT laudo_final FROM exames WHERE id=?', (eid,)).fetchone()[0]
    == 'SEGUNDA do medico', 'laudo_final aponta para a versao mais recente')
+con.close()
+
+print('=== o motivo se escreve sozinho (sem caixa na tela) ===')
+# Dr. Daniel, 10/08: nao quer campo para digitar o motivo (nem sempre ia
+# preencher), entao o sistema anota o FATO da mudanca. Deterministico e local:
+# sem IA, sem rede, sem custo.
+res = banco._resumo_da_mudanca
+LAUDO = 'Figado de dimensoes normais.\nRim direito mede 98 mm.\nBaco sem alteracoes.'
+ok(res(LAUDO, LAUDO) is None, 'texto igual: nenhum motivo (nem versao nova)')
+ok(res('Figado  normal.', 'Figado normal.') == 'so espacamento',
+   'mesma frase com espacos diferentes: dito como formatacao, nao como correcao')
+r_med = res(LAUDO, LAUDO.replace('98', '104'))
+ok('98 -> 104' in r_med, 'medida trocada aparece no motivo (o que mais importa no laudo)')
+ok('1 linha alterada' in r_med, 'linha trocada por outra conta como UMA alterada, nao duas')
+ok('acrescentada' in res(LAUDO, LAUDO + '\nCisto de 12 mm.'), 'achado novo: linha acrescentada')
+ok('removida' in res(LAUDO, 'Figado de dimensoes normais.\nRim direito mede 98 mm.'),
+   'linha apagada: linha removida')
+ok('11,5 -> 13,2' in res('Cisto de 11,5 mm.', 'Cisto de 13,2 mm.'),
+   'medida com virgula tambem e reconhecida')
+ok('numeros' not in res(LAUDO, LAUDO.replace('Baco sem alteracoes.', 'Baco preservado.')),
+   'reescrita sem mudar numero nao inventa mudanca de medida')
+
+print('=== o motivo automatico chega ao historico ===')
+p = payload(nome='Motivo Da Silva', cod='mo-1')
+p['exame']['laudo_gerado'] = 'Rim direito mede 98 mm.'
+rm = banco.gravar_exame(p, caminho=DB)
+em = rm['exame_id']
+banco.gravar_final(em, 'Rim direito mede 104 mm.', caminho=DB)
+con = sqlite3.connect(DB); con.row_factory = sqlite3.Row
+mv = con.execute('SELECT versao, motivo FROM laudo_versoes WHERE exame_id=? ORDER BY versao',
+                 (em,)).fetchall()
+ok(mv[0]['motivo'] is None, 'a versao 1 (da IA) nao tem motivo: nao havia com o que comparar')
+ok(mv[1]['motivo'] and '98 -> 104' in mv[1]['motivo'],
+   'a correcao do medico ganhou o motivo automatico')
+banco.gravar_final(em, 'Rim direito mede 105 mm.', caminho=DB, motivo='paciente trouxe exame antigo')
+mv = con.execute('SELECT motivo FROM laudo_versoes WHERE exame_id=? ORDER BY versao',
+                 (em,)).fetchall()
+ok(mv[2]['motivo'] == 'paciente trouxe exame antigo',
+   'motivo escrito por uma pessoa GANHA do automatico')
+ok(mv[1]['motivo'] and '98 -> 104' in mv[1]['motivo'],
+   'e nao sobrescreve o motivo da versao anterior')
 con.close()
 
 print('=== o ditado que virou o laudo fica guardado ===')

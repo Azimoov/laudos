@@ -15,6 +15,8 @@ O banco fica em  <pasta do agente>\\dados\\laudos.db  (fora do git, fora da nuve
 Backup diario local em dados\\backup\\; copia CIFRADA para o iCloud Drive quando
 7-Zip e senha existirem (melhor-esforco: falta de qualquer peca so avisa e pula).
 """
+import collections
+import difflib
 import json
 import os
 import re
@@ -114,6 +116,62 @@ def _log(msg):
     print('[banco] ' + msg, flush=True)
 
 
+_NUMERO = re.compile(r'\d+(?:[.,]\d+)?')
+_LIMITE_NUMEROS = 4          # o resumo e uma linha, nao um relatorio
+
+
+def _resumo_da_mudanca(antes, depois):
+    """O que mudou entre duas versoes do laudo, em uma linha. None se nada mudou.
+
+    Deterministico e local: sem IA, sem rede, sem custo. Nasceu de uma escolha
+    do Dr. Daniel em 10/08/2026 — ele nao quer uma caixa na tela para escrever o
+    motivo da correcao (nem sempre vai preencher), entao o sistema anota
+    sozinho o FATO da mudanca. Nao e a razao, e o que mudou; mas e automatico, e
+    e justamente isso que serve para treinar depois.
+
+    A mudanca de NUMEROS vem primeiro de proposito: num laudo de ultrassom, uma
+    medida trocada e a correcao que mais importa. Depois da separacao da
+    identificacao (mesma data), idade e data do exame nao estao mais no texto,
+    entao nao poluem essa comparacao.
+    """
+    antes, depois = (antes or ''), (depois or '')
+    if antes == depois:
+        return None
+    if antes.split() == depois.split():
+        return 'so espacamento'          # mesma coisa escrita, formatacao diferente
+
+    partes = []
+    ca = collections.Counter(_NUMERO.findall(antes))
+    cd = collections.Counter(_NUMERO.findall(depois))
+    sairam = sorted((ca - cd).elements())
+    entraram = sorted((cd - ca).elements())
+    if sairam or entraram:
+        partes.append('numeros: %s -> %s'
+                      % (', '.join(sairam[:_LIMITE_NUMEROS]) or '(nenhum)',
+                         ', '.join(entraram[:_LIMITE_NUMEROS]) or '(nenhum)'))
+
+    mais = menos = 0
+    for linha in difflib.unified_diff(antes.splitlines(), depois.splitlines(),
+                                      lineterm='', n=0):
+        if linha.startswith('+') and not linha.startswith('+++'):
+            mais += 1
+        elif linha.startswith('-') and not linha.startswith('---'):
+            menos += 1
+    # Linha que sai e outra que entra no lugar e UMA linha alterada, nao duas
+    # mexidas. O resumo e para o medico ler de relance.
+    alteradas = min(mais, menos)
+    for n, palavra in ((alteradas, 'alterada'), (mais - alteradas, 'acrescentada'),
+                       (menos - alteradas, 'removida')):
+        if n:
+            partes.append('%d linha%s %s%s' % (n, 's' if n > 1 else '',
+                                               palavra, 's' if n > 1 else ''))
+
+    if not partes:                       # mudou, mas nada acima descreveu o quê
+        dif = len(depois) - len(antes)
+        partes.append('%s%d caracteres' % ('+' if dif >= 0 else '', dif))
+    return '; '.join(partes)
+
+
 def _gravar_versao(con, exame_id, texto, origem, motivo=None):
     """Empilha mais uma versao do laudo. Nunca sobrescreve, nunca apaga.
 
@@ -133,9 +191,15 @@ def _gravar_versao(con, exame_id, texto, origem, motivo=None):
     if ult is not None and (ult['texto'] or '') == texto:
         return ult['versao']
     prox = (ult['versao'] + 1) if ult is not None else 1
+    # Sem motivo escrito, o sistema anota sozinho O QUE mudou em relacao a
+    # versao anterior. Motivo informado sempre ganha: o que a pessoa escreveu
+    # vale mais que o que a maquina deduziu.
+    motivo = (motivo or '').strip() or None
+    if motivo is None and ult is not None:
+        motivo = _resumo_da_mudanca(ult['texto'], texto)
     con.execute(
         'INSERT INTO laudo_versoes (exame_id, versao, texto, origem, motivo)'
-        ' VALUES (?,?,?,?,?)', (exame_id, prox, texto, origem, motivo or None))
+        ' VALUES (?,?,?,?,?)', (exame_id, prox, texto, origem, motivo))
     return prox
 
 

@@ -351,6 +351,77 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   </div>
 </div>
 
+<!-- ======================= TELA 3: O DIA EM ANDAMENTO (2.0) =======================
+     Aparece depois de "Iniciar". Mostra que a gravação está de pé, o que já foi
+     feito hoje e o que falta revisar. NADA abre sozinho: o painel avisa. -->
+<style>
+#telaDia{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
+#telaDia .ab-folha{max-width:920px;margin:20px auto;background:#FAFBFC;
+  border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
+#telaDia .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;display:flex;align-items:center;gap:14px}
+#telaDia .pt{width:14px;height:14px;border-radius:50%;background:#FF5A52;flex:0 0 14px}
+#telaDia .pt.off{background:#7FA8A5}
+#telaDia .pt.viva{animation:diaPulsa 1.6s ease-in-out infinite}
+@keyframes diaPulsa{0%,100%{box-shadow:0 0 0 0 rgba(255,90,82,.55)}70%{box-shadow:0 0 0 9px rgba(255,90,82,0)}}
+#telaDia .est{flex:1;font-size:14px;font-weight:600}
+#telaDia .enc{background:none;border:1px solid #7FA8A5;color:#DCEBEA;border-radius:16px;
+  padding:7px 18px;font-size:12.5px;cursor:pointer;font-family:inherit}
+#telaDia .enc:hover{background:rgba(255,255,255,.08)}
+#telaDia .ab-corpo{padding:24px 26px 26px}
+#telaDia .eb{font-size:11.5px;font-weight:700;color:#0E6E6B;letter-spacing:1.3px;margin:0 0 12px 4px}
+#telaDia .eb.dep{margin-top:32px}
+#telaDia .agora{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:20px 24px}
+#telaDia .agora .l1{font-size:16px;font-weight:700;color:#1C2430}
+#telaDia .agora .l2{font-size:11.5px;color:#8A93A0;margin-top:8px;line-height:1.5}
+#telaDia .item{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:16px 22px;
+  margin-bottom:12px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+#telaDia .item.falta{background:#FBECEC;border:1.5px solid #D97070;border-left:6px solid #C43B3B}
+#telaDia .hr{font-size:14px;font-weight:600;color:#26303C;flex:0 0 52px}
+#telaDia .quem{flex:1;min-width:190px}
+#telaDia .nm{font-size:15px;font-weight:700;color:#1C2430}
+#telaDia .tp{font-size:12.5px;color:#6B7480;margin-top:3px}
+#telaDia .sit{font-size:13px;flex:0 0 auto;min-width:180px}
+#telaDia .sit.aguarda{color:#B97A0F}
+#telaDia .sit.pronto{color:#1E8E5A}
+#telaDia .sit.falta{color:#C43B3B;font-weight:700}
+#telaDia .bt{background:#fff;border:1px solid #0E6E6B;color:#0E6E6B;border-radius:15px;padding:7px 18px;
+  font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+#telaDia .bt:hover{background:#E7F1F0}
+#telaDia .bt.forte{background:#C43B3B;border-color:#C43B3B;color:#fff}
+#telaDia .bt.forte:hover{background:#A93030}
+#telaDia .vazio{background:#fff;border:1px dashed #CBD4DC;border-radius:10px;padding:26px;
+  text-align:center;font-size:13px;color:#8A93A0}
+#telaDia .pend{display:block;margin:34px auto 0;background:#0E6E6B;color:#fff;border:0;border-radius:28px;
+  padding:16px 42px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit}
+#telaDia .pend:hover{background:#0B5A57}
+#telaDia .pend:disabled{background:#9DBDBB;cursor:default}
+#telaDia .rodape{text-align:center;font-size:12px;color:#6B7480;margin-top:16px}
+</style>
+
+<div id="telaDia">
+  <div class="ab-folha">
+    <div class="ab-topo">
+      <span class="pt" id="diaPonto"></span>
+      <span class="est" id="diaEstado">conferindo a gravação…</span>
+      <button class="enc" onclick="diaEncerrar()">Encerrar o dia</button>
+    </div>
+    <div class="ab-corpo">
+      <div class="eb">EXAME EM ANDAMENTO</div>
+      <div class="agora">
+        <div class="l1" id="diaAgora">—</div>
+        <div class="l2" id="diaAgoraSub"></div>
+      </div>
+
+      <div class="eb dep">EXAMES DE HOJE</div>
+      <div id="diaLista"></div>
+
+      <button class="pend" id="diaPend" onclick="diaRevisarPendentes()">Revisar laudos pendentes</button>
+      <p class="rodape">nada abre sozinho: o painel avisa (som + faixa) e você toca quando quiser</p>
+    </div>
+  </div>
+</div>
+
 <!-- ======================= TELA 2: REALIZAR EXAMES (2.0) =======================
      Escolhas que valem o dia inteiro (local e quando revisar), as regras do
      ditado sempre à vista, e o botão que liga a gravação. -->
@@ -468,9 +539,17 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       </div>
       <p class="ab-nota">a escolha vale para o dia inteiro e pode ser trocada a qualquer momento</p>
 
+      <h2 class="dep">Onde salvar os laudos de hoje?</h2>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <button class="ab-mod-arq" onclick="exEscolherPasta()">
+          <span style="font-size:16px">📁</span> Escolher pasta…</button>
+        <span class="ab-nota" id="exPastaNome" style="margin:0">conferindo…</span>
+      </div>
+      <p class="ab-nota">é para onde o laudo vai ao ser liberado — e o botão “Abrir na pasta” usa esta mesma pasta</p>
+
       <div class="ab-eb">REGRAS DO DITADO — VALEM O DIA TODO</div>
       <div class="regras">
-        <div class="regra"><span class="tag nao">NÃO</span>Não diga o nome do paciente — ele chega sozinho pelo aparelho</div>
+        <div class="regra"><span class="tag nao">NÃO</span>Não precisa dizer o nome do paciente — ele chega sozinho pelo aparelho</div>
         <div class="regra"><span class="tag sim">SIM</span>Diga o tipo do exame ao começar (“iniciando transvaginal”) — no máximo, antes do próximo</div>
         <div class="regra"><span class="tag sim">SIM</span>Dite achados e medidas conforme encontra — ou resuma tudo ao final do exame</div>
         <div class="regra"><span class="tag dica">DICA</span>Errou? Diga “corrigindo:” e repita a frase certa</div>
@@ -5925,11 +6004,28 @@ async function exIniciar(){
     if(r) r.textContent='gravação ligada — encerre pelo botão “Parar espera”';
   }catch(e){ if(r) r.textContent='não consegui ligar: '+((e&&e.message)||e); }
   if(b){ b.disabled=false; b.textContent='▶ Iniciar — ligar a gravação'; }
-  exFechar('captura');
+  _diaDesde=Date.now();          // o cronômetro do dia começa aqui
+  mostrarAba('captura');         // deixa a aba pronta atrás
+  diaAbrir();                    // e vai para o painel do dia
+}
+
+/* Pasta de destino dos laudos do dia. O mecanismo já existia (escolherPastaDestino
+   guarda a permissão no navegador); o que faltava era um lugar visível para
+   escolher ANTES de começar — e não no meio do primeiro laudo liberado. */
+function exMostrarPasta(){
+  var e=document.getElementById('exPastaNome'); if(!e) return;
+  if(!suportaFS()){ e.textContent='neste aparelho o salvar usa a folha de compartilhamento'; return; }
+  e.textContent = pastaLaudoH ? ('salvando em: '+(pastaLaudoH.name||'pasta escolhida'))
+                              : 'nenhuma pasta escolhida — será pedida ao liberar o primeiro laudo';
+}
+async function exEscolherPasta(){
+  try{ await escolherPastaDestino(); }catch(e){}
+  exMostrarPasta();
 }
 
 function exAbrir(){
   exAplicarLocaisExtra();      // os locais cadastrados entram no FUNDOS antes de desenhar
+  exMostrarPasta();
   var d=document.getElementById('exData');
   if(d) d.textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
   var salvo=exLocalSalvo(); if(salvo && !window.__fundoPerguntado){ window.__fundo=salvo; window.__fundoPerguntado=true; }
@@ -5946,6 +6042,132 @@ function exFechar(aba){
 function exVoltarInicio(){
   var t=document.getElementById('telaExames'); if(t) t.style.display='none';
   abVoltarInicio();
+}
+
+/* ================= TELA 3: O DIA EM ANDAMENTO — comportamento =================
+   Vive de dado real: o estado da gravação vem do agente, a lista vem dos exames
+   que já chegaram do aparelho hoje. Atualiza sozinha a cada 5 s enquanto está
+   aberta, e para quando fecha (nada de laço rodando escondido). */
+var _diaTimer=null, _diaDesde=null;
+
+function diaAbrir(){
+  _diaDesde=_diaDesde||Date.now();
+  var t=document.getElementById('telaDia'); if(t) t.style.display='block';
+  ['telaAbertura','telaExames'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.style.display='none';
+  });
+  var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
+  diaAtualizar();
+  if(!_diaTimer) _diaTimer=setInterval(diaAtualizar, 5000);
+  window.scrollTo(0,0);
+}
+function diaFechar(){
+  var t=document.getElementById('telaDia'); if(t) t.style.display='none';
+  if(_diaTimer){ clearInterval(_diaTimer); _diaTimer=null; }
+}
+function diaDecorrido(){
+  if(!_diaDesde) return '';
+  var s=Math.floor((Date.now()-_diaDesde)/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+  return h?(h+'h'+('0'+m).slice(-2)):(m+' min');
+}
+async function diaAtualizar(){
+  // ---- faixa de cima: a gravação está mesmo de pé? ----
+  var p=document.getElementById('diaPonto'), e=document.getElementById('diaEstado');
+  try{
+    var st=await (await fetch(agenteBase()+'/gravacao/estado')).json();
+    if(st&&st.capturando){
+      p.className='pt viva';
+      e.textContent='GRAVANDO — '+diaDecorrido()+' · microfone ok'
+        +(st.reinicios?(' · '+st.reinicios+' reinício(s) do microfone hoje'):'');
+    }else if(st&&st.microfone){
+      p.className='pt';
+      e.textContent='⚠ Microfone aberto mas SEM ÁUDIO chegando'
+        +(st.paradoHaSeg?(' há '+Math.round(st.paradoHaSeg)+'s'):'')+' — confira o microfone.';
+    }else{
+      p.className='pt off';
+      e.textContent='Gravação PARADA — os exames que chegarem agora não terão ditado.';
+    }
+  }catch(_){ p.className='pt off'; e.textContent='Sem contato com o agente.'; }
+
+  // ---- exame em andamento ----
+  // O tipo do exame só é conhecido DEPOIS, quando o ditado é transcrito no
+  // fechamento. Enquanto o exame acontece, o agente está gravando e nada mais —
+  // então aqui se diz o que é verdade, e não um palpite.
+  var emAndamento=document.getElementById('diaAgora'), sub=document.getElementById('diaAgoraSub');
+  emAndamento.textContent='Gravando o ditado — o exame aparece na lista quando as imagens chegarem';
+  sub.textContent='o nome da paciente e o tipo do exame chegam junto com as imagens, no fim do exame — fale normalmente';
+
+  diaRenderLista();
+}
+function diaExamesDeHoje(){
+  var hoje=new Date(); hoje.setHours(0,0,0,0);
+  return exames.filter(function(x){
+    if(!x._captura && !x._dicom) return false;
+    var q=x._quando||0;
+    return q ? (q>=hoje.getTime()) : true;
+  }).sort(function(a,b){ return (a._quando||0)-(b._quando||0); });
+}
+function diaRenderLista(){
+  var d=document.getElementById('diaLista'); if(!d) return;
+  var lista=diaExamesDeHoje();
+  var esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+  if(!lista.length){
+    d.innerHTML='<div class="vazio">Nenhum exame ainda hoje. Quando o aparelho enviar as imagens, ele aparece aqui.</div>';
+  }else{
+    d.innerHTML=lista.map(function(x){
+      var hora=x._quando?new Date(x._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
+      var tipo=(MODELOS[x.tipo]&&MODELOS[x.tipo].nome)||x.tipo||'tipo ainda não identificado';
+      var sit, acoes;
+      if(x._liberado){
+        sit='<span class="sit pronto">revisado e assinado ✓</span>';
+        acoes='<button class="bt" onclick="diaAbrirNaPasta('+x.id+')">Abrir na pasta de destino</button>';
+      }else if(x.laudo){
+        sit='<span class="sit aguarda">laudo pronto — aguarda revisão</span>';
+        acoes='<button class="bt" onclick="diaRevisar('+x.id+')">Revisar</button>';
+      }else{
+        sit='<span class="sit">aguardando o ditado ser processado</span>';
+        acoes='<button class="bt" onclick="diaReabrir('+x.id+')">Reabrir exame</button>';
+      }
+      return '<div class="item"><span class="hr">'+hora+'</span>'
+        +'<span class="quem"><span class="nm">'+esc(x.paciente||'(sem nome)')+'</span>'
+        +'<span class="tp">'+esc(tipo)+'</span></span>'+sit
+        +'<span style="display:flex;gap:8px;flex-wrap:wrap">'+acoes+'</span></div>';
+    }).join('');
+  }
+  var n=lista.filter(function(x){ return x.laudo && !x._liberado; }).length;
+  var b=document.getElementById('diaPend');
+  b.textContent='Revisar laudos pendentes'+(n?(' ('+n+')'):'');
+  b.disabled=!n;
+}
+function diaRevisar(exId){ diaFechar(); mostrarAba('revisao'); abrirRevisao(exId); }
+function diaRevisarPendentes(){
+  var p=diaExamesDeHoje().filter(function(x){ return x.laudo && !x._liberado; });
+  if(!p.length) return;
+  diaRevisar(p[0].id);
+}
+/* "Reabrir exame": devolve o exame para a fila de captura, para receber ditado
+   ou imagens de novo. */
+function diaReabrir(exId){
+  var x=exames.find(function(e){ return e.id===exId; }); if(!x) return;
+  x._liberado=false;
+  diaFechar(); mostrarAba('captura');
+  try{ capRenderNovos(); capRenderPendentes(); }catch(_){}
+  log('Exame de '+(x.paciente||'?')+' reaberto — ele volta a receber ditado e imagens.');
+  try{ agendarSalvarSessao(); }catch(_){}
+}
+async function diaAbrirNaPasta(exId){
+  // O navegador NÃO abre o Explorer: por segurança, uma página não comanda o
+  // computador. O que dá para fazer daqui é reabrir o laudo já salvo.
+  log('O laudo está salvo na pasta de destino. Abrindo a versão guardada aqui.');
+  diaRevisar(exId);
+}
+function diaEncerrar(){
+  if(!confirm('Encerrar o dia? A gravação contínua será desligada.')) return;
+  try{ if(typeof capOrtWatching!=='undefined' && capOrtWatching) capOrtToggle(); }catch(_){}
+  _diaDesde=null;
+  diaFechar();
+  abVoltarInicio();
+  log('Dia encerrado — gravação desligada.');
 }
 
 /* A tela está ocupada com um laudo em revisão? Se estiver, o laudo novo espera:

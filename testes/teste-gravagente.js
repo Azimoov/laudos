@@ -241,5 +241,29 @@ ok(/f\.size>4\*1024\*1024/.test(HTML), 'imagem grande demais e recusada com avis
 ok(/\^image\\\//.test(HTML) || /\/\^image\\\//.test(HTML) || /test\(f\.type\)/.test(HTML),
    'arquivo que nao e imagem e recusado');
 
+console.log('\n=== a tela de abertura nao mente sobre o aparelho ===');
+// "Aparelho conectado" era mentira: o aparelho nao fica ligado ao computador,
+// ele EMPURRA as imagens para o recebedor quando o medico salva. O recebedor no
+// ar nao diz nada sobre o aparelho estar ligado. Apontado pelo Dr. Daniel em
+// 12/08: "ele diz ultrassom conectado, mas nao tem nenhum aparelho conectado".
+const apar = semComent(grab('abConferirAparelho'));
+ok(!/Aparelho de ultrassom conectado/.test(HTML), 'a frase "conectado" saiu da tela');
+ok(/Recebedor de exames FORA DO AR/.test(apar), 'recebedor fora do ar e dito com esse nome');
+ok(/NENHUMA imagem foi recebida ainda/.test(apar), 'recebedor no ar sem imagem nenhuma tem aviso proprio');
+ok(/Exames chegando do aparelho/.test(apar), 'so diz que chega exame quando chegou mesmo');
+ok(/horas<=12/.test(apar), 'imagem antiga nao passa por "esta tudo bem"');
+
+console.log('\n=== relogio do aparelho: virou conferencia de abertura ===');
+// Desde 12/08 e a HORA que decide qual ditado e de qual exame. Aparelho com a
+// hora errada = ditado no exame errado. O agente ja media (mediana dos 8 mais
+// recentes) e publicava em /dicom/estudos; faltava alguem olhar.
+ok(/id="abRelBola"/.test(HTML) && /id="abRelTxt"/.test(HTML), 'existe a linha do relogio');
+ok(/j&&j\.relogio/.test(apar), 'ela le o desvio que o agente ja calculava');
+ok(/rel\.desvioSeg==null/.test(apar), 'sem exames para comparar, diz isso em vez de fingir que esta ok');
+ok(/AB_DESVIO_ATENCAO=120/.test(HTML),
+   'o limite da tela e 2 min — bem menor que os 15 min do agente, porque aqui o que esta em jogo e o encaixe do ditado');
+ok(/pode ir para o exame errado/.test(apar), 'o aviso diz a CONSEQUENCIA, nao so o numero');
+ok(/Acerte a hora no ultrassom/.test(apar), 'e diz o que fazer');
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

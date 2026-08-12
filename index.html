@@ -301,7 +301,11 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         </div>
         <div class="ab-linha">
           <span class="ab-bola" id="abOrtBola">…</span>
-          <span class="ab-txt" id="abOrtTxt">Procurando o aparelho de ultrassom…</span>
+          <span class="ab-txt" id="abOrtTxt">Procurando o recebedor de exames…</span>
+        </div>
+        <div class="ab-linha">
+          <span class="ab-bola" id="abRelBola">…</span>
+          <span class="ab-txt" id="abRelTxt">Conferindo o relógio do aparelho…</span>
         </div>
         <div class="ab-linha">
           <span class="ab-bola" id="abAsrBola">…</span>
@@ -5452,20 +5456,74 @@ async function abTestarMicrofone(){
   }
 }
 
+/* Duas conferências saem da mesma consulta.
+
+   "Conectado" seria mentira: o aparelho não fica ligado ao computador — ele
+   EMPURRA as imagens para um recebedor (o Orthanc) quando o médico salva. O
+   recebedor estar no ar não diz nada sobre o aparelho estar ligado. O que
+   prova que o aparelho está falando é ter chegado imagem, e quando.
+
+   E o RELÓGIO virou peça crítica: desde 12/08 é a hora que decide qual ditado é
+   de qual exame. Aparelho com a hora errada = ditado encaixado no exame errado.
+   O agente já mede o desvio (mediana dos 8 exames mais recentes, comparando a
+   hora do aparelho com a hora de chegada); aqui só mostramos. */
+var AB_DESVIO_ATENCAO=120, AB_DESVIO_GRAVE=600;   // segundos
+
+function abMinutos(seg){
+  var s=Math.abs(seg);
+  if(s<90) return Math.round(s)+' segundo'+(Math.round(s)===1?'':'s');
+  return (s/60).toFixed(s<600?1:0).replace('.',',')+' minutos';
+}
 async function abConferirAparelho(){
   try{
     var h=await (await fetch(agenteBase()+'/health')).json();
-    if(!h||!h.orthanc){ abBola('abOrtBola','ruim'); abTxt('abOrtTxt','Aparelho de ultrassom NÃO conectado.'); return; }
-    var quando='';
-    try{
-      var j=await (await fetch(agenteBase()+'/dicom/estudos')).json();
-      var lista=(j&&j.estudos)||[];
-      var top=lista.slice().sort(function(a,b){ return String(b.dataOrdem||'').localeCompare(String(a.dataOrdem||'')); })[0];
-      if(top&&top.data) quando=' — última imagem recebida: '+top.data+(top.hora?(' às '+top.hora):'');
-    }catch(_){}
-    abBola('abOrtBola','ok');
-    abTxt('abOrtTxt','Aparelho de ultrassom conectado'+quando);
-  }catch(e){ abBola('abOrtBola','ruim'); abTxt('abOrtTxt','Não consegui falar com o agente.'); }
+    if(!h||!h.orthanc){
+      abBola('abOrtBola','ruim');
+      abTxt('abOrtTxt','Recebedor de exames FORA DO AR — nenhum exame do aparelho vai chegar.');
+      abBola('abRelBola',''); abTxt('abRelTxt','Relógio do aparelho: sem como conferir agora.');
+      return;
+    }
+    var j=await (await fetch(agenteBase()+'/dicom/estudos')).json();
+    var lista=(j&&j.estudos)||[];
+    var top=lista.slice().sort(function(a,b){ return String(b.dataOrdem||'').localeCompare(String(a.dataOrdem||'')); })[0];
+
+    if(!top||!top.data){
+      abBola('abOrtBola','ruim');
+      abTxt('abOrtTxt','Recebedor de exames no ar, mas NENHUMA imagem foi recebida ainda.');
+    }else{
+      var q=capQuandoDoEstudo(top), horas=q?((Date.now()-q)/3600000):999;
+      var quando=top.data+(top.hora?(' às '+top.hora):'');
+      if(horas<=12){
+        abBola('abOrtBola','ok');
+        abTxt('abOrtTxt','Exames chegando do aparelho — última imagem: '+quando);
+      }else{
+        abBola('abOrtBola','ruim');
+        abTxt('abOrtTxt','Recebedor no ar, mas a última imagem chegou em '+quando
+              +'. Se vai atender agora, confira se o aparelho está ligado e enviando.');
+      }
+    }
+
+    var rel=(j&&j.relogio)||{};
+    if(rel.desvioSeg==null){
+      abBola('abRelBola','');
+      abTxt('abRelTxt','Relógio do aparelho: ainda sem exames recentes para comparar.');
+    }else{
+      var d=Math.abs(rel.desvioSeg);
+      if(d<=AB_DESVIO_ATENCAO){
+        abBola('abRelBola','ok');
+        abTxt('abRelTxt','Relógio do aparelho conferido — '+abMinutos(rel.desvioSeg)
+              +' de diferença para este computador.');
+      }else{
+        abBola('abRelBola','ruim');
+        abTxt('abRelTxt','⚠ Relógio do aparelho '+abMinutos(rel.desvioSeg)+' fora do relógio deste computador'
+              +(d>AB_DESVIO_GRAVE?' — é MUITO' : '')+'. O ditado é encaixado no exame pela HORA: com essa'
+              +' diferença ele pode ir para o exame errado. Acerte a hora no ultrassom.');
+      }
+    }
+  }catch(e){
+    abBola('abOrtBola','ruim'); abTxt('abOrtTxt','Não consegui falar com o agente.');
+    abBola('abRelBola',''); abTxt('abRelTxt','Relógio do aparelho: sem como conferir agora.');
+  }
 }
 
 async function abCarregarTranscricao(){

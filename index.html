@@ -229,6 +229,12 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 </style>
 </head>
 <body>
+<!-- Faixa da versao em reforma. Aparece SO quando o programa apontou o app para
+     um agente que nao e o de sempre (?agente=...), ou seja, so na 2.0. Na
+     versao que atende, este trecho nunca acende.
+     Existe por seguranca: as duas janelas sao iguais por dentro, e um laudo de
+     verdade escrito por engano na 2.0 iria para o banco de testes. -->
+<div id="faixaReforma" style="display:none">VERSÃO EM REFORMA · banco de testes · nada aqui vale como laudo</div>
 <header>
   <h1>Laudos USG</h1>
   <button class="btn peq sec" onclick="alternarConfig()">⚙︎ Configurações</button>
@@ -1090,6 +1096,16 @@ function _agenteDaURL(){
   catch(e){ return ''; }
 }
 const AGENTE_PADRAO = _agenteDaURL().replace(/\/+$/,'') || 'http://127.0.0.1:8977';
+/* Acende a faixa da reforma. O sinal é o programa ter apontado o app para outro
+   agente: só a 2.0 abre assim. Na versão que atende, nada acontece. */
+if(_agenteDaURL()){
+  var _f=document.getElementById('faixaReforma');
+  if(_f){
+    _f.style.cssText='display:block;background:#8a2be2;color:#fff;text-align:center;'
+      +'font-size:12px;font-weight:700;letter-spacing:.5px;padding:5px 8px;'
+      +'position:sticky;top:0;z-index:9999';
+  }
+}
 function agenteBase(){ return ((cfg.agenteLocal||'').trim().replace(/\/+$/,'')) || AGENTE_PADRAO; }
 var _agenteLocalOk=null;   // null=não checado · true/false=cache da sessão
 async function agenteLocalDisponivel(){

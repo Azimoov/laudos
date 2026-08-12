@@ -250,8 +250,32 @@ const apar = semComent(grab('abConferirAparelho'));
 ok(!/Aparelho de ultrassom conectado/.test(HTML), 'a frase "conectado" saiu da tela');
 ok(/Recebedor de exames FORA DO AR/.test(apar), 'recebedor fora do ar e dito com esse nome');
 ok(/NENHUMA imagem foi recebida ainda/.test(apar), 'recebedor no ar sem imagem nenhuma tem aviso proprio');
-ok(/Exames chegando do aparelho/.test(apar), 'so diz que chega exame quando chegou mesmo');
-ok(/horas<=12/.test(apar), 'imagem antiga nao passa por "esta tudo bem"');
+// Segundo apontamento do Dr. Daniel, no mesmo dia: "como o sistema confere que
+// os exames estao chegando e que o relogio esta ok, se nao tem nenhum aparelho
+// conectado?". Estava certo de novo — as duas linhas olhavam o PASSADO e
+// falavam no presente. Nao ha como interrogar o aparelho: o DICOM e de mao
+// unica. O verde e do RECEBEDOR, que da para conferir agora; sobre o aparelho
+// so se afirma o que ja chegou, e QUANDO chegou.
+ok(!/Exames chegando do aparelho/.test(HTML),
+   'nao afirma mais no presente que exames estao chegando');
+ok(/Recebedor de exames no ar · última imagem do aparelho/.test(apar),
+   'diz o que sabe: o recebedor esta no ar, e quando foi a ultima imagem');
+ok(/abHaQuanto\(top\)/.test(apar),
+   'e diz HA QUANTO TEMPO, para dar para julgar sozinho se e recente');
+ok(/medido nos exames já recebidos/.test(apar),
+   'o relogio diz de onde saiu a medicao — nao e uma leitura de agora');
+
+console.log('\n=== provar que o aparelho esta enviando AGORA ===');
+// O unico jeito honesto: o medico salva uma imagem e ela chega. Mesma ideia do
+// teste do microfone — em vez de afirmar, provar.
+const tap = semComent(grab('abTestarAparelho'));
+ok(/id="abOrtTestar"/.test(HTML), 'existe o botao de testar o aparelho');
+ok(/Salve uma imagem qualquer no aparelho/.test(tap), 'ele instrui o que fazer');
+ok(/if\(!antes\[e\.id\]&&!achou\) achou=e;/.test(tap),
+   'detecta um estudo NOVO, comparando com o que ja existia antes do teste');
+ok(/Aparelho enviando AGORA/.test(tap), 'chegando imagem, afirma o presente — ai pode');
+ok(/Nada chegou em 90 segundos/.test(tap), 'nao chegando, diz isso e o que conferir');
+ok(/_abTestandoAp/.test(tap), 'trava de reentrada: dois toques nao disparam dois testes');
 
 console.log('\n=== relogio do aparelho: virou conferencia de abertura ===');
 // Desde 12/08 e a HORA que decide qual ditado e de qual exame. Aparelho com a

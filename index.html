@@ -302,6 +302,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <div class="ab-linha">
           <span class="ab-bola" id="abOrtBola">…</span>
           <span class="ab-txt" id="abOrtTxt">Procurando o recebedor de exames…</span>
+          <button class="ab-mini" id="abOrtTestar" onclick="abTestarAparelho()" style="display:none">testar</button>
         </div>
         <div class="ab-linha">
           <span class="ab-bola" id="abRelBola">…</span>
@@ -5474,6 +5475,57 @@ function abMinutos(seg){
   if(s<90) return Math.round(s)+' segundo'+(Math.round(s)===1?'':'s');
   return (s/60).toFixed(s<600?1:0).replace('.',',')+' minutos';
 }
+/* "há 3 horas", "ontem às 17:42", "em 02/08/2026 às 09:10" — o tempo decorrido
+   dito de forma que dê para julgar sozinho se aquilo é recente ou não. */
+function abHaQuanto(est){
+  var q=capQuandoDoEstudo(est);
+  var quando=(est.data||'')+(est.hora?(' às '+est.hora):'');
+  if(!q) return 'em '+quando;
+  var min=(Date.now()-q)/60000;
+  if(min<0) return 'em '+quando+' (à frente do relógio deste computador!)';
+  if(min<90) return 'há '+Math.max(1,Math.round(min))+' minuto'+(Math.round(min)===1?'':'s');
+  if(min<20*60) return 'há '+Math.round(min/60)+' horas, às '+(est.hora||'?');
+  var dias=Math.round(min/1440);
+  if(dias<=1) return 'ontem às '+(est.hora||'?');
+  return 'há '+dias+' dias, em '+quando;
+}
+
+/* Só existe um jeito honesto de saber se o aparelho está enviando AGORA: o
+   médico salvar uma imagem e ela chegar. O DICOM é de mão única — o aparelho
+   empurra quando quer, e não há como interrogá-lo. Mesma ideia do teste do
+   microfone: em vez de afirmar, provar. */
+var _abTestandoAp=false;
+async function abTestarAparelho(){
+  if(_abTestandoAp) return; _abTestandoAp=true;
+  var btn=document.getElementById('abOrtTestar');
+  if(btn){ btn.disabled=true; btn.textContent='esperando…'; }
+  var antes={}, achou=null;
+  try{
+    var j0=await (await fetch(agenteBase()+'/dicom/estudos')).json();
+    ((j0&&j0.estudos)||[]).forEach(function(e){ antes[e.id]=true; });
+    var ate=Date.now()+90000;
+    while(Date.now()<ate && !achou){
+      var falta=Math.ceil((ate-Date.now())/1000);
+      abTxt('abOrtTxt','Salve uma imagem qualquer no aparelho — estou esperando ela chegar ('+falta+'s)…');
+      await new Promise(function(r){setTimeout(r,2500);});
+      try{
+        var j1=await (await fetch(agenteBase()+'/dicom/estudos')).json();
+        ((j1&&j1.estudos)||[]).forEach(function(e){ if(!antes[e.id]&&!achou) achou=e; });
+      }catch(_){}
+    }
+  }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent='testar'; }
+  _abTestandoAp=false;
+  if(achou){
+    abBola('abOrtBola','ok');
+    abTxt('abOrtTxt','✓ Aparelho enviando AGORA — a imagem de '+(achou.paciente||'?')+' acabou de chegar.');
+    abContarPendentes();
+  }else{
+    abBola('abOrtBola','ruim');
+    abTxt('abOrtTxt','Nada chegou em 90 segundos. Confira se o aparelho está ligado, na rede,'
+          +' e se o envio de imagens está configurado para este computador.');
+  }
+}
 async function abConferirAparelho(){
   try{
     var h=await (await fetch(agenteBase()+'/health')).json();
@@ -5487,36 +5539,38 @@ async function abConferirAparelho(){
     var lista=(j&&j.estudos)||[];
     var top=lista.slice().sort(function(a,b){ return String(b.dataOrdem||'').localeCompare(String(a.dataOrdem||'')); })[0];
 
+    var bt=document.getElementById('abOrtTestar'); if(bt) bt.style.display='';
     if(!top||!top.data){
       abBola('abOrtBola','ruim');
-      abTxt('abOrtTxt','Recebedor de exames no ar, mas NENHUMA imagem foi recebida ainda.');
+      abTxt('abOrtTxt','Recebedor de exames no ar, mas NENHUMA imagem foi recebida ainda.'
+            +' Salve uma imagem no aparelho e toque em testar.');
     }else{
-      var q=capQuandoDoEstudo(top), horas=q?((Date.now()-q)/3600000):999;
-      var quando=top.data+(top.hora?(' às '+top.hora):'');
-      if(horas<=12){
-        abBola('abOrtBola','ok');
-        abTxt('abOrtTxt','Exames chegando do aparelho — última imagem: '+quando);
-      }else{
-        abBola('abOrtBola','ruim');
-        abTxt('abOrtTxt','Recebedor no ar, mas a última imagem chegou em '+quando
-              +'. Se vai atender agora, confira se o aparelho está ligado e enviando.');
-      }
+      // O CHECK VERDE É DO RECEBEDOR, que dá para conferir agora. Sobre o
+      // APARELHO só se sabe o passado: quando chegou a última imagem. Dizer
+      // "exames chegando" seria afirmar o presente sem ter como saber — o
+      // DICOM é de mão única, ninguém consegue perguntar ao aparelho se ele
+      // está ligado. Quem prova isso agora é você salvar uma imagem: o botão
+      // testar fica esperando ela chegar.
+      abBola('abOrtBola','ok');
+      abTxt('abOrtTxt','Recebedor de exames no ar · última imagem do aparelho '+abHaQuanto(top)
+            +'. Para saber se o aparelho está enviando AGORA, toque em testar.');
     }
 
     var rel=(j&&j.relogio)||{};
+    var ref=top?(' (medido nos exames já recebidos, o mais novo '+abHaQuanto(top)+')'):'';
     if(rel.desvioSeg==null){
       abBola('abRelBola','');
-      abTxt('abRelTxt','Relógio do aparelho: ainda sem exames recentes para comparar.');
+      abTxt('abRelTxt','Relógio do aparelho: ainda não há exames recebidos para comparar.');
     }else{
       var d=Math.abs(rel.desvioSeg);
       if(d<=AB_DESVIO_ATENCAO){
         abBola('abRelBola','ok');
-        abTxt('abRelTxt','Relógio do aparelho conferido — '+abMinutos(rel.desvioSeg)
-              +' de diferença para este computador.');
+        abTxt('abRelTxt','Relógio do aparelho: '+abMinutos(rel.desvioSeg)
+              +' de diferença para este computador'+ref+'.');
       }else{
         abBola('abRelBola','ruim');
         abTxt('abRelTxt','⚠ Relógio do aparelho '+abMinutos(rel.desvioSeg)+' fora do relógio deste computador'
-              +(d>AB_DESVIO_GRAVE?' — é MUITO' : '')+'. O ditado é encaixado no exame pela HORA: com essa'
+              +(d>AB_DESVIO_GRAVE?' — é MUITO' : '')+ref+'. O ditado é encaixado no exame pela HORA: com essa'
               +' diferença ele pode ir para o exame errado. Acerte a hora no ultrassom.');
       }
     }

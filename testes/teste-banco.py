@@ -253,6 +253,29 @@ con.close()
 r3 = banco.gravar_exame(payload(nome='Depois Da Migracao', cod='m-1'), caminho=velho)
 ok(r3['exame_id'] >= 1, 'grava normalmente depois de migrado')
 
+print('=== quais exames ja foram liberados (para a recuperacao nao esquecer) ===')
+# 12/08: ao recuperar depois de fechar a janela sem querer, exames JA assinados
+# voltavam como "nao liberados" e o medico perdia a conta do que faltava.
+p = payload(nome='Liberado Da Silva', cod='lib-1')
+p['exame']['study_uid'] = 'uid-assinado'
+r_lib = banco.gravar_exame(p, caminho=DB)
+p2 = payload(nome='Pendente Da Silva', cod='lib-2')
+p2['exame']['study_uid'] = 'uid-pendente'
+banco.gravar_exame(p2, caminho=DB)
+uids = banco.liberados(caminho=DB)['uids']
+ok('uid-assinado' not in uids and 'uid-pendente' not in uids,
+   'antes de assinar, nenhum dos dois aparece como liberado')
+banco.gravar_final(r_lib['exame_id'], 'laudo assinado', caminho=DB)
+uids = banco.liberados(caminho=DB)['uids']
+ok('uid-assinado' in uids, 'depois de assinar, o exame aparece na lista')
+ok('uid-pendente' not in uids, 'o que nao foi assinado NAO aparece')
+p3 = payload(nome='Sem Uid', cod='lib-3')
+p3['exame']['study_uid'] = None
+r3 = banco.gravar_exame(p3, caminho=DB)
+banco.gravar_final(r3['exame_id'], 'assinado sem uid', caminho=DB)
+ok(None not in uids and '' not in banco.liberados(caminho=DB)['uids'],
+   'exame sem study_uid nao entra na lista (nao haveria como casar)')
+
 print('=== saude ===')
 r = banco.saude(DB)
 ok(r['ok'] and r['total_exames'] >= 6, 'saude responde com o total de exames')

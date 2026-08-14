@@ -5139,6 +5139,23 @@ window.addEventListener('DOMContentLoaded', function(){ mostrarAba('captura'); }
 window.addEventListener('DOMContentLoaded', function(){ cpRenderRecuperacao().catch(function(){}); });
 /* Gravação que ficou correndo no agente enquanto o navegador esteve fechado. */
 window.addEventListener('DOMContentLoaded', function(){ agReatar().catch(function(){}); });
+/* AQUECER O MOTOR DE VOZ (13/08/2026, pedido do Dr. Daniel).
+   O motor grande leva 11-15 s para carregar, e até hoje essa carga acontecia junto com
+   o PRIMEIRO exame do dia — o paciente já na maca, o ditado esperando. A rota já existia
+   no agente; faltava alguém chamá-la cedo. Agora ela é chamada assim que o programa
+   abre, que é quando não há ninguém esperando.
+   Silencioso de propósito: sem agente no ar, ou com o motor já carregado, não acontece
+   nada e nada é dito. Aquecer é conforto, não é função — nunca pode atrapalhar. */
+window.addEventListener('DOMContentLoaded', function(){
+  setTimeout(function(){
+    try{
+      fetch(agenteBase()+'/transcritor/carregar')
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if(j&&j.carregado) log('🎙️ Transcrição pronta ('+(j.modelo||'motor local')+').'); })
+        .catch(function(){});
+    }catch(e){}
+  }, 1500);   // deixa o app terminar de abrir antes
+});
 /* Banco estruturado: manda o que ficou pendente e mostra o estado nas Configurações. */
 window.addEventListener('DOMContentLoaded', function(){ bancoReenviarFila().catch(function(){}); });
 /* Fechar a janela no meio de uma gravação: o Chrome pergunta antes. Não impede um

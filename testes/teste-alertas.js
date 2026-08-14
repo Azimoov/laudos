@@ -104,14 +104,26 @@ ok(novo.length === 1 && novo[0].tipo === 'faltando', 'tendo categorias, elas man
 console.log('=== ligacao no app ===');
 ok(!/obsBanner/.test(HTML), 'a faixa ambar unica foi removida de vez');
 ok(/id="painelAlertas"/.test(HTML), 'o painel esta no HTML');
-ok((HTML.match(/montarAlertas\(alertasDoLaudo\(/g) || []).length === 2,
+// 13/08/2026: passaram a ser TRES caminhos — o terceiro repinta o painel quando o
+// medico digita no laudo (revMarcarEditado), senao o "✓" do conferente fica de pe
+// depois de o texto mudar. Conferir os caminhos vale mais que contar as chamadas.
+ok((HTML.match(/montarAlertas\(alertasDoLaudo\(/g) || []).length >= 2,
    'painel montado nos dois caminhos: laudo novo e laudo reaberto do historico');
+ok(/function revMarcarEditado\(\)[\s\S]{0,400}montarAlertas\(alertasDoLaudo\(/.test(HTML),
+   'e repintado tambem quando o medico digita no laudo');
 ok(/alertas:alertas/.test(HTML), 'os alertas ficam guardados no laudo');
 ok(/alertas:meta\.alertas\|\|null/.test(HTML), 'e vao para o historico, para valer ao reabrir');
 ok(/if\(!alertas\.length && obsFinal\)/.test(HTML), 'se a IA so mandar texto corrido, ele ainda aparece');
 
 console.log('=== o que o APP preenche sozinho ===');
-ok(/tipo:'calculo', texto:'TI-RADS calculado pelo app/.test(HTML), 'TI-RADS calculado acende a caixa de calculo');
+// 12/08/2026: o TI-RADS deixou de ter caminho proprio — TI-RADS, BI-RADS e O-RADS passam
+// todos por classifAplicar, que devolve os avisos ja com a categoria certa.
+ok(/tipo:'calculo', texto:t/.test(HTML) && /classifAplicar/.test(HTML),
+   'a classificacao calculada pelo app acende a caixa de calculo');
+ok(/out\.alertas\.push\(\{tipo:'faltando'/.test(HTML),
+   'descritor que faltou acende a caixa de dados faltando');
+ok(/CONFLITO de classificacao|CONFLITO de classifica/.test(HTML),
+   'ditado x calculo em conflito vira aviso');
 ok(/alertas\.push\(\{tipo:'calculo', texto:ob\.obs\.join/.test(HTML),
    'o que o app decidiu no obstetrico (idade gestacional, data do parto, margem) acende a caixa de calculo');
 ok(/alertas\.push\(\{tipo:'faltando', texto:ob\.faltando\.join/.test(HTML),

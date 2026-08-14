@@ -218,8 +218,20 @@ ok(M.capMelhorDitadoIdx({ paciente: 'Maria Silva' },
 
 ok(/_quando:capQuandoDoEstudo\(est\)/.test(HTML), 'o exame guarda a hora do aparelho');
 ok(/quando:ms, _captura:true, _agente:true/.test(HTML), 'o ditado do agente guarda a hora dele');
-ok(/capAudioDoAgente\(dit\.texto\|\|'', dit\.origem\|\|'recuperado', dit\.quando\)/.test(HTML),
+// 3o argumento = a hora do agente. O 4o (trechos, 12/08/2026) pode existir ou nao:
+// o que este teste protege e a HORA, nao a quantidade de argumentos.
+ok(/capAudioDoAgente\(dit\.texto\|\|'', dit\.origem\|\|'recuperado', dit\.quando\b/.test(HTML),
    'na recuperacao, vale a hora que o AGENTE carimbou, nao a de agora');
+
+// --- trechos com hora (12/08/2026): o agente parou de jogar fora o minuto de cada frase ---
+ok(/trechos:\(Array\.isArray\(trechos\)\?trechos:\[\]\)/.test(HTML),
+   'o ditado guarda os trechos com hora que vierem do agente');
+// o lookbehind tira a DEFINICAO da funcao da conta — queremos so as chamadas
+ok((HTML.match(/(?<!function )capAudioDoAgente\([^)]*trechos\)/g) || []).length === 3,
+   'os TRES caminhos de ditado repassam os trechos (botao, exame fechado, recuperacao)');
+ok(/const trechosEx *= *audios\.filter/.test(HTML),
+   'na geracao do laudo os trechos do exame sao reunidos');
+ok(/trechos:trechosEx/.test(HTML), 'e ficam guardados no laudo, para o botao de VOZ');
 
 console.log('\n=== cadastro de local de atendimento (2.0) ===');
 // "Outro..." abria a lista velha de fundos, que so deixava ESCOLHER entre os que

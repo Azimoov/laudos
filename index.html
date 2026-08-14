@@ -374,6 +374,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaDia .agora{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:20px 24px}
 #telaDia .agora .l1{font-size:16px;font-weight:700;color:#1C2430}
 #telaDia .agora .l2{font-size:11.5px;color:#8A93A0;margin-top:8px;line-height:1.5}
+#telaDia .agora .onda{display:block;width:100%;height:66px;margin:14px 0 4px}
 #telaDia .item{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:16px 22px;
   margin-bottom:12px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
 #telaDia .item.falta{background:#FBECEC;border:1.5px solid #D97070;border-left:6px solid #C43B3B}
@@ -410,6 +411,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <div class="eb">EXAME EM ANDAMENTO</div>
       <div class="agora">
         <div class="l1" id="diaAgora">—</div>
+        <canvas id="diaOnda" class="onda"></canvas>
         <div class="l2" id="diaAgoraSub"></div>
       </div>
 
@@ -420,6 +422,194 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <p class="rodape">nada abre sozinho: o painel avisa (som + faixa) e você toca quando quiser</p>
     </div>
   </div>
+</div>
+
+<!-- ======================= TELA 4: REVISÃO DO LAUDO (2.0) =======================
+     Desenho ditado e aprovado pelo Dr. Daniel em 12/08 (tela-4-v6-revisao-do-laudo.svg).
+     A ideia que organiza tudo: os botões de alerta em cima NÃO são só aviso — são a
+     LEGENDA das cores do texto. O mesmo assunto tem a mesma cor no botão e no retângulo,
+     e tocar no botão leva até a ocorrência. Em vez de ler um parágrafo para descobrir
+     onde está o problema, você segue a cor. -->
+<style>
+#telaRev2{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
+#telaRev2 .ab-folha{max-width:920px;margin:20px auto;background:#FAFBFC;
+  border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
+#telaRev2 .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;display:flex;align-items:center;gap:10px}
+#telaRev2 .ab-topo .tit{flex:1;font-size:16px;font-weight:700}
+#telaRev2 .lnk{background:none;border:1px solid #7FA8A5;color:#DCEBEA;border-radius:16px;
+  padding:7px 16px;font-size:12.5px;cursor:pointer;font-family:inherit;white-space:nowrap}
+#telaRev2 .lnk:hover{background:rgba(255,255,255,.08)}
+#telaRev2 .ab-corpo{padding:20px 26px 26px}
+#telaRev2 .eb{font-size:11.5px;font-weight:700;color:#0E6E6B;letter-spacing:1.3px;margin:0 0 10px 2px}
+#telaRev2 .cab{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:16px 22px;
+  margin-bottom:22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+#telaRev2 .cab .qual{flex:1;min-width:240px}
+#telaRev2 .cab .l1{display:block;font-size:16px;font-weight:700;color:#1C2430}
+#telaRev2 .cab .l2{display:block;font-size:12px;color:#6B7480;margin-top:6px}
+#telaRev2 .cab .fundo{font-size:11.5px;color:#8A93A0}
+#telaRev2 .cab select{display:block;margin-top:6px;min-width:200px;padding:6px 10px;
+  border:1px solid #9FB3B2;border-radius:14px;font:inherit;font-size:12.5px;background:#fff}
+#telaRev2 .legenda{display:flex;gap:8px;flex-wrap:wrap}
+#telaRev2 .lg{border:0;border-radius:15px;padding:8px 16px;font-size:11.5px;font-weight:600;
+  cursor:pointer;font-family:inherit;background:#F1F3F5;color:#77808C;border:1px solid #C9D0D8}
+#telaRev2 .lg.on{color:#fff;border-color:transparent}
+/* calmo: leu e está limpo. Não acende — mas fica clicável e mostra o ✓ no rótulo,
+   porque no toque não há passar o mouse para ler a dica. */
+#telaRev2 .lg.calmo{color:#4F6B5E;border-color:#B6CFC2;background:#F2F7F4;cursor:pointer}
+#telaRev2 .lg:disabled{cursor:default}
+#telaRev2 .dica{font-size:11.5px;color:#8A93A0;margin:10px 0 14px 2px}
+#telaRev2 .fmt{background:#fff;border:1px solid #DCE2E8;border-radius:8px;padding:7px 12px;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+#telaRev2 .fmt button{background:#fff;border:1px solid #C9D0D8;border-radius:6px;min-width:28px;
+  height:28px;padding:0 8px;cursor:pointer;font-family:inherit;font-size:13px;color:#26303C}
+#telaRev2 .fmt button:hover{background:#EEF3F7}
+/* o `width:100%` e o fundo escuro dos selects gerais do app não valem aqui: na barra
+   de formatação o seletor é um botãozinho, não um campo de formulário */
+#telaRev2 .fmt select{border:1px solid #C9D0D8;border-radius:6px;height:28px;font:inherit;
+  font-size:12px;width:62px;min-width:0;padding:0 6px;background:#fff;color:#26303C;margin:0}
+#telaRev2 .fmt .sep{width:1px;height:22px;background:#E2E6EA}
+#telaRev2 .fmt .rot{font-size:10.5px;color:#5A6472}
+#telaRev2 .duas{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+#telaRev2 .esq{flex:1 1 520px;min-width:0}
+#telaRev2 .dir{flex:0 1 292px;min-width:250px}
+/* --- os retângulos do laudo estruturado: um por órgão/segmento --- */
+#telaRev2 .bloco{background:#fff;border:1px solid #E7EAEE;border-radius:8px;padding:14px 18px;
+  margin-bottom:12px;position:relative;scroll-margin-top:14px}
+#telaRev2 .bloco .barra{position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:8px 0 0 8px}
+#telaRev2 .bloco .tit{font-size:13.5px;font-weight:700;color:#1C2430;margin-bottom:6px;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#telaRev2 .bloco .txt{font-size:13px;color:#26303C;line-height:1.55;white-space:pre-wrap}
+#telaRev2 .bloco.normal .tit,#telaRev2 .bloco.normal .txt{color:#8A93A0}
+#telaRev2 .bloco.info .tit{color:#1C2430}
+#telaRev2 .bloco.info .txt{color:#26303C}
+#telaRev2 .bloco.alterado{background:#EAF4F3;border-color:#9CC5C2}
+#telaRev2 .bloco.alterado .barra{background:#0E6E6B}
+#telaRev2 .bloco.falta{background:#FBECEC;border-color:#C43B3B}
+#telaRev2 .bloco.falta .barra{background:#C43B3B}
+#telaRev2 .bloco.falta .tit{color:#C43B3B}
+#telaRev2 .bloco.conflito{background:#FBF3E1;border-color:#C99B2E}
+#telaRev2 .bloco.conflito .barra{background:#C99B2E}
+#telaRev2 .bloco.ia{background:#FBF1F7;border-color:#D9A5C2}
+#telaRev2 .bloco.ia .barra{background:#B94A7E}
+#telaRev2 .bloco.ia .tit{font-size:11.5px;letter-spacing:.8px;color:#8A3A64}
+#telaRev2 .selo{margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0}
+#telaRev2 .selo button{border:0;border-radius:10px;padding:3px 10px;font-size:10px;font-weight:700;
+  color:#fff;cursor:pointer;font-family:inherit}
+#telaRev2 .selo .voz{background:#0E6E6B}
+#telaRev2 .selo .img{background:#3D6FB4}
+#telaRev2 .selo .hora{font-size:11px;color:#0E6E6B}
+/* --- a caixinha âmbar dentro do retângulo: conflito e descritor em falta --- */
+#telaRev2 .caixa{margin-top:10px;border-radius:8px;padding:10px 12px;font-size:12px}
+#telaRev2 .caixa.amb{background:#FBF3E1;border:1px solid #C99B2E;color:#8A6A1F}
+#telaRev2 .caixa.ver{background:#fff;border:1px solid #D97070;color:#B04A4A}
+#telaRev2 .caixa .fichas{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+#telaRev2 .caixa .ficha{background:#fff;border:1px solid #C99B2E;color:#8A6A1F;border-radius:11px;
+  padding:4px 12px;font-size:11px;cursor:pointer;font-family:inherit}
+#telaRev2 .caixa .ficha:hover{background:#FDF8EC}
+#telaRev2 .caixa.ver .ficha{border-color:#D97070;color:#B04A4A}
+#telaRev2 .caixa.ver .ficha:hover{background:#FDF3F3}
+#telaRev2 .caixa .ficha.mic{border-color:#0E6E6B;color:#0E6E6B}
+#telaRev2 .caixa .abrir{background:none;border:1px solid currentColor;border-radius:11px;
+  padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;color:inherit;margin-left:8px}
+/* --- coluna da direita --- */
+#telaRev2 .grade{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:280px;overflow:auto;
+  padding-right:4px}
+#telaRev2 .grade img{width:100%;height:78px;object-fit:cover;border-radius:6px;border:1px solid #CBD3DB;
+  cursor:pointer;background:#E3E8ED}
+#telaRev2 .grade img.viva{border:2.5px solid #0E6E6B}
+#telaRev2 .vaziod{background:#fff;border:1px dashed #CBD4DC;border-radius:8px;padding:18px;
+  text-align:center;font-size:12px;color:#8A93A0}
+#telaRev2 .tocador{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:12px 14px;
+  margin-top:14px;font-size:11px;color:#6B7480}
+#telaRev2 .lb{font-size:11.5px;font-weight:700;color:#5A6472;letter-spacing:.8px;margin:18px 0 8px}
+#telaRev2 .dir select,#telaRev2 .dir textarea{width:100%;font:inherit;font-size:12.5px;
+  border:1px solid #C9D0D8;border-radius:8px;padding:8px 10px;background:#fff;box-sizing:border-box}
+#telaRev2 .dir select{border-radius:15px;border-color:#9FB3B2}
+#telaRev2 .dir textarea{min-height:64px;resize:vertical}
+#telaRev2 .pedido{display:flex;gap:8px;align-items:flex-start}
+#telaRev2 .mic{flex:0 0 40px;height:40px;border-radius:50%;background:#0E6E6B;color:#fff;border:0;
+  cursor:pointer;font-size:17px;line-height:1}
+#telaRev2 .mic.gravando{background:#C43B3B;animation:rv2Pulsa 1.2s ease-in-out infinite}
+@keyframes rv2Pulsa{0%,100%{box-shadow:0 0 0 0 rgba(196,59,59,.5)}70%{box-shadow:0 0 0 8px rgba(196,59,59,0)}}
+#telaRev2 .bt{border-radius:20px;padding:11px 20px;font-size:12.5px;font-weight:600;cursor:pointer;
+  font-family:inherit;border:1px solid #0E6E6B;background:#fff;color:#0E6E6B}
+#telaRev2 .bt.forte{background:#0E6E6B;color:#fff;font-weight:700}
+#telaRev2 .bt.forte:hover{background:#0B5A57}
+#telaRev2 .bt.cinza{border-color:#C6CDD4;color:#6B7480}
+#telaRev2 .bt.larga{display:block;width:100%;margin-top:10px;box-sizing:border-box}
+#telaRev2 .bt:disabled{opacity:.5;cursor:default}
+#telaRev2 .rodapeBt{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+#telaRev2 .rodapeBt2{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+#telaRev2 .rodapeBt2 .bt{padding:8px 16px;font-size:12px;font-weight:400}
+#telaRev2 .info{font-size:11.5px;color:#8A93A0;margin:16px 0 0}
+#telaRev2 .info.centro{text-align:center;color:#6B7480;margin-top:10px}
+@media(max-width:760px){ #telaRev2 .dir{flex:1 1 100%} }
+</style>
+
+<div id="telaRev2">
+  <div class="ab-folha">
+    <div class="ab-topo">
+      <span class="tit" id="rv2Tit">Revisão de laudos</span>
+      <button class="lnk" onclick="rev2Calculadoras()">🧮 Calculadoras</button>
+      <button class="lnk" onclick="rev2Voltar()">Voltar ao painel</button>
+    </div>
+    <div class="ab-corpo">
+      <div class="cab" id="rv2Cab"></div>
+
+      <div class="eb">ALERTAS DESTE LAUDO — TAMBÉM SÃO A LEGENDA DAS CORES DO TEXTO</div>
+      <div class="legenda" id="rv2Legenda"></div>
+      <p class="dica">cinza = sem ocorrência · colorido = ocorrência neste laudo · toque no botão para ir até ela no texto</p>
+
+      <div class="fmt">
+        <b style="font-size:13px;color:#5A6472">Aa</b>
+        <select id="rv2Fonte" onchange="rev2Fonte(this.value)" title="Tamanho da fonte">
+          <option>10</option><option>11</option><option selected>12</option><option>13</option><option>14</option><option>16</option>
+        </select>
+        <span class="sep"></span>
+        <button title="Negrito" onclick="fmtCmd('bold')"><b>N</b></button>
+        <button title="Itálico" onclick="fmtCmd('italic')"><i>I</i></button>
+        <button title="Sublinhado" onclick="fmtCmd('underline')"><u>S</u></button>
+        <span class="sep"></span>
+        <button title="Copiar formatação" onclick="rev2CopiarFmt()">🖌</button><span class="rot">copiar formatação</span>
+        <button title="Zerar formatação" onclick="fmtCmd('removeFormat')">🧽</button><span class="rot">zerar formatação</span>
+        <span class="sep"></span>
+        <button title="Desfazer" onclick="fmtCmd('undo')">↶</button>
+        <button title="Refazer" onclick="fmtCmd('redo')">↷</button>
+      </div>
+
+      <div class="duas">
+        <div class="esq" id="rv2Blocos"></div>
+        <div class="dir">
+          <div class="eb">IMAGENS (<span id="rv2NImg">0</span>)</div>
+          <div id="rv2Imgs"></div>
+          <div class="tocador" id="rv2Tocador">nenhum trecho selecionado — toque em <b>VOZ</b> num trecho do laudo</div>
+          <div class="lb">MODELO DO EXAME</div>
+          <select id="rv2Modelo" onchange="rev2TrocarModelo(this.value)"></select>
+          <button class="bt larga" onclick="rev2Regerar()">🤖 Regenerar laudo pela IA</button>
+          <div class="lb">PEÇA À IA CORREÇÕES</div>
+          <div class="pedido">
+            <textarea id="rv2Pedido" placeholder="escreva ou dite o ajuste — ex.: “medir o útero nos três eixos”"></textarea>
+            <button class="mic" id="rv2Mic" onclick="rev2PedidoVoz()" title="Falar o pedido">🎙</button>
+          </div>
+          <p class="info" id="rv2PedidoStatus"></p>
+        </div>
+      </div>
+
+      <div class="rodapeBt">
+        <button class="bt forte" onclick="rev2Aprovar(false)">Aprovar e assinar → próximo laudo</button>
+        <button class="bt" onclick="rev2Aprovar(true)">Aprovar, assinar e imprimir → próximo laudo</button>
+      </div>
+      <div class="rodapeBt2">
+        <button class="bt cinza" onclick="rev2Depois()">Deixar para depois</button>
+        <button class="bt cinza" onclick="rev2SalvarApenas()">Salvar apenas</button>
+        <button class="bt" onclick="rev2Aprender()">Aprender com correções</button>
+      </div>
+      <p class="info" id="rv2Info"></p>
+      <p class="info centro">assinar gera o PDF e arquiva na pasta de destino — “imprimir” manda junto para a impressora padrão</p>
+    </div>
+  </div>
+  <audio id="rv2Audio" style="display:none"></audio>
 </div>
 
 <!-- ======================= TELA 2: REALIZAR EXAMES (2.0) =======================
@@ -648,8 +838,16 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 
 <div class="card" id="cardConfig" style="display:none">
   <h2>Configurações</h2>
-  <label>Chave da API da OpenAI</label>
-  <input type="password" id="cfgChave" placeholder="Cole aqui sua chave (sk-...)">
+  <label>Endereço do provedor de IA</label>
+  <input type="text" id="cfgIaBase" placeholder="https://api.openai.com/v1">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+    <button class="btn sec" type="button" onclick="iaTestarEndereco()">🔌 Testar este endereço</button>
+    <button class="btn sec" type="button" onclick="iaVoltarPadrao()">↩ Voltar ao padrão (OpenAI)</button>
+  </div>
+  <div id="iaBaseEstado" class="aviso" style="margin-top:4px"></div>
+  <span class="aviso">Quase todo concorrente da OpenAI — <b>Google, Groq, Mistral, DeepSeek, Together, Azure</b> e também servidores rodando <b>na sua própria máquina</b> — usa exatamente o mesmo formato de pedido. Para trocar de fornecedor, mude este endereço e a chave abaixo. <b>Não mexa se estiver funcionando.</b></span>
+  <label>Chave da API</label>
+  <input type="password" id="cfgChave" placeholder="Cole aqui sua chave (sk-... na OpenAI)">
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
     <button class="btn" type="button" onclick="guardarChaveNoAgente()">🔒 Guardar a chave no computador</button>
     <button class="btn sec" type="button" onclick="removerChaveDoNavegador()">Apagar a chave deste navegador</button>
@@ -664,7 +862,11 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   </select>
   <label>Modelo auxiliar (tarefas simples — ex.: aprendizado)</label>
   <input type="text" id="cfgModeloAux" placeholder="ex.: gpt-5-mini (vazio = usa o modelo acima)">
-  <span class="aviso">Modelo barato usado só na extração de regras do aprendizado. Se vazio, usa o modelo principal.</span>
+  <span class="aviso">Modelo barato, usado nas tarefas que não precisam de imagem: extração de regras do aprendizado, pedidos de ajuste na revisão e a conferência do laudo. <b>Se vazio, todas elas usam o modelo principal</b> — que é bem mais caro.</span>
+  <label style="margin-top:10px;font-weight:400;display:block">
+    <input type="checkbox" id="cfgConferente" onchange="conferenteAlternar(this)"> Conferir o laudo com uma segunda leitura antes de entregar
+  </label>
+  <span class="aviso">Um segundo leitor, que não escreveu o laudo e <b>não vê as imagens</b>: confere coerência, medidas, conclusão, lateralidade e português. Como não manda imagem, gasta pouco — <b>mas usa o modelo auxiliar acima; se aquele campo estiver vazio, ele roda no modelo principal e aí custa bem mais</b>. Acrescenta alguns segundos por laudo.</span>
   <div id="cfgDadosStatus" style="margin:8px 0"></div>
   <div id="bancoStatus" class="aviso" style="margin:4px 0 8px"></div>
   <label>Motor de transcrição local (opcional)</label>
@@ -911,23 +1113,27 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <label><input type="radio" name="biMarg" value="microlobulada">Microlobulada</label>
         <label><input type="radio" name="biMarg" value="espiculada">Espiculada</label>
       </div>
+      <!-- Léxico conferido contra o manual original em 12/08/2026 (Apêndice A do capítulo de
+           Ultrassom, pág. impressa 489). SEIS opções, nesta ordem — "cístico complexo e sólido"
+           saiu: era da 5ª edição. O achado não se perde: a definição de "misto sólido e cístico"
+           no v2025 diz que o componente sólido é a característica que importa. -->
       <label>Padrão ecogênico (opcional)</label>
       <select id="biEco" onchange="calcBirads()">
         <option value="">— não avaliado —</option>
         <option value="anecoico">Anecoico</option>
         <option value="hiperecoico">Hiperecoico</option>
-        <option value="hipoecoico">Hipoecoico</option>
         <option value="isoecoico">Isoecoico</option>
+        <option value="hipoecoico">Hipoecoico</option>
         <option value="heterogeneo">Heterogêneo</option>
-        <option value="cisticoComplexo">Cístico complexo e sólido (parede espessa, septado ou com nódulo mural)</option>
         <option value="misto">Misto sólido e cístico (contém claramente os dois componentes)</option>
       </select>
+      <!-- TRÊS opções no v2025 — "padrão combinado" era da 5ª edição e saiu. O manual manda
+           escolher o achado DOMINANTE. -->
       <label>Acústico posterior</label>
       <div class="calcOpts">
         <label><input type="radio" name="biPost" value="nenhum">Sem alteração</label>
         <label><input type="radio" name="biPost" value="reforco">Reforço</label>
         <label><input type="radio" name="biPost" value="sombra">Sombra</label>
-        <label><input type="radio" name="biPost" value="combinado">Padrão combinado</label>
       </div>
       <label>Achados associados</label>
       <div class="calcOpts">
@@ -1120,6 +1326,9 @@ const cfg = {
   chave: localStorage.getItem('gmk')||'',
   modelo: localStorage.getItem('gmodelo')||'chat-latest',
   modeloAux: localStorage.getItem('gmodaux')||'',
+  // Endereço do provedor de IA. O padrão é EXATAMENTE o que sempre foi usado, então
+  // quem não mexer em nada não sente diferença nenhuma. Ver iaBase().
+  iaBase: localStorage.getItem('giabase')||'https://api.openai.com/v1',
   agenteLocal: localStorage.getItem('gagente')||'',   // URL do agente local de transcrição (ex.: http://127.0.0.1:8977). Vazio = só OpenAI.
   medico: localStorage.getItem('gmedico')||'Dr. Daniel Serruya',
   crm: localStorage.getItem('gcrm')||'Crm-Pa - 9962',
@@ -1139,8 +1348,10 @@ function alternarConfig(){
   c.style.display = c.style.display==='none'?'block':'none';
   mostrarAssPrev();
   document.getElementById('cfgChave').value = cfg.chave;
+  var _cb=document.getElementById('cfgIaBase'); if(_cb) _cb.value = cfg.iaBase||IA_BASE_PADRAO;
   document.getElementById('cfgModelo').value = cfg.modelo;
   document.getElementById('cfgModeloAux').value = cfg.modeloAux;
+  var _ck=document.getElementById('cfgConferente'); if(_ck) _ck.checked=conferenteLigado();
   document.getElementById('cfgAgenteLocal').value = cfg.agenteLocal;
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
@@ -1295,6 +1506,8 @@ function mostrarAssPrev(){
 function removerAss(){ cfg.assinatura=''; localStorage.removeItem('gass'); mostrarAssPrev(); }
 function salvarConfig(){
   cfg.chave = document.getElementById('cfgChave').value.trim();
+  var _cbv=document.getElementById('cfgIaBase');
+  if(_cbv) cfg.iaBase = _cbv.value.trim().replace(/\/+$/,'') || IA_BASE_PADRAO;
   cfg.modelo = document.getElementById('cfgModelo').value;
   cfg.modeloAux = document.getElementById('cfgModeloAux').value.trim();
   cfg.agenteLocal = document.getElementById('cfgAgenteLocal').value.trim().replace(/\/+$/,'');
@@ -1317,8 +1530,53 @@ function salvarConfig(){
   }
   dadoSalvar('gmodelo',cfg.modelo); dadoSalvar('gmodaux',cfg.modeloAux);
   dadoSalvar('gmedico',cfg.medico); dadoSalvar('gcrm',cfg.crm);
+  dadoSalvar('giabase',cfg.iaBase);
+  // O agente tem a chave e é ELE quem fala com o provedor na maior parte do tempo:
+  // o endereço tem de chegar lá também, senão o app iria para um lugar e o agente
+  // para outro — e a diferença só apareceria no meio de um atendimento.
+  try{
+    fetch(agenteBase()+'/ia/chave',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({base:cfg.iaBase})})
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j&&!j.ok&&j.erro) log('⚠️ O agente recusou o endereço: '+j.erro, true); })
+      .catch(function(){});
+  }catch(e){}
   document.getElementById('cardConfig').style.display='none';
-  log('Configurações salvas.');
+  log('Configurações salvas.'+((cfg.iaBase!==IA_BASE_PADRAO)?(' Provedor de IA: '+cfg.iaBase):''));
+}
+/* Testar o endereço ANTES de precisar dele. Um endereço errado só apareceria no meio
+   de um atendimento, com o laudo falhando e ninguém sabendo por quê. */
+async function iaTestarEndereco(){
+  var el=document.getElementById('iaBaseEstado'); if(!el) return;
+  var campo=document.getElementById('cfgIaBase');
+  var base=String((campo&&campo.value)||'').trim().replace(/\/+$/,'')
+             .replace(/\/(chat\/completions|audio\/transcriptions)$/,'') || IA_BASE_PADRAO;
+  if(!/^https?:\/\//.test(base)){
+    el.textContent='⚠️ O endereço precisa começar com https:// (ou http:// se for um servidor da própria máquina).';
+    return;
+  }
+  el.textContent='🔌 Testando '+base+'…';
+  var salvo=cfg.iaBase, modelo=cfg.modeloAux||cfg.modelo;
+  cfg.iaBase=base;                                   // testa com o endereço DIGITADO
+  try{
+    var r=await openai([{type:'text', text:'Responda apenas: {"ok":true}'}], true,
+                       {modelo:modelo, rotulo:'teste de endereço'});
+    el.textContent=(r && (r.ok===true||r.ok==='true'))
+      ? '✅ Respondeu certo. O modelo "'+modelo+'" existe neste provedor e o formato bate.'
+      : '✅ Respondeu, mas fora do formato esperado. Costuma ser o nome do modelo: confira se "'+modelo+'" existe neste provedor.';
+  }catch(e){
+    var m=String((e&&e.message)||e);
+    el.textContent='❌ Não funcionou: '+m
+      +(/404|not found/i.test(m)?' — endereço certo mas rota diferente, ou o modelo não existe lá.':'')
+      +(/401|403|key/i.test(m)?' — parece a chave: cada provedor tem a sua.':'');
+  }finally{
+    cfg.iaBase=salvo;                                // só salva de verdade em "Salvar"
+  }
+}
+function iaVoltarPadrao(){
+  var campo=document.getElementById('cfgIaBase'); if(campo) campo.value=IA_BASE_PADRAO;
+  var el=document.getElementById('iaBaseEstado');
+  if(el) el.textContent='Voltou para o endereço da OpenAI. Toque em Salvar para valer.';
 }
 function log(m, erro){
   const el = document.getElementById('log');
@@ -1378,7 +1636,7 @@ async function openai(conteudo, querJson=true, opts){
     return querJson ? extrairJson(tp) : tp;
   }
   if(!cfg.chave) throw new Error('A IA está indisponível: o agente não respondeu e não há chave guardada neste dispositivo. Ligue o agente no computador da clínica.');
-  const r = await fetchRetentativa(function(){ return fetch('https://api.openai.com/v1/chat/completions',{
+  const r = await fetchRetentativa(function(){ return fetch(iaBase()+'/chat/completions',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.chave},
     body: JSON.stringify(body)
@@ -1508,6 +1766,16 @@ if(_agenteDaURL()){
   }
 }
 function agenteBase(){ return ((cfg.agenteLocal||'').trim().replace(/\/+$/,'')) || AGENTE_PADRAO; }
+/* O endereço do provedor de IA, já aparado.
+   Aceita o endereço colado da documentação do provedor com a rota no fim
+   (".../v1/chat/completions"), porque é assim que ele aparece nos exemplos deles —
+   e um endereço com a rota grudada geraria ".../chat/completions/chat/completions". */
+const IA_BASE_PADRAO='https://api.openai.com/v1';
+function iaBase(){
+  var b=String(cfg.iaBase||'').trim().replace(/\/+$/,'');
+  b=b.replace(/\/(chat\/completions|audio\/transcriptions)$/,'');
+  return b || IA_BASE_PADRAO;
+}
 var _agenteLocalOk=null;   // null=não checado · true/false=cache da sessão
 async function agenteLocalDisponivel(){
   if(_agenteLocalOk!==null) return _agenteLocalOk;
@@ -1537,12 +1805,37 @@ async function iaPeloAgente(){
    com tudo funcionando — e, no caminho do exame ao vivo, fazia o tipo do exame voltar
    vazio sem avisar ninguém. */
 async function temIA(){ return !!(cfg.chave||'').trim() || await iaPeloAgente(); }
+/* Quanto tempo vale a pena esperar o agente antes de ir para a nuvem.
+   O WAV é 16 kHz, mono, 16 bits — 32.000 bytes por segundo de áudio. Com isso dá para
+   saber o tamanho do ditado sem decodificar nada.
+   A regra é a impaciência: se o motor local não deu conta em ~2,5× a duração do áudio,
+   ele não está lento, está afogado — e esperar 120 s parado no meio do atendimento é
+   pior que pagar alguns centavos na nuvem. Piso de 25 s para ditado curto não ser
+   cortado por qualquer soluço; teto de 120 s, que era o limite antigo. */
+function paciencia(wavBlob){
+  var seg=(wavBlob && wavBlob.size ? wavBlob.size : 0)/32000;
+  return Math.round(Math.min(120000, Math.max(25000, seg*2500)));
+}
 async function transcreverLocal(wavBlob){
   var base=(cfg.agenteLocal||'').trim().replace(/\/+$/,'');
   var b64=await new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=function(){rej(fr.error);}; fr.readAsDataURL(wavBlob); });
-  var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},120000);
-  var r=await fetch(base+'/transcrever',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64:b64}),signal:ctrl.signal}); clearTimeout(t);
+  var espera=paciencia(wavBlob);
+  var ctrl=new AbortController(), estourou=false;
+  var t=setTimeout(function(){ estourou=true; ctrl.abort(); }, espera);
+  try{
+    var r=await fetch(base+'/transcrever',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64:b64}),signal:ctrl.signal});
+  }catch(e){
+    clearTimeout(t);
+    // mensagem honesta: "AbortError" não diz nada a quem está atendendo
+    if(estourou) throw new Error('o motor local passou de '+Math.round(espera/1000)+'s sem responder — indo para a nuvem');
+    throw e;
+  }
+  clearTimeout(t);
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'agente local falhou');
+  // o terceiro caminho também conta quando o agente teve de usar a nuvem: aqui não há
+  // marcação de tempo a perder, mas há gasto — e gasto escondido é gasto que só aparece
+  // na fatura do fim do mês
+  capAvisarMotor(j);
   return j.texto||'';
 }
 async function transcreverAudio(arquivoOuBlob){
@@ -1551,7 +1844,12 @@ async function transcreverAudio(arquivoOuBlob){
   // 1) motor LOCAL primeiro (se o agente estiver rodando): melhor vocabulário médico, áudio não sai da máquina
   if(await agenteLocalDisponivel()){
     try{ var tl=await transcreverLocal(wav); if(tl && tl.trim()) texto=tl; }
-    catch(e){ ultimoErro='local: '+((e&&e.message)||e); _agenteLocalOk=null; /* revalida na próxima; cai na OpenAI agora */ }
+    catch(e){
+      ultimoErro='local: '+((e&&e.message)||e); _agenteLocalOk=null; /* revalida na próxima; cai na OpenAI agora */
+      // a troca de motor não pode ser silenciosa: o médico precisa saber que aquele
+      // ditado saiu por outro caminho, e por quê
+      log('⚠️ Motor de voz local não deu conta ('+((e&&e.message)||e)+'). Transcrevendo na nuvem.', true);
+    }
   }
   // 2) fallback OpenAI — passando pelo agente se ele estiver no ar (a chave vive lá)
   if(texto===null) await iaPeloAgente();
@@ -1566,7 +1864,7 @@ async function transcreverAudio(arquivoOuBlob){
         fd.append('response_format', 'json');
         // pelo agente quando ele estiver no ar (a chave fica lá); senão, direto
         if(_iaAgente.ok) return fetch(agenteBase()+'/ia/transcrever',{method:'POST', body:fd});
-        return fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+cfg.chave}, body:fd});
+        return fetch(iaBase()+'/audio/transcriptions',{method:'POST', headers:{'Authorization':'Bearer '+cfg.chave}, body:fd});
       }, 'transcrição ('+m+')');
       const j = await r.json(); texto = j.text||''; break;
     }catch(e){
@@ -2545,6 +2843,8 @@ async function gerarLaudo(exId){
   try{
     const mod = MODELOS[ex.tipo];
     const trans = audios.filter(a=>a.exameId===exId).map(a=>a.transcricao).filter(Boolean).join('\n---\n');
+    // os trechos com hora, para o botão de VOZ tocar só o pedaço certo do ditado
+    const trechosEx = audios.filter(a=>a.exameId===exId).reduce(function(m,a){ return m.concat(a.trechos||[]); }, []);
     // Guardado no banco junto com o laudo: é a PERGUNTA que gerou a resposta.
     // Sem ela o banco fica com laudos sem o ditado que os originou — inútil
     // para comparar, para auditar e para treinar. Só este trecho vai para o
@@ -2585,9 +2885,14 @@ async function gerarLaudo(exId){
 (EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — preencha o campo 'obstetrico'. Você SÓ COPIA os valores; quem escolhe qual entra na conclusão é o aplicativo:\n- trouxe_usg_primeiro_trimestre: true se o médico disse que a paciente trouxe/apresentou a ultrassonografia INICIAL (de primeiro trimestre), ou se ele informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito.\n- ig_primeiro_usg_semanas: a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame (número; 0 se não foi ditada).\n- aua: leia da worksheet do aparelho o campo AUA — a idade gestacional média estimada pela biometria de HOJE — copiada exatamente como está, ex.: \"34w2d\". Vazio se não estiver legível.\n- ga: leia da worksheet o campo GA — a idade gestacional já estabelecida para a paciente — copiada exatamente como está, ex.: \"35w3d\". Vazio se não estiver legível.\n- edd_aua: a data que está em EDD(AUA), no formato dia/mês/ano. Vazio se não estiver legível.\n- edd_ga: a data que está em EDD(EDD), no formato dia/mês/ano. Vazio se não estiver legível.\nNUNCA invente nenhum desses valores: copie da imagem ou deixe vazio. ATENÇÃO — AUA e GA são campos DIFERENTES da worksheet e costumam ter valores diferentes: não troque um pelo outro nem repita o mesmo nos dois.\nNA CONCLUSÃO: NÃO escreva a idade gestacional, NÃO escreva a data provável do parto e NÃO escreva a variação em dias — deixe os pontilhados do modelo como estão. O aplicativo preenche os três, e escolhe a frase certa conforme a paciente ter trazido ou não o exame inicial.\n\n" : "")+
 (ex.tipo==='obst23' ? "OBSTÉTRICO — SITUAÇÃO FETAL: apresentação cefálica ou pélvica implica, por definição, situação longitudinal. Se o ditado disser 'cefálico(a)' ou 'pélvico(a)', preencha a situação com 'longitudinal' e a apresentação com 'cefálica' ou 'pélvica' (concordando com a palavra 'apresentação') — NUNCA deixe os pontilhados da situação nesse caso. Mantenha os pontilhados da situação apenas se a apresentação não for ditada; se o médico ditar situação transversa ou oblíqua, use o que ele ditou e NÃO infira a apresentação.\n\n" : "")+
 (ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
+(classifVale('birads', ex.tipo) ? "BI-RADS AUTOMÁTICO (somente mama): para CADA massa/nódulo mamário descrito no ditado, inclua um item no campo 'birads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado. Responda com o CÓDIGO, não com a frase:\n- localizacao: onde está, como o médico disse (ex.: \"mama direita, QSE\").\n- forma: oval | lobulada | redonda | irregular\n- orientacao: paralela (paralela à pele) | nao (não paralela)\n- margem: circ (circunscrita) | indistinta | angular | microlobulada | espiculada\n- eco: anecoico | hiperecoico | isoecoico | hipoecoico | heterogeneo | misto (misto sólido e cístico)\n- posterior: nenhum (sem alteração) | reforco | sombra\n- halo: sim | nao — halo ecogênico (echogenic rind)\n- tamanho_cm: maior medida em cm; 0 se não ditada nem legível.\n- caso_especial: SÓ quando o médico ditar explicitamente um destes, e aí os outros descritores podem vir vazios: cistoSimples | cistoComplicado | microcistos | linfonodo | cat0a | cat0b | cat6. Senão: \"\".\nDescritor não citado: \"\" (string vazia). Este é o léxico do ACR BI-RADS v2025 — NÃO use \"cístico complexo e sólido\" nem \"padrão combinado\": saíram nesta versão. NÃO calcule nem escreva a categoria BI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir destes descritores e insere no laudo. Se nenhuma massa for descrita: \"birads\":[].\n\n" : "")+
+(classifVale('orads', ex.tipo) ? "O-RADS AUTOMÁTICO (somente transvaginal e pélvica): para CADA lesão ovariana ou anexial descrita no ditado, inclua um item no campo 'orads' com o que foi DITADO — NUNCA infira. Responda com o CÓDIGO:\n- localizacao: ex.: \"ovário esquerdo\".\n- tipo: fisio (folículo ou corpo lúteo ≤ 3 cm) | uniSimples (cisto unilocular simples, anecoico, parede lisa) | uniNaoSimples (unilocular não simples, parede lisa) | uniIrreg (unilocular com parede interna irregular < 3 mm) | classica (dermoide, endometrioma ou cisto hemorrágico típicos) | multiLisa (multilocular de paredes e septos lisos) | multiIrreg (multilocular com parede ou septo irregular) | solido (com componente sólido ou projeção papilar) | solidoLiso (sólida ≥ 80% de contorno liso) | solidoIrreg (sólida ≥ 80% de contorno irregular)\n- escore_cor: 1 | 2 | 3 | 4 — escore de cor ao Doppler; \"\" se não ditado.\n- tamanho_cm: maior diâmetro em cm; 0 se não ditado.\n- papilas: número de projeções papilares; 0 se não ditado.\n- ascite: sim | nao — ascite e/ou nódulos peritoneais.\nNÃO calcule nem escreva a categoria O-RADS — o aplicativo calcula. Nenhuma lesão descrita: \"orads\":[].\n\n" : "")+
 "AVISOS SEPARADOS POR ASSUNTO (campo 'avisos'): além de 'observacoes_para_o_medico', devolva CADA aviso como um item próprio, com 'tipo' sendo EXATAMENTE uma destas palavras:\n- identificacao: nome, idade ou data que não conferem entre o ditado, as imagens e o cadastro.\n- divergencia: o ditado diz uma coisa e as imagens mostram outra.\n- faltando: medida, dado ou legenda ausente/ilegível que deixou pontilhados no laudo.\n- iacriou: você escreveu a descrição de uma patologia a partir do seu conhecimento, por não haver dizer padrão do médico (diga qual patologia).\n- outros: aviso que não caiba em nenhum acima.\nUm assunto por item, 'texto' curto e direto. Nada a avisar: \"avisos\":[]. NUNCA use os tipos 'anterior' nem 'calculo' — esses o aplicativo preenche sozinho.\n\n"+
+"DE ONDE VEIO CADA COISA (campo 'procedencia'): você já está OLHANDO as imagens para escrever este laudo — então, enquanto lê, anote de qual delas tirou cada informação. As imagens vão nesta mensagem NA ORDEM: a primeira é a imagem 1, a segunda é a 2, e assim por diante.\nDevolva um item por SEÇÃO do corpo do laudo:\n- secao: o título da seção EXATAMENTE como você o escreveu no corpo, sem os asteriscos (ex.: \"Útero\", \"RIM DIREITO\", \"Ovário direito\"). Se a informação não estiver sob um título, use \"\".\n- imagem_n: o NÚMERO da imagem de onde saiu a medida ou o achado daquela seção (1, 2, 3…). Se a informação veio SÓ do ditado e não é visível em imagem nenhuma, use 0. Se estiver em várias, use aquela em que a medida está impressa/mais legível.\n- origem: \"imagem\" (medida lida na imagem) | \"voz\" (só ditado) | \"ambos\".\n- citacao: quando a informação veio do ditado, COPIE de 4 a 12 palavras do DITADO, exatamente como estão escritas ali (sem corrigir, sem resumir) — é o pedaço que o médico falou sobre essa seção. Se não veio do ditado: \"\".\nREGRA DURA: só aponte uma imagem se você realmente leu a informação NELA. Na dúvida, imagem_n = 0 — apontar a imagem errada é pior que não apontar. Nenhuma seção identificável: \"procedencia\":[].\n\n"+
 "DADOS ESTRUTURADOS (campo 'dados_estruturados'): além do laudo, devolva os achados campo a campo, para o arquivo longitudinal do paciente. Regras:\n- Preencha APENAS com informação presente no ditado ou legível nas imagens. Campo sem informação = null (ou \"\" em texto). NUNCA invente medida, órgão ou classificação.\n- indicacao_clinica: os dados clínicos ditados, se houver.\n- conclusao_codigo: UMA palavra que resuma a conclusão — normal | benigno | provavelmente-benigno | suspeito | indeterminado | outro.\n- achados: um item por achado DESCRITO no laudo. orgao (ex.: 'mama-direita', 'figado', 'lobo-tireoidiano-esquerdo'), localizacao (ex.: 'QSE', 'terco medio'), tipo (ex.: 'nodulo', 'cisto', 'calculo', 'esteatose'), medidas em MILÍMETROS (medida_1_mm a medida_3_mm; converta de cm; null se não medida), caracteristicas (objeto livre: ecogenicidade, margens, sombra...), classificacao (ex.: 'BI-RADS 3'; \"\" se não se aplica), descricao (a frase do achado como está no laudo).\n- Exame normal, sem achados: \"achados\":[].\n\n"+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
++(classifVale('birads', ex.tipo)?",\"birads\":[{\"localizacao\":\"\",\"forma\":\"\",\"orientacao\":\"\",\"margem\":\"\",\"eco\":\"\",\"posterior\":\"\",\"halo\":\"\",\"tamanho_cm\":0,\"caso_especial\":\"\"}]":"")
++(classifVale('orads', ex.tipo)?",\"orads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"escore_cor\":\"\",\"tamanho_cm\":0,\"papilas\":0,\"ascite\":\"\"}]":"")
 +(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0,\"aua\":\"\",\"ga\":\"\",\"edd_aua\":\"\",\"edd_ga\":\"\"}":"")+"}"
     }];
     for(const img of ex.imagens) partes.push(dataUrlParaParte(img));
@@ -2602,15 +2907,18 @@ async function gerarLaudo(exId){
       if(txt) alertas.push({tipo:alertaTipoValido(a&&a.tipo), texto:txt});
     });
     if(!alertas.length && obsFinal) alertas.push({tipo:'outros', texto:obsFinal});
-    if(ex.tipo==='tireoide' && resp.tirads){
-      try{
-        const tri = processarTirads(resp.tirads, trans);
-        if(tri.linhas.length){ conclusaoFinal = (conclusaoFinal?conclusaoFinal+'\n':'')+tri.linhas.join('\n');
-          alertas.push({tipo:'calculo', texto:'TI-RADS calculado pelo app: '+tri.linhas.join(' | ')}); }
-        if(tri.obs.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+tri.obs.join(' ');
-          alertas.push({tipo:'calculo', texto:tri.obs.join(' ')}); }
-      }catch(e){}
-    }
+    // Classificações por descritor — TI-RADS (tireoide), BI-RADS (mama) e O-RADS (anexos).
+    // A IA anota o que foi ditado; a conta é daqui. Ver CLASSIF e classifAplicar.
+    var _cls={linhas:[], alertas:[], pendencias:[], conflitos:[]};
+    try{
+      _cls = classifAplicar(ex, resp, trans);
+      if(_cls.linhas.length){
+        conclusaoFinal = (conclusaoFinal?conclusaoFinal+'\n':'')+_cls.linhas.join('\n');
+      }
+      _cls.alertas.forEach(function(a){ alertas.push(a); });
+      var _clsTxt=_cls.alertas.map(function(a){ return a.texto; }).join(' ');
+      if(_clsTxt) obsFinal = (obsFinal?obsFinal+' | ':'')+_clsTxt;
+    }catch(e){ log('Falha ao calcular a classificação de '+ex.paciente+': '+e.message, true); }
     // Obstétrico 2º/3º trimestre: margem de erro pela IG do 1º USG (código calcula, IA só extrai)
     if(EX_OBST_SEQ[ex.tipo]){
       try{
@@ -2630,7 +2938,28 @@ async function gerarLaudo(exId){
       alertas.push({tipo:'identificacao', texto:'Falta confirmar se o exame de '+(ant.pendentes[0].data||'sem data')+' é da mesma pessoa. O laudo saiu SEM comparação.'});
     }
     if(!usados.length && !ant.pendentes.length && histBuscaIncompleta()) alertas.push({tipo:'anterior', texto:'Busca incompleta ('+_histDiscoErro+'): procurei só na cópia do navegador, que é podada. Ligue o agente.'});
-    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas};
+    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas,
+      // dado ESTRUTURADO para a tela de revisão desenhar os botões de descritor faltando
+      // e a caixa âmbar de conflito, sem ter de reinterpretar o texto do aviso
+      classifPendencias:_cls.pendencias, classifConflitos:_cls.conflitos,
+      // de qual imagem a IA tirou cada seção — ela já estava olhando, agora anota enquanto lê
+      procedencia:(Array.isArray(resp.procedencia)?resp.procedencia:[]),
+      trechos:trechosEx,
+      // idade e sexo do APARELHO, para a conferência de medidas por idade (REF_MEDIDAS).
+      // Ficam no laudo, e não só no exame, para o aviso continuar valendo quando o
+      // laudo for reaberto do histórico.
+      idadePac:ex.idadeExame||'', sexoPac:ex.sexoPac||''};
+    // SEGUNDA LEITURA, por quem não escreveu o laudo e não viu as imagens (conferirLaudo).
+    // Roda com o texto JÁ MONTADO — inclusive com as linhas de classificação que o app
+    // acabou de inserir —, porque é o documento inteiro que precisa fechar em si mesmo.
+    try{
+      // guarda o RESULTADO; o aviso é montado na hora por alertasConferente
+      ex.laudo.conferencia = await conferirLaudo(ex.laudo);
+      if(ex.laudo.conferencia.itens.length)
+        log('Conferente em '+ex.paciente+': '+ex.laudo.conferencia.itens.length+' ponto(s) a olhar.', true);
+      else if(!ex.laudo.conferencia.rodou)
+        log('Conferente em '+ex.paciente+': NÃO conferiu ('+(ex.laudo.conferencia.motivo||'?')+').', true);
+    }catch(e){ ex.laudo.conferencia={itens:[], rodou:false, motivo:String(e&&e.message||e)}; }
     ex._liberado=false;   // laudo novo = ainda não liberado (volta p/ a lista de revisão)
     ex._falhou=false;
     ex.laudoBaseTexto = textoBaseLaudo(ex.laudo); // base p/ comparar com as edições do médico (loop de aprendizado)
@@ -3320,14 +3649,25 @@ function montarRevAnterior(ex){
    um erro de identificação era preciso LER o parágrafo inteiro. Agora cada assunto
    tem seu quadro e sua cor, e o quadro fica na tela mesmo sem aviso — apagado, dizendo
    o que foi conferido. 'anterior' e 'calculo' são preenchidos pelo app, não pela IA. */
+/* As cores vieram do desenho da tela 4 (12/08/2026), onde os botões de alerta são
+   TAMBÉM a legenda das cores do laudo estruturado: o mesmo assunto tem a mesma cor no
+   aviso e no retângulo do texto. Trocar uma cor aqui troca nos dois lugares — é de
+   propósito, e é o que faz o botão servir de mapa. */
 const ALERTAS = [
-  {k:'identificacao', nome:'Identificação',        cor:'#e5534b', vazio:'Nome, idade e data conferem'},
-  {k:'anterior',      nome:'Exame anterior',       cor:'#6db3ff', vazio:'Nenhum exame anterior deste paciente'},
-  {k:'divergencia',   nome:'Ditado × imagens',     cor:'#a78bfa', vazio:'Ditado e imagens batem'},
-  {k:'faltando',      nome:'Dados faltando',       cor:'#e3a93c', vazio:'Nenhuma medida ou dado em falta'},
-  {k:'iacriou',       nome:'Texto criado pela IA', cor:'#f06ab1', vazio:'Nenhum texto criado pela IA'},
-  {k:'calculo',       nome:'Cálculo do app',       cor:'#2eb35c', vazio:'Nenhum cálculo automático neste laudo'},
-  {k:'outros',        nome:'Outros avisos',        cor:'#98a3b3', vazio:'Nenhum outro aviso'}
+  {k:'identificacao', nome:'Conflito de identificação',     cor:'#D2601A', vazio:'Nome, idade e data conferem'},
+  {k:'anterior',      nome:'Exame anterior identificado',   cor:'#3D6FB4', vazio:'Nenhum exame anterior deste paciente'},
+  {k:'divergencia',   nome:'Ditado incompatível com imagens',cor:'#C99B2E', vazio:'Ditado e imagens batem'},
+  {k:'faltando',      nome:'Dados faltando',                cor:'#C43B3B', vazio:'Nenhuma medida ou dado em falta'},
+  {k:'iacriou',       nome:'Texto gerado por IA',           cor:'#B94A7E', vazio:'Nenhum texto criado pela IA'},
+  // "Classificação calculada", nunca "pela IA": a IA anota os descritores, o app calcula
+  {k:'calculo',       nome:'Classificação calculada',       cor:'#2E7D53', vazio:'Nenhum cálculo automático neste laudo'},
+  // segunda leitura, por um leitor que não escreveu o laudo (ver conferirLaudo)
+  // "vazio" NÃO pode se ler como aprovação: laudo antigo, conferente desligado ou
+  // conferência que falhou caem todos aqui, e nenhum deles foi conferido.
+  {k:'conferente',    nome:'Revisão do conferente',         cor:'#6A4FB6', vazio:'Sem informação de conferência neste laudo'},
+  // medida comparada com a tabela da IDADE do paciente (ver REF_MEDIDAS)
+  {k:'referencia',    nome:'Medida fora da referência',     cor:'#0E7C8A', vazio:'Nenhuma medida fora da referência para a idade'},
+  {k:'outros',        nome:'Outros avisos',                 cor:'#6B7480', vazio:'Nenhum outro aviso'}
 ];
 /* Categoria desconhecida NUNCA some: cai em "outros". Aviso perdido é aviso não lido. */
 function alertaTipoValido(t){
@@ -3341,19 +3681,122 @@ function alertasDoLaudo(L){
   if(Array.isArray(L.alertas) && L.alertas.length) return L.alertas;
   return L.obs ? [{tipo:'outros', texto:String(L.obs)}] : [];
 }
+
+/* ============ F2e — as medidas que ficaram em branco (12/08/2026) ============
+   O aparelho manda a medida QUEIMADA no pixel da imagem (BurnedInAnnotation=YES):
+   não há número para o app ler. Mas a lista do que é obrigatório já existe há
+   anos — cada pontilhado dos modelos do médico é uma medida exigida, e a IA
+   mantém o pontilhado quando o dado não foi ditado. Logo: o pontilhado que
+   SOBROU no laudo pronto é, exatamente, o que faltou. Sem IA, sem custo.
+
+   NADA aqui é lista fixa, de propósito. Tudo é lido do texto do laudo no
+   instante em que se olha: mudar um modelo, criar um pontilhado novo ou trocar
+   os dizeres NÃO pede alteração de código. Por isso:
+     · pontilhado é "3 pontos ou mais" — hoje os modelos usam 5 nas medidas e
+       10 nas datas; amanhã podem usar outro tamanho;
+     · o nome do que falta é lido da própria frase (o título em negrito da
+       seção + o que vem escrito antes dos pontos), nunca de um dicionário.
+
+   Limite conhecido: só enxerga o que o MODELO exige. Medida que o médico
+   deveria ter ditado mas que o modelo não pede não aparece aqui. */
+const FALTA = {
+  pont: /\.{3,}/,
+  // sobras que atrapalham o nome: unidades e ligações no COMEÇO
+  ini: ['cm','mm','ml','g','kg','cm³','cm3','mm³','ml²','%','e','x','×','por','de','com','a','o','os','as','que','em','no','na'],
+  // e verbos/ligações no FIM ("Lobo direito mede" -> "Lobo direito")
+  fim: ['mede','medem','medindo','medida','medidas','é','de','com','em','no','na','do','da','para','até','ate','aproximadamente','cerca','x','×','e']
+};
+function faltaPalavraNua(p){ return String(p||'').toLowerCase().replace(/[.,;:()"'*]/g,''); }
+/* apara as pontas do rótulo até sobrar só o que nomeia a medida */
+function faltaApara(txt){
+  var p=String(txt||'').split(/\s+/).filter(Boolean);
+  while(p.length && FALTA.ini.indexOf(faltaPalavraNua(p[0]))>=0) p.shift();
+  while(p.length && FALTA.fim.indexOf(faltaPalavraNua(p[p.length-1]))>=0) p.pop();
+  var s=p.join(' ').replace(/^[\s,;:.+\/\-–—()]+/,'').replace(/[\s,;:.+\/\-–—()]+$/,'').trim();
+  return s.length>55 ? s.slice(0,54).replace(/\s\S*$/,'')+'…' : s;
+}
+/* Título da seção = o primeiro **negrito** da linha que NÃO tenha pontilhado
+   dentro. "**Volume pré miccional: ..... ml**" é a medida em si, não um título. */
+function faltaTitulo(linha){
+  var m=String(linha||'').match(/\*\*([^*]{1,70})\*\*/);
+  if(!m || FALTA.pont.test(m[1])) return null;
+  return m[1].replace(/[:\s]+$/,'').trim() || null;
+}
+/* "..... x ..... x ....." é UMA medida de três números, não três medidas.
+   Pontilhados separados só por x, vírgula, barra, "por" ou "e" viram um grupo. */
+function faltaGrupos(linha){
+  var re=/\.{3,}/g, m, cru=[];
+  while((m=re.exec(linha))!==null) cru.push([m.index, m.index+m[0].length]);
+  var g=[];
+  for(var k=0;k<cru.length;k++){
+    var u=g.length?g[g.length-1]:null;
+    if(u && /^[\s*]*(?:[x×,\/]|por|e)?[\s*]*$/i.test(linha.slice(u.f, cru[k][0]))){ u.f=cru[k][1]; u.n++; }
+    else g.push({i:cru[k][0], f:cru[k][1], n:1});
+  }
+  return g;
+}
+/* o pedaço da frase ao redor do buraco, para o médico reconhecer o lugar de bate-pronto */
+function faltaTrecho(linha, G){
+  var i=Math.max(0, G.i-46), f=Math.min(linha.length, G.f+18);
+  return (i>0?'…':'')+linha.slice(i,f).replace(/\*\*/g,'').replace(/\s+/g,' ').trim()+(f<linha.length?'…':'');
+}
+/* Devolve [{secao, rotulo, quantos, trecho}] — vazio quando o laudo está completo. */
+function medidasFaltando(L){
+  if(!L) return [];
+  var linhas=[L.corpo||'', L.conclusao||'', L.extra||''].join('\n').split('\n');
+  var secao='', achados=[];
+  for(var n=0;n<linhas.length;n++){
+    var linha=linhas[n];
+    var tit=faltaTitulo(linha); if(tit) secao=tit;
+    if(!FALTA.pont.test(linha)) continue;
+    var grupos=faltaGrupos(linha), fim=0;
+    for(var k=0;k<grupos.length;k++){
+      var G=grupos[k], antes=linha.slice(fim, G.i).replace(/\*\*/g,'').replace(/\s+$/,'');
+      fim=G.f;
+      var rot;
+      if(/:$/.test(antes)){                       // "Dimensões:" -> o nome está ANTES dos dois pontos
+        var pre=antes.slice(0,-1).split(/[.;,]\s*/);
+        rot=faltaApara(pre[pre.length-1]);
+      }else{                                      // "...mede" -> fica com a última oração
+        var pd=antes.split(/[.;:,]\s*/);
+        rot=faltaApara(pd[pd.length-1]);
+      }
+      achados.push({secao:secao, rotulo:rot||secao||'medida sem nome no modelo',
+                    quantos:G.n, trecho:faltaTrecho(linha, G)});
+    }
+  }
+  return achados;
+}
+/* Vira aviso da categoria "Dados faltando" (o quadro âmbar da revisão).
+   Calculado na hora, nunca guardado: se o médico preencher a medida e reabrir,
+   o aviso some sozinho — aviso que mente é pior que aviso nenhum. */
+function alertasFaltando(L){
+  var f=medidasFaltando(L); if(!f.length) return [];
+  var txt=f.map(function(x){
+    var nome=(x.secao && x.rotulo.toLowerCase().indexOf(x.secao.toLowerCase())<0) ? (x.secao+' — '+x.rotulo) : x.rotulo;
+    return '• '+nome+(x.quantos>1?(' ('+x.quantos+' números)'):'')+'   ⟨'+x.trecho+'⟩';
+  });
+  return [{tipo:'faltando', texto:'O laudo saiu com '+f.length+' pontilhado(s) por preencher — o modelo pede estas medidas e elas não foram ditadas:\n'+txt.join('\n')}];
+}
+
+/* Um aviso pode vir marcado `calmo`: tem texto a dizer, mas NÃO é ocorrência.
+   Ele troca a frase da caixa apagada e a caixa continua apagada. Serve para o
+   conferente dizer "li e está limpo" sem gastar o sinal de relance — caixa acesa
+   é para o que precisa da sua atenção AGORA. */
 function montarAlertas(lista){
   var box=document.getElementById('painelAlertas'); if(!box) return;
-  var porTipo={};
+  var porTipo={}, calmos={};
   (lista||[]).forEach(function(a){
     var txt=String((a&&a.texto)||'').trim(); if(!txt) return;
     var t=alertaTipoValido(a&&a.tipo);
+    if(a&&a.calmo){ calmos[t]=txt; return; }
     (porTipo[t]=porTipo[t]||[]).push(txt);
   });
   box.innerHTML=ALERTAS.map(function(A){
     var msgs=porTipo[A.k]||[], aceso=msgs.length>0;
     return '<div class="alerta'+(aceso?' aceso':'')+'" style="--corAlerta:'+A.cor+'">'
       +'<div class="alertaTit"><span class="alertaLed"></span>'+esc(A.nome)+'</div>'
-      +'<div class="alertaTxt">'+esc(aceso?msgs.join('\n'):A.vazio)+'</div></div>';
+      +'<div class="alertaTxt">'+esc(aceso?msgs.join('\n'):(calmos[A.k]||A.vazio))+'</div></div>';
   }).join('');
 }
 async function revTrazerMais(exId, quantos){
@@ -4161,16 +4604,19 @@ function abrirRevisao(exId, semTela){
   var _folhaAbre = '<div class="laudoFolha'+(_temFundo?' comFundo':'')+'"'+(_temFundo?' style="padding-top:'+(_fnd.padTopMm||30)+'mm;padding-bottom:'+(_fnd.padBottomMm||20)+'mm"':'')+'>'+(_temFundo?'<img class="fundoLaudo" src="'+_fnd.img+'" alt="">':'');
   document.getElementById('areaImpressao').innerHTML =
   _folhaAbre
-  +'<div class="laudoCab"><div contenteditable="true"><b>Nome do Paciente:</b>'+esc(c.nome||'')+'<br><b>Idade:</b> '+esc(c.idade||'')+'<br><b>Realizado em:</b> '+esc(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+esc(c.dados_clinicos||'')+'</div></div>'
-  +'<div class="laudoCorpoBox"><div class="laudoTitulo" contenteditable="true">'+esc(L.titulo)+'</div>'
-  +'<div class="laudoTexto" contenteditable="true">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n'))
+  +'<div class="laudoCab"><div contenteditable="true" oninput="revMarcarEditado()"><b>Nome do Paciente:</b>'+esc(c.nome||'')+'<br><b>Idade:</b> '+esc(c.idade||'')+'<br><b>Realizado em:</b> '+esc(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+esc(c.dados_clinicos||'')+'</div></div>'
+  +'<div class="laudoCorpoBox"><div class="laudoTitulo" contenteditable="true" oninput="revMarcarEditado()">'+esc(L.titulo)+'</div>'
+  +'<div class="laudoTexto" contenteditable="true" oninput="revMarcarEditado()">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n'))
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')
   +'</div></div>'
   +'<div class="assin">'+(cfg.assinatura?'<img src="'+cfg.assinatura+'" style="height:62px;display:block;margin:0 auto -16px">':'')+'<span class="linha">'+cfg.medico+'<br>'+cfg.crm+'</span></div>'
   +'<div class="rodapeLaudo">Esclarecemos que a impressão diagnóstica em exames de imagem não é absoluta, devendo ser feita a correlação clínico laboratorial, além de outros exames de imagem. Somente o seu médico tem condições de interpretar corretamente o conjunto de todas essas informações.</div>'
   +'</div>';
-  montarAlertas(alertasDoLaudo(L));
+  // F2e e conferente: avisos CALCULADOS AGORA, não guardados — assim nenhum deles
+  // sobrevive apontando um trecho que o médico já corrigiu.
+  montarAlertas(alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
+                                 .concat(alertasReferencia(L)));
   document.title = 'Laudo - '+((c.nome||ex.paciente||'paciente').trim());
   if(!semTela){ document.querySelector('main').style.display='none';
   document.getElementById('telaRevisao').style.display='block';
@@ -4192,6 +4638,18 @@ function revZoomMostrar(img){
   if(zi.getAttribute('src')!==img.src) zi.src=img.src;
   z.style.display='';            // limpa o display inline de versões antigas do app
   z.classList.add('aberto');
+}
+/* O médico digitou no laudo (tela 3). O texto ali vive no DOM e não volta para
+   `L.corpo`/`L.conclusao` — então a impressão digital do conferente não muda sozinha.
+   Sem isto, ele corrigia "rim direito" para "rim esquerdo" e o painel continuava
+   dizendo "✓ não encontrei problema de lateralidade" na mesma tela. */
+function revMarcarEditado(){
+  var ex=exames.filter(function(x){ return x.id===(window.__revAtual||{}).exId; })[0];
+  var L=ex&&ex.laudo; if(!L) return;
+  if(L.conferencia && !L.conferencia.editadoDepois){
+    L.conferencia.editadoDepois=true;
+    try{ montarAlertas(alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))); }catch(e){}
+  }
 }
 function revZoomEsconder(){ var z=document.getElementById('revZoom'); if(z) z.classList.remove('aberto'); }
 /* compatibilidade: laudos antigos no histórico ainda chamam estas funções */
@@ -4430,7 +4888,8 @@ async function capToggleRec(){
     agLimparAtiva();
     capEstado='idle'; clearInterval(capTimer2); capSetRecUI();
     if(resP && resP.texto && resP.texto.trim()){
-      var aP=capAudioDoAgente(resP.texto, 'botao');
+      capAvisarMotor(resP);
+      var aP=capAudioDoAgente(resP.texto, 'botao', null, resP.trechos);
       if(resP.ditadoId) aP.url=agenteBase()+'/exame/audio/'+resP.ditadoId;
       try{
         var mP=await capClassificarDitado(resP.texto, '');
@@ -4654,7 +5113,10 @@ function micSom(tipo){
     if(micAudioCtx.state==='suspended') micAudioCtx.resume();
     var t0=micAudioCtx.currentTime;
     // reinício: dois tons descendentes, discreto. morto: três tons, mais insistente.
-    var notas=(tipo==='morto')?[[494,0],[392,0.20],[330,0.40]]:[[880,0],[660,0.15]];
+    // falta (F2e): dois tons SUBINDO — de ouvido não se confunde com problema de microfone.
+    var notas=(tipo==='morto')?[[494,0],[392,0.20],[330,0.40]]
+             :(tipo==='falta')?[[587,0],[784,0.17]]
+             :[[880,0],[660,0.15]];
     notas.forEach(function(n){
       var o=micAudioCtx.createOscillator(), g=micAudioCtx.createGain();
       o.type='sine'; o.frequency.value=n[0];
@@ -4809,8 +5271,25 @@ async function capAgenteFecharExame(est){
   var corpo={estudoId:est.id||'', contentDate:est.imgData||'', contentTime:est.imgHora||'',
              contentDateFim:est.imgDataFim||'', contentTimeFim:est.imgHoraFim||'', margemSeg:90};
   Object.keys(viz).forEach(function(k){ corpo[k]=viz[k]; });
-  var r=await fetch(agenteBase()+'/exame/fechar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(corpo)});
+  // Prazo: este fetch não tinha nenhum. Com a rede da nuvem, o pior caso do agente
+  // cresceu (três modelos × 180 s), e a tela ficava parada em "Encerrando…" sem uma
+  // palavra. O áudio já foi gravado no disco ANTES de transcrever, então desistir aqui
+  // não perde o exame — ele volta pela recuperação. Perder a paciência é seguro; ficar
+  // olhando uma tela muda no meio do atendimento, não.
+  var ctrl=new AbortController(), estourou=false;
+  var t=setTimeout(function(){ estourou=true; ctrl.abort(); }, 300000);
+  var r;
+  try{
+    r=await fetch(agenteBase()+'/exame/fechar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(corpo), signal:ctrl.signal});
+  }catch(e){
+    clearTimeout(t);
+    if(estourou) throw new Error('o agente passou de 5 min para fechar este exame. O áudio NÃO se '
+      +'perdeu: está guardado no computador. Quando o agente terminar, toque em "Recuperar exames" '
+      +'e o ditado entra neste mesmo exame.');
+    throw e;
+  }
+  clearTimeout(t);
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'falha ao fechar o exame');
   return j;
 }
@@ -4819,12 +5298,27 @@ async function capAgenteFecharExame(est){
    /exame/ditados na recuperação. Sem ela, vale o momento de agora.
    É esse carimbo que permite casar ditado e exame pelo relógio em vez de pelo
    nome — e o nome, desde 12/08, o médico não diz mais. */
-function capAudioDoAgente(texto, origem, quandoSeg){
+/* O agente diz por qual motor o ditado saiu ("local" ou "nuvem"). Até 13/08 o app
+   simplesmente não lia esse campo: pelo botão vermelho, um ditado transcrito na nuvem
+   chegava sem marcação de tempo, com o botão de VOZ morto na revisão, e sem uma palavra
+   ao médico. Receber pior sem saber é o pior dos casos. */
+function capAvisarMotor(j){
+  if(!j || j.motor!=='nuvem') return;
+  // o agente já manda o próprio aviso no fechamento do exame: dois textos quase iguais
+  // sobre a mesma coisa viram barulho, e barulho é o que faz aviso deixar de ser lido
+  if(/NUVEM/i.test(String(j.aviso||''))) return;
+  log('⚠️ Este ditado foi transcrito na NUVEM (o motor de voz local falhou). O texto veio, '
+     +'mas SEM marcação de tempo — o botão de voz da revisão não funciona neste exame.', true);
+}
+function capAudioDoAgente(texto, origem, quandoSeg, trechos){
   var idx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
   var ms=(quandoSeg&&isFinite(quandoSeg))?Math.round(quandoSeg*1000):Date.now();
   var hora=new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   var a={idx:idx, nome:'Ditado '+hora+(origem==='prebuffer'?' (recuperado)':''), url:null, blob:null,
          transcricao:texto||'', nomePaciente:'', tipoExame:'', lateralidade:'', exameId:null,
+         // trechos = [{inicio, fim, texto}] em segundos, vindos do agente (12/08/2026).
+         // É o que permite tocar só o pedaço do ditado que gerou cada parte do laudo.
+         trechos:(Array.isArray(trechos)?trechos:[]),
          quando:ms, _captura:true, _agente:true};
   audios.push(a);
   return a;
@@ -4912,7 +5406,8 @@ async function capOrtProcessar(est){
       agLimparAtiva();
       if(capEstado==='agente'){ capEstado='idle'; if(capTimer2) clearInterval(capTimer2); capSetRecUI(); }
       if(res.texto && res.texto.trim()){
-        var a=capAudioDoAgente(res.texto, res.origem);
+        capAvisarMotor(res);
+        var a=capAudioDoAgente(res.texto, res.origem, null, res.trechos);
         var meta=await capClassificarDitado(res.texto, est.descricao);
         a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
         a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
@@ -4949,7 +5444,19 @@ async function capRecuperar(){
     var jl=await rl.json();
     (jl&&jl.uids||[]).forEach(function(u){ jaLiberados[u]=true; });
   }catch(e){ /* agente sem a rota ainda: segue sem a marca, nunca trava */ }
-  var jaTem={}; exames.forEach(function(e){ if(e._estudoId) jaTem[e._estudoId]=true; });
+  /* "Já tenho" = o exame está na tela E COM DITADO. Estar na tela não basta.
+     13/08/2026: quando o fechamento do exame falha (motor e nuvem, ou o prazo de 5 min),
+     o exame JÁ ENTROU na lista — sem áudio — e o agente JÁ GUARDOU o ditado no disco.
+     Marcando pelo estudo apenas, a recuperação pulava exatamente esse caso e respondia
+     "nada a recuperar: os exames com ditado guardado já estão carregados". O ditado
+     existia no computador e o médico era informado de que não havia nada a trazer —
+     redizia o exame por cima, ou assinava sem ele.
+     Pior: antes disso, recarregar a página resolvia (a lista nascia vazia). A mensagem
+     de erro apontava justamente para longe do que funcionava. */
+  var jaTem={};
+  exames.forEach(function(e){
+    if(e._estudoId && (e.audios||[]).length) jaTem[e._estudoId]=true;
+  });
   var alvo=estudos.filter(function(e){ return e.data===dh && ditados[e.id] && !jaTem[e.id]; });
   if(!alvo.length){
     var comDitado=estudos.filter(function(e){ return ditados[e.id]; }).length;
@@ -4967,18 +5474,36 @@ async function capRecuperar(){
       try{ imagens.push(await capOrtBaixar(est.instancias[q])); }catch(err){}
     }
     if(!imagens.length){ log('Recuperação: exame de '+(est.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
-    var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
-            tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
-            idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
-    ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
-    ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
-    exames.push(ex);
+    // Este exame já pode estar na tela SEM ditado — é o caso que a recuperação passou a
+    // alcançar. Aí se adota o que existe, em vez de criar um segundo cartão para o mesmo
+    // exame: dois cartões do mesmo paciente no meio do atendimento é confusão pior que
+    // o problema que se veio resolver.
+    var ex=exames.filter(function(e){ return e._estudoId===est.id; })[0];
+    if(ex){
+      if(!ex.imagens || !ex.imagens.length) ex.imagens=imagens;
+      log('Recuperação: trazendo o ditado para o exame de '+(ex.paciente||'?')+' que já estava na lista.');
+    }else{
+      ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
+          tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
+          idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
+      ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
+      ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
+      exames.push(ex);
+    }
     // o ditado guardado volta como áudio do exame (com o WAV original p/ você poder ouvir)
     // dit.quando: a hora que o agente carimbou quando guardou este ditado.
     // Sem ela, o ditado recuperado entraria com a hora de AGORA e o encaixe
     // pelo relógio olharia para o momento errado.
-    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado', dit.quando);
-    a.nome='Ditado recuperado ('+(dit.quandoTexto||'')+')';
+    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado', dit.quando, dit.trechos);
+    // "pre-transcricao" é a marca que o agente deixa quando grava o WAV ANTES de
+    // transcrever. Se ela sobreviveu, a transcrição nunca terminou — e um ditado que
+    // volta em branco por falha é coisa muito diferente de um exame sem fala nenhuma.
+    var falhou=(String(dit.origem||'')==='pre-transcricao') && !String(dit.texto||'').trim();
+    a.nome=falhou
+      ? '⚠️ Ditado recuperado SEM TEXTO ('+(dit.quandoTexto||'')+') — a transcrição falhou; ouça o áudio e dite de novo'
+      : 'Ditado recuperado ('+(dit.quandoTexto||'')+')';
+    if(falhou) log('⚠️ O ditado de '+(est.paciente||'?')+' voltou SEM TEXTO: a transcrição não '
+                  +'chegou a terminar. O áudio está guardado e pode ser ouvido.', true);
     if(dit.temAudio) a.url=agenteBase()+'/exame/audio/'+est.id;
     var meta=await capClassificarDitado(dit.texto||'', est.descricao);
     a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
@@ -5390,40 +5915,782 @@ function tiradsConduta(tr, tam){
 }
 /* pontua os descritores DITADOS (extraídos pela IA como texto); devolve {pts, falta[], tam} */
 function tiradsPontuarDescritores(d){
-  var falta=[], pts=0;
+  var falta=[], faltaK=[], pts=0;
+  // guarda a CHAVE junto com o texto: é a chave que liga o aviso à lista de opções
+  // clicáveis (CLASSIF.tirads). Sem ela o aviso só sabe reclamar, não sabe oferecer.
+  var some=function(chave, rotulo, valor){
+    falta.push(rotulo + (valor ? (' ("'+valor+'" não reconhecida)') : ''));
+    faltaK.push(chave);
+  };
   var comp=norm(d.composicao), eco=norm(d.ecogenicidade), forma=norm(d.forma), marg=norm(d.margem);
-  if(!comp) falta.push('composição');
+  if(!comp) some('composicao','composição');
   else if(/espongi/.test(comp)) pts+=0; else if(/mist/.test(comp)) pts+=1; else if(/solid/.test(comp)) pts+=2; else if(/cist/.test(comp)) pts+=0;
-  else falta.push('composição ("'+d.composicao+'" não reconhecida)');
-  if(!eco) falta.push('ecogenicidade');
+  else some('composicao','composição', d.composicao);
+  if(!eco) some('ecogenicidade','ecogenicidade');
   else if(/anecoic/.test(eco)) pts+=0; else if(/muito hipo|acentuadamente hipo|marcadamente hipo/.test(eco)) pts+=3; else if(/hipo/.test(eco)) pts+=2; else if(/hiper|iso/.test(eco)) pts+=1;
-  else falta.push('ecogenicidade ("'+d.ecogenicidade+'" não reconhecida)');
-  if(!forma) falta.push('forma (mais alta × mais larga)');
+  else some('ecogenicidade','ecogenicidade', d.ecogenicidade);
+  if(!forma) some('forma','forma (mais alta × mais larga)');
   else if(/mais alta|alta que larg|nao paralel|vertical/.test(forma)) pts+=3; else if(/mais larga|larga que alt|paralel|horizontal/.test(forma)) pts+=0;
-  else falta.push('forma ("'+d.forma+'" não reconhecida)');
-  if(!marg) falta.push('margem');
+  else some('forma','forma', d.forma);
+  if(!marg) some('margem','margem');
   else if(/extratireoid/.test(marg)) pts+=3; else if(/lobulad|irregular/.test(marg)) pts+=2; else if(/lis|regular|definid|circunscrit|indistint/.test(marg)) pts+=0;
-  else falta.push('margem ("'+d.margem+'" não reconhecida)');
+  else some('margem','margem', d.margem);
   var focos=d.focos; if(focos && !Array.isArray(focos)) focos=[focos];
   (focos||[]).forEach(function(f){ var x=norm(f); if(/macrocalc/.test(x)) pts+=1; else if(/perifer|casca|anel/.test(x)) pts+=2; else if(/puntif|microcalc|pontilh/.test(x)) pts+=3; });
   var tam=parseFloat(String(d.tamanho_cm==null?'':d.tamanho_cm).replace(',','.'))||0;
-  return {pts:pts, falta:falta, tam:tam};
+  return {pts:pts, falta:falta, faltaK:faltaK, tam:tam};
 }
 /* monta as linhas p/ conclusão + observações a partir dos nódulos extraídos do ditado */
 function processarTirads(lista, ditadoTexto){
-  var linhas=[], obs=[];
+  var linhas=[], obs=[], pendencias=[], conflitos=[];
   var jaDitouTirads=/ti.?rads/i.test(ditadoTexto||'');
   var n=(lista||[]).length;
   (lista||[]).forEach(function(d,i){
     var r=tiradsPontuarDescritores(d||{});
     var rot=n>1?('Nódulo '+(i+1)):'Nódulo';
-    if(r.falta.length){ obs.push(rot+': TI-RADS não calculado — faltou ditar: '+r.falta.join(', ')+'.'); return; }
+    if(r.falta.length){
+      obs.push(rot+': TI-RADS não calculado — faltou ditar: '+r.falta.join(', ')+'.');
+      // não basta reclamar: manda junto as OPÇÕES, para a tela oferecer o clique
+      r.faltaK.forEach(function(ch, j){
+        pendencias.push({sistema:'tirads', achado:rot, chave:ch,
+                         rotulo:classifRotulo('tirads',ch), ditado:String((d||{})[ch]||''),
+                         opcoes:classifOpcoes('tirads',ch), texto:r.falta[j]});
+      });
+      return;
+    }
     var c=tiradsCategoria(r.pts);
     if(!jaDitouTirads) linhas.push((n>1?('Nódulo '+(i+1)+' — '):'')+'Categoria: ACR TI-RADS '+c.tr+'.');
     var cond=tiradsConduta(c.tr, r.tam);
     obs.push(rot+': TI-RADS calculado automaticamente dos descritores ditados — TR'+c.tr+' ('+c.desc+', '+r.pts+' pts'+(r.tam?', '+String(r.tam).replace('.',',')+' cm':'')+')'+(cond?'; conduta ACR: '+cond:'; dite o tamanho para a conduta')+'. Confira antes de liberar.'+(jaDitouTirads?' (A categoria que você ditou foi mantida no laudo.)':''));
+    var cf=classifConferir('tirads', String(c.tr), ditadoTexto);
+    if(cf.conflito) conflitos.push({sistema:'tirads', nome:'TI-RADS', achado:rot,
+                                    ditado:cf.ditado, calculado:cf.calculado});
   });
-  return {linhas:linhas, obs:obs};
+  return {linhas:linhas, obs:obs, pendencias:pendencias, conflitos:conflitos};
+}
+
+/* ---- BI-RADS automático (mama). Mesmo contrato do TI-RADS. ----
+   Diferença de rigor de propósito: aqui NÃO se calcula com descritor faltando. A regra de
+   ouro do léxico é que um único descritor suspeito elimina a categoria 3 — então descritor
+   não ditado significa que não se sabe se a categoria 3 é legítima. Preferir o silêncio a
+   um número que pode estar dois degraus abaixo do certo. */
+function processarBirads(lista, ditadoTexto){
+  var linhas=[], obs=[], pendencias=[], conflitos=[];
+  var n=(lista||[]).length;
+  (lista||[]).forEach(function(d,i){
+    d=d||{};
+    var rot=(d.localizacao||d.local||'').trim() || (n>1?('Nódulo '+(i+1)):'Nódulo');
+    if(d.caso_especial && BIRADS_ESPECIAIS[d.caso_especial]){
+      var e=BIRADS_ESPECIAIS[d.caso_especial];
+      linhas.push((n>1?(rot+' — '):'')+'Categoria: BI-RADS '+e[0]+'.');
+      obs.push(rot+': BI-RADS '+e[0]+' por caso especial ditado ('+d.caso_especial+') — '+e[1]+' Confira antes de liberar.');
+      return;
+    }
+    var L=classifLerDescritores('birads', d);
+    if(L.falta.length){
+      obs.push(rot+': BI-RADS não calculado — faltou ditar: '
+               +L.falta.map(function(f){ return f.rot.toLowerCase()+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):''); }).join(', ')+'.');
+      L.falta.forEach(function(f){
+        pendencias.push({sistema:'birads', achado:rot, chave:f.k, rotulo:f.rot,
+                         ditado:f.ditado, opcoes:f.ops,
+                         texto:f.rot+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):'')});
+      });
+      return;
+    }
+    var r=biradsAvaliar(L.achou);
+    linhas.push((n>1?(rot+' — '):'')+'Categoria: BI-RADS '+r.cat+'.');
+    obs.push(rot+': BI-RADS calculado automaticamente dos descritores ditados — '+r.cat
+             +(r.susp.length?(' (suspeitos: '+r.susp.join(', ')+')'):' (todos os descritores benignos)')
+             +'; conduta: '+r.cond+(r.notas.length?(' Notas: '+r.notas.join('; ')+'.'):'')+' Confira antes de liberar.');
+    var cf=classifConferir('birads', r.cat, ditadoTexto);
+    if(cf.conflito) conflitos.push({sistema:'birads', nome:'BI-RADS', achado:rot,
+                                    ditado:cf.ditado, calculado:cf.calculado});
+  });
+  return {linhas:linhas, obs:obs, pendencias:pendencias, conflitos:conflitos};
+}
+
+/* ---- O-RADS automático (ovário / anexos) ----
+   A calculadora, quando falta um dado, assume o menor risco e avisa. Aqui NÃO: assumir o
+   menor risco num laudo que ninguém está conferindo é a forma mais silenciosa de errar
+   para baixo. Falta dado, não sai categoria — sai o pedido do dado. */
+function processarOrads(lista, ditadoTexto){
+  var linhas=[], obs=[], pendencias=[], conflitos=[];
+  var n=(lista||[]).length;
+  (lista||[]).forEach(function(d,i){
+    d=d||{};
+    var rot=(d.localizacao||d.local||'').trim() || (n>1?('Lesão '+(i+1)):'Lesão anexial');
+    var L=classifLerDescritores('orads', d);
+    var r=oradsAvaliar(L.achou, L.falta);   // pode acrescentar faltas sob demanda (tamanho, CS, papilas)
+    if(!r || L.falta.length){
+      if(!L.falta.length) return;           // nem tipo de lesão veio: não há o que dizer
+      obs.push(rot+': O-RADS não calculado — faltou ditar: '
+               +L.falta.map(function(f){ return f.rot.toLowerCase()+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):''); }).join(', ')+'.');
+      L.falta.forEach(function(f){
+        pendencias.push({sistema:'orads', achado:rot, chave:f.k, rotulo:f.rot,
+                         ditado:f.ditado, opcoes:f.ops,
+                         texto:f.rot+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):'')});
+      });
+      return;
+    }
+    linhas.push((n>1?(rot+' — '):'')+'Categoria: O-RADS US '+r.cat+'.');
+    obs.push(rot+': O-RADS calculado automaticamente dos descritores ditados — categoria '+r.cat
+             +' ('+r.risco+'); conduta: '+r.cond+(r.notas.length?(' Notas: '+r.notas.join('; ')+'.'):'')+' Confira antes de liberar.');
+    var cf=classifConferir('orads', r.cat, ditadoTexto);
+    if(cf.conflito) conflitos.push({sistema:'orads', nome:'O-RADS', achado:rot,
+                                    ditado:cf.ditado, calculado:cf.calculado});
+  });
+  return {linhas:linhas, obs:obs, pendencias:pendencias, conflitos:conflitos};
+}
+
+/* Junta o resultado dos três num pacote só, para o laudo e para a tela.
+   O conflito vira aviso EM TEXTO (serve na tela de hoje) e também dado ESTRUTURADO em
+   `ex.laudo.conflitos` (a tela nova desenha as duas fichas para tocar na certa, sem
+   precisar reinterpretar frase). */
+function classifAplicar(ex, resp, trans){
+  var out={linhas:[], alertas:[], pendencias:[], conflitos:[]};
+  var rodar=function(sis, fn, dados){
+    if(!dados || !dados.length) return;
+    var r=fn(dados, trans);
+    out.linhas=out.linhas.concat(r.linhas||[]);
+    out.pendencias=out.pendencias.concat(r.pendencias||[]);
+    out.conflitos=out.conflitos.concat(r.conflitos||[]);
+    (r.obs||[]).forEach(function(t){ out.alertas.push({tipo:'calculo', texto:t}); });
+    (r.pendencias||[]).forEach(function(p){
+      out.alertas.push({tipo:'faltando', texto:CLASSIF[sis].nome+' não calculado em "'+p.achado
+        +'" — faltou o descritor: '+p.rotulo+'. Toque para escolher ou ditar.'});
+    });
+    (r.conflitos||[]).forEach(function(c){
+      out.alertas.push({tipo:'calculo', texto:'⚠ CONFLITO de classificação em "'+c.achado+'": você ditou '
+        +c.nome+' '+c.ditado+' e os descritores dão '+c.nome+' '+c.calculado
+        +'. O laudo ficou com a SUA categoria. Confira qual está certa — pode ser engano do ditado ou da conta do aplicativo.'});
+    });
+  };
+  rodar('tirads', processarTirads, classifVale('tirads', ex.tipo) ? resp.tirads : null);
+  rodar('birads', processarBirads, classifVale('birads', ex.tipo) ? resp.birads : null);
+  rodar('orads',  processarOrads,  classifVale('orads',  ex.tipo) ? resp.orads  : null);
+  return out;
+}
+
+/* ================= MEDIDAS DE REFERÊNCIA POR IDADE (13/08/2026) =================
+   Pedido do Dr. Daniel: criança não é adulto pequeno. Um fígado de 12 cm é normal aos
+   10 anos e seria pequeno num adulto; um baço de 11 cm é normal aos 10 anos e grande
+   aos 2. Sem a idade na conta, um aviso de "aumentado" ou é ruído ou é omissão.
+
+   MORA AQUI DENTRO, de propósito: consulta local, sem nuvem, sem custo e sem depender
+   de internet no meio do atendimento.
+
+   O QUE ESTE MECANISMO FAZ: acha as medidas JÁ ESCRITAS no laudo pronto, pega a idade
+   do cabeçalho, e diz quando um valor está fora da referência daquela idade. Não
+   escreve diagnóstico: não troca "mede 15 cm" por "hepatomegalia". Isso é decisão
+   clínica e continua sendo do médico — o programa aponta, ele decide.
+
+   ⚠️ NENHUM NÚMERO AQUI FOI INVENTADO, e nenhum vale sem a revisão do médico.
+   A procedência de cada tabela está escrita ao lado, e o detalhamento em
+   conhecimento/medidas-pediatricas.md. Onde eu NÃO tinha fonte confiável, NÃO há
+   tabela — é melhor não avisar do que avisar errado. */
+const REF_MEDIDAS = {
+  figado: {
+    nome:'Fígado — lobo direito, longitudinal na linha hemiclavicular', unidade:'cm',
+    fonte:'Manteghinejad A et al. Sonographic pediatric liver size standards. Pediatr Radiol 2026;56(6):1368-79 — 4.611 exames, 0 a 18 anos, Children\'s Hospital of Philadelphia. Faixa = P5 a P95.',
+    // [idade máxima da faixa em anos, P5, P95]
+    ped:[[0.25,4.9,7.9],[0.5,5.7,8.7],[0.75,6.4,9.3],[1,6.9,9.8],[1.5,7.5,10.4],
+         [2,8.0,10.8],[3,8.3,11.3],[4,8.7,11.8],[5,9.0,12.2],[6,9.4,12.7],
+         [7,9.8,13.3],[8,9.8,13.4],[9,10.0,13.8],[10,10.3,14.4],[11,10.7,14.9],
+         [12,11.1,15.5],[13,11.5,15.8],[14,11.9,16.1],[15,12.1,16.4],[16,12.1,16.8],
+         [17,12.1,17.0],[18,12.3,17.2]],
+    adulto:null   // os modelos do médico não trazem referência de fígado no adulto
+  },
+  baco: {
+    nome:'Baço — maior eixo longitudinal', unidade:'cm',
+    fonte:'Rosenberg HK et al. Normal splenic size in infants and children. AJR 1991 — limites SUPERIORES por idade, os de uso corrente. Adulto: 13 cm, o valor que já está escrito nos modelos do próprio médico.',
+    ped:[[0.25,null,6.0],[0.5,null,6.5],[1,null,7.0],[2,null,8.0],[4,null,9.0],
+         [6,null,9.5],[8,null,10.0],[10,null,11.0],[12,null,11.5],[18,null,12.0]],
+    // ≥15 anos o limite difere por sexo (12,0 meninas · 13,0 meninos); abaixo disso a
+    // tabela é a mesma para os dois, e por isso `sexoDesde`
+    sexoDesde:15,
+    pedSexo:{F:[[18,null,12.0]], M:[[18,null,13.0]]},
+    adulto:{min:null, max:13.0, fonte:'modelo do médico: "(Normal até 13 cm)"'}
+  },
+  rim: {
+    /* 13/08/2026 — TROCADO. Antes era a fórmula de Rosenbaum (AJR 1984) com uma margem
+       de ±1,5 cm que era ESCOLHA MINHA, não do estudo. O médico mandou buscar os
+       intervalos originais, e o que apareceu é melhor que o original: um estudo aberto
+       (CC BY 4.0), multicêntrico, com percentis de verdade por idade E por sexo.
+       Agora nenhum número desta linha é meu. */
+    nome:'Rim — maior eixo longitudinal', unidade:'cm',
+    fonte:'Obrycki Ł et al. Kidney length normative values in children aged 0-19 years — a multicenter study. Pediatr Nephrol 2021;37(5):1075-85 (acesso aberto, CC BY 4.0) — 1.758 crianças. Faixa = percentil 2,5 a 97,5, por idade e sexo.',
+    // [idade máxima da faixa, P2,5, P97,5] — em cm
+    pedSexo:{
+      M:[[1,5.16,7.01],[2,5.63,7.56],[3,6.02,8.03],[4,6.37,8.46],[5,6.70,8.89],
+         [6,6.98,9.28],[7,7.21,9.60],[8,7.42,9.90],[9,7.64,10.19],[10,7.90,10.52],
+         [11,8.19,10.86],[12,8.48,11.16],[13,8.77,11.45],[14,9.08,11.75],[15,9.36,12.01],
+         [16,9.57,12.22],[17,9.75,12.41],[18,9.92,12.59]],
+      F:[[1,4.74,6.95],[2,5.35,7.55],[3,5.86,8.04],[4,6.29,8.47],[5,6.68,8.89],
+         [6,6.99,9.25],[7,7.23,9.55],[8,7.44,9.83],[9,7.66,10.11],[10,7.91,10.42],
+         [11,8.19,10.72],[12,8.45,10.97],[13,8.70,11.19],[14,8.95,11.40],[15,9.14,11.58],
+         [16,9.27,11.73],[17,9.36,11.86],[18,9.43,11.98]]
+    },
+    // sem sexo na etiqueta do aparelho: a faixa MAIS ESTREITA das duas. Erra para o
+    // lado de avisar, e o aviso diz que o sexo não veio — falso alarme custa uma
+    // conferida; deixar passar não ajuda ninguém.
+    adulto:null   // o estudo vai só até 19 anos; para adulto não há referência aqui
+  }
+  /* NÃO ENTRARAM, e é melhor assim:
+     · tireoide — a referência da OMS depende da superfície corporal (peso e altura),
+       que o exame não traz. Uma tabela só por idade daria aviso errado.
+     · pâncreas — não encontrei tabela pediátrica que eu considerasse confiável.
+     · útero e ovário — os valores publicados são por ESTÁGIO PUBERAL, não por idade;
+       duas meninas de 11 anos podem estar em estágios diferentes. Entra quando o
+       médico disser como quer tratar isso. */
+};
+/* A idade como o exame a entrega: "034Y", "8M", "34 anos", "3a2m", "4". Devolve anos
+   (decimal) ou null. Null significa NÃO SEI — e aí nenhuma conferência é feita, que é
+   o certo: sem idade, comparar com tabela nenhuma é chute. */
+function idadeEmAnos(txt){
+  var s=String(txt==null?'':txt).trim().toLowerCase();
+  if(!s) return null;
+  var m=s.match(/^0*(\d{1,3})\s*y/);            if(m) return parseInt(m[1],10);
+  m=s.match(/^0*(\d{1,3})\s*m(?!\w)/);          if(m) return parseInt(m[1],10)/12;
+  m=s.match(/^0*(\d{1,3})\s*[dw]/);             if(m) return 0;
+  m=s.match(/(\d{1,3})\s*a(?:nos?)?\s*(?:e\s*)?(\d{1,2})\s*m/); if(m) return parseInt(m[1],10)+parseInt(m[2],10)/12;
+  m=s.match(/(\d{1,3})\s*(?:anos?|a\b)/);       if(m) return parseInt(m[1],10);
+  m=s.match(/(\d{1,3})\s*(?:meses|m[êe]s)/);    if(m) return parseInt(m[1],10)/12;
+  m=s.match(/(\d{1,3})\s*(?:dias?|semanas?)/);  if(m) return 0;
+  m=s.match(/^(\d{1,3})(?:[.,](\d+))?$/);       if(m) return parseFloat(m[0].replace(',','.'));
+  return null;
+}
+/* a linha da tabela que cobre aquela idade */
+function refLinha(tab, anos){
+  for(var i=0;i<tab.length;i++){ if(anos<=tab[i][0]) return tab[i]; }
+  return tab[tab.length-1];
+}
+/* A faixa de referência de um órgão para aquela idade. null = não há tabela, e aí
+   NENHUMA conferência é feita — que é o certo quando não se sabe. */
+function refFaixa(orgao, anos, sexo){
+  var R=REF_MEDIDAS[orgao]; if(!R || anos==null) return null;
+  if(anos>=18){
+    if(!R.adulto) return null;
+    return {min:R.adulto.min, max:R.adulto.max, fonte:R.adulto.fonte||R.fonte, adulto:true};
+  }
+  var s=String(sexo||'').toUpperCase().charAt(0);
+  // o rim depende do sexo em TODA idade; o baço só a partir dos 15 (sexoDesde)
+  var usaSexo = !!R.pedSexo && (R.sexoDesde==null || anos>=R.sexoDesde);
+  if(usaSexo && R.pedSexo[s]){
+    var l=refLinha(R.pedSexo[s], anos);
+    return {min:l[1], max:l[2], fonte:R.fonte};
+  }
+  if(usaSexo){
+    /* O sexo não veio na etiqueta do aparelho. Em vez de escolher um e fingir que sabe,
+       usa a faixa MAIS ESTREITA das duas — só deixa passar o que é normal para ambos.
+       Erra para o lado de avisar: um falso alarme custa uma conferida; deixar passar
+       não ajuda ninguém. E o aviso diz que o sexo não veio, para poder ser descontado. */
+    var lm=refLinha(R.pedSexo.M, anos), lf=refLinha(R.pedSexo.F, anos);
+    var mins=[lm[1],lf[1]].filter(function(v){ return v!=null; });
+    var maxs=[lm[2],lf[2]].filter(function(v){ return v!=null; });
+    return {min:mins.length?Math.max.apply(null,mins):null,
+            max:maxs.length?Math.min.apply(null,maxs):null,
+            fonte:R.fonte, semSexo:true};
+  }
+  if(!R.ped) return null;
+  var l2=refLinha(R.ped, anos);
+  return {min:l2[1], max:l2[2], fonte:R.fonte};
+}
+/* Quais órgãos a frase está descrevendo. Só nomes inequívocos: "rim direito" conta,
+   "medida renal" conta, mas nada que dependa de adivinhar. */
+const REF_APELIDOS = [
+  {orgao:'figado', re:/\b(f[íi]gado|lobo\s+direito|hep[áa]tic)/i},
+  {orgao:'baco',   re:/\b(ba[çc]o|espl[êe]nic)/i},
+  {orgao:'rim',    re:/\b(rim|renal|rins)\b/i}
+];
+/* Acha as medidas JÁ PREENCHIDAS no laudo: o mesmo caminho do F2e, mas procurando
+   número onde o F2e procura pontilhado. */
+function medidasDoLaudo(L){
+  if(!L) return [];
+  var linhas=[(L.corpo||''), (L.conclusao||'')].join('\n').split('\n');
+  var secao='', achados=[];
+  for(var n=0;n<linhas.length;n++){
+    var linha=linhas[n], tit=faltaTitulo(linha);
+    if(tit) secao=tit;
+    /* "9,0 x 4,0 x 3,0 cm": só o ÚLTIMO número tem a unidade colada, mas os três são
+       medidas. Lendo um por um, o baço só seria comparado pelo 3,0 — e um baço grande
+       passaria batido. Falso negativo é o pior lado para errar, então a unidade do fim
+       vale para a corrente inteira, e o que se compara é o MAIOR eixo, que é o que as
+       tabelas de referência medem. */
+    var re=/(\d{1,3}(?:[.,]\d{1,2})?(?:\s*[x×]\s*\d{1,3}(?:[.,]\d{1,2})?)*)\s*(cm|mm)\b/gi, m;
+    while((m=re.exec(linha))!==null){
+      var unid=m[2].toLowerCase();
+      var valor=m[1].split(/[x×]/).map(function(p){
+        var v=parseFloat(String(p).trim().replace(',','.'));
+        return (unid==='mm') ? v/10 : v;                 // tudo em cm por dentro
+      }).reduce(function(a,b){ return (isNaN(b)?a:Math.max(a,b)); }, 0);
+      if(!valor) continue;
+      var antes=linha.slice(0, m.index).replace(/\*\*/g,'');
+      var contexto=(secao+' '+antes);
+      var orgao=null;
+      for(var k=0;k<REF_APELIDOS.length;k++){
+        if(REF_APELIDOS[k].re.test(contexto)){ orgao=REF_APELIDOS[k].orgao; break; }
+      }
+      if(!orgao) continue;
+      achados.push({orgao:orgao, valor:valor, secao:secao,
+                    trecho:faltaTrecho(linha, {i:m.index, f:m.index+m[0].length})});
+    }
+  }
+  return achados;
+}
+/* O aviso. Calculado na hora, nunca guardado — o médico pode corrigir a medida. */
+function alertasReferencia(L){
+  if(!L) return [];
+  var c=(L.cab)||{};
+  // A idade vem do APARELHO (tag DICOM), guardada no laudo na geração. A que a IA leu
+  // do cabeçalho da imagem é a segunda opção: ela pode ter lido errado, e aqui um erro
+  // de idade viraria aviso errado sobre o tamanho de um órgão.
+  var anos=idadeEmAnos(L.idadePac);
+  if(anos==null) anos=idadeEmAnos(c.idade);
+  if(anos==null) return [];
+  var sexo=L.sexoPac||'';
+  var achados=medidasDoLaudo(L), fora=[];
+  achados.forEach(function(a){
+    var f=refFaixa(a.orgao, anos, sexo); if(!f) return;
+    // A MAIOR medida de cada órgão é a que interessa: o laudo cita vários números do
+    // mesmo órgão (três eixos), e comparar o menor deles com o maior eixo daria alarme
+    // falso em todo exame.
+    var alto=(f.max!=null && a.valor>f.max), baixo=(f.min!=null && a.valor<f.min);
+    if(!alto && !baixo) return;
+    fora.push({orgao:a.orgao, valor:a.valor, faixa:f, alto:alto, trecho:a.trecho});
+  });
+  if(!fora.length) return [];
+  // só o pior de cada órgão, para não repetir o mesmo aviso três vezes
+  var porOrgao={};
+  fora.forEach(function(x){
+    var p=porOrgao[x.orgao];
+    if(!p || (x.alto && x.valor>p.valor) || (!x.alto && x.valor<p.valor)) porOrgao[x.orgao]=x;
+  });
+  var idadeTxt = anos<1 ? (Math.round(anos*12)+' meses') : (Math.round(anos)+' anos');
+  var linhas=Object.keys(porOrgao).map(function(k){
+    var x=porOrgao[k], R=REF_MEDIDAS[k];
+    var faixa=(x.faixa.min!=null?x.faixa.min:'—')+' a '+(x.faixa.max!=null?x.faixa.max:'—')+' cm';
+    return '• '+R.nome+': '+String(x.valor).replace('.',',')+' cm — '
+      +(x.alto?'ACIMA':'abaixo')+' da referência para '+idadeTxt+' ('+faixa+')'
+      +(x.faixa.semSexo?' ⚠ o sexo não veio na etiqueta do aparelho: usei a faixa mais estreita, então este aviso pode ser falso alarme':'')
+      +'\n   ⟨'+x.trecho+'⟩\n   fonte: '+x.faixa.fonte;
+  });
+  return [{tipo:'referencia', texto:'Medida fora da referência para a idade ('+idadeTxt+'):\n'
+           +linhas.join('\n')+'\n\nO programa NÃO conclui nada disto: confira a medida e decida.'}];
+}
+
+/* ================= O CONFERENTE (12/08/2026) =================
+   Um SEGUNDO leitor, que não escreveu o laudo. Roda depois que o texto está pronto e
+   antes de o laudo ser entregue.
+
+   POR QUE ELE NÃO VÊ AS IMAGENS NEM O DITADO — e isto é o ponto todo:
+   um conferente que recebe as mesmas fontes do redator tende a repetir o erro do
+   redator. Se a IA leu "3,2" onde estava "8,2", ela vai reler "3,2" e concordar
+   consigo mesma. Dando a ele SÓ O TEXTO PRONTO, ele deixa de ser uma segunda opinião
+   sobre o exame e passa a ser o que de fato pega erro: alguém conferindo se o
+   documento fecha em si mesmo — se a conclusão bate com o corpo, se o lado é o mesmo
+   do começo ao fim, se a medida faz sentido, se o português está certo.
+   É o revisor da editora, que nunca esteve na cena e justamente por isso vê a
+   contradição entre a página 3 e a página 40.
+
+   Ele NÃO reescreve. Aponta, sugere, e quem decide é o médico.
+   Custa pouco: sem imagem, e no modelo auxiliar barato. */
+const CONFERENTE_TIPOS = ['coerencia','medida','conclusao','lateralidade','gramatica','outros'];
+function conferenteLigado(){ try{ return localStorage.getItem('gconferente')!=='0'; }catch(e){ return true; } }
+function conferenteAlternar(el){
+  try{ localStorage.setItem('gconferente', el.checked?'1':'0'); }catch(e){}
+  log(el.checked?'Conferente LIGADO — cada laudo passa por uma segunda leitura antes de sair.'
+                :'Conferente DESLIGADO — os laudos saem sem a segunda leitura.');
+}
+/* Tipo que não se reconhece vai para "outros", como manda o padrão da casa
+   (ver alertaTipoValido): rebatizar de "coerência" seria afirmar sobre o conteúdo. */
+function conferenteTipoValido(t){
+  // tira o acento de forma GERAL: dois "if" literais deixavam "coerência" de fora,
+  // e é justamente o mais provável de chegar acentuado
+  var s=String(t||'').trim().toLowerCase().replace(/[.\s]/g,'')
+        .normalize('NFD').replace(/[̀-ͯ]/g,'');
+  return CONFERENTE_TIPOS.indexOf(s)>=0 ? s : 'outros';
+}
+/* " ALTA " e "alta." têm de valer "alta": senão um achado grave desce na lista e vai
+   parar embaixo de um acento faltando — exatamente o que a ordenação evita. */
+function conferenteGravidade(g){
+  var s=String(g==null?'':g).trim().toLowerCase().replace(/[.\s]/g,'')
+        .replace('média','media').replace('médio','media').replace('medio','media');
+  return /^(alta|media|baixa)$/.test(s) ? s : 'media';
+}
+/* Impressão digital do texto conferido. Se o médico editar o laudo depois, o aviso do
+   conferente passa a se referir a um texto que não existe mais — e um aviso apontando
+   um trecho já corrigido é pior que aviso nenhum. */
+function conferenteMarca(L){
+  // a marca cobre TUDO o que foi enviado ao conferente: se a idade muda de "4 anos"
+  // para "40 anos", o que ele disse sobre as medidas deixa de valer
+  var s=[(L&&L.titulo)||'', (L&&L.corpo)||'', (L&&L.conclusao)||'', (L&&L.extra)||'',
+         ((L&&L.cab)||{}).idade||'', ((L&&L.cab)||{}).dados_clinicos||''].join('\u0001');
+  var h=5381;
+  for(var i=0;i<s.length;i++){ h=((h*33)^s.charCodeAt(i))>>>0; }
+  return s.length+'.'+h.toString(36);
+}
+function conferentePrompt(L){
+  var c=(L&&L.cab)||{};
+  // idade e dados clínicos entram: "útero" em paciente do sexo masculino, ou medida
+  // plausível para adulto e absurda para criança, só se enxerga com o cabeçalho à vista
+  var ficha='';
+  if(c.idade) ficha+='IDADE: '+c.idade+'\n';
+  if(c.dados_clinicos) ficha+='DADOS CLÍNICOS: '+c.dados_clinicos+'\n';
+  return "Você é o CONFERENTE de laudos de ultrassonografia — NÃO foi você quem escreveu este laudo, "
+    +"e você NÃO tem acesso às imagens nem ao ditado. Isso é de propósito: o seu trabalho é conferir se o "
+    +"DOCUMENTO fecha em si mesmo.\n\n"
+    +"LAUDO A CONFERIR:\n"+ficha+"TÍTULO: "+(L.titulo||'')+"\n\nCORPO:\n"+(L.corpo||'')
+    +((L&&L.extra)?("\n\nTEXTO COMPLEMENTAR:\n"+L.extra):"")
+    +"\n\nCONCLUSÃO:\n"+(L.conclusao||'')+"\n\n"
+    +"CONFIRA EXATAMENTE ESTES CINCO ASSUNTOS:\n"
+    +"1. coerencia — o corpo se contradiz? Um órgão descrito como normal e depois como alterado? "
+    +"Um achado citado na conclusão que não existe no corpo, ou um achado importante do corpo que sumiu da conclusão?\n"
+    +"2. medida — valor fora de qualquer plausibilidade biológica para a estrutura (ex.: rim de 45 cm, "
+    +"endométrio de 90 mm), unidade trocada (cm onde deveria ser mm), medida que contradiz o adjetivo usado "
+    +"(\"dimensões normais\" seguido de um valor claramente aumentado), ou soma/volume que não fecha com as dimensões dadas.\n"
+    +"3. conclusao — a conclusão afirma mais do que o corpo sustenta, ou é genérica demais para os achados descritos.\n"
+    +"4. lateralidade — direita e esquerda trocadas ou inconsistentes ao longo do texto; lado citado na conclusão "
+    +"diferente do lado descrito no corpo.\n"
+    +"5. gramatica — erro de português, concordância, ortografia, pontuação que atrapalhe a leitura. "
+    +"Termo técnico consagrado NÃO é erro.\n\n"
+    +"REGRAS DURAS:\n"
+    +"- NÃO reescreva o laudo. Você aponta, não conserta.\n"
+    +"- NÃO invente problema para parecer útil. Laudo limpo devolve \"problemas\":[]. Um conferente que "
+    +"reclama de tudo é ignorado no dia seguinte, e aí não serve para nada.\n"
+    +"- Pontilhados (\".....\") são campos que o médico ainda vai preencher: NÃO os aponte como erro.\n"
+    +"- NÃO comente ausência de informação que dependeria das imagens ou do ditado — você não os tem.\n"
+    +"- 'trecho' deve ser copiado LITERALMENTE do laudo, para o médico achar o lugar.\n"
+    +"- As linhas de categoria (ACR TI-RADS, BI-RADS, O-RADS) e os cálculos obstétricos "
+    +"foram CALCULADOS PELO APLICATIVO a partir dos descritores ditados, por aritmética fixa. "
+    +"NÃO os conteste nem sugira outra categoria — não é opinião, é conta.\n\n"
+    +"Responda SOMENTE em JSON válido:\n"
+    +"{\"problemas\":[{\"tipo\":\"coerencia|medida|conclusao|lateralidade|gramatica\","
+    +"\"gravidade\":\"alta|media|baixa\",\"trecho\":\"\",\"problema\":\"\",\"sugestao\":\"\"}]}";
+}
+/* Devolve o RESULTADO, não o texto do aviso: {itens, rodou, erro, marca}.
+   O aviso é montado na hora por `alertasConferente`, como o F2e faz — assim ele nunca
+   sobrevive à edição do laudo apontando um trecho que já foi corrigido.
+   Nunca derruba a geração: se o conferente falhar, o laudo sai e fica DITO que não passou. */
+async function conferirLaudo(L){
+  var marca=conferenteMarca(L);
+  if(!conferenteLigado()) return {itens:[], rodou:false, motivo:'desligado', marca:marca};
+  if(!L || !String(L.corpo||'').trim()) return {itens:[], rodou:false, motivo:'laudo vazio', marca:marca};
+  try{
+    var resp=await openai([{type:'text', text:conferentePrompt(L)}], true,
+                          {modelo: cfg.modeloAux||cfg.modelo});
+    // resposta fora do formato NÃO é "conferido e limpo": é conferência que não houve.
+    // Contar como limpa seria dar passe livre a um laudo que ninguém leu.
+    if(!resp || !Array.isArray(resp.problemas)){
+      return {itens:[], rodou:false, motivo:'a resposta veio fora do formato esperado', marca:marca};
+    }
+    var itens=[];
+    resp.problemas.forEach(function(p){
+      var txt=String((p&&p.problema)||'').trim(); if(!txt) return;
+      itens.push({tipo:conferenteTipoValido(p&&p.tipo),
+                  gravidade:conferenteGravidade(p&&p.gravidade),
+                  trecho:String((p&&p.trecho)||'').trim(),
+                  problema:txt,
+                  sugestao:String((p&&p.sugestao)||'').trim()});
+    });
+    // grave primeiro: o que pode mudar conduta não fica embaixo de um acento errado
+    var peso={alta:0, media:1, baixa:2};
+    itens.sort(function(a,b){ return peso[a.gravidade]-peso[b.gravidade]; });
+    return {itens:itens, rodou:true, marca:marca};
+  }catch(e){
+    return {itens:[], rodou:false, motivo:String((e&&e.message)||e), marca:marca};
+  }
+}
+/* O aviso do conferente, calculado NA HORA a partir do resultado guardado.
+   Três estados, e nenhum deles mente:
+     · não rodou (ou laudo antigo, de antes do conferente) → diz que não foi conferido;
+     · rodou mas o texto MUDOU depois → diz que a conferência venceu;
+     · rodou sobre este texto → o resultado, limpo ou com os pontos. */
+function alertasConferente(L){
+  if(!L) return [];
+  var c=L.conferencia;
+  if(!c || typeof c!=='object' || !('rodou' in c)){
+    return [{tipo:'conferente', texto:'Este laudo NÃO passou pela segunda leitura'
+      +(L.corpo?' (foi gerado antes de o conferente existir, ou ele estava desligado)':'')+'.'}];
+  }
+  if(!c.rodou){
+    return [{tipo:'conferente', texto:'A segunda leitura NÃO foi feita'
+      +(c.motivo?(' — '+c.motivo):'')+'. O laudo está sem conferência: leia com mais atenção.'}];
+  }
+  if(c.editadoDepois || (c.marca && c.marca!==conferenteMarca(L))){
+    return [{tipo:'conferente', texto:'⏳ A conferência VENCEU: o laudo foi editado depois que o '
+      +'conferente o leu. O que ele apontou já não corresponde ao texto atual — '
+      +'toque em "Regenerar laudo pela IA" ou confira você mesmo.'}];
+  }
+  var itens=c.itens||[];
+  // CALMO: leu e não achou nada. A caixa fica APAGADA, com o texto do ✓ dentro.
+  // Acender aqui mataria o sinal de relance — se o roxo acende todo dia, no dia do
+  // achado grave ele parece igual ao de ontem. Caixa acesa é para ocorrência.
+  if(!itens.length) return [{tipo:'conferente', calmo:true,
+    texto:'✓ O conferente leu este texto e não encontrou problema de coerência, medida, conclusão, lateralidade ou português.'}];
+  return [{tipo:'conferente', texto:'O conferente (segunda leitura, só do texto) apontou '
+    +itens.length+' ponto(s):\n'+itens.map(function(i){
+      return '• ['+i.gravidade.toUpperCase()+' · '+i.tipo+'] '+i.problema
+             +(i.trecho?('\n   ⟨'+i.trecho+'⟩'):'')
+             +(i.sugestao?('\n   sugestão: '+i.sugestao):'');
+    }).join('\n')}];
+}
+
+/* ================= CLASSIFICAÇÕES POR DESCRITOR — BI-RADS e O-RADS (12/08/2026) =================
+   O TI-RADS já funcionava assim desde julho: a IA ANOTA os descritores que o médico ditou, o
+   aplicativo CALCULA a categoria. A IA está proibida de calcular — aritmética que dá sempre o
+   mesmo resultado é o que se pode assinar. Aqui o mesmo caminho passa a valer para mama e ovário.
+
+   TABELA ÚNICA, de propósito. Cada descritor, cada opção e o que cada opção significa moram
+   num lugar só, e dela saem TRÊS coisas:
+     1. o vocabulário que vai no pedido à IA;
+     2. a conta da categoria;
+     3. a lista de opções do botão "faltou este descritor — clique ou dite".
+   Mudou o léxico? Muda a tabela. O teste `teste-classif.js` compara a tabela com os botões da
+   calculadora e falha se as duas metades divergirem.
+
+   LÉXICO CONFERIDO NA FONTE PRIMÁRIA em 12/08/2026 — ACR BI-RADS v2025 Manual, Apêndice A do
+   capítulo de Ultrassom (Ultrasound Lexicon Summary Form, págs. impressas 488-490). O que saiu
+   da 5ª edição e não está no v2025 NÃO está aqui: "cístico complexo e sólido" (padrão ecogênico)
+   e "padrão combinado" (achados posteriores). Ver conhecimento/birads-mama-us-v2025.md §13. */
+const CLASSIF = {
+  birads: {
+    nome:'BI-RADS', fonte:'ACR BI-RADS® v2025 Manual', campoIA:'birads',
+    exames:['mama'], radioHTML:'blocoBirads',
+    desc:[
+      {k:'forma', rot:'Forma', campo:'biForma', tipo:'radio', ops:[
+        {v:'oval',        rot:'Oval'},
+        {v:'lobulada',    rot:'Lobulada', nota:'forma lobulada é discretamente mais suspeita que oval — não converte por si só em categoria 4, mas não é neutra'},
+        {v:'redonda',     rot:'Redonda'},
+        {v:'irregular',   rot:'Irregular', susp:'forma irregular'}]},
+      {k:'orientacao', rot:'Orientação', campo:'biOri', tipo:'radio', ops:[
+        {v:'paralela',    rot:'Paralela à pele'},
+        {v:'nao',         rot:'Não paralela', susp:'orientação não paralela', sin:['nao paralela','não-paralela','vertical']}]},
+      {k:'margem', rot:'Margem', campo:'biMarg', tipo:'radio', ops:[
+        {v:'circ',          rot:'Circunscrita', sin:['circunscrita','bem definida','lisa','regular']},
+        {v:'indistinta',    rot:'Indistinta', susp:'margem indistinta', sin:['mal definida','imprecisa']},
+        {v:'angular',       rot:'Angular', susp:'margem angular'},
+        {v:'microlobulada', rot:'Microlobulada', susp:'margem microlobulada'},
+        {v:'espiculada',    rot:'Espiculada', susp:'margem espiculada'}]},
+      {k:'eco', rot:'Padrão ecogênico', campo:'biEco', tipo:'select', ops:[
+        {v:'anecoico',    rot:'Anecoico'},
+        {v:'hiperecoico', rot:'Hiperecoico', sin:['hiperecogenico','hiperecogênico']},
+        {v:'isoecoico',   rot:'Isoecoico', sin:['isoecogenico','isoecogênico']},
+        {v:'hipoecoico',  rot:'Hipoecoico', sin:['hipoecogenico','hipoecogênico']},
+        {v:'heterogeneo', rot:'Heterogêneo', susp:'padrão ecogênico heterogêneo'},
+        {v:'misto',       rot:'Misto sólido e cístico', susp:'massa mista sólido-cística',
+         sin:['misto solido e cistico','solido-cistico','sólido-cístico']}]},
+      {k:'posterior', rot:'Achados posteriores', campo:'biPost', tipo:'radio', ops:[
+        {v:'nenhum',  rot:'Sem alteração', sin:['sem achados posteriores','sem alteracao','ausentes','ausente','nenhum']},
+        {v:'reforco', rot:'Reforço', sin:['reforco acustico','reforço acústico','realce']},
+        {v:'sombra',  rot:'Sombra', susp:'sombra acústica posterior', sin:['sombra acustica','sombreamento']}]},
+      // a IA pode devolver "sim"/"não", verdadeiro/falso ou 1/0 — todos valem
+      {k:'halo', rot:'Halo ecogênico', campo:'biHalo', tipo:'checkbox', opcional:true, ops:[
+        {v:'nao', rot:'Ausente', sin:['nao','não','false','0','sem halo']},
+        {v:'sim', rot:'Presente', susp:'halo ecogênico', nota:'incluir o halo ecogênico na medida da lesão',
+         sin:['sim','true','1','halo ecogenico','echogenic rind']}]}
+    ]
+  },
+  orads: {
+    nome:'O-RADS', fonte:'O-RADS US v2022', campoIA:'orads',
+    exames:['transvaginal','pelvica'], radioHTML:'blocoOrads',
+    desc:[
+      {k:'tipo', rot:'Tipo de lesão', campo:'orTipo', tipo:'select', ops:[
+        {v:'fisio',        rot:'Folículo ou corpo lúteo ≤ 3 cm (fisiológico)'},
+        {v:'uniSimples',   rot:'Cisto unilocular SIMPLES (anecoico, parede lisa)', pede:['tamanho_cm']},
+        {v:'uniNaoSimples',rot:'Cisto unilocular NÃO simples, parede lisa', pede:['tamanho_cm']},
+        {v:'uniIrreg',     rot:'Cisto unilocular com parede interna IRREGULAR (< 3 mm)'},
+        {v:'classica',     rot:'Lesão clássica benigna típica (dermoide / endometrioma / cisto hemorrágico)', pede:['tamanho_cm']},
+        {v:'multiLisa',    rot:'Multilocular, paredes e septos LISOS', pede:['tamanho_cm','escore_cor']},
+        {v:'multiIrreg',   rot:'Multilocular com parede ou septo IRREGULAR'},
+        {v:'solido',       rot:'Lesão com componente SÓLIDO ou projeção papilar', pede:['papilas']},
+        {v:'solidoLiso',   rot:'Lesão sólida (≥ 80%) de contorno LISO', pede:['escore_cor']},
+        {v:'solidoIrreg',  rot:'Lesão sólida (≥ 80%) de contorno IRREGULAR'}]},
+      {k:'escore_cor', rot:'Escore de cor (Doppler)', campo:'orCS', tipo:'select', sobDemanda:true, ops:[
+        {v:'1', rot:'CS 1 (sem fluxo)'}, {v:'2', rot:'CS 2 (mínimo)'},
+        {v:'3', rot:'CS 3 (moderado)'},  {v:'4', rot:'CS 4 (intenso)'}]},
+      {k:'tamanho_cm', rot:'Maior diâmetro (cm)', campo:'orTam', tipo:'numero', sobDemanda:true},
+      {k:'papilas', rot:'Projeções papilares (nº)', campo:'orPap', tipo:'numero', sobDemanda:true},
+      {k:'ascite', rot:'Ascite e/ou nódulos peritoneais', campo:'orAscite', tipo:'checkbox', opcional:true, ops:[
+        {v:'nao', rot:'Ausente',  sin:['nao','não','false','0','sem ascite']},
+        {v:'sim', rot:'Presente', sin:['sim','true','1','com ascite']}]}
+    ]
+  },
+  /* O TI-RADS entra aqui SÓ pelas opções: a conta dele já existia e continua onde estava
+     (`tiradsPontuarDescritores`), com o casamento tolerante por pedaço de palavra que já
+     estava rodando e testado. O que esta entrada acrescenta é a lista de opções para
+     clicar quando um descritor não foi ditado — que antes não existia. */
+  tirads: {
+    nome:'TI-RADS', fonte:'ACR TI-RADS 2017', campoIA:'tirads',
+    exames:['tireoide'], radioHTML:'blocoTirads', contaPropria:true,
+    desc:[
+      {k:'composicao', rot:'Composição', campo:'trComp', tipo:'radio', ops:[
+        {v:'cistica',      rot:'Cística / quase toda cística', pts:0},
+        {v:'espongiforme', rot:'Espongiforme', pts:0},
+        {v:'mista',        rot:'Mista cística-sólida', pts:1},
+        {v:'solida',       rot:'Sólida / quase toda sólida', pts:2}]},
+      {k:'ecogenicidade', rot:'Ecogenicidade', campo:'trEco', tipo:'radio', ops:[
+        {v:'anecoica',      rot:'Anecoica', pts:0},
+        {v:'hiperOuIso',    rot:'Hiper ou isoecogênica', pts:1},
+        {v:'hipoecogenica', rot:'Hipoecogênica', pts:2},
+        {v:'muitoHipo',     rot:'Muito hipoecogênica', pts:3}]},
+      {k:'forma', rot:'Forma', campo:'trForma', tipo:'radio', ops:[
+        {v:'maisLarga', rot:'Mais larga que alta', pts:0},
+        {v:'maisAlta',  rot:'Mais alta que larga', pts:3}]},
+      {k:'margem', rot:'Margem', campo:'trMarg', tipo:'radio', ops:[
+        {v:'lisa',            rot:'Lisa', pts:0},
+        {v:'malDefinida',     rot:'Mal definida', pts:0},
+        {v:'lobuladaIrreg',   rot:'Lobulada ou irregular', pts:2},
+        {v:'extratireoidiana',rot:'Extensão extratireoidiana', pts:3}]},
+      {k:'focos', rot:'Focos ecogênicos', campo:'trFoco', tipo:'checkbox', opcional:true, ops:[
+        {v:'nenhum',        rot:'Nenhum ou cauda de cometa', pts:0},
+        {v:'macro',         rot:'Macrocalcificações', pts:1},
+        {v:'periferica',    rot:'Calcificação periférica', pts:2},
+        {v:'puntiformes',   rot:'Focos ecogênicos puntiformes', pts:3}]},
+      {k:'tamanho_cm', rot:'Maior diâmetro (cm)', campo:'trTam', tipo:'numero', opcional:true}
+    ]
+  }
+};
+/* Este sistema de classificação se aplica a este tipo de exame? (um lugar só decide) */
+function classifVale(sis, tipoExame){
+  var C=CLASSIF[sis];
+  return !!(C && (C.exames||[]).indexOf(String(tipoExame||''))>=0);
+}
+/* As opções de um descritor, para desenhar os botões de "clique o que faltou". */
+function classifOpcoes(sis, chave){
+  var C=CLASSIF[sis]; if(!C) return [];
+  var D=(C.desc||[]).filter(function(x){ return x.k===chave; })[0];
+  return D ? (D.ops||[]).map(function(o){ return {v:o.v, rot:o.rot}; }) : [];
+}
+function classifRotulo(sis, chave){
+  var C=CLASSIF[sis]; if(!C) return chave;
+  var D=(C.desc||[]).filter(function(x){ return x.k===chave; })[0];
+  return D ? D.rot : chave;
+}
+/* Casos que dispensam os descritores (dropdown "caso especial" da calculadora de mama) */
+const BIRADS_ESPECIAIS = {
+  cat0a:['0a','Avaliação incompleta — necessita imagem adicional. Complementar antes de atribuir categoria final.'],
+  cat0b:['0b','Avaliação incompleta — necessita exames prévios para comparação. Recuperar e comparar antes de atribuir categoria final.'],
+  cistoSimples:['2','Cisto simples — achado benigno. Rotina.'],
+  cistoComplicado:['3','Cisto complicado — provavelmente benigno. Seguimento em 6, 12 e 24 meses (ou aspiração se sintomático).'],
+  microcistos:['3','Microcistos agrupados — provavelmente benigno. Seguimento em 6, 12 e 24 meses.'],
+  linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.'],
+  cat6:['6','Malignidade comprovada por biópsia. Seguimento clínico e terapia local definitiva, conforme a conduta oncológica adotada.']
+};
+/* Casa o texto que a IA anotou com uma opção da tabela. Reconhece o código, o rótulo e os
+   sinônimos; não reconheceu = trata como NÃO DITADO (nunca chuta a opção mais parecida). */
+function classifCasar(descritor, texto){
+  var t=norm(texto); if(!t) return null;
+  var ops=descritor.ops||[];
+  for(var i=0;i<ops.length;i++){
+    var o=ops[i], alvos=[o.v, o.rot].concat(o.sin||[]);
+    for(var j=0;j<alvos.length;j++){ if(norm(alvos[j])===t) return o; }
+  }
+  for(var i2=0;i2<ops.length;i2++){                       // 2ª volta: contém (ex.: "margem espiculada")
+    var o2=ops[i2], alvos2=[o2.rot].concat(o2.sin||[]);
+    for(var j2=0;j2<alvos2.length;j2++){
+      var a=norm(alvos2[j2]); if(a.length>=4 && t.indexOf(a)>=0) return o2;
+    }
+  }
+  return null;
+}
+/* Lê os descritores ditados e devolve o que falta, com as OPÇÕES de cada um em falta —
+   é isso que alimenta o botão "clique ou dite o descritor" da tela de revisão. */
+function classifLerDescritores(sis, d){
+  var C=CLASSIF[sis], achou={}, falta=[];
+  d=d||{};
+  (C.desc||[]).forEach(function(D){
+    if(D.tipo==='numero'){
+      var n=parseFloat(String(d[D.k]==null?'':d[D.k]).replace(',','.'));
+      if(!isNaN(n) && n>0) achou[D.k]=n;
+      return;
+    }
+    var o=classifCasar(D, d[D.k]);
+    if(o) achou[D.k]=o;
+    else if(!D.opcional && !D.sobDemanda){
+      falta.push({k:D.k, rot:D.rot, ditado:String(d[D.k]||''),
+                  ops:(D.ops||[]).map(function(x){ return {v:x.v, rot:x.rot}; })});
+    }
+  });
+  return {achou:achou, falta:falta};
+}
+/* acrescenta a falta de um descritor pedido SOB DEMANDA (ex.: O-RADS só pede o tamanho
+   em certos tipos de lesão) */
+function classifExigir(sis, chave, achou, falta){
+  if(achou[chave]!=null) return;
+  var D=(CLASSIF[sis].desc||[]).filter(function(x){ return x.k===chave; })[0];
+  if(!D || falta.some(function(f){ return f.k===chave; })) return;
+  falta.push({k:D.k, rot:D.rot, ditado:'',
+              ops:(D.ops||[]).map(function(x){ return {v:x.v, rot:x.rot}; })});
+}
+
+/* ---- BI-RADS: a conta, a partir dos descritores já casados ----
+   Regra de ouro do léxico: UM descritor suspeito elimina a categoria 3. Por isso quem chama
+   decide o rigor: a calculadora (o médico está olhando e sabe o que deixou em branco) aceita
+   calcular com o essencial; a geração automática do laudo NÃO calcula com descritor faltando. */
+function biradsAvaliar(achou){
+  var susp=[], notas=[];
+  (CLASSIF.birads.desc||[]).forEach(function(D){
+    var o=achou[D.k]; if(!o || !o.v) return;
+    if(o.susp) susp.push(o.susp);
+    if(o.nota) notas.push(o.nota);
+  });
+  var marg=(achou.margem||{}).v, n=susp.length, cat, cond;
+  if(n===0){ cat='3'; cond='Provavelmente benigno (≤ 2% de risco) — seguimento em 6, 12 e 24 meses; 2 anos de estabilidade documentada permitem reclassificar como BI-RADS 2.'; }
+  else if(marg==='espiculada' && n>=2){ cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
+  else if(marg==='espiculada'){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
+  else if(n===1){ cat='4A'; cond='Suspeita baixa (2–10%) — biópsia/PAAF.'; }
+  else if(n===2){ cat='4B'; cond='Suspeita moderada (10–50%) — biópsia.'; }
+  else if(n===3){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
+  else { cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
+  return {cat:cat, cond:cond, susp:susp, notas:notas};
+}
+/* ---- O-RADS: a conta. Nada de "assumi < 10 cm" no caminho automático: o que falta, falta. ---- */
+function oradsAvaliar(achou, falta){
+  var t=(achou.tipo||{}).v; if(!t) return null;
+  var tam=achou.tamanho_cm, cs=parseInt((achou.escore_cor||{}).v||'0',10);
+  var pap=achou.papilas, asc=((achou.ascite||{}).v==='sim');
+  var op=(CLASSIF.orads.desc[0].ops||[]).filter(function(x){ return x.v===t; })[0]||{};
+  (op.pede||[]).forEach(function(ch){ classifExigir('orads', ch, achou, falta); });
+  var cat=0;
+  if(t==='fisio') cat=1;
+  else if(t==='uniSimples'||t==='uniNaoSimples'||t==='classica') cat=(tam&&tam>=10)?3:2;
+  else if(t==='uniIrreg') cat=3;
+  else if(t==='multiLisa') cat=(cs===4||(tam&&tam>=10))?4:3;
+  else if(t==='multiIrreg') cat=4;
+  else if(t==='solido') cat=(pap>=4)?5:4;
+  else if(t==='solidoLiso') cat=(cs===1)?3:4;
+  else if(t==='solidoIrreg') cat=5;
+  var notas=[];
+  if(t==='classica' && tam && tam>=5 && tam<10) notas.push('cisto hemorrágico de 5–10 cm: controle ecográfico em 8–12 semanas');
+  if(asc){ if(cat>=3) cat=5; else notas.push('ascite/nódulos com lesão de baixa categoria: investigar outras causas'); }
+  var risco={1:'achado fisiológico',2:'quase certamente benigno (< 1% de risco)',3:'baixo risco (1 a < 10%)',4:'risco intermediário (10 a < 50%)',5:'alto risco (≥ 50%)'}[cat];
+  var cond={1:'Nenhuma conduta necessária.',2:'Em geral sem seguimento (ver notas quando houver).',3:'US por especialista ou RM; conduta conforme contexto clínico.',4:'RM ou avaliação por ginecologista com experiência oncológica.',5:'Encaminhar à ginecologia oncológica.'}[cat];
+  return {cat:String(cat), risco:risco, cond:cond, notas:notas};
+}
+
+/* ---- A CONFERÊNCIA: o que foi DITADO × o que a conta deu ----
+   As duas únicas fontes de verdade independentes que existem aqui. Serve nos dois sentidos —
+   pega o médico que trocou a categoria E pega erro da conta do próprio aplicativo. Não custa
+   token nenhum: a categoria ditada já está no ditado que já é enviado. */
+function classifCategoriaDitada(texto, sis){
+  var s=String(texto||''), re;
+  if(sis==='birads')      re=/\bbi[\s.\-]*rads\b[\s:•\-]*(0\s*[ab]|[1-6])\s*([abc])?/ig;
+  else if(sis==='tirads') re=/\bti[\s.\-]*rads\b[\s:•\-]*(?:tr\s*)?([1-5])/ig;
+  else                    re=/\bo[\s.\-]*rads\b[\s:•\-]*(?:us\s*)?([0-5])/ig;
+  var m, ult=null;
+  while((m=re.exec(s))!==null){
+    // sempre em MAIÚSCULA: "0a" e "4A" têm de sair na mesma forma, senão a comparação
+    // com a categoria calculada acusaria conflito onde não há
+    ult=(String(m[1]||'').replace(/\s+/g,'')+String(m[2]||'')).toUpperCase();
+  }
+  return ult;
+}
+/* Devolve {conflito:true, ditado, calculado} quando as duas discordam. */
+function classifConferir(sis, calculado, ditadoTexto){
+  var dito=classifCategoriaDitada(ditadoTexto, sis);
+  if(!dito || !calculado) return {conflito:false, ditado:dito||null, calculado:calculado||null};
+  var a=String(dito).toUpperCase(), b=String(calculado).toUpperCase();
+  return {conflito:(a!==b), ditado:a, calculado:b};
 }
 function calcTirads(){
   var comp=calcRadio('blocoTirads','trComp'), eco=calcRadio('blocoTirads','trEco'), forma=calcRadio('blocoTirads','trForma'), marg=calcRadio('blocoTirads','trMarg');
@@ -5437,62 +6704,57 @@ function calcTirads(){
   else { cond=tiradsConduta(c.tr, tam); cond=cond.charAt(0).toUpperCase()+cond.slice(1)+'.'; }
   calcOut('trRes','ACR TI-RADS: '+pts+' ponto'+(pts===1?'':'s')+' → TR'+c.tr+' ('+c.desc+').'+(tam?' Nódulo de '+String(tam).replace('.',',')+' cm.':'')+'\n'+cond);
 }
+/* A calculadora virou a "casca de tela" da mesma conta que o laudo automático usa
+   (`biradsAvaliar`). Antes a regra vivia aqui dentro e teria de ser copiada; regra copiada
+   diverge — é só questão de tempo. */
+function calcBiradsLerTela(){
+  var achou={};
+  (CLASSIF.birads.desc||[]).forEach(function(D){
+    var v='';
+    if(D.tipo==='radio') v=calcRadio(CLASSIF.birads.radioHTML, D.campo)||'';
+    else if(D.tipo==='select') v=(document.getElementById(D.campo)||{}).value||'';
+    else if(D.tipo==='checkbox') v=((document.getElementById(D.campo)||{}).checked)?'sim':'';
+    if(!v) return;
+    var o=(D.ops||[]).filter(function(x){ return x.v===v; })[0];
+    if(o) achou[D.k]=o;
+  });
+  return achou;
+}
 function calcBirads(){
   var esp=(document.getElementById('biEsp')||{}).value||'';
   if(esp){
-    var mapa={
-      cat0a:['0a','Avaliação incompleta — necessita imagem adicional. Complementar antes de atribuir categoria final.'],
-      cat0b:['0b','Avaliação incompleta — necessita exames prévios para comparação. Recuperar e comparar antes de atribuir categoria final.'],
-      cistoSimples:['2','Cisto simples — achado benigno. Rotina.'],
-      cistoComplicado:['3','Cisto complicado — provavelmente benigno. Seguimento em 6, 12 e 24 meses (ou aspiração se sintomático).'],
-      microcistos:['3','Microcistos agrupados — provavelmente benigno. Seguimento em 6, 12 e 24 meses.'],
-      linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.'],
-      cat6:['6','Malignidade comprovada por biópsia. Seguimento clínico e terapia local definitiva, conforme a conduta oncológica adotada.']
-    };
-    var r=mapa[esp]; calcOut('biRes','BI-RADS '+r[0]+'. '+r[1]); return;
+    var e=BIRADS_ESPECIAIS[esp];
+    if(e) calcOut('biRes','BI-RADS '+e[0]+'. '+e[1]);
+    return;
   }
-  var forma=calcRadio('blocoBirads','biForma'), ori=calcRadio('blocoBirads','biOri'), marg=calcRadio('blocoBirads','biMarg'), post=calcRadio('blocoBirads','biPost');
-  var eco=(document.getElementById('biEco')||{}).value||'', halo=!!(document.getElementById('biHalo')||{}).checked;
-  if(!forma||!ori||!marg){ calcOut('biRes',''); return; }
-  var susp=[], notas=[], cat, cond;
-  if(forma==='irregular') susp.push('forma irregular');
-  if(forma==='lobulada') notas.push('forma lobulada é discretamente mais suspeita que oval — não converte por si só em categoria 4, mas não é neutra');
-  if(ori==='nao') susp.push('orientação não paralela');
-  if(marg!=='circ') susp.push('margem '+({indistinta:'indistinta',angular:'angular',microlobulada:'microlobulada',espiculada:'espiculada'})[marg]);
-  if(eco==='heterogeneo') susp.push('padrão ecogênico heterogêneo');
-  if(eco==='cisticoComplexo') susp.push('massa cística complexa e sólida');
-  if(eco==='misto') susp.push('massa mista sólido-cística');
-  if(post==='sombra') susp.push('sombra acústica posterior');
-  if(post==='combinado') susp.push('padrão acústico posterior combinado');
-  if(halo){ susp.push('halo ecogênico'); notas.push('incluir o halo ecogênico na medida da lesão'); }
-  var n=susp.length;
-  if(n===0){ cat='3'; cond='Provavelmente benigno (≤ 2% de risco) — seguimento em 6, 12 e 24 meses; 2 anos de estabilidade documentada permitem reclassificar como BI-RADS 2.'; }
-  else if(marg==='espiculada' && n>=2){ cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
-  else if(marg==='espiculada'){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
-  else if(n===1){ cat='4A'; cond='Suspeita baixa (2–10%) — biópsia/PAAF.'; }
-  else if(n===2){ cat='4B'; cond='Suspeita moderada (10–50%) — biópsia.'; }
-  else if(n===3){ cat='4C'; cond='Suspeita alta (50–95%) — biópsia.'; }
-  else { cat='5'; cond='Altamente sugestivo de malignidade (≥ 95%) — biópsia.'; }
-  calcOut('biRes','BI-RADS '+cat+(n?' — descritores suspeitos: '+susp.join(', ')+'.':' — descritores benignos (margem circunscrita, orientação paralela, sem sombra acústica).')+'\n'+cond+(notas.length?'\nNotas: '+notas.join('; ')+'.':'')+'\n(Apoio por descritores — a categoria final considera o conjunto clínico-radiológico.)');
+  var achou=calcBiradsLerTela();
+  // o médico está olhando a tela e sabe o que deixou em branco: basta o essencial
+  if(!achou.forma||!achou.orientacao||!achou.margem){ calcOut('biRes',''); return; }
+  var r=biradsAvaliar(achou), n=r.susp.length;
+  calcOut('biRes','BI-RADS '+r.cat+(n?' — descritores suspeitos: '+r.susp.join(', ')+'.':' — descritores benignos (margem circunscrita, orientação paralela, sem sombra acústica).')+'\n'+r.cond+(r.notas.length?'\nNotas: '+r.notas.join('; ')+'.':'')+'\n(Apoio por descritores — a categoria final considera o conjunto clínico-radiológico.)');
+}
+function calcOradsLerTela(){
+  var achou={};
+  (CLASSIF.orads.desc||[]).forEach(function(D){
+    if(D.tipo==='numero'){ var n=calcNum(D.campo); if(n) achou[D.k]=n; return; }
+    var v='';
+    if(D.tipo==='select') v=(document.getElementById(D.campo)||{}).value||'';
+    else if(D.tipo==='checkbox') v=((document.getElementById(D.campo)||{}).checked)?'sim':'';
+    if(!v) return;
+    var o=(D.ops||[]).filter(function(x){ return x.v===v; })[0];
+    if(o) achou[D.k]=o;
+  });
+  return achou;
 }
 function calcOrads(){
-  var t=(document.getElementById('orTipo')||{}).value||'';
-  if(!t){ calcOut('orRes',''); return; }
-  var tam=calcNum('orTam'), cs=parseInt((document.getElementById('orCS')||{}).value||'0',10), pap=calcNum('orPap'), asc=(document.getElementById('orAscite')||{}).checked;
-  var cat=0, notas=[];
-  if(t==='fisio') cat=1;
-  else if(t==='uniSimples'||t==='uniNaoSimples'){ cat=(tam&&tam>=10)?3:2; if(!tam) notas.push('assumi < 10 cm — informe o tamanho'); }
-  else if(t==='uniIrreg') cat=3;
-  else if(t==='classica'){ cat=(tam&&tam>=10)?3:2; if(!tam) notas.push('assumi < 10 cm'); if(tam&&tam>=5&&tam<10) notas.push('cisto hemorrágico de 5–10 cm: controle ecográfico em 8–12 semanas'); }
-  else if(t==='multiLisa'){ if(cs===4||(tam&&tam>=10)) cat=4; else { cat=3; if(!cs) notas.push('assumi CS 1–3'); if(!tam) notas.push('assumi < 10 cm'); } }
-  else if(t==='multiIrreg') cat=4;
-  else if(t==='solido'){ cat=(pap>=4)?5:4; if(!pap) notas.push('assumi 1–3 projeções papilares'); }
-  else if(t==='solidoLiso'){ if(cs===1) cat=3; else { cat=4; if(!cs) notas.push('assumi CS ≥ 2'); } }
-  else if(t==='solidoIrreg') cat=5;
-  if(asc){ if(cat>=3) cat=5; else notas.push('ascite/nódulos com lesão de baixa categoria: investigar outras causas'); }
-  var risco={1:'achado fisiológico',2:'quase certamente benigno (< 1% de risco)',3:'baixo risco (1 a < 10%)',4:'risco intermediário (10 a < 50%)',5:'alto risco (≥ 50%)'}[cat];
-  var cond={1:'Nenhuma conduta necessária.',2:'Em geral sem seguimento (ver notas quando houver).',3:'US por especialista ou RM; conduta conforme contexto clínico.',4:'RM ou avaliação por ginecologista com experiência oncológica.',5:'Encaminhar à ginecologia oncológica.'}[cat];
-  calcOut('orRes','O-RADS US: categoria '+cat+' — '+risco+'.\n'+cond+(notas.length?'\nNotas: '+notas.join('; ')+'.':''));
+  var achou=calcOradsLerTela(), falta=[];
+  var r=oradsAvaliar(achou, falta);
+  if(!r){ calcOut('orRes',''); return; }
+  // na calculadora o que falta vira aviso, não impedimento — o médico está vendo a tela
+  var notas=r.notas.concat(falta.map(function(f){
+    return 'calculei pelo MENOR risco por falta de: '+f.rot.toLowerCase();
+  }));
+  calcOut('orRes','O-RADS US: categoria '+r.cat+' — '+r.risco+'.\n'+r.cond+(notas.length?'\nNotas: '+notas.join('; ')+'.':''));
 }
 function calcBosniak(){
   var v=(document.getElementById('boTipo')||{}).value||'';
@@ -6048,46 +7310,210 @@ function exVoltarInicio(){
    Vive de dado real: o estado da gravação vem do agente, a lista vem dos exames
    que já chegaram do aparelho hoje. Atualiza sozinha a cada 5 s enquanto está
    aberta, e para quando fecha (nada de laço rodando escondido). */
-var _diaTimer=null, _diaDesde=null;
+var _diaTimer=null, _diaDesde=null, _diaSeg=null, _diaUltEstado=null;
+var _diaBipou={};   // F2e: de quem já se avisou que faltou medida (para não bipar a cada 5 s)
+
+/* ================= A ONDA DO DITADO (12/08/2026) =================
+   A fonte é o AGENTE, não o navegador: fora do modo exame o microfone do navegador
+   fica fechado, por privacidade. O agente mede o nível ~12 vezes por segundo e
+   guarda os últimos 30 s — é esse fio que a onda desenha.
+
+   Cinco decisões, cada uma contra um jeito conhecido de a onda ficar feia:
+
+   1. INTERPOLA em vez de empilhar barras. 12 amostras por segundo espalhadas em
+      ~250 colunas deixa a maioria das colunas vazia — é isso que vira aquele
+      pente de espetos. Cada coluna pergunta "qual era o nível NESTE instante?" e
+      recebe um valor interpolado entre as duas amostras vizinhas.
+   2. CURVA, não segmentos. O contorno é traçado com curvas que passam pelos pontos
+      médios: o resultado não tem um único canto.
+   3. PERSEGUE, não salta. A cada quadro cada coluna caminha um pedaço rumo ao valor
+      novo. É o que dá a sensação de peso — a onda balança, não pisca.
+   4. SEGURA a ponta entre as consultas. O agente responde a cada 0,4 s; sem isso a
+      borda direita cairia a zero e voltaria, batendo como um pisca-pisca.
+   5. NÍTIDA na tela do notebook. O canvas é desenhado na resolução real do monitor
+      (devicePixelRatio); sem isso qualquer curva fica com a borda embaçada — é a
+      razão mais comum de um gráfico "parecer" mal feito.
+
+   Honestidade: em silêncio a fita fica FINA e continua andando — o que prova que
+   está viva é ela ANDAR. Se as amostras pararem de chegar, ela fica vermelha.
+   Se a gravação estiver parada, vira um traço cinza imóvel: não finge. */
+var _ondaRAF=null, _ondaFeed=null, _ondaCols=[];
+
+async function ondaAlimentar(){
+  try{
+    var j=await capAgenteEstado(); if(!j) return;
+    if(j.relogioAgente){ micRelAgente=j.relogioAgente; micRecebidoEm=Date.now(); }
+    (j.niveis||[]).forEach(function(p){ if(p[0]>micUltAmostra()) micNiveis.push(p); });
+    if(micNiveis.length>900) micNiveis.splice(0, micNiveis.length-900);
+  }catch(e){}
+}
+function ondaComecar(){ if(!_ondaRAF) _ondaRAF=requestAnimationFrame(ondaQuadro); }
+function ondaParar(){ if(_ondaRAF){ cancelAnimationFrame(_ondaRAF); _ondaRAF=null; } }
+function ondaQuadro(){ _ondaRAF=requestAnimationFrame(ondaQuadro); try{ ondaDesenhar(); }catch(e){ ondaParar(); } }
+
+/* o nível num instante qualquer, interpolado — e segurando a ponta entre consultas */
+function ondaNivel(t, j){
+  var M=micNiveis.length; if(!M) return 0;
+  var a=micNiveis[j], b=micNiveis[Math.min(M-1, j+1)];
+  if(t<=a[0]) return (a[0]-t<1.2)?a[1]:0;
+  if(t>=b[0]){
+    var dt=t-b[0];
+    if(dt<=0.7) return b[1];                       // ainda é a ponta viva
+    return dt<2.7 ? b[1]*(1-(dt-0.7)/2) : 0;       // parou de chegar: some devagar
+  }
+  var f=(t-a[0])/Math.max(1e-6, b[0]-a[0]);
+  return a[1]+(b[1]-a[1])*f;
+}
+/* acrescenta um bordo da fita ao caminho, com curvas pelos pontos médios */
+function ondaBordo(g, pts, sinal, meio, comecar){
+  var p0=pts[0];
+  if(comecar) g.moveTo(p0.x, meio+sinal*p0.y); else g.lineTo(p0.x, meio+sinal*p0.y);
+  for(var i=0;i<pts.length-1;i++){
+    var p=pts[i], q=pts[i+1];
+    g.quadraticCurveTo(p.x, meio+sinal*p.y, (p.x+q.x)/2, meio+sinal*((p.y+q.y)/2));
+  }
+  var u=pts[pts.length-1];
+  g.lineTo(u.x, meio+sinal*u.y);
+}
+function ondaDesenhar(){
+  var cv=document.getElementById('diaOnda'); if(!cv || !cv.clientWidth) return;
+  var dpr=Math.min(3, window.devicePixelRatio||1);
+  var L=cv.clientWidth, A=cv.clientHeight;
+  if(cv.width!==Math.round(L*dpr) || cv.height!==Math.round(A*dpr)){
+    cv.width=Math.round(L*dpr); cv.height=Math.round(A*dpr); _ondaCols=[];
+  }
+  var g=cv.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,L,A);
+
+  var meio=A/2;
+  var st=_diaUltEstado;
+  var gravando=!!(st && st.capturando);
+  var t1=micAgoraAgente(), t0=t1-8;                    // janela de 8 segundos
+  var vivo=gravando && micNiveis.length>0 && (t1-micUltAmostra())<3;
+
+  // gravação parada: um traço cinza parado. A tela não afirma o que não está acontecendo.
+  if(!gravando){
+    g.strokeStyle='rgba(138,147,160,.45)'; g.lineWidth=1.5; g.lineCap='round';
+    g.beginPath(); g.moveTo(10, meio); g.lineTo(L-10, meio); g.stroke();
+    return;
+  }
+
+  var N=Math.max(40, Math.round(L/3.2));
+  var alvo=new Array(N), j=0, M=micNiveis.length;
+  for(var k=0;k<N;k++){
+    var t=t0+(k+0.5)*(8/N);
+    while(j<M-1 && micNiveis[j+1][0]<t) j++;
+    alvo[k]=ondaNivel(t, j);
+  }
+  // alisa no espaço: tira a aspereza sem achatar o pico da voz
+  var suave=new Array(N);
+  for(var k2=0;k2<N;k2++){
+    var s=0,c=0;
+    for(var d=-2;d<=2;d++){ var i2=k2+d; if(i2<0||i2>=N) continue; s+=alvo[i2]; c++; }
+    suave[k2]=s/c;
+  }
+  // persegue no tempo
+  if(_ondaCols.length!==N) _ondaCols=suave.slice();
+  for(var k3=0;k3<N;k3++) _ondaCols[k3]+=(suave[k3]-_ondaCols[k3])*0.32;
+
+  var pad=5, maxH=Math.max(4, meio-pad), base=1.4;
+  var pts=new Array(N);
+  for(var k4=0;k4<N;k4++){
+    var v=Math.max(0, Math.min(1, _ondaCols[k4]));
+    // a raiz levanta a fala baixa: sem ela, conversa normal vira um fio reto
+    pts[k4]={x:(k4+0.5)*(L/N), y: base + Math.pow(v, 0.62)*(maxH-base)};
+  }
+
+  var RGB = vivo ? '14,110,107' : '196,59,59';
+  var cor = function(a){ return 'rgba('+RGB+','+a+')'; };
+
+  g.strokeStyle='rgba(26,36,48,.07)'; g.lineWidth=1;
+  g.beginPath(); g.moveTo(0,meio); g.lineTo(L,meio); g.stroke();
+
+  g.beginPath();
+  ondaBordo(g, pts, -1, meio, true);
+  var inv=pts.slice().reverse();
+  ondaBordo(g, inv, +1, meio, false);
+  g.closePath();
+  var grd=g.createLinearGradient(0, meio-maxH, 0, meio+maxH);
+  grd.addColorStop(0,   cor(0.05));
+  grd.addColorStop(0.5, cor(0.26));
+  grd.addColorStop(1,   cor(0.05));
+  g.fillStyle=grd; g.fill();
+  g.strokeStyle=cor(0.85); g.lineWidth=1.5; g.lineJoin='round'; g.stroke();
+
+  // a ponta do "agora": um ponto com halo, para o olho achar a borda viva
+  var u=pts[N-1];
+  g.beginPath(); g.arc(u.x, meio, 7.5, 0, 6.2832); g.fillStyle=cor(0.14); g.fill();
+  g.beginPath(); g.arc(u.x, meio, 3, 0, 6.2832); g.fillStyle=cor(0.95); g.fill();
+
+  // a esquerda se dissolve em vez de ser cortada por uma borda dura
+  var larg=Math.min(72, L*0.2);
+  g.globalCompositeOperation='destination-out';
+  var f=g.createLinearGradient(0,0,larg,0);
+  f.addColorStop(0,'rgba(0,0,0,1)'); f.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=f; g.fillRect(0,0,larg,A);
+  g.globalCompositeOperation='source-over';
+}
 
 function diaAbrir(){
   _diaDesde=_diaDesde||Date.now();
   var t=document.getElementById('telaDia'); if(t) t.style.display='block';
-  ['telaAbertura','telaExames'].forEach(function(id){
+  ['telaAbertura','telaExames','telaRev2'].forEach(function(id){
     var e=document.getElementById(id); if(e) e.style.display='none';
   });
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
   diaAtualizar();
   if(!_diaTimer) _diaTimer=setInterval(diaAtualizar, 5000);
+  if(!_diaSeg) _diaSeg=setInterval(diaFaixa, 1000);      // o relógio anda de segundo em segundo
+  if(!_ondaFeed) _ondaFeed=setInterval(ondaAlimentar, 400);
+  ondaAlimentar(); ondaComecar();
   window.scrollTo(0,0);
 }
 function diaFechar(){
   var t=document.getElementById('telaDia'); if(t) t.style.display='none';
+  // nada de laço rodando escondido: fecha a tela, param os três
   if(_diaTimer){ clearInterval(_diaTimer); _diaTimer=null; }
+  if(_diaSeg){ clearInterval(_diaSeg); _diaSeg=null; }
+  if(_ondaFeed){ clearInterval(_ondaFeed); _ondaFeed=null; }
+  ondaParar();
 }
 function diaDecorrido(){
   if(!_diaDesde) return '';
-  var s=Math.floor((Date.now()-_diaDesde)/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
-  return h?(h+'h'+('0'+m).slice(-2)):(m+' min');
+  var s=Math.floor((Date.now()-_diaDesde)/1000);
+  var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), g=s%60;
+  var dd=function(n){ return ('0'+n).slice(-2); };
+  if(h) return h+'h'+dd(m)+'m'+dd(g)+'s';
+  if(m) return m+' min '+dd(g)+' s';
+  return g+' s';
+}
+/* A faixa de cima. Separada do diaAtualizar porque o texto se refaz a cada SEGUNDO,
+   enquanto a conversa com o agente continua a cada 5 s — perguntar de segundo em
+   segundo seria bater na porta do agente 5 vezes mais só para mover um número. */
+function diaFaixa(){
+  var p=document.getElementById('diaPonto'), e=document.getElementById('diaEstado');
+  if(!p||!e) return;
+  var st=_diaUltEstado;
+  if(!st){ p.className='pt off'; e.textContent='Sem contato com o agente.'; return; }
+  if(st.capturando){
+    p.className='pt viva';
+    e.textContent='GRAVANDO — '+diaDecorrido()+' · microfone ok'
+      +(st.reinicios?(' · '+st.reinicios+' reinício(s) do microfone hoje'):'');
+  }else if(st.microfone){
+    p.className='pt';
+    e.textContent='⚠ Microfone aberto mas SEM ÁUDIO chegando'
+      +(st.paradoHaSeg?(' há '+Math.round(st.paradoHaSeg)+'s'):'')+' — confira o microfone.';
+  }else{
+    p.className='pt off';
+    e.textContent='Gravação PARADA — os exames que chegarem agora não terão ditado.';
+  }
 }
 async function diaAtualizar(){
   // ---- faixa de cima: a gravação está mesmo de pé? ----
-  var p=document.getElementById('diaPonto'), e=document.getElementById('diaEstado');
-  try{
-    var st=await (await fetch(agenteBase()+'/gravacao/estado')).json();
-    if(st&&st.capturando){
-      p.className='pt viva';
-      e.textContent='GRAVANDO — '+diaDecorrido()+' · microfone ok'
-        +(st.reinicios?(' · '+st.reinicios+' reinício(s) do microfone hoje'):'');
-    }else if(st&&st.microfone){
-      p.className='pt';
-      e.textContent='⚠ Microfone aberto mas SEM ÁUDIO chegando'
-        +(st.paradoHaSeg?(' há '+Math.round(st.paradoHaSeg)+'s'):'')+' — confira o microfone.';
-    }else{
-      p.className='pt off';
-      e.textContent='Gravação PARADA — os exames que chegarem agora não terão ditado.';
-    }
-  }catch(_){ p.className='pt off'; e.textContent='Sem contato com o agente.'; }
+  try{ _diaUltEstado=await (await fetch(agenteBase()+'/gravacao/estado')).json(); }
+  catch(_){ _diaUltEstado=null; }
+  diaFaixa();
 
   // ---- exame em andamento ----
   // O tipo do exame só é conhecido DEPOIS, quando o ditado é transcrito no
@@ -6114,32 +7540,449 @@ function diaRenderLista(){
   if(!lista.length){
     d.innerHTML='<div class="vazio">Nenhum exame ainda hoje. Quando o aparelho enviar as imagens, ele aparece aqui.</div>';
   }else{
+    var bipar=false;
     d.innerHTML=lista.map(function(x){
       var hora=x._quando?new Date(x._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
       var tipo=(MODELOS[x.tipo]&&MODELOS[x.tipo].nome)||x.tipo||'tipo ainda não identificado';
-      var sit, acoes;
+      var sit, acoes, classe='';
       if(x._liberado){
         sit='<span class="sit pronto">revisado e assinado ✓</span>';
         acoes='<button class="bt" onclick="diaAbrirNaPasta('+x.id+')">Abrir na pasta de destino</button>';
       }else if(x.laudo){
-        sit='<span class="sit aguarda">laudo pronto — aguarda revisão</span>';
-        acoes='<button class="bt" onclick="diaRevisar('+x.id+')">Revisar</button>';
+        // F2e: recalculado a cada volta (5 s). Preencheu a medida? o cartão desacende sozinho.
+        var flt=[]; try{ flt=medidasFaltando(x.laudo); }catch(_){}
+        if(flt.length){
+          var nomes=flt.slice(0,2).map(function(z){ return z.rotulo; }).join(', ');
+          classe=' falta';
+          sit='<span class="sit falta">faltou medir: '+esc(nomes)+(flt.length>2?(' +'+(flt.length-2)+''):'')+'</span>';
+          acoes='<button class="bt forte" onclick="diaRevisar('+x.id+')">Revisar e completar</button>';
+          if(!_diaBipou[x.id]){ _diaBipou[x.id]=1; bipar=true; }
+        }else{
+          delete _diaBipou[x.id];   // completou: pode voltar a avisar se abrir buraco de novo
+          sit='<span class="sit aguarda">laudo pronto — aguarda revisão</span>';
+          acoes='<button class="bt" onclick="diaRevisar('+x.id+')">Revisar</button>';
+        }
       }else{
         sit='<span class="sit">aguardando o ditado ser processado</span>';
         acoes='<button class="bt" onclick="diaReabrir('+x.id+')">Reabrir exame</button>';
       }
-      return '<div class="item"><span class="hr">'+hora+'</span>'
+      return '<div class="item'+classe+'"><span class="hr">'+hora+'</span>'
         +'<span class="quem"><span class="nm">'+esc(x.paciente||'(sem nome)')+'</span>'
         +'<span class="tp">'+esc(tipo)+'</span></span>'+sit
         +'<span style="display:flex;gap:8px;flex-wrap:wrap">'+acoes+'</span></div>';
     }).join('');
+    // som só quando um exame ENTRA em falta, não a cada 5 s: aviso repetido vira ruído
+    if(bipar){ try{ micSom('falta'); }catch(_){} }
   }
   var n=lista.filter(function(x){ return x.laudo && !x._liberado; }).length;
   var b=document.getElementById('diaPend');
   b.textContent='Revisar laudos pendentes'+(n?(' ('+n+')'):'');
   b.disabled=!n;
 }
-function diaRevisar(exId){ diaFechar(); mostrarAba('revisao'); abrirRevisao(exId); }
+function diaRevisar(exId){ diaFechar(); rev2Abrir(exId); }
+
+/* ================= TELA 4: REVISÃO DO LAUDO (2.0) — comportamento =================
+   O laudo estruturado é o modelo do médico REDIVIDIDO: cada título em negrito dos
+   modelos já marca um órgão/segmento, então o corte não é invenção nova — é o mesmo
+   corte que os modelos sempre tiveram, agora visível como retângulos.
+   A cor de cada retângulo sai de dado real, nunca de palpite:
+     vermelho  = pontilhado em branco (F2e) ou descritor de classificação faltando
+     âmbar     = conflito (ditado × cálculo)
+     verde     = alterado — há negrito ALÉM do título, e negrito é como o sistema
+                 marca achado patológico desde sempre
+     rosa      = impressão diagnóstica (texto gerado por IA)
+     cinza     = sem alteração — apagado de propósito, para o olho ir no que importa */
+var _rev2Id=null, _rev2Fim={}, _rev2Fmt=null;
+
+function rev2Fila(){
+  var l=exames.filter(function(x){ return x.laudo && !x._liberado; });
+  // "deixar para depois" manda para o FIM da fila; nunca reaparece no topo
+  l.sort(function(a,b){
+    var fa=_rev2Fim[a.id]?1:0, fb=_rev2Fim[b.id]?1:0;
+    if(fa!==fb) return fa-fb;
+    return (a._quando||0)-(b._quando||0);
+  });
+  return l;
+}
+function rev2Ex(){ return exames.filter(function(x){ return x.id===_rev2Id; })[0]||null; }
+function rev2Abrir(exId){
+  var fila=rev2Fila();
+  if(exId==null) exId=(fila[0]||{}).id;
+  if(exId==null){ log('Nenhum laudo pendente de revisão.'); diaAbrir(); return; }
+  _rev2Id=exId;
+  ['telaAbertura','telaExames','telaDia','telaRevisao'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.style.display='none';
+  });
+  var t=document.getElementById('telaRev2'); if(t) t.style.display='block';
+  rev2Render();
+  window.scrollTo(0,0);
+}
+function rev2Fechar(){ var t=document.getElementById('telaRev2'); if(t) t.style.display='none'; }
+function rev2Voltar(){ rev2Fechar(); diaAbrir(); }
+function rev2Calculadoras(){ rev2Fechar(); mostrarAba('calc'); }
+
+/* ---- corta o corpo do laudo em retângulos, um por título em negrito ---- */
+function rev2Blocos(L){
+  var linhas=String((L&&L.corpo)||'').split('\n'), blocos=[], at=null;
+  linhas.forEach(function(li){
+    var t=faltaTitulo(li);
+    if(t){ at={titulo:t, linhas:[li]}; blocos.push(at); return; }
+    if(!at){ at={titulo:'', linhas:[]}; blocos.push(at); }
+    at.linhas.push(li);
+  });
+  blocos.forEach(function(b){ b.texto=b.linhas.join('\n').replace(/^\n+|\n+$/g,''); });
+  return blocos.filter(function(b){ return b.texto.trim(); });
+}
+/* casa o "achado" de uma pendência/conflito com o título de um retângulo */
+function rev2Casa(achado, titulo){
+  var a=norm(achado), t=norm(titulo);
+  if(!a || !t) return false;
+  return a===t || a.indexOf(t)>=0 || t.indexOf(a)>=0;
+}
+function rev2Estado(ex, b){
+  if(b._ia) return 'ia';
+  // Pontilhado em branco pinta o cartão INTEIRO de vermelho: ali a falta é a história
+  // toda daquele trecho ("Ovário esquerdo — falta a medida", no desenho).
+  if(medidasFaltando({corpo:b.texto}).length) return 'falta';
+  // Já pendência de descritor e conflito de classificação NÃO repintam o cartão: viram
+  // a caixinha âmbar DENTRO dele (rev2Caixas). É como está no desenho — o "Ovário
+  // direito" continua verde de alterado, com a caixa de conflito por dentro. Repintar
+  // o cartão apagaria a informação de que aquele trecho tem um achado.
+  var resto=b.titulo ? b.texto.replace(/\*\*[^*]{1,70}\*\*/,'') : b.texto;
+  if(/\*\*/.test(resto)) return 'alterado';   // negrito além do título = achado patológico
+  // informação que veio do ditado (indicação clínica, história) não é "órgão sem
+  // alteração": fica branca e legível, em vez de apagada em cinza
+  var pr=rev2Proc(ex, b.titulo);
+  if(pr && /voz|ambos/i.test(String(pr.origem||''))) return 'info';
+  return 'normal';
+}
+/* de onde veio a informação daquele retângulo (a IA anotou enquanto lia as imagens) */
+function rev2Proc(ex, titulo){
+  var lista=((ex.laudo||{}).procedencia)||[], n=norm(titulo);
+  if(!n) return null;
+  for(var i=0;i<lista.length;i++){ if(norm(lista[i].secao||'')===n) return lista[i]; }
+  return null;
+}
+/* acha o trecho do ditado pela citação que a IA copiou dele */
+function rev2Trecho(ex, citacao){
+  var tr=((ex.laudo||{}).trechos)||[];
+  var c=norm(citacao||''); if(!tr.length || c.length<6) return null;
+  for(var i=0;i<tr.length;i++){ if(norm(tr[i].texto).indexOf(c)>=0) return tr[i]; }
+  var pal=c.split(' ').filter(function(p){ return p.length>3; });
+  var melhor=null, quantas=0;
+  tr.forEach(function(t){
+    var s=norm(t.texto), n=pal.filter(function(p){ return s.indexOf(p)>=0; }).length;
+    if(n>quantas){ quantas=n; melhor=t; }
+  });
+  return quantas>=2 ? melhor : null;   // pouca sobreposição: prefiro não tocar nada a tocar errado
+}
+
+function rev2Render(){
+  var ex=rev2Ex(); if(!ex || !ex.laudo){ rev2Voltar(); return; }
+  var L=ex.laudo, fila=rev2Fila(), pos=fila.map(function(x){return x.id;}).indexOf(ex.id)+1;
+  var c=L.cab||{};
+
+  document.getElementById('rv2Tit').textContent='Revisão de laudos — '+fila.length+' pendente'+(fila.length===1?'':'s');
+
+  // ---- cabeçalho: qual laudo, quem, e o fundo ----
+  var hora=ex._quando?new Date(ex._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
+  var tipo=(MODELOS[ex.tipo]&&MODELOS[ex.tipo].nome)||ex.tipo||'tipo não identificado';
+  var opFundo=Object.keys(FUNDOS||{}).map(function(k){
+    return '<option value="'+esc(k)+'"'+((window.__fundo||'branco')===k?' selected':'')+'>'+esc((FUNDOS[k]&&FUNDOS[k].nome)||k)+'</option>';
+  }).join('');
+  document.getElementById('rv2Cab').innerHTML=
+     '<span class="qual"><span class="l1">Laudo '+pos+' de '+fila.length+' — '+esc(tipo)+' · '+hora+'</span>'
+    +'<span class="l2">Paciente: '+esc(c.nome||ex.paciente||'(sem nome)')+(c.idade?(', '+esc(c.idade)):'')
+    +(ex._dicom?' — identificada pelo aparelho':'')+'</span></span>'
+    +'<span><span class="fundo">Fundo do laudo</span>'
+    +'<select onchange="rev2Fundo(this.value)">'+opFundo+'</select></span>';
+
+  // ---- os alertas, que são a legenda das cores ----
+  var lista=alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
+                             .concat(alertasReferencia(L));
+  var porTipo={}, calmos={};
+  lista.forEach(function(a){
+    var txt=String((a&&a.texto)||'').trim(); if(!txt) return;
+    var t=alertaTipoValido(a&&a.tipo);
+    if(a&&a.calmo){ calmos[t]=txt; return; }   // tem o que dizer, mas não é ocorrência
+    (porTipo[t]=porTipo[t]||[]).push(txt);
+  });
+  document.getElementById('rv2Legenda').innerHTML=ALERTAS.map(function(A){
+    var on=(porTipo[A.k]||[]).length>0, calmo=!on && !!calmos[A.k];
+    // no toque não existe passar o mouse: o "✓" do estado calmo precisa aparecer no
+    // próprio rótulo, senão a confirmação de que o conferente passou fica invisível
+    return '<button class="lg'+(on?' on':'')+(calmo?' calmo':'')+'" data-k="'+A.k+'"'
+      +(on?(' style="background:'+A.cor+'"'):'')+(on||calmo?'':' disabled')
+      +' onclick="rev2Ir(\''+A.k+'\')" title="'+esc(on?(porTipo[A.k].join(' | ')):(calmos[A.k]||A.vazio))+'">'
+      +(calmo?'✓ ':'')+esc(A.nome)+'</button>';
+  }).join('')
+    +'<div id="rv2ConfTxt" style="display:none;flex:1 1 100%;margin-top:8px;background:#fff;'
+    +'border:1px solid #D6CCEA;border-left:4px solid #6A4FB6;border-radius:8px;padding:10px 12px;'
+    +'font-size:12px;color:#3F3357;white-space:pre-wrap">'
+    +esc((porTipo.conferente||[]).join('\n') || calmos.conferente || '')+'</div>';
+
+  // ---- o laudo estruturado ----
+  var blocos=rev2Blocos(L);
+  if(L.conclusao) blocos.push({titulo:'IMPRESSÃO — TEXTO GERADO POR IA · TOQUE PARA EDITAR',
+                               texto:String(L.conclusao), _ia:true, _conc:true});
+  var html=blocos.map(function(b,i){
+    var est=rev2Estado(ex,b), pr=rev2Proc(ex,b.titulo), selo='';
+    if(pr && pr.imagem_n>0 && (ex.imagens||[]).length>=pr.imagem_n)
+      selo+='<button class="img" onclick="rev2VerImagem('+pr.imagem_n+')" title="mostrar a imagem de onde saiu esta medida">IMG</button>';
+    var tr=pr?rev2Trecho(ex,pr.citacao):null;
+    if(tr) selo+='<button class="voz" onclick="rev2Tocar('+tr.inicio+','+tr.fim+')" title="ouvir só este pedaço do ditado">VOZ</button>'
+                +'<span class="hora">'+rev2Rel(tr.inicio)+'</span>';
+    var corpoTxt=b._conc?b.texto:b.texto.replace(/^\*\*[^*]{1,70}\*\*:?\s*/,'');
+    return '<div class="bloco '+est+'" id="rv2b'+i+'" data-est="'+est+'">'
+      +(/^(alterado|falta|conflito|ia)$/.test(est)?'<span class="barra"></span>':'')
+      +(b.titulo?('<div class="tit">'+esc(b.titulo)+(est==='alterado'?' — alterado':'')
+                  +(est==='falta'?' — falta a medida':'')
+                  +(selo?('<span class="selo">'+selo+'</span>'):'')+'</div>')
+                : (selo?('<div class="tit"><span class="selo">'+selo+'</span></div>'):''))
+      +'<div class="txt" contenteditable="true" data-bloco="'+i+'" onblur="rev2Editou(this)">'+negrito(esc(corpoTxt))+'</div>'
+      +rev2Caixas(ex,b)+'</div>';
+  }).join('');
+  document.getElementById('rv2Blocos').innerHTML=html||'<div class="vaziod">Este laudo está vazio.</div>';
+
+  // ---- imagens ----
+  var imgs=ex.imagens||[];
+  document.getElementById('rv2NImg').textContent=imgs.length;
+  document.getElementById('rv2Imgs').innerHTML=imgs.length
+    ? '<div class="grade">'+imgs.map(function(d,i){
+        return '<img src="'+d+'" id="rv2i'+(i+1)+'" onclick="ampliarImg(this)" title="imagem '+(i+1)+'">'; }).join('')+'</div>'
+    : '<div class="vaziod">Sem imagens neste exame.</div>';
+
+  // ---- modelo do exame ----
+  var sel=document.getElementById('rv2Modelo');
+  sel.innerHTML=Object.keys(MODELOS).map(function(k){
+    return '<option value="'+esc(k)+'"'+(ex.tipo===k?' selected':'')+'>'+esc(MODELOS[k].nome||k)+'</option>'; }).join('');
+
+  // ---- rodapé ----
+  var a=audios.filter(function(x){ return x.exameId===ex.id; })[0];
+  var seg=(L.trechos||[]).reduce(function(m,t){ return Math.max(m,t.fim||0); },0);
+  document.getElementById('rv2Info').textContent=
+    'áudio deste exame: '+(seg?rev2Rel(seg):'—')
+    +' · origem: '+((a&&a._agente)?'pré-buffer':'—')
+    // "transcreva de novo com o agente novo" era conselho errado: se quem transcreveu
+    // foi a nuvem, refazer não traz hora nenhuma — a nuvem não devolve marcação.
+    +' · '+((L.trechos||[]).length
+            ? ((L.trechos||[]).length+' trecho(s) com hora')
+            : 'sem marcação de tempo — o botão de voz não funciona neste exame');
+}
+function rev2Rel(s){ s=Math.max(0,Math.round(s||0)); return Math.floor(s/60)+' min '+('0'+(s%60)).slice(-2)+' s'; }
+
+/* as caixinhas dentro do retângulo: conflito de classificação e descritor em falta */
+function rev2Caixas(ex,b){
+  var L=ex.laudo||{}, h='';
+  (L.classifConflitos||[]).forEach(function(cf,i){
+    if(!rev2Casa(cf.achado,b.titulo)) return;
+    h+='<div class="caixa amb">classificação em conflito — toque na certa:'
+      +'<div class="fichas">'
+      +'<button class="ficha" onclick="rev2Conflito('+i+',\'ditado\')">'+esc(cf.nome+' '+cf.ditado)+' — ditado</button>'
+      +'<button class="ficha" onclick="rev2Conflito('+i+',\'calculado\')">'+esc(cf.nome+' '+cf.calculado)+' — descritores</button>'
+      +'</div></div>';
+  });
+  (L.classifPendencias||[]).forEach(function(p,i){
+    if(!rev2Casa(p.achado,b.titulo)) return;
+    h+='<div class="caixa amb" id="rv2p'+i+'">'
+      +esc(CLASSIF[p.sistema].nome+' não calculado — faltou o descritor: '+p.rotulo)
+      +(p.ditado?esc(' (ouvi “'+p.ditado+'”, que não é um descritor válido)'):'')
+      +'<button class="abrir" onclick="rev2AbrirOpcoes('+i+')">escolher</button>'
+      +'<div class="fichas" id="rv2po'+i+'" style="display:none">'
+      +(p.opcoes||[]).map(function(o){
+          return '<button class="ficha" onclick="rev2Escolher('+i+',\''+esc(o.v)+'\')">'+esc(o.rot)+'</button>'; }).join('')
+      +'<button class="ficha mic" onclick="rev2DitarDescritor('+i+')">🎙 falar</button>'
+      +'</div></div>';
+  });
+  var falta=medidasFaltando({corpo:b.texto});
+  falta.forEach(function(f){
+    h+='<div class="caixa ver">falta a medida: <b>'+esc(f.rotulo)+'</b>'
+      +(f.quantos>1?(' ('+f.quantos+' números)'):'')+' — dite agora ou digite no texto acima</div>';
+  });
+  return h;
+}
+function rev2AbrirOpcoes(i){
+  var d=document.getElementById('rv2po'+i); if(d) d.style.display=(d.style.display==='none')?'flex':'none';
+}
+/* o médico escolheu o descritor que faltava: entra no laudo e a conta refaz */
+function rev2Escolher(i, valor){
+  var ex=rev2Ex(); if(!ex) return;
+  var p=(ex.laudo.classifPendencias||[])[i]; if(!p) return;
+  ex.laudo._descritores=ex.laudo._descritores||{};
+  var chaveAchado=p.sistema+'|'+p.achado;
+  (ex.laudo._descritores[chaveAchado]=ex.laudo._descritores[chaveAchado]||{})[p.chave]=valor;
+  var rot=((p.opcoes||[]).filter(function(o){return o.v===valor;})[0]||{}).rot||valor;
+  log('Descritor preenchido em '+p.achado+': '+p.rotulo+' = '+rot+'. Toque "Regenerar laudo pela IA" para recalcular a categoria.');
+  var cx=document.getElementById('rv2p'+i);
+  if(cx){ cx.className='caixa ver'; cx.innerHTML=esc(p.rotulo+': '+rot+' — anotado. Regenere o laudo para recalcular a categoria.'); }
+}
+function rev2DitarDescritor(i){
+  var ex=rev2Ex(); if(!ex) return;
+  var p=(ex.laudo.classifPendencias||[])[i]; if(!p) return;
+  rev2Ouvir(function(txt){
+    var D=(CLASSIF[p.sistema].desc||[]).filter(function(x){ return x.k===p.chave; })[0];
+    var o=D?classifCasar(D, txt):null;
+    if(o) rev2Escolher(i, o.v);
+    else log('Não reconheci "'+txt+'" como '+p.rotulo+'. Toque numa das opções.', true);
+  });
+}
+function rev2Conflito(i, qual){
+  var ex=rev2Ex(); if(!ex) return;
+  var cf=(ex.laudo.classifConflitos||[])[i]; if(!cf) return;
+  var vale=(qual==='ditado')?cf.ditado:cf.calculado;
+  ex.laudo.conclusao=String(ex.laudo.conclusao||'')
+    .replace(new RegExp('('+cf.nome.replace('-','\\-')+'\\s*(?:US\\s*)?)[0-9][ABCabc]?', 'g'), '$1'+vale);
+  ex.laudo.classifConflitos.splice(i,1);
+  log('Classificação resolvida em '+cf.achado+': ficou '+cf.nome+' '+vale+' ('+qual+').');
+  rev2Render();
+}
+
+/* legenda -> leva até a ocorrência no texto */
+function rev2Ir(chave){
+  // 'conferente' aponta para o texto inteiro, não para um retângulo: em vez de rolar
+  // até um bloco qualquer (que era o que acontecia), leva ao painel do aviso.
+  if(chave==='conferente'){
+    // o aviso do conferente é sobre o texto INTEIRO, não sobre um retângulo: em vez de
+    // rolar para algum lugar, abre o que ele escreveu — que é o que o médico quer ler
+    var bt=document.querySelector('#rv2Legenda .lg[data-k="conferente"]');
+    var cx=document.getElementById('rv2ConfTxt');
+    if(bt && cx){ cx.style.display=(cx.style.display==='none'?'block':'none');
+                  if(cx.style.display==='block') cx.scrollIntoView({behavior:'smooth', block:'center'}); }
+    return;
+  }
+  var mapa={faltando:'falta', divergencia:'conflito', calculo:'conflito', iacriou:'ia'};
+  var alvo=mapa[chave]||null;
+  var el=alvo?document.querySelector('#rv2Blocos .bloco[data-est="'+alvo+'"]'):null;
+  if(!el) el=document.querySelector('#rv2Blocos .bloco:not([data-est="normal"])');
+  if(el){ el.scrollIntoView({behavior:'smooth', block:'center'});
+          el.style.outline='2px solid #0E6E6B'; setTimeout(function(){ el.style.outline=''; }, 1400); }
+}
+function rev2VerImagem(n){
+  var el=document.getElementById('rv2i'+n); if(!el) return;
+  Array.prototype.forEach.call(document.querySelectorAll('#rv2Imgs img'), function(x){ x.classList.remove('viva'); });
+  el.classList.add('viva');
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function rev2Tocar(ini, fim){
+  var ex=rev2Ex(); if(!ex) return;
+  var a=audios.filter(function(x){ return x.exameId===ex.id && x.url; })[0];
+  var el=document.getElementById('rv2Audio');
+  var cx=document.getElementById('rv2Tocador');
+  if(!a || !el){ if(cx) cx.textContent='o áudio deste exame não está disponível para tocar.'; return; }
+  if(el.src!==a.url) el.src=a.url;
+  el.currentTime=ini; el.play();
+  if(cx) cx.innerHTML='▶ trecho do ditado — <b>'+rev2Rel(ini)+'</b> · '+Math.max(1,Math.round(fim-ini))+' s';
+  clearTimeout(window.__rv2Par);
+  window.__rv2Par=setTimeout(function(){ try{ el.pause(); }catch(e){} }, Math.max(500,(fim-ini)*1000));
+}
+
+/* edição: o texto volta para o laudo com os ** de negrito preservados */
+function rev2ParaTexto(el){
+  var h=el.innerHTML
+    .replace(/<(b|strong)[^>]*>/gi,'**').replace(/<\/(b|strong)>/gi,'**')
+    .replace(/<br\s*\/?>/gi,'\n').replace(/<\/div>|<\/p>/gi,'\n')
+    .replace(/<[^>]+>/g,'');
+  var d=document.createElement('textarea'); d.innerHTML=h;
+  return d.value.replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
+}
+function rev2Editou(el){
+  var ex=rev2Ex(); if(!ex) return;
+  var i=parseInt(el.getAttribute('data-bloco'),10);
+  var blocos=rev2Blocos(ex.laudo), novo=rev2ParaTexto(el);
+  // o bloco da impressão. Repinta ANTES de sair: era o único bloco que não repintava,
+  // e logo a conclusão, que é um dos cinco assuntos que o conferente olha.
+  if(i===blocos.length){ ex.laudo.conclusao=novo; rev2Render(); return; }
+  var b=blocos[i]; if(!b) return;
+  var cab=(b.texto.match(/^\*\*[^*]{1,70}\*\*:?\s*/)||[''])[0];
+  blocos[i].texto=cab+novo;
+  ex.laudo.corpo=blocos.map(function(x){ return x.texto; }).join('\n\n');
+  // o texto mudou: a legenda tem de ser repintada AGORA, senão o médico assina
+  // vendo o "✓" de uma conferência que já não vale
+  rev2Render();
+}
+function rev2Fonte(px){
+  Array.prototype.forEach.call(document.querySelectorAll('#rv2Blocos .txt'), function(el){ el.style.fontSize=px+'px'; });
+}
+function rev2CopiarFmt(){
+  var s=window.getSelection();
+  if(_rev2Fmt===null){ _rev2Fmt=(s&&String(s).trim())?'copiado':null;
+    log(_rev2Fmt?'Formatação copiada — selecione o destino e toque de novo.':'Selecione primeiro o texto de origem.'); return; }
+  fmtCmd('removeFormat'); _rev2Fmt=null;
+}
+function rev2Fundo(k){ window.__fundo=k; try{ exLocalSalvar&&exLocalSalvar(k); }catch(e){} }
+function rev2TrocarModelo(k){
+  var ex=rev2Ex(); if(!ex) return;
+  ex.tipo=k; log('Modelo trocado para "'+((MODELOS[k]||{}).nome||k)+'". Toque "Regenerar laudo pela IA" para refazer o texto.');
+  rev2Render();
+}
+async function rev2Regerar(){
+  var ex=rev2Ex(); if(!ex) return;
+  var st=document.getElementById('rv2PedidoStatus'); if(st) st.textContent='regenerando o laudo…';
+  try{ await gerarLaudo(ex.id); rev2Render(); if(st) st.textContent='✅ laudo refeito.'; }
+  catch(e){ if(st) st.textContent='⚠️ falha: '+e.message; }
+}
+/* microfone: usa o agente para transcrever o que o médico falar */
+function rev2Ouvir(aoTerminar){
+  var b=document.getElementById('rv2Mic');
+  if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não grava áudio.', true); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+    var mr=new MediaRecorder(st), pedacos=[];
+    mr.ondataavailable=function(e){ pedacos.push(e.data); };
+    mr.onstop=async function(){
+      st.getTracks().forEach(function(t){ t.stop(); });
+      if(b) b.classList.remove('gravando');
+      try{
+        var blob=new Blob(pedacos), b64=await new Promise(function(res){
+          var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.readAsDataURL(blob); });
+        var r=await fetch(agenteBase()+'/transcrever',{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({audioBase64:b64})});
+        var j=await r.json();
+        if(j&&j.ok&&j.texto) aoTerminar(j.texto); else log('Não entendi o que foi dito.', true);
+      }catch(e){ log('Falha ao transcrever: '+e.message, true); }
+    };
+    if(b) b.classList.add('gravando');
+    mr.start();
+    window.__rv2Mr=mr;
+    setTimeout(function(){ try{ mr.state!=='inactive'&&mr.stop(); }catch(e){} }, 12000);
+  }).catch(function(){ log('Não consegui abrir o microfone.', true); });
+}
+function rev2PedidoVoz(){
+  if(window.__rv2Mr && window.__rv2Mr.state==='recording'){ try{ window.__rv2Mr.stop(); }catch(e){} return; }
+  rev2Ouvir(function(txt){
+    var t=document.getElementById('rv2Pedido'); if(t) t.value=(t.value?t.value+' ':'')+txt;
+  });
+}
+
+/* ---- os botões do rodapé ----
+   Reaproveitam os caminhos já testados: `abrirRevisao(id, true)` monta a folha do laudo
+   SEM trocar de tela, e aí as funções que já existem (salvar, liberar, imprimir, aprender)
+   trabalham como sempre trabalharam. */
+function rev2Preparar(){ try{ abrirRevisao(_rev2Id, true); }catch(e){} }
+async function rev2Aprovar(comImpressao){
+  var ex=rev2Ex(); if(!ex) return;
+  rev2Preparar();
+  try{ await salvarLaudoPasta(); }catch(e){ log('Falha ao salvar na pasta: '+e.message, true); }
+  if(comImpressao){ try{ window.print(); }catch(e){} }
+  ex._liberado=true;
+  try{ agendarSalvarSessao(); }catch(e){}
+  delete _rev2Fim[ex.id];
+  var prox=rev2Fila()[0];
+  if(prox) rev2Abrir(prox.id);
+  else { log('🎉 Todos os laudos revisados.'); rev2Voltar(); }
+}
+function rev2Depois(){
+  var ex=rev2Ex(); if(!ex) return;
+  _rev2Fim[ex.id]=1;                       // vai para o FIM da fila, não volta ao topo
+  var prox=rev2Fila().filter(function(x){ return x.id!==ex.id; })[0];
+  if(prox) rev2Abrir(prox.id);
+  else { log('Este é o único laudo pendente — ele continua aqui.'); rev2Render(); }
+}
+async function rev2SalvarApenas(){
+  rev2Preparar();
+  try{ await salvarLaudoPasta(); log('Laudo salvo (sem assinar).'); }
+  catch(e){ log('Falha ao salvar: '+e.message, true); }
+}
+function rev2Aprender(){ rev2Preparar(); try{ aprenderAgora(); }catch(e){ log('Falha: '+e.message, true); } }
 function diaRevisarPendentes(){
   var p=diaExamesDeHoje().filter(function(x){ return x.laudo && !x._liberado; });
   if(!p.length) return;

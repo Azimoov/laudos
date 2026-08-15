@@ -2939,7 +2939,17 @@ async function gerarLaudo(exId){
       alertas.push({tipo:'identificacao', texto:'Falta confirmar se o exame de '+(ant.pendentes[0].data||'sem data')+' é da mesma pessoa. O laudo saiu SEM comparação.'});
     }
     if(!usados.length && !ant.pendentes.length && histBuscaIncompleta()) alertas.push({tipo:'anterior', texto:'Busca incompleta ('+_histDiscoErro+'): procurei só na cópia do navegador, que é podada. Ligue o agente.'});
-    ex.laudo = {cab:resp.cabecalho||{}, corpo:resp.corpo||mod.corpo, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas,
+    /* 15/08/2026 — a referência da idade vai ESCRITA junto da medida, no corpo (pedido do
+       Dr. Daniel). Ver refEscreverNoCorpo, inclusive para o porquê de ser texto factual.
+       Falhar aqui não pode custar o laudo: se der erro, o corpo sai como veio. */
+    var _corpoFinal = resp.corpo||mod.corpo;
+    try{
+      var _anosRef = idadePrecisaAnos(ex.nascPac, ex.dataExame);
+      if(_anosRef==null) _anosRef = idadeEmAnos(ex.idadeExame);
+      if(_anosRef!=null)
+        _corpoFinal = refEscreverNoCorpo({corpo:_corpoFinal}, _anosRef, ex.sexoPac||'');
+    }catch(e){ log('Falha ao escrever a referência no corpo de '+ex.paciente+': '+e.message, true); }
+    ex.laudo = {cab:resp.cabecalho||{}, corpo:_corpoFinal, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas,
       // dado ESTRUTURADO para a tela de revisão desenhar os botões de descritor faltando
       // e a caixa âmbar de conflito, sem ter de reinterpretar o texto do aviso
       classifPendencias:_cls.pendencias, classifConflitos:_cls.conflitos,
@@ -6126,6 +6136,9 @@ const REF_MEDIDAS = {
        como saber disso — é uma das razões de o aviso pedir conferência em vez de concluir. */
     nome:'Fígado — lobo direito, longitudinal na linha hemiclavicular', unidade:'cm',
     fonte:'Manteghinejad A et al. Sonographic pediatric liver size standards based on generalized additive modeling in a diverse population. Pediatr Radiol 2026;56(6):1368-79 (acesso aberto, PMC13212396) — 4.611 exames, 0 a 18 anos, Children\'s Hospital of Philadelphia, método GAMLSS/BCPE. Faixa = P5 a P95. Sem divisão por sexo: os autores acharam 1-2 mm de diferença e a atribuem a sobreajuste.',
+    /* versão curta: é a que vai DENTRO do laudo, ao lado da medida. A `fonte` inteira
+       continua no aviso da tela, onde há espaço para ela. */
+    fonteCurta:'Manteghinejad, Pediatr Radiol 2026',
     // [idade máxima da faixa em anos, P5, P95]
     ped:[[0.25,4.9,7.9],[0.5,5.7,8.7],[0.75,6.4,9.3],[1,6.9,9.8],[1.5,7.5,10.4],
          [2,8.0,10.8],[3,8.3,11.3],[4,8.7,11.8],[5,9.0,12.2],[6,9.4,12.7],
@@ -6153,7 +6166,8 @@ const REF_MEDIDAS = {
            casos. Ou seja: o aviso aqui tem margem de erro do APARELHO embutida, além da
            do valor. Mais uma razão para o programa apontar e não concluir. */
     adulto:{min:null, max:16.0,
-            fonte:'16 cm na linha hemiclavicular — valor de uso corrente do Dr. Daniel (decisão dele, 15/08/2026). Origem: Sienz M, Ignee A, Dietrich CF. Referenzwerte in der Abdomensonographie - Leber und Lebergefasse. Z Gastroenterol 2010;48(9):1141-52, revisao sistematica que o propoe com a ressalva de nao estar suficientemente avaliado.'}
+            fonte:'16 cm na linha hemiclavicular — valor de uso corrente do Dr. Daniel (decisão dele, 15/08/2026). Origem: Sienz M, Ignee A, Dietrich CF. Referenzwerte in der Abdomensonographie - Leber und Lebergefasse. Z Gastroenterol 2010;48(9):1141-52, revisao sistematica que o propoe com a ressalva de nao estar suficientemente avaliado.',
+            fonteCurta:'Sienz, Z Gastroenterol 2010'}
   },
   baco: {
     /* 15/08/2026 — TABELA TROCADA, E A DIVISÃO POR SEXO SAIU.
@@ -6189,6 +6203,7 @@ const REF_MEDIDAS = {
        Custo assumido: perde-se sensibilidade em moças de 15 a 17 com baço de 12 a 13 cm. */
     nome:'Baço — maior eixo longitudinal', unidade:'cm',
     fonte:'Mohtasib RS et al. Sonographic measurements for spleen size in healthy Saudi children. Ann Saudi Med 2021;41(1):14-23 (acesso aberto) — 1.028 crianças, "limite superior sugerido" por faixa de idade, tabela lida no artigo. Dos 15 aos 18 anos: 13,0 cm, valor superior de Rosenberg (AJR 1991), onde o Mohtasib tem apenas 10 crianças. SEM divisão por sexo, seguindo a recomendação explícita dos próprios autores. Adulto: 13 cm, o valor que já está escrito nos modelos do médico.',
+    fonteCurta:'Mohtasib, Ann Saudi Med 2021',
     /* Faixas do artigo (Tabelas 3 e 4), convertidas para anos. Onde o limite se repete
        em faixas vizinhas, as linhas foram fundidas — os números são os do artigo. */
     /* ⚠️ os limites de faixa em meses são arredondados PARA CIMA de propósito:
@@ -6207,7 +6222,8 @@ const REF_MEDIDAS = {
          [12,null,11.0],      // 11 a 12 anos
          [15,null,12.0],      // 12 a 15 anos (o artigo dá 12,0 até 16; estendido até 15)
          [18,null,13.0]],     // 15 a 18 anos — NÃO é do Mohtasib, ver acima
-    adulto:{min:null, max:13.0, fonte:'modelo do médico: "(Normal até 13 cm)"'}
+    adulto:{min:null, max:13.0, fonte:'modelo do médico: "(Normal até 13 cm)"',
+            fonteCurta:'valor de referência do Dr. Daniel'}
   },
   rim: {
     /* 13/08/2026 — TROCADO. Antes era a fórmula de Rosenbaum (AJR 1984) com uma margem
@@ -6217,6 +6233,7 @@ const REF_MEDIDAS = {
        Agora nenhum número desta linha é meu. */
     nome:'Rim — maior eixo longitudinal', unidade:'cm',
     fonte:'Obrycki Ł et al. Kidney length normative values in children aged 0-19 years — a multicenter study. Pediatr Nephrol 2021;37(5):1075-85 (acesso aberto, CC BY 4.0) — 1.758 crianças. Faixa = percentil 2,5 a 97,5, por idade e sexo.',
+    fonteCurta:'Obrycki, Pediatr Nephrol 2021',
     // [idade máxima da faixa, P2,5, P97,5] — em cm
     pedSexo:{
       M:[[1,5.16,7.01],[2,5.63,7.56],[3,6.02,8.03],[4,6.37,8.46],[5,6.70,8.89],
@@ -6271,6 +6288,7 @@ const REF_MEDIDAS = {
     idadeMin:2,         // abaixo de 2 anos o estudo não cobre
     idadeMax:7,         // dos 8 em diante a idade não diz o estágio puberal
     fonte:'Salardi S, Orsini LF, Cacciari E, Bovicelli L, Tassoni P, Reggiani A. Pelvic ultrasonography in premenarcheal girls: relation to puberty and sex hormone concentrations. Arch Dis Child 1985;60(2):120-5 (acesso aberto, PMC1777113) — 55 meninas de 2 a 7 anos, faixa em que o estudo NÃO acha correlação do volume uterino com idade, peso, altura ou hormônio. Limite = média + 2 DP das seis faixas combinadas (2,04 + 2×1,15), derivado por mim das médias e desvios publicados; o artigo não publica percentis.',
+    fonteCurta:'Salardi, Arch Dis Child 1985',
     ped:[[7, null, 4.3]],
     adulto:null
   }
@@ -6351,7 +6369,8 @@ function refFaixa(orgao, anos, sexo){
   var R=REF_MEDIDAS[orgao]; if(!R || anos==null) return null;
   if(anos>=18){
     if(!R.adulto) return null;
-    return {min:R.adulto.min, max:R.adulto.max, fonte:R.adulto.fonte||R.fonte, adulto:true};
+    return {min:R.adulto.min, max:R.adulto.max, fonte:R.adulto.fonte||R.fonte,
+            fonteCurta:R.adulto.fonteCurta||R.fonteCurta||'', adulto:true};
   }
   /* Piso e teto de idade da tabela. Só o útero usa hoje: fora dos 2 aos 7 anos a idade
      não diz o estágio puberal, e comparar ali seria pior que calar. Sem isto, refLinha
@@ -6363,7 +6382,7 @@ function refFaixa(orgao, anos, sexo){
   var usaSexo = !!R.pedSexo && (R.sexoDesde==null || anos>=R.sexoDesde);
   if(usaSexo && R.pedSexo[s]){
     var l=refLinha(R.pedSexo[s], anos);
-    return {min:l[1], max:l[2], fonte:R.fonte};
+    return {min:l[1], max:l[2], fonte:R.fonte, fonteCurta:R.fonteCurta||''};
   }
   if(usaSexo){
     /* O sexo não veio na etiqueta do aparelho. Em vez de escolher um e fingir que sabe,
@@ -6375,11 +6394,11 @@ function refFaixa(orgao, anos, sexo){
     var maxs=[lm[2],lf[2]].filter(function(v){ return v!=null; });
     return {min:mins.length?Math.max.apply(null,mins):null,
             max:maxs.length?Math.min.apply(null,maxs):null,
-            fonte:R.fonte, semSexo:true};
+            fonte:R.fonte, fonteCurta:R.fonteCurta||'', semSexo:true};
   }
   if(!R.ped) return null;
   var l2=refLinha(R.ped, anos);
-  return {min:l2[1], max:l2[2], fonte:R.fonte};
+  return {min:l2[1], max:l2[2], fonte:R.fonte, fonteCurta:R.fonteCurta||''};
 }
 /* Quais órgãos a frase está descrevendo. Só nomes inequívocos: "rim direito" conta,
    "medida renal" conta, mas nada que dependa de adivinhar. */
@@ -6429,13 +6448,85 @@ function medidasDoLaudo(L){
         if(REF_APELIDOS[k].re.test(contexto)){ orgao=REF_APELIDOS[k].orgao; break; }
       }
       if(!orgao) continue;
+      /* nLinha/ini/fim: onde a medida está no texto. Existem para a referência poder ser
+         ESCRITA ao lado dela no corpo do laudo (refEscreverNoCorpo). Quem só quer saber
+         o valor ignora estes três e nada muda. */
       achados.push({orgao:orgao, valor:valor, eixos:eixos, secao:secao,
+                    nLinha:n, ini:m.index, fim:m.index+m[0].length,
                     trecho:faltaTrecho(linha, {i:m.index, f:m.index+m[0].length})});
     }
   }
   return achados;
 }
 /* O aviso. Calculado na hora, nunca guardado — o médico pode corrigir a medida. */
+/* A REFERÊNCIA ESCRITA DENTRO DO LAUDO (15/08/2026 — pedido do Dr. Daniel).
+   "Quando colocar uma situação de hepatomegalia, colocar no próprio corpo do laudo a
+   referência do tamanho esperado para a idade e a referência do estudo."
+
+   O QUE MUDA, e é uma mudança de princípio: até aqui o programa NUNCA escrevia no corpo.
+   A conferência de medida morria como aviso na tela, calculado na hora e nunca guardado.
+   Agora, quando uma medida está fora da faixa da idade, a faixa e a fonte passam a ficar
+   ESCRITAS ao lado dela, e vão junto no laudo assinado.
+
+   O PARA QUÊ: quem recebe o laudo não tem as tabelas. Dizer "fígado aumentado" sem dizer
+   o esperado obriga o outro médico a acreditar ou a ir procurar. Com a faixa e o estudo
+   ao lado, a conclusão fica conferível por quem lê.
+
+   ⚠️ O TEXTO É ESTRITAMENTE FACTUAL, e isso é deliberado. Ele diz a faixa e cita o
+   estudo — nunca "aumentado", "hepatomegalia" ou qualquer adjetivo. A conclusão continua
+   sendo do médico; o programa só documenta contra o que a medida foi comparada. Foi a
+   forma de atender ao pedido sem que o app passe a concluir. Há teste travando isso.
+
+   ⚠️ ESCRITO NA GERAÇÃO, ENTÃO NÃO SE ATUALIZA SOZINHO. Diferente dos avisos da tela,
+   isto é texto do laudo: se o médico editar a medida depois, a referência ao lado não
+   acompanha. É o preço de estar no documento em vez de na tela. Editou a medida, confira
+   a referência. */
+function refEscreverNoCorpo(L, anos, sexo){
+  var corpo=String((L&&L.corpo)||''); if(!corpo || anos==null) return corpo;
+  var linhas=corpo.split('\n'), nCorpo=linhas.length;
+  var pior={};
+  medidasDoLaudo(L).forEach(function(a){
+    if(a.nLinha>=nCorpo) return;              // veio da conclusão: não se escreve lá
+    var R=REF_MEDIDAS[a.orgao]; if(!R) return;
+    var f=refFaixa(a.orgao, anos, sexo); if(!f) return;
+    var medida=a.valor;
+    if(R.volume){
+      if(!a.eixos || a.eixos.length<3) return;
+      medida=Math.round(a.eixos[0]*a.eixos[1]*a.eixos[2]*0.5233*100)/100;
+    }
+    var alto=(f.max!=null && medida>f.max), baixo=(f.min!=null && medida<f.min);
+    if(!alto && !baixo) return;
+    // um por órgão, no valor mais extremo — a mesma regra do aviso da tela
+    var p=pior[a.orgao];
+    if(!p || (alto && medida>p.medida) || (!alto && medida<p.medida))
+      pior[a.orgao]={a:a, f:f, medida:medida, R:R};
+  });
+  var alvos=Object.keys(pior).map(function(k){ return pior[k]; });
+  if(!alvos.length) return corpo;
+  /* de trás para frente: inserir texto empurra tudo que vem depois, e os índices
+     guardados em `ini`/`fim` deixariam de valer */
+  alvos.sort(function(x,y){ return (y.a.nLinha-x.a.nLinha) || (y.a.fim-x.a.fim); });
+  /* número no padrão do laudo: vírgula decimal, e nunca "7" solto — vira "7,0" */
+  var vg=function(v){ var s=String(v); if(s.indexOf('.')<0) s+='.0'; return s.replace('.',','); };
+  var idadeTxt = anos<1 ? (Math.round(anos*12)+' meses') : (Math.round(anos)+' anos');
+  alvos.forEach(function(t){
+    var un=t.R.unidade||'cm', faixa;
+    if(t.f.min!=null && t.f.max!=null) faixa=vg(t.f.min)+' a '+vg(t.f.max)+' '+un;
+    else if(t.f.max!=null) faixa='até '+vg(t.f.max)+' '+un;
+    else faixa='a partir de '+vg(t.f.min)+' '+un;
+    var fonte=t.f.fonteCurta||t.R.fonteCurta||'';
+    var txt=' (referência para '+idadeTxt+': '+faixa+(fonte?' — '+fonte:'')+')';
+    var ln=linhas[t.a.nLinha];
+    /* NO FIM DA FRASE, não colado no número. "medindo 15,5 cm na linha hemiclavicular"
+       é uma frase só: enfiar a referência logo após o "15,5 cm" a parte no meio e
+       produz "medindo 15,5 cm (referência...) na linha hemiclavicular". Procura-se o
+       ponto final que fecha a frase da medida; sem ponto, vai para o fim da linha. */
+    var p=ln.indexOf('.', t.a.fim);
+    var corte=(p>=0) ? p : ln.length;
+    linhas[t.a.nLinha]=ln.slice(0,corte)+txt+ln.slice(corte);
+  });
+  return linhas.join('\n');
+}
 function alertasReferencia(L){
   if(!L) return [];
   var c=(L.cab)||{};

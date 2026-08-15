@@ -6090,15 +6090,49 @@ function classifAplicar(ex, resp, trans){
    tabela — é melhor não avisar do que avisar errado. */
 const REF_MEDIDAS = {
   figado: {
+    /* 15/08/2026 — CONFERIDA nos conectores de literatura, e MANTIDA. O que a checagem
+       achou, para não ser refeita à toa:
+       · Continua sendo a maior e a única a cobrir 0 a 18 anos inteiros. As anteriores
+         param aos 7, 12, 15 ou 16,7 anos, e várias têm 10 a 12 crianças em alguma faixa
+         (aqui o menor grupo tem 113). Método GAMLSS/BCPE, faixas com mínimo de 100 casos.
+       · ETNIA — a preocupação levantada por Waelti 2021 (fígado 1-2 cm maior em crianças
+         da Europa Central que em não-caucasianas) está respondida: este estudo é de
+         população DIVERSA e os próprios autores comparam com o Waelti, achando os
+         resultados compatíveis. Os valores daqui são os MAIORES da literatura, não os
+         menores — o risco seria usar tabela pequena numa criança grande, e não é o caso.
+       · SEXO — os autores fizeram tabelas separadas e acharam 1 a 2 mm de diferença na
+         mediana. A única faixa com 0,5 cm eles próprios atribuem a sobreajuste do modelo.
+         Por isso NÃO há divisão por sexo aqui, e não é esquecimento.
+       · VIÉS QUE OS AUTORES ADMITEM: os exames entraram como "ultrassom normal", laudados
+         por radiologistas que usavam as tabelas antigas. Isso pode ter cortado fígados
+         grandes e normais, e portanto SUBESTIMAR o limite. Ou seja, o P95 daqui erra para
+         o lado de avisar demais, não de calar.
+       ⚠️ VARIANTE ANATÔMICA: lobo de Riedel e "beaver tail" alongam a medida sem doença
+       nenhuma, e a tabela foi feita só com fígados de forma normal. O programa NÃO tem
+       como saber disso — é uma das razões de o aviso pedir conferência em vez de concluir. */
     nome:'Fígado — lobo direito, longitudinal na linha hemiclavicular', unidade:'cm',
-    fonte:'Manteghinejad A et al. Sonographic pediatric liver size standards. Pediatr Radiol 2026;56(6):1368-79 — 4.611 exames, 0 a 18 anos, Children\'s Hospital of Philadelphia. Faixa = P5 a P95.',
+    fonte:'Manteghinejad A et al. Sonographic pediatric liver size standards based on generalized additive modeling in a diverse population. Pediatr Radiol 2026;56(6):1368-79 (acesso aberto, PMC13212396) — 4.611 exames, 0 a 18 anos, Children\'s Hospital of Philadelphia, método GAMLSS/BCPE. Faixa = P5 a P95. Sem divisão por sexo: os autores acharam 1-2 mm de diferença e a atribuem a sobreajuste.',
     // [idade máxima da faixa em anos, P5, P95]
     ped:[[0.25,4.9,7.9],[0.5,5.7,8.7],[0.75,6.4,9.3],[1,6.9,9.8],[1.5,7.5,10.4],
          [2,8.0,10.8],[3,8.3,11.3],[4,8.7,11.8],[5,9.0,12.2],[6,9.4,12.7],
          [7,9.8,13.3],[8,9.8,13.4],[9,10.0,13.8],[10,10.3,14.4],[11,10.7,14.9],
          [12,11.1,15.5],[13,11.5,15.8],[14,11.9,16.1],[15,12.1,16.4],[16,12.1,16.8],
          [17,12.1,17.0],[18,12.3,17.2]],
-    adulto:null   // os modelos do médico não trazem referência de fígado no adulto
+    /* ADULTO: continua sem conferência, mas agora sabe-se POR QUÊ, e não por falta de ter
+       procurado (15/08/2026). O valor de uso corrente é 16 cm na linha hemiclavicular —
+       só que ele é frágil, e quem diz isso é a própria literatura:
+         · uma revisão sistemática dos estudos de medida de fígado em adultos concluiu que
+           NENHUM deles tinha rigor suficiente (tamanho de amostra, validade da medida,
+           confiabilidade, estatística), e que o corte de 16 cm pode não ter acurácia para
+           definir hepatomegalia;
+         · num estudo com 2.080 adultos, 11,5% dos saudáveis passavam de 16 cm;
+         · e neste próprio estudo, aos 17-18 anos o P95 já é 17,2 cm — 1,2 cm ACIMA do
+           corte de adulto. Um rapaz de 17 anos com 17,0 cm é normal e, no aniversário de
+           18, viraria "aumentado" sem nada ter mudado no fígado dele.
+       Programar 16 cm criaria esse degrau absurdo e chamaria de doente 1 em cada 9 adultos
+       saudáveis. Fica NULL até o Dr. Daniel dizer o valor que ele usa — e a decisão é
+       clínica, não minha. Enquanto for null, medida de fígado em adulto não gera aviso. */
+    adulto:null
   },
   baco: {
     /* 15/08/2026 — TABELA TROCADA, E A DIVISÃO POR SEXO SAIU.

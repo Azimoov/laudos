@@ -737,9 +737,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       </div>
       <p class="ab-nota">é para onde o laudo vai ao ser liberado — e o botão “Abrir na pasta” usa esta mesma pasta</p>
 
-      <div class="ab-eb">REGRAS DO DITADO — VALEM O DIA TODO</div>
+      <div class="ab-eb">REGRAS DO DIA — VALEM O DIA TODO</div>
       <div class="regras">
         <div class="regra"><span class="tag nao">NÃO</span>Não precisa dizer o nome do paciente — ele chega sozinho pelo aparelho</div>
+        <div class="regra"><span class="tag sim">SIM</span>No aparelho, cadastre <b>data de nascimento e sexo</b> junto com o nome — é o que deixa o laudo mais preciso: sem a data, o programa não sabe a idade e não confere medida nenhuma</div>
         <div class="regra"><span class="tag sim">SIM</span>Diga o tipo do exame ao começar (“iniciando transvaginal”) — no máximo, antes do próximo</div>
         <div class="regra"><span class="tag sim">SIM</span>Dite achados e medidas conforme encontra — ou resuma tudo ao final do exame</div>
         <div class="regra"><span class="tag dica">DICA</span>Errou? Diga “corrigindo:” e repita a frase certa</div>
@@ -5390,8 +5391,15 @@ async function capOrtProcessar(est){
     try{ imagens.push(await capOrtBaixar(est.instancias[i])); }catch(err){ log('Falha ao baixar imagem: '+err.message,true); }
   }
   if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
+  /* 15/08/2026 — nascPac e sexoPac PASSARAM A SER COPIADOS AQUI. O agente já os
+     entregava (tags DICOM PatientBirthDate e PatientSex), mas este caminho — o da
+     captura ao vivo, que é o do dia a dia — os jogava fora. Efeito prático: a conferência
+     de medidas do rim caía sempre no ramo "o sexo não veio na etiqueta do aparelho",
+     usava a faixa mais estreita e avisava que podia ser falso alarme — mesmo quando o
+     aparelho tinha mandado o sexo direitinho. O aviso culpava o aparelho por uma perda
+     que era daqui. */
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
@@ -5483,9 +5491,11 @@ async function capRecuperar(){
       if(!ex.imagens || !ex.imagens.length) ex.imagens=imagens;
       log('Recuperação: trazendo o ditado para o exame de '+(ex.paciente||'?')+' que já estava na lista.');
     }else{
+      // 15/08/2026: nascimento e sexo também aqui — ver o comentário no outro caminho da
+      // captura. Recuperar um exame não pode devolvê-lo com menos cadastro do que ele tinha.
       ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
           tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
-          idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
+          idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
       ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
       ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
       exames.push(ex);

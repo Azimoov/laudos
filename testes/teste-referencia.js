@@ -212,6 +212,31 @@ ok(medidasDoLaudo({ corpo: '**Figado**\nLobo direito mede 14,2 cm.' })[0].orgao 
 ok(medidasDoLaudo({ corpo: 'Medida renal em seu maior eixo 9,0 cm.' })[0].orgao === 'rim',
    'e "medida renal" tambem, mesmo sem titulo');
 
+console.log('=== o cadastro do APARELHO chega inteiro ao laudo (15/08) ===');
+// Tudo nesta secao existe por causa de uma cadeia so: o medico digita a data de
+// nascimento no aparelho -> o agente calcula a idade a partir dela (_idade) -> o app
+// guarda em idadeExame/sexoPac -> alertasReferencia compara as medidas. Se qualquer elo
+// se perder, o programa fica MUDO e ninguem percebe, porque calar nao da erro.
+const capturas = HTML.match(/_captura:true/g) || [];
+ok(capturas.length >= 2, 'ha pelo menos dois caminhos de captura ao vivo');
+ok((HTML.match(/sexoPac:est\.sexo/g) || []).length >= 2,
+   'e OS DOIS copiam o sexo que o aparelho mandou — antes de 15/08 jogavam fora');
+ok((HTML.match(/nascPac:est\.nascimento/g) || []).length >= 2,
+   'e os dois copiam a data de nascimento tambem');
+// o efeito de nao copiar era um aviso que culpava o aparelho por uma perda do app
+ok(/sexo n[ãa]o veio na etiqueta/.test(HTML),
+   'o aviso de "sexo nao veio" continua existindo, para quando o aparelho REALMENTE nao mandar');
+
+console.log('=== a tela do dia orienta a preencher nascimento e sexo ===');
+const regras = (HTML.match(/<div class="regras">[\s\S]*?<\/div>\s*<\/div>/) || [''])[0];
+ok(/data de nascimento e sexo/i.test(regras),
+   'a regra pede data de nascimento E sexo, nao so o nome');
+ok(/aparelho/i.test(regras), 'e diz ONDE preencher: no aparelho');
+ok(/preciso|precis[ãa]o/i.test(regras),
+   'e explica o ganho: o laudo sai mais preciso');
+ok(/n[ãa]o sabe a idade|nao confere/i.test(regras),
+   'e diz o custo de nao preencher, que e o programa ficar mudo');
+
 console.log('=== exame normal nao vira alarme ===');
 const normal = { idadePac: '008Y', cab: {}, corpo:
   '**Figado** com dimensoes normais.\nLobo direito mede 11,5 cm.\n\n'

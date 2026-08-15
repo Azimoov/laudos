@@ -29,14 +29,15 @@ const src = [
   (HTML.match(/const REF_MEDIDAS = \{[\s\S]*?\n\};/) || [])[0],
   (HTML.match(/const REF_APELIDOS = \[[\s\S]*?\n\];/) || [])[0],
   (HTML.match(/const FALTA = \{[\s\S]*?\n\};/) || [])[0],
-  grab('idadeEmAnos'), grab('refLinha'), grab('refFaixa'), grab('faltaTitulo'), grab('faltaTrecho'),
+  grab('idadeEmAnos'), grab('idadePrecisaAnos'), grab('refLinha'), grab('refFaixa'),
+  grab('faltaTitulo'), grab('faltaTrecho'),
   grab('medidasDoLaudo'), grab('alertasReferencia'), grab('alertaTipoValido'),
   (HTML.match(/const ALERTAS = \[[\s\S]*?\n\];/) || [])[0]
 ].join('\n');
-const A = new Function(src + '\nreturn {REF_MEDIDAS, idadeEmAnos, refFaixa, medidasDoLaudo,'
-  + ' alertasReferencia, alertaTipoValido, ALERTAS};')();
-const { REF_MEDIDAS, idadeEmAnos, refFaixa, medidasDoLaudo, alertasReferencia,
-        alertaTipoValido, ALERTAS } = A;
+const A = new Function(src + '\nreturn {REF_MEDIDAS, idadeEmAnos, idadePrecisaAnos, refFaixa,'
+  + ' medidasDoLaudo, alertasReferencia, alertaTipoValido, ALERTAS};')();
+const { REF_MEDIDAS, idadeEmAnos, idadePrecisaAnos, refFaixa, medidasDoLaudo,
+        alertasReferencia, alertaTipoValido, ALERTAS } = A;
 
 const so = a => (a.length ? a[0].texto : '(nenhum aviso)');
 
@@ -211,6 +212,40 @@ ok(medidasDoLaudo({ corpo: '**Figado**\nLobo direito mede 14,2 cm.' })[0].orgao 
    'mas "lobo direito" sob o titulo Figado e reconhecido');
 ok(medidasDoLaudo({ corpo: 'Medida renal em seu maior eixo 9,0 cm.' })[0].orgao === 'rim',
    'e "medida renal" tambem, mesmo sem titulo');
+
+console.log('=== BEBES: a idade sai da DATA DE NASCIMENTO, nao do inteiro do agente ===');
+// O agente calcula idade em anos INTEIROS: bebe de 11 meses chega como "0". E a faixa de
+// 0 anos e a do RECEM-NASCIDO, a mais estreita de todas. Resultado: alarme falso em todo
+// bebe do primeiro ano, justo onde os orgaos crescem mais depressa.
+// Com as duas datas do aparelho, a idade sai com casas decimais.
+const bebe11m = { idadePac: '0', nascPac: '20250915', dataExame: '15/08/2026', cab: {},
+  corpo: '**Figado**\nLobo direito mede 9,0 cm.' };
+ok(alertasReferencia(bebe11m).length === 0,
+   'bebe de 11 meses com figado de 9,0 cm: NORMAL (faixa 9-12m e 6,9-9,8)');
+// e a prova de que sem o conserto seria alarme falso: o MESMO laudo sem data de nascimento
+const bebe11mSemData = { idadePac: '0', cab: {}, corpo: '**Figado**\nLobo direito mede 9,0 cm.' };
+ok(alertasReferencia(bebe11mSemData).length === 1,
+   'o MESMO figado, sem data de nascimento, cai na faixa de recem-nascido e vira aviso');
+// a idade aparece certa no texto do aviso
+const bebeGrande = { idadePac: '0', nascPac: '20250915', dataExame: '15/08/2026', cab: {},
+  corpo: '**Figado**\nLobo direito mede 12,0 cm.' };
+ok(/11 meses/.test(so(alertasReferencia(bebeGrande))),
+   'e o aviso diz "11 meses", nao "0 meses"');
+// a funcao em si
+ok(Math.abs(idadePrecisaAnos('20250915', '15/08/2026') - 0.914) < 0.01, '11 meses = 0,91 anos');
+ok(Math.abs(idadePrecisaAnos('19860310', '15/08/2026') - 40.4) < 0.1, 'adulto de 40 anos');
+// so aceita o que da para confiar — no resto, deixa o caminho antigo agir
+ok(idadePrecisaAnos('', '15/08/2026') === null, 'sem nascimento: null');
+ok(idadePrecisaAnos('2025091', '15/08/2026') === null, 'nascimento truncado: null');
+ok(idadePrecisaAnos('20250230', '15/08/2026') === null,
+   '30 de fevereiro nao existe: null, em vez de o Date "consertar" para 02/03');
+ok(idadePrecisaAnos('20991231', '15/08/2026') === null, 'nascimento no futuro: null');
+ok(idadePrecisaAnos('18000101', '15/08/2026') === null, 'idade impossivel: null');
+ok(idadePrecisaAnos('20250915', 'bagunca') !== null,
+   'data de exame ilegivel nao invalida: cai para hoje, que e quando o exame e feito');
+// nao pode ter estragado o caminho de quem ja funcionava
+ok(alertasReferencia({ idadePac: '010Y', cab: {}, corpo: '**Baco** medindo 9,0 cm.' }).length === 0,
+   'crianca de 10 anos sem data de nascimento continua sendo conferida pelo caminho antigo');
 
 console.log('=== o cadastro do APARELHO chega inteiro ao laudo (15/08) ===');
 // Tudo nesta secao existe por causa de uma cadeia so: o medico digita a data de

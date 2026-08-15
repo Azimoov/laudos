@@ -2949,7 +2949,11 @@ async function gerarLaudo(exId){
       // idade e sexo do APARELHO, para a conferência de medidas por idade (REF_MEDIDAS).
       // Ficam no laudo, e não só no exame, para o aviso continuar valendo quando o
       // laudo for reaberto do histórico.
-      idadePac:ex.idadeExame||'', sexoPac:ex.sexoPac||''};
+      // 15/08/2026: a DATA DE NASCIMENTO e a data do exame entram junto. `idadePac` vem
+      // do agente em anos INTEIROS — um bebê de 11 meses chega como "0" —, e com as duas
+      // datas dá para calcular a idade de verdade. Ver idadePrecisaAnos.
+      idadePac:ex.idadeExame||'', sexoPac:ex.sexoPac||'',
+      nascPac:ex.nascPac||'', dataExame:ex.dataExame||''};
     // SEGUNDA LEITURA, por quem não escreveu o laudo e não viu as imagens (conferirLaudo).
     // Roda com o texto JÁ MONTADO — inclusive com as linhas de classificação que o app
     // acabou de inserir —, porque é o documento inteiro que precisa fechar em si mesmo.
@@ -6301,6 +6305,41 @@ function idadeEmAnos(txt){
   m=s.match(/^(\d{1,3})(?:[.,](\d+))?$/);       if(m) return parseFloat(m[0].replace(',','.'));
   return null;
 }
+/* A IDADE DE VERDADE, em anos com casas decimais, calculada das duas datas do aparelho.
+   15/08/2026 — existe por causa dos BEBÊS, e o problema era silencioso:
+
+   O agente calcula a idade em anos INTEIROS (função _idade). Um bebê de 11 meses chega
+   como "0". E a faixa de 0 anos, nas tabelas, é a do RECÉM-NASCIDO — a mais estreita de
+   todas. Um fígado de 9,0 cm aos 11 meses é normal (faixa 6,9–9,8), mas era comparado
+   com a faixa de 0 a 3 meses (4,9–7,9) e virava ALARME FALSO. Justamente no primeiro ano,
+   quando os órgãos crescem mais depressa e as faixas são mais finas — de 4,9 a 9,8 cm
+   só no fígado, num intervalo em que a idade "0" não distingue nada.
+
+   Entra AQUI e não no agente de propósito: o `asr.py` e o agente são compartilhados com a
+   versão estável, e mudar o formato de `idade` mexeria no cabeçalho do laudo e no banco.
+   Aqui é local, e só melhora quando as duas datas existem.
+
+   nascimento: AAAAMMDD (tag DICOM crua) · dataExame: DD/MM/AAAA (como o agente entrega)
+   Devolve null quando não dá para confiar — e aí vale o caminho antigo. */
+function idadePrecisaAnos(nascDicom, dataBr){
+  var n=String(nascDicom||'').replace(/\D/g,'');
+  if(n.length!==8) return null;
+  var ano=+n.slice(0,4), mes=+n.slice(4,6), dia=+n.slice(6,8);
+  if(!(ano>=1900 && ano<=2100 && mes>=1 && mes<=12 && dia>=1 && dia<=31)) return null;
+  var nas=new Date(ano, mes-1, dia);
+  // o Date "conserta" 31/02 virando 03/03: se os campos não voltarem iguais, a data era falsa
+  if(nas.getFullYear()!==ano || nas.getMonth()!==mes-1 || nas.getDate()!==dia) return null;
+  var ref=null, m=String(dataBr||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m){
+    ref=new Date(+m[3], +m[2]-1, +m[1]);
+    if(ref.getFullYear()!==+m[3] || ref.getMonth()!==+m[2]-1 || ref.getDate()!==+m[1]) ref=null;
+  }
+  if(!ref) ref=new Date();          // sem data do exame, hoje — o exame é do dia
+  var dias=(ref-nas)/86400000;
+  // nascimento no futuro, ou idade impossível: melhor calar e deixar o caminho antigo agir
+  if(!(dias>=0 && dias<130*365.25)) return null;
+  return dias/365.25;
+}
 /* a linha da tabela que cobre aquela idade */
 function refLinha(tab, anos){
   for(var i=0;i<tab.length;i++){ if(anos<=tab[i][0]) return tab[i]; }
@@ -6403,7 +6442,11 @@ function alertasReferencia(L){
   // A idade vem do APARELHO (tag DICOM), guardada no laudo na geração. A que a IA leu
   // do cabeçalho da imagem é a segunda opção: ela pode ter lido errado, e aqui um erro
   // de idade viraria aviso errado sobre o tamanho de um órgão.
-  var anos=idadeEmAnos(L.idadePac);
+  /* 15/08/2026: a DATA DE NASCIMENTO vem primeiro. Ela dá a idade com casas decimais;
+     `idadePac` vem do agente em anos inteiros e joga todo bebê de menos de 1 ano no
+     mesmo balaio do recém-nascido. Sem as duas datas, cai no caminho de sempre. */
+  var anos=idadePrecisaAnos(L.nascPac, L.dataExame);
+  if(anos==null) anos=idadeEmAnos(L.idadePac);
   if(anos==null) anos=idadeEmAnos(c.idade);
   if(anos==null) return [];
   var sexo=L.sexoPac||'';

@@ -724,7 +724,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         </button>
         <button class="opt modo" data-modo="arquivo" onclick="exEscolherModo('arquivo')">
           <span class="t">Arquivar para liberar depois</span>
-          <span class="s">tudo fica guardado — libere em lote em “Liberar laudos”</span>
+          <!-- 15/08/2026: dizia "libere em lote", e lote NÃO existe — cada laudo é revisado
+               e assinado um por um. Prometer na tela o que o programa não faz é pior que
+               não prometer nada: o médico organiza o dia contando com isso. -->
+          <span class="s">tudo fica guardado — revise e assine depois em “Liberar laudos”, um de cada vez</span>
         </button>
       </div>
       <p class="ab-nota">a escolha vale para o dia inteiro e pode ser trocada a qualquer momento</p>
@@ -8345,7 +8348,7 @@ function exTelaOcupada(){
 /* Decide o que fazer quando um laudo fica pronto, conforme a escolha do dia. */
 function exLaudoPronto(exId, nomePac){
   var m=exModo();
-  if(m==='arquivo'){ log('Laudo de '+(nomePac||'')+' arquivado — libere em lote em “Liberar laudos”.'); return; }
+  if(m==='arquivo'){ log('Laudo de '+(nomePac||'')+' arquivado — revise e assine em “Liberar laudos”.'); return; }
   if(m==='lista'){ log('✅ Laudo de '+(nomePac||'')+' pronto — está na lista de revisão.'); try{ micSom(); }catch(e){} return; }
   if(exTelaOcupada()){
     log('✅ Laudo de '+(nomePac||'')+' pronto — entrou na fila. O da tela continua até você liberar.');

@@ -87,13 +87,29 @@ async function rodarNaPagina(cdp, expr) {
   const r = await cdp.enviar('Runtime.evaluate', {
     expression: expr, awaitPromise: true, returnByValue: true,
   });
-  if (r.result && r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.text);
+  // 15/08: a mensagem era so "Uncaught", que nao diz nada. O detalhe (mensagem, linha e
+  // pilha) vem em exception.description — sem ele, achar o erro vira adivinhacao.
+  const ex = r.result && r.result.exceptionDetails;
+  if (ex) {
+    const det = (ex.exception && (ex.exception.description || ex.exception.value)) || ex.text;
+    const onde = ex.lineNumber != null ? (' [linha ' + (ex.lineNumber + 1) + ']') : '';
+    throw new Error(String(det) + onde);
+  }
   const res = r.result && r.result.result;
-  if (r.result && r.result.exceptionDetails) throw new Error('erro na pagina');
   return res && res.value;
 }
 
 // ---- as verificacoes, escritas para rodar DENTRO da pagina ----
+//
+// ⚠️⚠️ ARMADILHA DAS CRASES — ja mordeu DUAS vezes em 15/08/2026. LEIA ANTES DE ESCREVER.
+// Tudo daqui para baixo vive dentro de uma template string. A barra invertida e consumida
+// por ela ANTES de o codigo chegar ao navegador:
+//     escrito aqui        vira na pagina        resultado
+//     /\w+/               /w+/                  regex que nao casa nada — passa VAZIO
+//     /\n/g               / <quebra real> /g    SyntaxError: invalid regular expression
+// Em regex, DOBRE a barra: escreva  /\\w+/  e  /\\s+/  para obter  /\w+/  e  /\s+/.
+// O primeiro caso e o pior: nao quebra, so faz o teste passar sem testar nada.
+// Na duvida, prefira metodos sem regex (indexOf, split, querySelector, cssRules).
 const VERIFICACOES = `(async () => {
   const R = [];
   const diz = (nome, cond, visto) => R.push({ nome, ok: !!cond, visto: visto === undefined ? '' : String(visto) });
@@ -367,6 +383,17 @@ const VERIFICACOES = `(async () => {
     telaVisivel() === 'telaDia', 'ficou em: ' + telaVisivel());
   try { diaFechar(); } catch (e) {}   // nao deixa laco rodando depois do teste
   exames = examesAntes;
+
+  // A TELA NAO PODE PROMETER O QUE O PROGRAMA NAO FAZ (2026-08-15). O modo "Arquivar para
+  // liberar depois" dizia "libere em lote", e lote nao existe: cada laudo e revisado e
+  // assinado um por um. O medico organiza o dia contando com o que a tela promete.
+  // Se um dia o lote for construido de verdade, este teste cai junto — de proposito.
+  const btArquivo = document.querySelector('#telaExames .opt.modo[data-modo="arquivo"]');
+  diz('o modo "arquivar para depois" existe na tela', !!btArquivo);
+  const txtArquivo = btArquivo ? btArquivo.innerText : '';
+  diz('e NAO promete liberar em lote, que o programa nao faz',
+    txtArquivo.toLowerCase().indexOf('lote') < 0, txtArquivo.replace(/\\s+/g, ' ').trim());
+  diz('mas diz para onde ir depois', txtArquivo.indexOf('Liberar laudos') >= 0);
 
   return R;
 })()`;

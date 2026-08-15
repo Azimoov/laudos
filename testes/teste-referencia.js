@@ -155,6 +155,47 @@ ok(!/Rosenbaum/.test(JSON.stringify(REF_MEDIDAS.rim)), 'a fonte antiga saiu');
 ok(/CC BY 4\.0|acesso aberto/.test(REF_MEDIDAS.rim.fonte), 'e a nova diz que e de acesso aberto');
 ok(!REF_MEDIDAS.rim.formula, 'nao ha mais formula com margem inventada');
 
+console.log('=== UTERO (Salardi 1985) — por VOLUME, e so dos 2 aos 7 anos ===');
+// O unico orgao comparado por volume, e o unico com teto de idade. Dos 8 anos em diante
+// quem manda e a puberdade, e o exame nao traz estagio puberal nem tempo de menarca.
+const ut = (idade, txt) => alertasReferencia({ idadePac: idade, cab: {},
+  corpo: '**Utero** de contornos regulares, medindo ' + txt + '.' });
+// 3,0 x 1,5 x 1,0 x 0,5233 = 2,36 cm3 -> dentro (limite 4,3)
+ok(ut('004Y', '3,0 x 1,5 x 1,0 cm').length === 0, 'utero de 2,36 cm3 aos 4 anos: normal');
+// 4,0 x 2,5 x 2,0 x 0,5233 = 10,47 cm3 -> acima
+ok(ut('004Y', '4,0 x 2,5 x 2,0 cm').length === 1, 'utero de 10,47 cm3 aos 4 anos: acima');
+ok(/cm3|cm³/.test(so(ut('004Y', '4,0 x 2,5 x 2,0 cm'))), 'e o aviso fala em cm3, nao em cm');
+// a fronteira do limite
+ok(ut('004Y', '3,0 x 2,0 x 1,3 cm').length === 0, '4,08 cm3 passa raspando');
+ok(ut('004Y', '3,5 x 2,0 x 1,2 cm').length === 1, 'e 4,40 cm3 ja e acima');
+// O TETO DE IDADE: o mesmo utero enorme nao gera aviso fora da janela
+ok(ut('010Y', '4,0 x 2,5 x 2,0 cm').length === 0,
+   'aos 10 anos o MESMO utero nao gera aviso: a idade nao diz o estagio puberal');
+ok(ut('016Y', '4,0 x 2,5 x 2,0 cm').length === 0, 'idem aos 16 anos');
+ok(ut('030Y', '4,0 x 2,5 x 2,0 cm').length === 0, 'idem na adulta — nao ha tabela de adulto');
+ok(ut('001Y', '4,0 x 2,5 x 2,0 cm').length === 0,
+   'e abaixo de 2 anos tambem cala: o estudo comeca aos 2');
+// SEM OS TRES EIXOS NAO HA VOLUME: cala, em vez de comparar grandeza errada
+ok(ut('004Y', '3,0 cm').length === 0,
+   'utero com UMA medida so nao e comparado: comprimento nao se compara com tabela de volume');
+ok(ut('004Y', '3,0 x 2,0 cm').length === 0, 'com dois eixos idem');
+// O PARA-CHOQUE DO OVARIO: medida de ovario na mesma linha que cita utero nao pode
+// ser comparada com a tabela do utero
+const ovNaLinha = alertasReferencia({ idadePac: '004Y', cab: {},
+  corpo: '**Utero** anteversofletido. Ovario direito medindo 4,0 x 2,5 x 2,0 cm.' });
+ok(ovNaLinha.length === 0, 'medida de OVARIO na linha do utero nao vira aviso de utero');
+ok(!REF_MEDIDAS.ovario, 'e o ovario nao tem tabela: n=4 em uma das faixas, daria inversao');
+// a procedencia, e a honestidade sobre o limite ser calculado
+ok(/Salardi/.test(REF_MEDIDAS.utero.fonte), 'a fonte do utero esta registrada');
+ok(/m[ée]dia \+ 2 DP|media \+ 2 DP/.test(REF_MEDIDAS.utero.fonte),
+   'e a fonte diz que o limite foi DERIVADO, nao publicado');
+ok(REF_MEDIDAS.utero.volume === true, 'o utero esta marcado como tabela de volume');
+ok(REF_MEDIDAS.utero.idadeMin === 2 && REF_MEDIDAS.utero.idadeMax === 7,
+   'com piso e teto de idade explicitos');
+// os outros orgaos NAO mudaram de grandeza
+ok(!REF_MEDIDAS.figado.volume && !REF_MEDIDAS.baco.volume && !REF_MEDIDAS.rim.volume,
+   'figado, baco e rim continuam sendo comparados pelo maior eixo');
+
 console.log('=== milimetro tambem e lido, e convertido ===');
 const mm = alertasReferencia({ idadePac: '002Y', cab: {},
   corpo: '**Baco** medindo 95 mm.' });

@@ -6218,7 +6218,55 @@ const REF_MEDIDAS = {
     // lado de avisar, e o aviso diz que o sexo não veio — falso alarme custa uma
     // conferida; deixar passar não ajuda ninguém.
     adulto:null   // o estudo vai só até 19 anos; para adulto não há referência aqui
+  },
+  utero: {
+    /* 15/08/2026 — O PRIMEIRO ÓRGÃO COMPARADO POR VOLUME, e o único com teto de idade.
+       Leia antes de mexer, porque quase tudo aqui é diferente dos outros três.
+
+       POR QUE SÓ DOS 2 AOS 7 ANOS. Útero e ovário crescem com HORMÔNIO, não com o
+       calendário — os valores publicados vêm por estágio puberal (Tanner), e o aparelho
+       manda a idade, não o estágio. Só existe uma janela em que a idade basta:
+         · Salardi 1985 (Arch Dis Child, n=114) mediu 55 meninas de 2 a 7 anos e NÃO
+           achou correlação nenhuma do volume uterino com idade, idade óssea, peso,
+           altura ou qualquer hormônio (Tabela 3, tudo "NS"). Textualmente: "não há
+           diferenças no volume uterino médio dos 2 aos 7 anos".
+         · Orsini 1984 (Radiology, n=114), do mesmo grupo, conclui igual.
+       Por isso aqui NÃO há tabela por idade: um valor único cobre a faixa inteira.
+
+       POR QUE CALA DOS 8 ANOS EM DIANTE. A partir dos 7 o útero cresce, e o que manda é
+       a puberdade. Pior: Holm 1995 (n=166) mostrou que DEPOIS da menarca o crescimento
+       é função dos ANOS DESDE A MENARCA — não de idade, peso nem altura — e Gilligan
+       2019 (n=889) mostrou que o volume ainda varia com a SEMANA DO CICLO. Nada disso
+       chega no exame. O vão começa aos 8 e não fecha mais: por isso `idadeMax`.
+
+       ⚠️ O LIMITE DE 4,3 É CÁLCULO MEU, não um número publicado.
+       O artigo publica média e desvio-padrão por ano, não percentis. Combinei as seis
+       faixas de 2 a 7 anos (n=55) — o que o próprio artigo autoriza, já que não há
+       diferença entre elas — e apliquei média + 2 DP, que é a forma padrão de derivar
+       limite superior de normalidade:
+         média ponderada = 2,04 cm³ · DP combinado = 1,15 cm³ · 2,04 + 2×1,15 = 4,34
+       Médias do artigo por ano: 1,98 · 1,64 · 2,10 · 2,36 · 1,80 · 2,32.
+
+       ⚠️ A LITERATURA NÃO É CONSENSUAL AQUI. Haber 1995 relata controles normais até 7
+       anos com 0,9 ± 0,3 ml — menos da metade do Salardi — e propõe 1,8 ml como corte
+       para puberdade precoce. Pelo Salardi, esse corte acusaria mais da metade das
+       meninas normais. NÃO se misturam as duas fontes. Se um dia este aviso incomodar,
+       é aqui que está a discussão. */
+    nome:'Útero — volume (L × AP × T × 0,5233)', unidade:'cm³',
+    volume:true,        // compara VOLUME, não o maior eixo: precisa dos três eixos
+    idadeMin:2,         // abaixo de 2 anos o estudo não cobre
+    idadeMax:7,         // dos 8 em diante a idade não diz o estágio puberal
+    fonte:'Salardi S, Orsini LF, Cacciari E, Bovicelli L, Tassoni P, Reggiani A. Pelvic ultrasonography in premenarcheal girls: relation to puberty and sex hormone concentrations. Arch Dis Child 1985;60(2):120-5 (acesso aberto, PMC1777113) — 55 meninas de 2 a 7 anos, faixa em que o estudo NÃO acha correlação do volume uterino com idade, peso, altura ou hormônio. Limite = média + 2 DP das seis faixas combinadas (2,04 + 2×1,15), derivado por mim das médias e desvios publicados; o artigo não publica percentis.',
+    ped:[[7, null, 4.3]],
+    adulto:null
   }
+  /* OVÁRIO: reconhecido em REF_APELIDOS, mas SEM tabela, de propósito.
+     O Salardi publica volume ovariano por ano (0,75 · 0,66 · 0,82 · 0,86 · 1,19 · 1,26
+     dos 2 aos 7 anos), mas ali o ovário JÁ CRESCE com a idade (Tabela 5: r=0,495,
+     P<0,001) — ao contrário do útero. Precisaria de tabela por ano, e as faixas têm de
+     4 a 15 crianças. Com n=4 aos 5 anos o desvio saiu 0,03, e "média + 2 DP" daria
+     limite MENOR aos 5 anos (0,92) do que aos 4 (1,54) — uma inversão que geraria alarme
+     falso em criança normal. Tabela pequena demais para virar aviso. */
   /* NÃO ENTRARAM, e é melhor assim:
      · tireoide — a referência da OMS depende da superfície corporal (peso e altura),
        que o exame não traz. Uma tabela só por idade daria aviso errado.
@@ -6256,6 +6304,11 @@ function refFaixa(orgao, anos, sexo){
     if(!R.adulto) return null;
     return {min:R.adulto.min, max:R.adulto.max, fonte:R.adulto.fonte||R.fonte, adulto:true};
   }
+  /* Piso e teto de idade da tabela. Só o útero usa hoje: fora dos 2 aos 7 anos a idade
+     não diz o estágio puberal, e comparar ali seria pior que calar. Sem isto, refLinha
+     devolveria a última linha da tabela para QUALQUER idade acima do teto. */
+  if(R.idadeMin!=null && anos<R.idadeMin) return null;
+  if(R.idadeMax!=null && anos>R.idadeMax) return null;
   var s=String(sexo||'').toUpperCase().charAt(0);
   // o rim depende do sexo em TODA idade; o baço só a partir dos 15 (sexoDesde)
   var usaSexo = !!R.pedSexo && (R.sexoDesde==null || anos>=R.sexoDesde);
@@ -6282,9 +6335,17 @@ function refFaixa(orgao, anos, sexo){
 /* Quais órgãos a frase está descrevendo. Só nomes inequívocos: "rim direito" conta,
    "medida renal" conta, mas nada que dependa de adivinhar. */
 const REF_APELIDOS = [
+  /* ⚠️ O OVÁRIO VEM PRIMEIRO DE PROPÓSITO, e NÃO tem tabela (ver REF_MEDIDAS).
+     Ele existe aqui só para funcionar como para-choque: numa linha como
+     "Útero anteversofletido. Ovário direito medindo 2,0 x 1,0 x 1,0 cm", o contexto
+     que o programa lê contém a palavra "útero", e a medida do OVÁRIO seria comparada
+     com a tabela do ÚTERO. Casando ovário primeiro, a medida é reconhecida e
+     descartada — cala em vez de comparar a coisa errada. */
+  {orgao:'ovario', re:/\b(ov[áa]ri|anexo|anexial)/i},
   {orgao:'figado', re:/\b(f[íi]gado|lobo\s+direito|hep[áa]tic)/i},
   {orgao:'baco',   re:/\b(ba[çc]o|espl[êe]nic)/i},
-  {orgao:'rim',    re:/\b(rim|renal|rins)\b/i}
+  {orgao:'rim',    re:/\b(rim|renal|rins)\b/i},
+  {orgao:'utero',  re:/\b([úu]tero|uterin)/i}
 ];
 /* Acha as medidas JÁ PREENCHIDAS no laudo: o mesmo caminho do F2e, mas procurando
    número onde o F2e procura pontilhado. */
@@ -6303,10 +6364,14 @@ function medidasDoLaudo(L){
     var re=/(\d{1,3}(?:[.,]\d{1,2})?(?:\s*[x×]\s*\d{1,3}(?:[.,]\d{1,2})?)*)\s*(cm|mm)\b/gi, m;
     while((m=re.exec(linha))!==null){
       var unid=m[2].toLowerCase();
-      var valor=m[1].split(/[x×]/).map(function(p){
+      /* 15/08/2026: os eixos passam a ser guardados um a um, ALÉM do maior.
+         Fígado, baço e rim se comparam pelo maior eixo e nada muda para eles. O útero
+         é o primeiro órgão cuja tabela é de VOLUME, e volume precisa dos três. */
+      var eixos=m[1].split(/[x×]/).map(function(p){
         var v=parseFloat(String(p).trim().replace(',','.'));
         return (unid==='mm') ? v/10 : v;                 // tudo em cm por dentro
-      }).reduce(function(a,b){ return (isNaN(b)?a:Math.max(a,b)); }, 0);
+      }).filter(function(v){ return !isNaN(v); });
+      var valor=eixos.reduce(function(a,b){ return Math.max(a,b); }, 0);
       if(!valor) continue;
       var antes=linha.slice(0, m.index).replace(/\*\*/g,'');
       var contexto=(secao+' '+antes);
@@ -6315,7 +6380,7 @@ function medidasDoLaudo(L){
         if(REF_APELIDOS[k].re.test(contexto)){ orgao=REF_APELIDOS[k].orgao; break; }
       }
       if(!orgao) continue;
-      achados.push({orgao:orgao, valor:valor, secao:secao,
+      achados.push({orgao:orgao, valor:valor, eixos:eixos, secao:secao,
                     trecho:faltaTrecho(linha, {i:m.index, f:m.index+m[0].length})});
     }
   }
@@ -6334,13 +6399,22 @@ function alertasReferencia(L){
   var sexo=L.sexoPac||'';
   var achados=medidasDoLaudo(L), fora=[];
   achados.forEach(function(a){
+    var R=REF_MEDIDAS[a.orgao]; if(!R) return;
     var f=refFaixa(a.orgao, anos, sexo); if(!f) return;
     // A MAIOR medida de cada órgão é a que interessa: o laudo cita vários números do
     // mesmo órgão (três eixos), e comparar o menor deles com o maior eixo daria alarme
     // falso em todo exame.
-    var alto=(f.max!=null && a.valor>f.max), baixo=(f.min!=null && a.valor<f.min);
+    var medida=a.valor;
+    if(R.volume){
+      /* Tabela de VOLUME (hoje só o útero). Sem os TRÊS eixos não há volume — e comparar
+         um comprimento contra tabela de volume seria erro grosseiro. Então CALA.
+         Fórmula do elipsoide prolato, a mesma que o artigo da fonte usou. */
+      if(!a.eixos || a.eixos.length<3) return;
+      medida = Math.round(a.eixos[0]*a.eixos[1]*a.eixos[2]*0.5233*100)/100;
+    }
+    var alto=(f.max!=null && medida>f.max), baixo=(f.min!=null && medida<f.min);
     if(!alto && !baixo) return;
-    fora.push({orgao:a.orgao, valor:a.valor, faixa:f, alto:alto, trecho:a.trecho});
+    fora.push({orgao:a.orgao, valor:medida, faixa:f, alto:alto, trecho:a.trecho});
   });
   if(!fora.length) return [];
   // só o pior de cada órgão, para não repetir o mesmo aviso três vezes
@@ -6352,8 +6426,9 @@ function alertasReferencia(L){
   var idadeTxt = anos<1 ? (Math.round(anos*12)+' meses') : (Math.round(anos)+' anos');
   var linhas=Object.keys(porOrgao).map(function(k){
     var x=porOrgao[k], R=REF_MEDIDAS[k];
-    var faixa=(x.faixa.min!=null?x.faixa.min:'—')+' a '+(x.faixa.max!=null?x.faixa.max:'—')+' cm';
-    return '• '+R.nome+': '+String(x.valor).replace('.',',')+' cm — '
+    var un=R.unidade||'cm';   // o útero é comparado em cm³, os outros em cm
+    var faixa=(x.faixa.min!=null?x.faixa.min:'—')+' a '+(x.faixa.max!=null?x.faixa.max:'—')+' '+un;
+    return '• '+R.nome+': '+String(x.valor).replace('.',',')+' '+un+' — '
       +(x.alto?'ACIMA':'abaixo')+' da referência para '+idadeTxt+' ('+faixa+')'
       +(x.faixa.semSexo?' ⚠ o sexo não veio na etiqueta do aparelho: usei a faixa mais estreita, então este aviso pode ser falso alarme':'')
       +'\n   ⟨'+x.trecho+'⟩\n   fonte: '+x.faixa.fonte;

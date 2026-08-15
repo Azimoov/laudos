@@ -334,7 +334,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <span class="ab-seta">›</span>
       </button>
 
-      <button class="ab-botao" onclick="abEscolher('revisao')">
+      <button class="ab-botao" onclick="abLiberarLaudos()">
         <span class="ab-icone">📄</span>
         <span style="flex:1">
           <span class="ab-nome">Liberar laudos</span>
@@ -7882,7 +7882,8 @@ function diaRenderLista(){
   b.textContent='Revisar laudos pendentes'+(n?(' ('+n+')'):'');
   b.disabled=!n;
 }
-function diaRevisar(exId){ diaFechar(); rev2Abrir(exId); }
+// entrando pela tela 3, é para ela que "Voltar ao painel" tem de devolver
+function diaRevisar(exId){ _rev2Origem='dia'; diaFechar(); rev2Abrir(exId); }
 
 /* ================= TELA 4: REVISÃO DO LAUDO (2.0) — comportamento =================
    O laudo estruturado é o modelo do médico REDIVIDIDO: cada título em negrito dos
@@ -7896,6 +7897,11 @@ function diaRevisar(exId){ diaFechar(); rev2Abrir(exId); }
      rosa      = impressão diagnóstica (texto gerado por IA)
      cinza     = sem alteração — apagado de propósito, para o olho ir no que importa */
 var _rev2Id=null, _rev2Fim={}, _rev2Fmt=null;
+/* De onde se entrou nesta tela: 'dia' (tela 3) ou 'abertura'. Decide para onde o botão
+   "Voltar ao painel" devolve — ver abLiberarLaudos. Fica declarado aqui, junto das outras
+   variáveis da tela, e não lá embaixo: assim já vale mesmo se algo chamar rev2Voltar antes
+   de o script terminar de carregar. */
+var _rev2Origem='dia';
 
 function rev2Fila(){
   var l=exames.filter(function(x){ return x.laudo && !x._liberado; });
@@ -7911,7 +7917,12 @@ function rev2Ex(){ return exames.filter(function(x){ return x.id===_rev2Id; })[0
 function rev2Abrir(exId){
   var fila=rev2Fila();
   if(exId==null) exId=(fila[0]||{}).id;
-  if(exId==null){ log('Nenhum laudo pendente de revisão.'); diaAbrir(); return; }
+  // a fila pode esvaziar entre abrir a tela e chegar aqui: volta para quem chamou
+  if(exId==null){
+    log('Nenhum laudo pendente de revisão.');
+    if(_rev2Origem==='abertura'){ _rev2Origem='dia'; abVoltarInicio(); } else diaAbrir();
+    return;
+  }
   _rev2Id=exId;
   ['telaAbertura','telaExames','telaDia','telaRevisao'].forEach(function(id){
     var e=document.getElementById(id); if(e) e.style.display='none';
@@ -7921,7 +7932,14 @@ function rev2Abrir(exId){
   window.scrollTo(0,0);
 }
 function rev2Fechar(){ var t=document.getElementById('telaRev2'); if(t) t.style.display='none'; }
-function rev2Voltar(){ rev2Fechar(); diaAbrir(); }
+/* "Voltar ao painel" leva de volta a QUEM CHAMOU (15/08/2026). Vindo da tela de abertura,
+   abrir a tela 3 ligaria os laços da gravação para quem só queria assinar laudos parados.
+   Ver o comentário em abLiberarLaudos. */
+function rev2Voltar(){
+  rev2Fechar();
+  if(_rev2Origem==='abertura'){ _rev2Origem='dia'; abVoltarInicio(); return; }
+  diaAbrir();
+}
 function rev2Calculadoras(){ rev2Fechar(); mostrarAba('calc'); }
 
 /* ---- corta o corpo do laudo em retângulos, um por título em negrito ---- */
@@ -8351,6 +8369,36 @@ function abVoltarInicio(){
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
   abContarPendentes();         // o número pode ter mudado enquanto ele trabalhava
   window.scrollTo(0,0);
+}
+/* ================= LIBERAR LAUDOS, da tela de abertura (15/08/2026) =================
+   Até aqui este botão caía na aba antiga do 1.0 ("4 · Revisão dos laudos", com lista
+   simples e "Salvar todos"). A tela de revisão da 2.0 já existia desde 12/08, mas só se
+   chegava nela pela tela 3 — quem abrisse o programa só para liberar o que ficou
+   acumulado ia parar no programa velho.
+
+   ⚠️ POR QUE UMA FUNÇÃO, e não só trocar o onclick por rev2Abrir(): a tela de revisão
+   volta pelo botão "Voltar ao painel", e o painel dela era SEMPRE a tela 3 — que liga os
+   laços da gravação (relógio, onda, varredura a cada 5 s) e anuncia "EXAME EM ANDAMENTO".
+   Para quem entrou pela abertura só para assinar laudos de ontem, isso seria ligar o
+   consultório sem paciente nenhum. Por isso a tela agora lembra DE ONDE veio
+   (`_rev2Origem`, declarada junto das outras variáveis da tela de revisão). */
+function abLiberarLaudos(){
+  var fila=rev2Fila();
+  if(fila.length){ _rev2Origem='abertura'; rev2Abrir(fila[0].id); return; }
+  /* Nada para liberar. A mensagem diz QUAL dos casos é, porque o selo de pendentes na
+     tela de abertura vem do BANCO (pelo agente) e a fila vem do que está aberto nesta
+     sessão — os dois podem discordar, e "não há nada" sem explicação faria o médico achar
+     que o programa perdeu laudo. */
+  var comLaudo=exames.filter(function(x){ return x.laudo; }).length;
+  if(!exames.length)
+    log('Nenhum exame nesta sessão para liberar. Os laudos aparecem aqui depois que o '
+        +'aparelho enviar as imagens. Se você espera encontrar laudos de outro dia, eles '
+        +'estão guardados no computador — abra por "Recuperar exames".');
+  else if(comLaudo===0)
+    log('Há '+exames.length+' exame(s) nesta sessão, mas nenhum tem laudo gerado ainda — '
+        +'não há o que assinar.');
+  else
+    log('Todos os laudos desta sessão já foram revisados e assinados. 🎉');
 }
 
 window.addEventListener('DOMContentLoaded', function(){

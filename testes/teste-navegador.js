@@ -316,6 +316,58 @@ const VERIFICACOES = `(async () => {
     idsFixos.length > 0 && idsFixos.every(id => TELAS.indexOf(id) >= 0),
     'no CSS: ' + idsFixos.join(', '));
 
+  // 15) LIBERAR LAUDOS pela tela de abertura (2026-08-15). O botao caia na aba antiga do
+  // 1.0; agora abre a fila de revisao da 2.0. O que estes testes protegem, em ordem:
+  //   1. "Voltar ao painel" devolve a QUEM CHAMOU. Vindo da abertura, cair na tela 3
+  //      ligaria os lacos da gravacao (relogio, onda, varredura) para quem so queria
+  //      assinar laudos parados — ligar o consultorio sem paciente nenhum.
+  //   2. Fila vazia NAO abre tela nenhuma, e muito menos a aba velha.
+  const telaVisivel = () => TELAS.filter(id => {
+    const el = document.getElementById(id);
+    return el && getComputedStyle(el).display !== 'none';
+  }).join(',') || '(nenhuma)';
+  const laudoFalso = id => ({
+    id, paciente: 'M.F.S.', tipo: '', audios: [], imagens: [], _quando: 1,
+    laudo: { cab: {}, corpo: '**Utero** normal.', conclusao: 'Normal.', alertas: [] },
+  });
+  const examesAntes = exames;
+
+  // fila vazia: fica na abertura, sem abrir nada
+  exames = [];
+  abLiberarLaudos();
+  diz('sem laudo nenhum, "Liberar laudos" nao abre tela de revisao',
+    telaVisivel() !== 'telaRev2', 'ficou em: ' + telaVisivel());
+  // exame sem laudo tambem nao e coisa para assinar
+  exames = [{ id: 1, paciente: 'A', laudo: null, audios: [], imagens: [], _quando: 1 }];
+  abLiberarLaudos();
+  diz('exame ainda sem laudo tambem nao abre a revisao',
+    telaVisivel() !== 'telaRev2', 'ficou em: ' + telaVisivel());
+
+  // com laudo pendente: abre a tela 4 da 2.0 — e NAO a aba antiga do 1.0
+  exames = [laudoFalso(1)];
+  abLiberarLaudos();
+  diz('com laudo pendente, abre a tela de revisao da 2.0', telaVisivel() === 'telaRev2',
+    'ficou em: ' + telaVisivel());
+  diz('e a tela lembra que veio da abertura', _rev2Origem === 'abertura');
+
+  // voltar: devolve para a ABERTURA, e sem ligar os lacos da tela 3
+  rev2Voltar();
+  diz('"Voltar ao painel" devolve para a tela de abertura', telaVisivel() === 'telaAbertura',
+    'ficou em: ' + telaVisivel());
+  diz('e NAO liga os lacos da gravacao da tela 3',
+    !_diaTimer && !_diaSeg && !_ondaFeed,
+    'relogio=' + !!_diaTimer + ' segundos=' + !!_diaSeg + ' onda=' + !!_ondaFeed);
+
+  // o caminho de sempre — pela tela 3 — nao pode ter quebrado
+  diaRevisar(1);
+  diz('entrando pela tela 3, a revisao tambem abre', telaVisivel() === 'telaRev2',
+    'ficou em: ' + telaVisivel());
+  rev2Voltar();
+  diz('e dali "Voltar ao painel" devolve para a tela 3, como sempre',
+    telaVisivel() === 'telaDia', 'ficou em: ' + telaVisivel());
+  try { diaFechar(); } catch (e) {}   // nao deixa laco rodando depois do teste
+  exames = examesAntes;
+
   return R;
 })()`;
 

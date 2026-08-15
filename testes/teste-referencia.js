@@ -74,14 +74,32 @@ ok(fig('040Y', 22.0).length === 0,
    'ADULTO com 22 cm NAO gera aviso: nao ha tabela de figado adulto nos modelos, e '
    + 'inventar um limite seria pior que ficar calado');
 
-console.log('=== BACO (Rosenberg, AJR 1991) — e o sexo importa a partir dos 15 ===');
+console.log('=== BACO (Rosenberg, AJR 1991) — e o sexo NAO importa (corrigido em 14/08) ===');
+// 14/08: saiu a divisao por sexo dos >=15 anos (era 12,0 mocas / 13,0 rapazes).
+// Eze 2013 (n=947) e Megremis 2004 (n=512) nao acham diferenca entre os sexos; Waelti
+// 2021 (n=736), o UNICO que acha, mede 0,24 cm e recomenda tabela unica. O programa
+// aplicava 1,0 cm — quatro vezes a maior diferenca ja medida.
 const bac = (idade, cm, sexo) => alertasReferencia({ idadePac: idade, sexoPac: sexo, cab: {},
   corpo: '**Baco** de contornos regulares, medindo ' + cm + ' cm.' });
 ok(bac('002Y', 7.5).length === 0, 'baco de 7,5 cm aos 2 anos: normal (limite 8,0)');
 ok(bac('002Y', 9.0).length === 1, '9,0 cm aos 2 anos: acima');
 ok(bac('010Y', 9.0).length === 0, 'os mesmos 9,0 cm aos 10 anos: normal (limite 11,0)');
 ok(bac('016Y', 12.5, 'M').length === 0, '12,5 cm num rapaz de 16: normal (limite 13,0)');
-ok(bac('016Y', 12.5, 'F').length === 1, 'os mesmos 12,5 cm numa moca de 16: acima (limite 12,0)');
+ok(bac('016Y', 12.5, 'F').length === 0,
+   'os MESMOS 12,5 cm numa moca de 16: TAMBEM normal — o limite deixou de depender do sexo');
+ok(bac('016Y', 13.5, 'F').length === 1, '13,5 cm aos 16 passa do limite numa moca...');
+ok(bac('016Y', 13.5, 'M').length === 1, '...e passa igual num rapaz');
+ok(bac('013Y', 12.0).length === 0, 'aos 13 anos o limite ainda e 12,0: 12,0 passa raspando');
+ok(bac('013Y', 12.5).length === 1, 'e 12,5 aos 13 anos ja e acima');
+// nao basta o resultado bater hoje: a divisao por sexo tem de SUMIR da tabela, senao
+// alguem a religa sem querer e o teste acima continua verde por coincidencia
+ok(!REF_MEDIDAS.baco.pedSexo, 'a tabela por sexo do baco saiu de vez');
+ok(!REF_MEDIDAS.baco.sexoDesde, 'e o gatilho de idade que a ligava tambem');
+ok(/Eze|Megremis|Waelti/.test(REF_MEDIDAS.baco.fonte),
+   'e a fonte registra por que a divisao por sexo nao e usada');
+// o degrau some: 17 anos e 18 anos passam a ter o mesmo limite
+ok(bac('017Y', 12.5, 'F').length === 0 && bac('018Y', 12.5, 'F').length === 0,
+   'nao ha mais degrau no aniversario de 18 anos');
 ok(bac('040Y', 12.0).length === 0, 'adulto com 12,0 cm: normal (13,0, do modelo do medico)');
 ok(bac('040Y', 14.0).length === 1, 'adulto com 14,0 cm: acima — aqui SIM ha referencia');
 ok(/13/.test(so(bac('040Y', 14.0))), 'e o aviso mostra o limite de 13 cm');

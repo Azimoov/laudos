@@ -6101,14 +6101,29 @@ const REF_MEDIDAS = {
     adulto:null   // os modelos do médico não trazem referência de fígado no adulto
   },
   baco: {
+    /* 14/08/2026 — A DIVISÃO POR SEXO SAIU DAQUI.
+       Até hoje, dos 15 anos em diante, o limite era 12,0 para moças e 13,0 para rapazes:
+       1,0 cm de diferença, vinda de Rosenberg 1991 (n=230), que eu nunca li no original.
+       Os conectores de literatura desmontaram esse número:
+         · Eze 2013 (Afr Health Sci, n=947, acesso aberto) — dimensões do baço NÃO
+           diferem entre meninos e meninas (p > 0,05).
+         · Megremis 2004 (Radiology, n=512) — "no statistically significant difference
+           between the sexes".
+         · Waelti 2021 (BMC Pediatr, n=736, acesso aberto) — É O ÚNICO que acha diferença,
+           e ela mede 0,24 cm. Os próprios autores escrevem que não a consideram relevante
+           na prática diária e recomendam uma tabela única para os dois sexos.
+       Ou seja: o programa aplicava 1,0 cm onde a MAIOR diferença já medida é 0,24 cm.
+       O número não era apoiado nem pelo estudo que estava do lado dele.
+
+       Dos 15 aos 18 o limite passa a ser 13,0 para ambos (decisão do médico, 14/08):
+       é o valor superior do próprio Rosenberg naquela faixa, e emenda com o limite de
+       adulto de 13,0 que já estava no modelo dele. Antes havia um degrau sem base —
+       uma moça de 17 anos tinha limite 12,0 e no aniversário de 18 pulava para 13,0. */
     nome:'Baço — maior eixo longitudinal', unidade:'cm',
-    fonte:'Rosenberg HK et al. Normal splenic size in infants and children. AJR 1991 — limites SUPERIORES por idade, os de uso corrente. Adulto: 13 cm, o valor que já está escrito nos modelos do próprio médico.',
+    fonte:'Rosenberg HK et al. Normal splenic size in infants and children. AJR 1991 — limites SUPERIORES por idade. A divisão por sexo deste estudo NÃO é usada: Eze 2013 (n=947) e Megremis 2004 (n=512) não acham diferença entre os sexos, e Waelti 2021 (n=736), o único que acha, mede 0,24 cm e recomenda tabela única. Adulto: 13 cm, o valor que já está escrito nos modelos do próprio médico.',
     ped:[[0.25,null,6.0],[0.5,null,6.5],[1,null,7.0],[2,null,8.0],[4,null,9.0],
-         [6,null,9.5],[8,null,10.0],[10,null,11.0],[12,null,11.5],[18,null,12.0]],
-    // ≥15 anos o limite difere por sexo (12,0 meninas · 13,0 meninos); abaixo disso a
-    // tabela é a mesma para os dois, e por isso `sexoDesde`
-    sexoDesde:15,
-    pedSexo:{F:[[18,null,12.0]], M:[[18,null,13.0]]},
+         [6,null,9.5],[8,null,10.0],[10,null,11.0],[12,null,11.5],[15,null,12.0],
+         [18,null,13.0]],
     adulto:{min:null, max:13.0, fonte:'modelo do médico: "(Normal até 13 cm)"'}
   },
   rim: {

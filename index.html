@@ -8357,6 +8357,35 @@ window.addEventListener('DOMContentLoaded', function(){
   mostrarAba('captura');       // deixa uma aba pronta atrás da tela de abertura
   abAtualizarTudo();
 });
+/* UMA BARRA DE ROLAGEM SÓ (15/08/2026 — o médico viu duas na lateral direita).
+   As quatro telas de tela cheia (abertura, exames, dia, revisão 2) são position:fixed,
+   cobrem a janela e têm rolagem própria. Mas o app continua POR BAIXO, no fluxo normal,
+   ocupando cerca de 4.000 px de altura — medido: 4.131 contra 720 de janela. A janela
+   então mantinha a barra dela, rolando um conteúdo que ninguém está vendo, bem ao lado
+   da barra da tela que está por cima. Duas barras, e a de fora não levava a lugar nenhum.
+
+   Um OBSERVADOR em vez de acertar cada ponto: são muitos lugares que abrem e fecham
+   essas telas, e uma tela nova amanhã repetiria o defeito sem ninguém notar. Aqui basta
+   acrescentar o id à lista. */
+(function(){
+  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2'];
+  function travarFundo(){
+    var algumaAberta = TELAS_CHEIAS.some(function(id){
+      var el=document.getElementById(id);
+      return el && getComputedStyle(el).display !== 'none';
+    });
+    // '' devolve o valor da folha de estilo — não force 'auto', que atropelaria o padrão
+    document.documentElement.style.overflow = algumaAberta ? 'hidden' : '';
+  }
+  window.addEventListener('DOMContentLoaded', function(){
+    var obs=new MutationObserver(travarFundo);
+    TELAS_CHEIAS.forEach(function(id){
+      var el=document.getElementById(id);
+      if(el) obs.observe(el, {attributes:true, attributeFilter:['style','class']});
+    });
+    travarFundo();
+  });
+})();
 /* Gravação interrompida: mostra assim que o app abre. */
 window.addEventListener('DOMContentLoaded', function(){ cpRenderRecuperacao().catch(function(){}); });
 /* Gravação que ficou correndo no agente enquanto o navegador esteve fechado. */

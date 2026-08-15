@@ -256,6 +256,66 @@ const VERIFICACOES = `(async () => {
   const avisoAud = (document.getElementById('audiosInfo') || {}).textContent || '';
   diz('escolher audios avulsos mostra a contagem no aviso', avisoAud.indexOf('2') >= 0, avisoAud || '(vazio)');
 
+  // 14) UMA BARRA DE ROLAGEM SO (2026-08-15): o medico viu duas na lateral direita da
+  // tela inicial. As telas de tela cheia sao position:fixed e cobrem a janela, mas o app
+  // continua POR BAIXO ocupando ~4.000 px — a janela mantinha a barra dela, rolando um
+  // conteudo invisivel, ao lado da barra da propria tela.
+  // So se pega num navegador de verdade: nenhuma funcao isolada mostra isso.
+  const TELAS = ['telaAbertura', 'telaExames', 'telaDia', 'telaRev2'];
+  const contarBarras = () => {
+    const de = document.documentElement;
+    let n = (window.innerWidth - de.clientWidth) > 2 ? 1 : 0;
+    TELAS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && getComputedStyle(el).display !== 'none' && (el.offsetWidth - el.clientWidth) > 2) n++;
+    });
+    return n;
+  };
+  const mostrarSo = id => TELAS.forEach(t => {
+    const el = document.getElementById(t);
+    if (el) el.style.display = (t === id ? 'block' : 'none');
+  });
+  // o observador reage a mudanca de atributo, que e assincrona: da um tempinho a ele
+  const respirar = () => new Promise(r => setTimeout(r, 60));
+
+  mostrarSo('telaAbertura'); await respirar();
+  diz('tela de abertura: no maximo UMA barra de rolagem', contarBarras() <= 1,
+    'barras: ' + contarBarras());
+  mostrarSo('telaExames'); await respirar();
+  diz('tela Realizar exames: no maximo UMA barra', contarBarras() <= 1, 'barras: ' + contarBarras());
+  // e o controle que importa: com as telas FECHADAS o app tem de voltar a rolar, senao
+  // "consertamos" as duas barras deixando o programa preso
+  mostrarSo(null); await respirar();
+  diz('telas fechadas: o app volta a rolar normalmente',
+    document.documentElement.style.overflow !== 'hidden',
+    'overflow no html: ' + (document.documentElement.style.overflow || '(vazio)'));
+  mostrarSo('telaAbertura'); await respirar();
+  diz('e reabrir a tela trava o fundo de novo',
+    document.documentElement.style.overflow === 'hidden');
+  // Toda tela de tela cheia precisa estar na lista do observador — se alguem criar a
+  // quinta e esquecer, o defeito volta calado.
+  // ⚠️ Le as REGRAS de CSS, e nao o texto do HTML: este script inteiro vive dentro de uma
+  // template string (crases), e ali "\\w" de um regex vira "w". A primeira versao deste
+  // teste passou VAZIA por isso — nao achava nada, e ".every()" de lista vazia e sempre
+  // verdadeiro. Passar sem testar nada e pior que falhar.
+  const idsFixos = [];
+  for (const folha of document.styleSheets) {
+    try {
+      for (const regra of folha.cssRules) {
+        if (regra.selectorText && /^#tela/.test(regra.selectorText)
+            && regra.style && regra.style.position === 'fixed'
+            && parseInt(regra.style.inset || '99', 10) === 0) {
+          idsFixos.push(regra.selectorText.slice(1));
+        }
+      }
+    } catch (e) { /* folha de outra origem: nao ha nenhuma aqui, mas nao vale quebrar */ }
+  }
+  diz('achei as telas de tela cheia no CSS (se der 0, o teste esta cego)',
+    idsFixos.length >= 4, 'achadas: ' + idsFixos.length);
+  diz('todas as telas de tela cheia estao na lista do observador',
+    idsFixos.length > 0 && idsFixos.every(id => TELAS.indexOf(id) >= 0),
+    'no CSS: ' + idsFixos.join(', '));
+
   return R;
 })()`;
 

@@ -6101,29 +6101,57 @@ const REF_MEDIDAS = {
     adulto:null   // os modelos do médico não trazem referência de fígado no adulto
   },
   baco: {
-    /* 14/08/2026 — A DIVISÃO POR SEXO SAIU DAQUI.
-       Até hoje, dos 15 anos em diante, o limite era 12,0 para moças e 13,0 para rapazes:
-       1,0 cm de diferença, vinda de Rosenberg 1991 (n=230), que eu nunca li no original.
-       Os conectores de literatura desmontaram esse número:
-         · Eze 2013 (Afr Health Sci, n=947, acesso aberto) — dimensões do baço NÃO
-           diferem entre meninos e meninas (p > 0,05).
-         · Megremis 2004 (Radiology, n=512) — "no statistically significant difference
-           between the sexes".
-         · Waelti 2021 (BMC Pediatr, n=736, acesso aberto) — É O ÚNICO que acha diferença,
-           e ela mede 0,24 cm. Os próprios autores escrevem que não a consideram relevante
-           na prática diária e recomendam uma tabela única para os dois sexos.
-       Ou seja: o programa aplicava 1,0 cm onde a MAIOR diferença já medida é 0,24 cm.
-       O número não era apoiado nem pelo estudo que estava do lado dele.
+    /* 15/08/2026 — TABELA TROCADA, E A DIVISÃO POR SEXO SAIU.
+       Antes: Rosenberg 1991 (n=230), lido por citação de terceiros, com limite dependente
+       do sexo dos 15 anos em diante (12,0 moças / 13,0 rapazes).
 
-       Dos 15 aos 18 o limite passa a ser 13,0 para ambos (decisão do médico, 14/08):
-       é o valor superior do próprio Rosenberg naquela faixa, e emenda com o limite de
-       adulto de 13,0 que já estava no modelo dele. Antes havia um degrau sem base —
-       uma moça de 17 anos tinha limite 12,0 e no aniversário de 18 pulava para 13,0. */
+       SOBRE O SEXO — cuidado ao ler isto, porque o motivo NÃO é o que parece.
+       A diferença por sexo EXISTE: dos cinco estudos consultados, quatro a encontram,
+       entre eles os dois maiores (Mohtasib 2021, n=1.028; Akinlade 2020, n=1.000).
+       O ponto é outro: onde ela foi QUANTIFICADA, mede 0,24 cm (Waelti 2021, n=736) e
+       0,3 cm (Mohtasib). O programa aplicava 1,0 cm — três a quatro vezes mais.
+       E os dois maiores estudos, tendo achado a diferença, escolhem NÃO usá-la:
+       Mohtasib escreve que as diferenças "não foram consideradas clinicamente
+       significativas" e por isso apresenta os gráficos por idade, independentemente do
+       sexo; Waelti diz o mesmo e recomenda tabela composta.
+       Ou seja: não se descartou a diferença por ela não existir, e sim por ser pequena
+       demais para virar limite. Quem quiser reabrir isto, reabra por aí.
+
+       SOBRE OS VALORES — agora vêm de Mohtasib 2021 (Ann Saudi Med, n=1.028, acesso
+       aberto), 4,5x maior e 30 anos mais novo que o Rosenberg, com "limite superior
+       sugerido" por faixa etária. EU LI A TABELA no artigo: o baço deixa de ser a única
+       tabela do programa cujos números eu conhecia só de segunda mão.
+       Os dois estudos concordam quase ponto a ponto (maior desacordo: 0,5 cm), o que
+       serve de confirmação independente do Rosenberg, que não consegui abrir.
+       O artigo ainda compara Arábia Saudita x EUA x Índia e acha ±2 mm entre elas —
+       para o baço, etnia não muda a conduta.
+
+       DOS 15 AOS 18 o limite fica 13,0 (decisão do médico): o Mohtasib para aos 16 e
+       tem só 10 crianças na faixa de 14 a 16, então ali vale o valor superior do
+       Rosenberg, que emenda com o limite de adulto de 13,0 já escrito no modelo dele.
+       Antes havia um degrau sem base — moça de 17 anos com limite 12,0 que no
+       aniversário de 18 pulava para 13,0.
+       Custo assumido: perde-se sensibilidade em moças de 15 a 17 com baço de 12 a 13 cm. */
     nome:'Baço — maior eixo longitudinal', unidade:'cm',
-    fonte:'Rosenberg HK et al. Normal splenic size in infants and children. AJR 1991 — limites SUPERIORES por idade. A divisão por sexo deste estudo NÃO é usada: Eze 2013 (n=947) e Megremis 2004 (n=512) não acham diferença entre os sexos, e Waelti 2021 (n=736), o único que acha, mede 0,24 cm e recomenda tabela única. Adulto: 13 cm, o valor que já está escrito nos modelos do próprio médico.',
-    ped:[[0.25,null,6.0],[0.5,null,6.5],[1,null,7.0],[2,null,8.0],[4,null,9.0],
-         [6,null,9.5],[8,null,10.0],[10,null,11.0],[12,null,11.5],[15,null,12.0],
-         [18,null,13.0]],
+    fonte:'Mohtasib RS et al. Sonographic measurements for spleen size in healthy Saudi children. Ann Saudi Med 2021;41(1):14-23 (acesso aberto) — 1.028 crianças, "limite superior sugerido" por faixa de idade, tabela lida no artigo. Dos 15 aos 18 anos: 13,0 cm, valor superior de Rosenberg (AJR 1991), onde o Mohtasib tem apenas 10 crianças. SEM divisão por sexo, seguindo a recomendação explícita dos próprios autores. Adulto: 13 cm, o valor que já está escrito nos modelos do médico.',
+    /* Faixas do artigo (Tabelas 3 e 4), convertidas para anos. Onde o limite se repete
+       em faixas vizinhas, as linhas foram fundidas — os números são os do artigo. */
+    /* ⚠️ os limites de faixa em meses são arredondados PARA CIMA de propósito:
+       1/12 = 0,08333... e escrever 0,0833 deixaria o bebê de 1 mês exato cair na
+       faixa seguinte. 0,084 / 0,417 / 0,917 resolvem, sem mudar nenhuma outra idade. */
+    ped:[[0.084,null,5.5],    // até 1 mês
+         [0.417,null,6.5],    // 1 a 5 meses
+         [0.917,null,7.0],    // 5 a 11 meses
+         [1.25,null,7.5],     // 11 a 15 meses
+         [2,null,8.0],        // 15 a 24 meses
+         [4,null,8.5],        // 2 a 4 anos
+         [5,null,9.0],        // 4 a 5 anos
+         [7,null,9.5],        // 5 a 7 anos
+         [8,null,10.0],       // 7 a 8 anos
+         [11,null,10.5],      // 8 a 11 anos
+         [12,null,11.0],      // 11 a 12 anos
+         [15,null,12.0],      // 12 a 15 anos (o artigo dá 12,0 até 16; estendido até 15)
+         [18,null,13.0]],     // 15 a 18 anos — NÃO é do Mohtasib, ver acima
     adulto:{min:null, max:13.0, fonte:'modelo do médico: "(Normal até 13 cm)"'}
   },
   rim: {

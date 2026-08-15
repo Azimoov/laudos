@@ -74,29 +74,44 @@ ok(fig('040Y', 22.0).length === 0,
    'ADULTO com 22 cm NAO gera aviso: nao ha tabela de figado adulto nos modelos, e '
    + 'inventar um limite seria pior que ficar calado');
 
-console.log('=== BACO (Rosenberg, AJR 1991) — e o sexo NAO importa (corrigido em 14/08) ===');
-// 14/08: saiu a divisao por sexo dos >=15 anos (era 12,0 mocas / 13,0 rapazes).
-// Eze 2013 (n=947) e Megremis 2004 (n=512) nao acham diferenca entre os sexos; Waelti
-// 2021 (n=736), o UNICO que acha, mede 0,24 cm e recomenda tabela unica. O programa
-// aplicava 1,0 cm — quatro vezes a maior diferenca ja medida.
+console.log('=== BACO (Mohtasib 2021, n=1.028, aberto) — sem divisao por sexo ===');
+// 15/08: trocada a tabela (era Rosenberg 1991, n=230, lido por citacao de terceiros) e
+// retirada a divisao por sexo dos >=15 anos, que aplicava 1,0 cm de diferenca.
+//
+// CUIDADO AO LER: a diferenca por sexo EXISTE. Quatro dos cinco estudos consultados a
+// encontram, entre eles os dois maiores (Mohtasib n=1.028, Akinlade n=1.000). O motivo
+// de nao usa-la e outro: onde foi medida, vale 0,24 cm (Waelti) a 0,3 cm (Mohtasib), e
+// os dois maiores estudos, tendo-a achado, escolhem apresentar a tabela SEM separar por
+// sexo por nao considera-la clinicamente significativa. 1,0 cm nunca teve respaldo.
 const bac = (idade, cm, sexo) => alertasReferencia({ idadePac: idade, sexoPac: sexo, cab: {},
   corpo: '**Baco** de contornos regulares, medindo ' + cm + ' cm.' });
+// as faixas do artigo, uma amostra de cada ponta e do meio
+ok(bac('000M', 5.0).length === 0, 'recem-nascido com 5,0 cm: normal (limite 5,5)');
+ok(bac('000M', 6.0).length === 1, 'e com 6,0 cm: acima');
+ok(bac('001M', 5.4).length === 0,
+   'bebe de 1 mes EXATO ainda pega o limite de 5,5 — 1/12 nao e 0,0833');
+ok(bac('006M', 6.9).length === 0, '6 meses com 6,9 cm: normal (limite 7,0)');
 ok(bac('002Y', 7.5).length === 0, 'baco de 7,5 cm aos 2 anos: normal (limite 8,0)');
 ok(bac('002Y', 9.0).length === 1, '9,0 cm aos 2 anos: acima');
-ok(bac('010Y', 9.0).length === 0, 'os mesmos 9,0 cm aos 10 anos: normal (limite 11,0)');
+ok(bac('003Y', 8.4).length === 0, 'aos 3 anos o limite sobe para 8,5: 8,4 passa');
+ok(bac('010Y', 9.0).length === 0, 'os mesmos 9,0 cm aos 10 anos: normal (limite 10,5)');
+ok(bac('010Y', 11.0).length === 1, 'mas 11,0 aos 10 anos e acima — Rosenberg deixava passar');
+ok(bac('013Y', 12.0).length === 0, 'aos 13 anos o limite e 12,0: 12,0 passa raspando');
+ok(bac('013Y', 12.5).length === 1, 'e 12,5 aos 13 anos ja e acima');
+// o sexo nao entra mais em lugar nenhum
 ok(bac('016Y', 12.5, 'M').length === 0, '12,5 cm num rapaz de 16: normal (limite 13,0)');
 ok(bac('016Y', 12.5, 'F').length === 0,
-   'os MESMOS 12,5 cm numa moca de 16: TAMBEM normal — o limite deixou de depender do sexo');
+   'os MESMOS 12,5 cm numa moca de 16: TAMBEM normal — o limite nao depende do sexo');
 ok(bac('016Y', 13.5, 'F').length === 1, '13,5 cm aos 16 passa do limite numa moca...');
 ok(bac('016Y', 13.5, 'M').length === 1, '...e passa igual num rapaz');
-ok(bac('013Y', 12.0).length === 0, 'aos 13 anos o limite ainda e 12,0: 12,0 passa raspando');
-ok(bac('013Y', 12.5).length === 1, 'e 12,5 aos 13 anos ja e acima');
 // nao basta o resultado bater hoje: a divisao por sexo tem de SUMIR da tabela, senao
-// alguem a religa sem querer e o teste acima continua verde por coincidencia
+// alguem a religa sem querer e os casos acima continuam verdes por coincidencia
 ok(!REF_MEDIDAS.baco.pedSexo, 'a tabela por sexo do baco saiu de vez');
 ok(!REF_MEDIDAS.baco.sexoDesde, 'e o gatilho de idade que a ligava tambem');
-ok(/Eze|Megremis|Waelti/.test(REF_MEDIDAS.baco.fonte),
-   'e a fonte registra por que a divisao por sexo nao e usada');
+ok(/Mohtasib/.test(REF_MEDIDAS.baco.fonte), 'a fonte nova esta registrada...');
+ok(/acesso aberto|aberto/.test(REF_MEDIDAS.baco.fonte), '...e diz que e de acesso aberto');
+ok(/Rosenberg/.test(REF_MEDIDAS.baco.fonte),
+   'e a faixa de 15 a 18 anos declara que NAO e do Mohtasib');
 // o degrau some: 17 anos e 18 anos passam a ter o mesmo limite
 ok(bac('017Y', 12.5, 'F').length === 0 && bac('018Y', 12.5, 'F').length === 0,
    'nao ha mais degrau no aniversario de 18 anos');

@@ -6118,21 +6118,28 @@ const REF_MEDIDAS = {
          [7,9.8,13.3],[8,9.8,13.4],[9,10.0,13.8],[10,10.3,14.4],[11,10.7,14.9],
          [12,11.1,15.5],[13,11.5,15.8],[14,11.9,16.1],[15,12.1,16.4],[16,12.1,16.8],
          [17,12.1,17.0],[18,12.3,17.2]],
-    /* ADULTO: continua sem conferência, mas agora sabe-se POR QUÊ, e não por falta de ter
-       procurado (15/08/2026). O valor de uso corrente é 16 cm na linha hemiclavicular —
-       só que ele é frágil, e quem diz isso é a própria literatura:
-         · uma revisão sistemática dos estudos de medida de fígado em adultos concluiu que
-           NENHUM deles tinha rigor suficiente (tamanho de amostra, validade da medida,
-           confiabilidade, estatística), e que o corte de 16 cm pode não ter acurácia para
-           definir hepatomegalia;
-         · num estudo com 2.080 adultos, 11,5% dos saudáveis passavam de 16 cm;
-         · e neste próprio estudo, aos 17-18 anos o P95 já é 17,2 cm — 1,2 cm ACIMA do
-           corte de adulto. Um rapaz de 17 anos com 17,0 cm é normal e, no aniversário de
-           18, viraria "aumentado" sem nada ter mudado no fígado dele.
-       Programar 16 cm criaria esse degrau absurdo e chamaria de doente 1 em cada 9 adultos
-       saudáveis. Fica NULL até o Dr. Daniel dizer o valor que ele usa — e a decisão é
-       clínica, não minha. Enquanto for null, medida de fígado em adulto não gera aviso. */
-    adulto:null
+    /* ADULTO: 16,0 cm na linha hemiclavicular — DECISÃO DO DR. DANIEL em 15/08/2026,
+       depois de eu apresentar as alternativas e as ressalvas abaixo. É o valor de uso
+       corrente na prática dele, mesma lógica dos 13 cm do baço.
+
+       O QUE ELE SABIA AO DECIDIR (registrado para quem reabrir isto um dia):
+         · Sienz 2010 (Z Gastroenterol), revisão sistemática de 1970 a 2010, é a origem do
+           número: "embora NÃO SUFICIENTEMENTE AVALIADO, <16 cm pode ser usado como valor
+           de referência". A própria revisão diz que os dados são escassos e que a técnica
+           não foi padronizada o bastante para comparar estudos.
+         · Num estudo com 2.080 adultos, 11,5% dos saudáveis passavam de 16 cm.
+         · ⚠️ DEGRAU CONHECIDO E ACEITO: aos 17 anos o P95 pediátrico é 17,2 cm. Logo, um
+           rapaz de 17 anos com 17,0 cm não gera aviso, e o MESMO fígado gera aviso no
+           aniversário de 18. Isso é consequência de misturar duas fontes, não defeito de
+           código — quem for mexer, mexa sabendo.
+         · ⚠️ A RÉGUA É FRÁGIL, não só o número: Gao 2024 (J Ultrasound Med) mediu que o
+           ÂNGULO DE VISÃO do aparelho muda a medida do mesmo fígado (p<0,001, contra
+           ressonância). Borchert 2009 mostrou que o modo panorâmico produz falso-positivo
+           de hepatomegalia, e que o B-mode comum concorda com a tomografia em só 81% dos
+           casos. Ou seja: o aviso aqui tem margem de erro do APARELHO embutida, além da
+           do valor. Mais uma razão para o programa apontar e não concluir. */
+    adulto:{min:null, max:16.0,
+            fonte:'16 cm na linha hemiclavicular — valor de uso corrente do Dr. Daniel (decisão dele, 15/08/2026). Origem: Sienz M, Ignee A, Dietrich CF. Referenzwerte in der Abdomensonographie - Leber und Lebergefasse. Z Gastroenterol 2010;48(9):1141-52, revisao sistematica que o propoe com a ressalva de nao estar suficientemente avaliado.'}
   },
   baco: {
     /* 15/08/2026 — TABELA TROCADA, E A DIVISÃO POR SEXO SAIU.

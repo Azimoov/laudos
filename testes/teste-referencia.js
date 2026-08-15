@@ -70,9 +70,20 @@ ok(fig('002Y', 9.5).length === 0, '9,5 cm aos 2 anos: normal');
 ok(fig('000M', 6.0).length === 0, 'recem-nascido com 6,0 cm: normal');
 ok(fig('000M', 9.0).length === 1, 'recem-nascido com 9,0 cm: fora');
 ok(fig('017Y', 16.5).length === 0, '16,5 cm aos 17 anos: ainda dentro (P95=17,0)');
-ok(fig('040Y', 22.0).length === 0,
-   'ADULTO com 22 cm NAO gera aviso: nao ha tabela de figado adulto nos modelos, e '
-   + 'inventar um limite seria pior que ficar calado');
+// 15/08: o figado adulto passou a ser conferido. 16,0 cm, decisao do Dr. Daniel.
+ok(fig('040Y', 15.0).length === 0, 'adulto com 15,0 cm: normal (limite 16,0)');
+ok(fig('040Y', 16.0).length === 0, 'adulto com 16,0 cm: passa raspando');
+ok(fig('040Y', 16.5).length === 1, 'adulto com 16,5 cm: acima');
+ok(fig('040Y', 22.0).length === 1,
+   'ADULTO com 22 cm AGORA gera aviso — antes de 15/08 passava calado');
+ok(/16/.test(so(fig('040Y', 22.0))), 'e o aviso mostra o limite de 16 cm');
+// O DEGRAU DOS 18 ANOS: conhecido, aceito pelo medico, e travado aqui de proposito.
+// A tabela pediatrica vai ate 17,2 cm aos 17 anos; o limite de adulto e 16,0. Logo o
+// MESMO figado muda de veredito no aniversario de 18. Isso e consequencia de misturar
+// duas fontes (Manteghinejad para crianca, valor classico para adulto), nao um bug.
+// Se um dia alguem "consertar" isto, que seja de proposito e nao por acidente.
+ok(fig('017Y', 17.0).length === 0, 'degrau: 17,0 cm aos 17 anos NAO avisa (P95 = 17,2)...');
+ok(fig('018Y', 17.0).length === 1, '...e o MESMO 17,0 cm aos 18 anos avisa (limite 16,0)');
 
 console.log('=== BACO (Mohtasib 2021, n=1.028, aberto) — sem divisao por sexo ===');
 // 15/08: trocada a tabela (era Rosenberg 1991, n=230, lido por citacao de terceiros) e

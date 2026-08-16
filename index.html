@@ -1219,7 +1219,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
     <div class="calcCorpo" id="blocoIg">
       <div style="display:flex;gap:14px;flex-wrap:wrap">
         <span><label>DUM (data da última menstruação)</label><input type="date" id="igDum" style="width:170px" onchange="calcIg()"></span>
-        <span><label>CCN (mm, 4–84 — Robinson)</label><input type="number" id="igCcn" step="1" min="0" style="width:130px" oninput="calcIg()"></span>
+        <span><label>CCN (mm, 4–84 — Robinson &amp; Fleming, BJOG 1975)</label><input type="number" id="igCcn" step="1" min="0" style="width:130px" oninput="calcIg()"></span>
       </div>
       <div class="calcRes" id="igRes"></div>
       <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('igRes')">📋 Copiar</button></div>
@@ -5792,6 +5792,15 @@ async function copiarCalc(id){
    Intervalos meio-abertos [inferior, superior): 9 semanas cai em ±5 dias (o mais conservador). */
 // exames obstétricos sequenciais (2º/3º trim.): são os que usam margem de erro do 1º USG
 const EX_OBST_SEQ = {obst23:true, obst_gemelar:true};
+/* [médico] — PROCEDÊNCIA CONFIRMADA EM 15/08/2026: os valores abaixo são do próprio
+   Dr. Daniel (ele o disse com todas as letras quando a auditoria externa apontou a
+   tabela como "sem fonte"). Mesma categoria dos 13 cm do baço e 16 cm do fígado adulto.
+   ⚠️ PENDÊNCIA REGISTRADA: ele pediu fonte melhor. Candidata: ACOG Committee Opinion 700
+   (2017) — existe (PMID 28426621, verificado), mas as faixas não puderam ser LIDAS
+   (site bloqueia acesso automático; abstract não as traz). Fontes secundárias relatam
+   que o ACOG daria ±5-7 dias no 1º trimestre (aqui: ±3) e ±21+ no 3º (aqui: ±20) — se
+   correto, esta tabela e mais confiante que o ACOG nas duas pontas. NÃO trocar sem ler
+   o documento: regra do projeto. Ver conhecimento/referencias-do-programa.md §3.2. */
 const MARGEM_IG = [
   {de:6,  ate:9,  dias:3},
   {de:9,  ate:12, dias:5},
@@ -6235,7 +6244,13 @@ const REF_MEDIDAS = {
        (CC BY 4.0), multicêntrico, com percentis de verdade por idade E por sexo.
        Agora nenhum número desta linha é meu. */
     nome:'Rim — maior eixo longitudinal', unidade:'cm',
-    fonte:'Obrycki Ł et al. Kidney length normative values in children aged 0-19 years — a multicenter study. Pediatr Nephrol 2021;37(5):1075-85 (acesso aberto, CC BY 4.0) — 1.758 crianças. Faixa = percentil 2,5 a 97,5, por idade e sexo.',
+    /* 15/08/2026, reconferido no texto completo (PMC9023417) após auditoria externa:
+       a diferença por sexo POR IDADE está no artigo (medianas aos 18 anos: 114,2 mm
+       meninos × 105,2 meninas; "boys aged 15 and higher had significantly larger
+       kidneys"). Os percentis por idade+sexo vêm do MATERIAL SUPLEMENTAR do artigo.
+       Os autores preferem avaliar pela ALTURA (aí sem diferença por sexo) — o programa
+       usa idade porque a etiqueta DICOM não traz altura. */
+    fonte:'Obrycki Ł et al. Kidney length normative values in children aged 0-19 years — a multicenter study. Pediatr Nephrol 2021;37(5):1075-85 (acesso aberto, CC BY 4.0) — 1.758 crianças. Faixa = percentil 2,5 a 97,5, por idade e sexo (material suplementar do artigo; os autores preferem a tabela por altura, que o exame não permite usar).',
     fonteCurta:'Obrycki, Pediatr Nephrol 2021',
     // [idade máxima da faixa, P2,5, P97,5] — em cm
     pedSexo:{

@@ -1080,6 +1080,14 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <details class="calcBloco">
     <summary>Mama — BI-RADS (descritores US)</summary>
     <div class="calcCorpo" id="blocoBirads" onchange="calcBirads()">
+      <!-- §13.3 v2025: lesão não-massa é achado próprio, SEM conta de categoria.
+           O seletor troca o formulário; massa é o caminho de sempre. -->
+      <label>Tipo de achado</label>
+      <select id="biTipoAchado" onchange="calcBirads()">
+        <option value="massa">Massa / nódulo</option>
+        <option value="naoMassa">Lesão não-massa (v2025)</option>
+      </select>
+      <div id="biCampoMassa">
       <label>Caso especial ou situação que dispensa os descritores</label>
       <select id="biEsp" onchange="calcBirads()">
         <option value="">— nenhum: usar descritores —</option>
@@ -1139,10 +1147,57 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <label><input type="radio" name="biPost" value="reforco">Reforço</label>
         <label><input type="radio" name="biPost" value="sombra">Sombra</label>
       </div>
+      <!-- §13.3 v2025 — categorias formais acrescentadas em 17/08/2026 (pedido de 12/08).
+           Opcionais de propósito (decisão do médico, 16/08): não avaliadas = negativas,
+           nem cobram cartão nem pesam na conta. Suspeição (§5.6): interna e dura. -->
+      <label>Vascularização (opcional)</label>
+      <select id="biVasc" onchange="calcBirads()">
+        <option value="">— não avaliada —</option>
+        <option value="avascular">Avascular</option>
+        <option value="interna">Vascularização interna</option>
+        <option value="periferica">Hipervascularização periférica</option>
+      </select>
+      <label>Elastografia (opcional)</label>
+      <select id="biElasto" onchange="calcBirads()">
+        <option value="">— não avaliada —</option>
+        <option value="macia">Macia</option>
+        <option value="intermediaria">Intermediária</option>
+        <option value="dura">Dura</option>
+      </select>
       <label>Achados associados</label>
       <div class="calcOpts">
         <label><input type="checkbox" id="biHalo" onchange="calcBirads()">Halo ecogênico (<i>echogenic rind</i>) — incluir na medida da lesão</label>
+        <label><input type="checkbox" id="biPseudocap" onchange="calcBirads()">Pseudocápsula ecogênica (distinta do halo — não pesa na conta)</label>
       </div>
+      </div>
+      <div id="biCampoNaoMassa" style="display:none">
+        <!-- 4 distribuições e 3 padrões, NA ORDEM DO MANUAL (§13.3). -->
+        <label>Distribuição</label>
+        <select id="biNmDist" onchange="calcBirads()">
+          <option value="">— não avaliada —</option>
+          <option value="regional">Regional</option>
+          <option value="focal">Focal</option>
+          <option value="linear">Linear</option>
+          <option value="segmentar">Segmentar</option>
+        </select>
+        <label>Padrão ecogênico</label>
+        <select id="biNmPadrao" onchange="calcBirads()">
+          <option value="">— não avaliado —</option>
+          <option value="hiperecoico">Hiperecoico</option>
+          <option value="heterogeneo">Heterogêneo</option>
+          <option value="hipoecoico">Hipoecoico</option>
+        </select>
+      </div>
+      <!-- §13.3: composição do EXAME (a mama inteira), não da lesão — nunca pesa na conta.
+           Campo do exame na calculadora por decisão do médico (16/08, opção 3a). -->
+      <label>Componente de tecido glandular (composição do exame — opcional)</label>
+      <select id="biTecGland" onchange="calcBirads()">
+        <option value="">— não avaliado —</option>
+        <option value="minimo">Mínimo (&lt;25%)</option>
+        <option value="discreto">Discreto (25–49%)</option>
+        <option value="moderado">Moderado (50–74%)</option>
+        <option value="acentuado">Acentuado (≥75%)</option>
+      </select>
       <div class="calcRes" id="biRes"></div>
       <div style="margin-top:6px"><button class="btn peq sec" type="button" onclick="copiarCalc('biRes')">📋 Copiar</button></div>
     </div>
@@ -2889,13 +2944,13 @@ async function gerarLaudo(exId){
 (EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — preencha o campo 'obstetrico'. Você SÓ COPIA os valores; quem escolhe qual entra na conclusão é o aplicativo:\n- trouxe_usg_primeiro_trimestre: true se o médico disse que a paciente trouxe/apresentou a ultrassonografia INICIAL (de primeiro trimestre), ou se ele informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito.\n- ig_primeiro_usg_semanas: a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame (número; 0 se não foi ditada).\n- aua: leia da worksheet do aparelho o campo AUA — a idade gestacional média estimada pela biometria de HOJE — copiada exatamente como está, ex.: \"34w2d\". Vazio se não estiver legível.\n- ga: leia da worksheet o campo GA — a idade gestacional já estabelecida para a paciente — copiada exatamente como está, ex.: \"35w3d\". Vazio se não estiver legível.\n- edd_aua: a data que está em EDD(AUA), no formato dia/mês/ano. Vazio se não estiver legível.\n- edd_ga: a data que está em EDD(EDD), no formato dia/mês/ano. Vazio se não estiver legível.\nNUNCA invente nenhum desses valores: copie da imagem ou deixe vazio. ATENÇÃO — AUA e GA são campos DIFERENTES da worksheet e costumam ter valores diferentes: não troque um pelo outro nem repita o mesmo nos dois.\nNA CONCLUSÃO: NÃO escreva a idade gestacional, NÃO escreva a data provável do parto e NÃO escreva a variação em dias — deixe os pontilhados do modelo como estão. O aplicativo preenche os três, e escolhe a frase certa conforme a paciente ter trazido ou não o exame inicial.\n\n" : "")+
 (ex.tipo==='obst23' ? "OBSTÉTRICO — SITUAÇÃO FETAL: apresentação cefálica ou pélvica implica, por definição, situação longitudinal. Se o ditado disser 'cefálico(a)' ou 'pélvico(a)', preencha a situação com 'longitudinal' e a apresentação com 'cefálica' ou 'pélvica' (concordando com a palavra 'apresentação') — NUNCA deixe os pontilhados da situação nesse caso. Mantenha os pontilhados da situação apenas se a apresentação não for ditada; se o médico ditar situação transversa ou oblíqua, use o que ele ditou e NÃO infira a apresentação.\n\n" : "")+
 (ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
-(classifVale('birads', ex.tipo) ? "BI-RADS AUTOMÁTICO (somente mama): para CADA massa/nódulo mamário descrito no ditado, inclua um item no campo 'birads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado. Responda com o CÓDIGO, não com a frase:\n- localizacao: onde está, como o médico disse (ex.: \"mama direita, QSE\").\n- forma: oval | lobulada | redonda | irregular\n- orientacao: paralela (paralela à pele) | nao (não paralela)\n- margem: circ (circunscrita) | indistinta | angular | microlobulada | espiculada\n- eco: anecoico | hiperecoico | isoecoico | hipoecoico | heterogeneo | misto (misto sólido e cístico)\n- posterior: nenhum (sem alteração) | reforco | sombra\n- halo: sim | nao — halo ecogênico (echogenic rind)\n- tamanho_cm: maior medida em cm; 0 se não ditada nem legível.\n- caso_especial: SÓ quando o médico ditar explicitamente um destes, e aí os outros descritores podem vir vazios: cistoSimples | cistoComplicado | microcistos | linfonodo | cat0a | cat0b | cat6. Senão: \"\".\nDescritor não citado: \"\" (string vazia). Este é o léxico do ACR BI-RADS v2025 — NÃO use \"cístico complexo e sólido\" nem \"padrão combinado\": saíram nesta versão. NÃO calcule nem escreva a categoria BI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir destes descritores e insere no laudo. Se nenhuma massa for descrita: \"birads\":[].\n\n" : "")+
+(classifVale('birads', ex.tipo) ? "BI-RADS AUTOMÁTICO (somente mama): para CADA massa/nódulo mamário descrito no ditado, inclua um item no campo 'birads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado. Responda com o CÓDIGO, não com a frase:\n- localizacao: onde está, como o médico disse (ex.: \"mama direita, QSE\").\n- tipo: massa | naoMassa — use naoMassa SÓ quando o médico disser explicitamente que o achado é lesão não-massa (non-mass, não forma massa); na dúvida, massa. Para naoMassa os descritores de massa podem vir vazios.\n- forma: oval | lobulada | redonda | irregular\n- orientacao: paralela (paralela à pele) | nao (não paralela)\n- margem: circ (circunscrita) | indistinta | angular | microlobulada | espiculada\n- eco: anecoico | hiperecoico | isoecoico | hipoecoico | heterogeneo | misto (misto sólido e cístico)\n- posterior: nenhum (sem alteração) | reforco | sombra\n- halo: sim | nao — halo ecogênico (echogenic rind)\n- vasc: avascular | interna (vascularização interna) | periferica (hipervascularização periférica) — SÓ se o Doppler/vascularização foi mencionado no ditado.\n- elasto: macia | intermediaria | dura — SÓ se a elastografia foi mencionada.\n- pseudocapsula: sim | nao — pseudocápsula ecogênica (achado distinto do halo).\n- distribuicao (só quando tipo=naoMassa): regional | focal | linear | segmentar\n- padrao (só quando tipo=naoMassa): hiperecoico | heterogeneo | hipoecoico\n- tamanho_cm: maior medida em cm; 0 se não ditada nem legível.\n- caso_especial: SÓ quando o médico ditar explicitamente um destes, e aí os outros descritores podem vir vazios: cistoSimples | cistoComplicado | microcistos | linfonodo | cat0a | cat0b | cat6. Senão: \"\".\nDescritor não citado: \"\" (string vazia). Este é o léxico do ACR BI-RADS v2025 — NÃO use \"cístico complexo e sólido\" nem \"padrão combinado\": saíram nesta versão. NÃO calcule nem escreva a categoria BI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir destes descritores e insere no laudo. Se nenhuma massa for descrita: \"birads\":[].\n\n" : "")+
 (classifVale('orads', ex.tipo) ? "O-RADS AUTOMÁTICO (somente transvaginal e pélvica): para CADA lesão ovariana ou anexial descrita no ditado, inclua um item no campo 'orads' com o que foi DITADO — NUNCA infira. Responda com o CÓDIGO:\n- localizacao: ex.: \"ovário esquerdo\".\n- tipo: fisio (folículo ou corpo lúteo ≤ 3 cm) | uniSimples (cisto unilocular simples, anecoico, parede lisa) | uniNaoSimples (unilocular não simples, parede lisa) | uniIrreg (unilocular com parede interna irregular < 3 mm) | classica (dermoide, endometrioma ou cisto hemorrágico típicos) | multiLisa (multilocular de paredes e septos lisos) | multiIrreg (multilocular com parede ou septo irregular) | solido (com componente sólido ou projeção papilar) | solidoLiso (sólida ≥ 80% de contorno liso) | solidoIrreg (sólida ≥ 80% de contorno irregular)\n- escore_cor: 1 | 2 | 3 | 4 — escore de cor ao Doppler; \"\" se não ditado.\n- tamanho_cm: maior diâmetro em cm; 0 se não ditado.\n- papilas: número de projeções papilares; 0 se não ditado.\n- ascite: sim | nao — ascite e/ou nódulos peritoneais.\nNÃO calcule nem escreva a categoria O-RADS — o aplicativo calcula. Nenhuma lesão descrita: \"orads\":[].\n\n" : "")+
 "AVISOS SEPARADOS POR ASSUNTO (campo 'avisos'): além de 'observacoes_para_o_medico', devolva CADA aviso como um item próprio, com 'tipo' sendo EXATAMENTE uma destas palavras:\n- identificacao: nome, idade ou data que não conferem entre o ditado, as imagens e o cadastro.\n- divergencia: o ditado diz uma coisa e as imagens mostram outra.\n- faltando: medida, dado ou legenda ausente/ilegível que deixou pontilhados no laudo.\n- iacriou: você escreveu a descrição de uma patologia a partir do seu conhecimento, por não haver dizer padrão do médico (diga qual patologia).\n- outros: aviso que não caiba em nenhum acima.\nUm assunto por item, 'texto' curto e direto. Nada a avisar: \"avisos\":[]. NUNCA use os tipos 'anterior' nem 'calculo' — esses o aplicativo preenche sozinho.\n\n"+
 "DE ONDE VEIO CADA COISA (campo 'procedencia'): você já está OLHANDO as imagens para escrever este laudo — então, enquanto lê, anote de qual delas tirou cada informação. As imagens vão nesta mensagem NA ORDEM: a primeira é a imagem 1, a segunda é a 2, e assim por diante.\nDevolva um item por SEÇÃO do corpo do laudo:\n- secao: o título da seção EXATAMENTE como você o escreveu no corpo, sem os asteriscos (ex.: \"Útero\", \"RIM DIREITO\", \"Ovário direito\"). Se a informação não estiver sob um título, use \"\".\n- imagem_n: o NÚMERO da imagem de onde saiu a medida ou o achado daquela seção (1, 2, 3…). Se a informação veio SÓ do ditado e não é visível em imagem nenhuma, use 0. Se estiver em várias, use aquela em que a medida está impressa/mais legível.\n- origem: \"imagem\" (medida lida na imagem) | \"voz\" (só ditado) | \"ambos\".\n- citacao: quando a informação veio do ditado, COPIE de 4 a 12 palavras do DITADO, exatamente como estão escritas ali (sem corrigir, sem resumir) — é o pedaço que o médico falou sobre essa seção. Se não veio do ditado: \"\".\nREGRA DURA: só aponte uma imagem se você realmente leu a informação NELA. Na dúvida, imagem_n = 0 — apontar a imagem errada é pior que não apontar. Nenhuma seção identificável: \"procedencia\":[].\n\n"+
 "DADOS ESTRUTURADOS (campo 'dados_estruturados'): além do laudo, devolva os achados campo a campo, para o arquivo longitudinal do paciente. Regras:\n- Preencha APENAS com informação presente no ditado ou legível nas imagens. Campo sem informação = null (ou \"\" em texto). NUNCA invente medida, órgão ou classificação.\n- indicacao_clinica: os dados clínicos ditados, se houver.\n- conclusao_codigo: UMA palavra que resuma a conclusão — normal | benigno | provavelmente-benigno | suspeito | indeterminado | outro.\n- achados: um item por achado DESCRITO no laudo. orgao (ex.: 'mama-direita', 'figado', 'lobo-tireoidiano-esquerdo'), localizacao (ex.: 'QSE', 'terco medio'), tipo (ex.: 'nodulo', 'cisto', 'calculo', 'esteatose'), medidas em MILÍMETROS (medida_1_mm a medida_3_mm; converta de cm; null se não medida), caracteristicas (objeto livre: ecogenicidade, margens, sombra...), classificacao (ex.: 'BI-RADS 3'; \"\" se não se aplica), descricao (a frase do achado como está no laudo).\n- Exame normal, sem achados: \"achados\":[].\n\n"+
 "Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
-+(classifVale('birads', ex.tipo)?",\"birads\":[{\"localizacao\":\"\",\"forma\":\"\",\"orientacao\":\"\",\"margem\":\"\",\"eco\":\"\",\"posterior\":\"\",\"halo\":\"\",\"tamanho_cm\":0,\"caso_especial\":\"\"}]":"")
++(classifVale('birads', ex.tipo)?",\"birads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"forma\":\"\",\"orientacao\":\"\",\"margem\":\"\",\"eco\":\"\",\"posterior\":\"\",\"halo\":\"\",\"vasc\":\"\",\"elasto\":\"\",\"pseudocapsula\":\"\",\"distribuicao\":\"\",\"padrao\":\"\",\"tamanho_cm\":0,\"caso_especial\":\"\"}]":"")
 +(classifVale('orads', ex.tipo)?",\"orads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"escore_cor\":\"\",\"tamanho_cm\":0,\"papilas\":0,\"ascite\":\"\"}]":"")
 +(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0,\"aua\":\"\",\"ga\":\"\",\"edd_aua\":\"\",\"edd_ga\":\"\"}":"")+"}"
     }];
@@ -6016,6 +6071,21 @@ function processarBirads(lista, ditadoTexto){
   (lista||[]).forEach(function(d,i){
     d=d||{};
     var rot=(d.localizacao||d.local||'').trim() || (n>1?('Nódulo '+(i+1)):'Nódulo');
+    /* §13.3 v2025: lesão não-massa NÃO tem conta de categoria — registra os
+       descritores próprios (se ditados) e deixa a categoria em aberto, dito
+       às claras. O desvio vem ANTES da cobrança: forma/margem/orientação são
+       descritores de MASSA e não podem ser cobrados de uma não-massa. */
+    if(String(d.tipo||'')==='naoMassa'){
+      var DD=CLASSIF.birads.desc||[];
+      var pega=function(k){ var D=DD.filter(function(x){ return x.k===k; })[0]; return D?classifCasar(D, d[k]):null; };
+      var dist=pega('distribuicao'), pad=pega('padrao'), ped=[];
+      if(dist) ped.push('distribuição '+dist.rot.toLowerCase());
+      if(pad) ped.push('padrão ecogênico '+pad.rot.toLowerCase());
+      linhas.push((n>1?(rot+' — '):'')+'Lesão não-massa'+(ped.length?(' ('+ped.join(', ')+')'):'')
+                  +' — categoria BI-RADS não calculada pelo aplicativo.');
+      obs.push(rot+': lesão não-massa (léxico v2025) — o aplicativo não calcula categoria para este tipo de achado; a categoria é decisão clínica. Confira antes de liberar.');
+      return;
+    }
     if(d.caso_especial && BIRADS_ESPECIAIS[d.caso_especial]){
       var e=BIRADS_ESPECIAIS[d.caso_especial];
       linhas.push((n>1?(rot+' — '):'')+'Categoria: BI-RADS '+e[0]+'.');
@@ -6804,11 +6874,49 @@ const CLASSIF = {
         {v:'nenhum',  rot:'Sem alteração', sin:['sem achados posteriores','sem alteracao','ausentes','ausente','nenhum']},
         {v:'reforco', rot:'Reforço', sin:['reforco acustico','reforço acústico','realce']},
         {v:'sombra',  rot:'Sombra', susp:'sombra acústica posterior', sin:['sombra acustica','sombreamento']}]},
+      /* ---- §13.3 do manual v2025 (conhecimento/birads-mama-us-v2025.md) ----
+         Pedidos em 12/08, construídos em 17/08. Decisão do médico (16/08):
+         vascularização e elastografia CONTAM na conta quando suspeitas
+         (§5.6 do manual: interna e dura), mas NÃO são exigidas — não ditadas,
+         valem como negativas. `opcional` faz exatamente isso: não cobra e
+         não pesa na conta. */
+      {k:'vasc', rot:'Vascularização', campo:'biVasc', tipo:'select', opcional:true, ops:[
+        {v:'avascular',  rot:'Avascular', sin:['sem vascularizacao','sem vascularização','sem fluxo','fluxo ausente']},
+        {v:'interna',    rot:'Vascularização interna', susp:'vascularização interna',
+         sin:['fluxo interno','vascularizacao central','fluxo central']},
+        {v:'periferica', rot:'Hipervascularização periférica',
+         sin:['vascularizacao periferica','vascularização periférica','fluxo periferico','fluxo periférico','perinodular']}]},
+      {k:'elasto', rot:'Elastografia', campo:'biElasto', tipo:'select', opcional:true, ops:[
+        {v:'macia',         rot:'Macia', sin:['mole']},
+        {v:'intermediaria', rot:'Intermediária'},
+        {v:'dura',          rot:'Dura', susp:'elastografia dura', sin:['rigida','rígida','endurecida']}]},
       // a IA pode devolver "sim"/"não", verdadeiro/falso ou 1/0 — todos valem
       {k:'halo', rot:'Halo ecogênico', campo:'biHalo', tipo:'checkbox', opcional:true, ops:[
         {v:'nao', rot:'Ausente', sin:['nao','não','false','0','sem halo']},
         {v:'sim', rot:'Presente', susp:'halo ecogênico', nota:'incluir o halo ecogênico na medida da lesão',
-         sin:['sim','true','1','halo ecogenico','echogenic rind']}]}
+         sin:['sim','true','1','halo ecogenico','echogenic rind']}]},
+      /* Pseudocápsula ecogênica — achado associado DISTINTO do halo (§13.3,
+         item 1 da lista do manual). O manual não a lista entre os suspeitos
+         (§5.6) — entra NEUTRA: registra no laudo, não pesa na conta. */
+      {k:'pseudocapsula', rot:'Pseudocápsula ecogênica', campo:'biPseudocap', tipo:'checkbox', opcional:true, ops:[
+        {v:'nao', rot:'Ausente', sin:['nao','não','false','0','sem pseudocapsula','sem pseudocápsula']},
+        {v:'sim', rot:'Presente',
+         sin:['sim','true','1','pseudocapsula','pseudocápsula','pseudocapsula ecogenica','cápsula ecogênica','capsula ecogenica']}]},
+      /* ---- Lesão não-massa (§13.3): a categoria NÃO é calculada — o manual
+         não dá régua por descritores para não-massa, e a tela não afirma o
+         que não sabe. Os dois descritores abaixo valem só quando o achado é
+         não-massa (sobDemanda: nunca cobram; registram se ditados).
+         São 4 distribuições e 3 padrões, NA ORDEM DO MANUAL (§13.3) — a
+         §5.4 antiga listava 5 e 4, e vale o manual. */
+      {k:'distribuicao', rot:'Distribuição (lesão não-massa)', campo:'biNmDist', tipo:'select', sobDemanda:true, ops:[
+        {v:'regional',  rot:'Regional'},
+        {v:'focal',     rot:'Focal'},
+        {v:'linear',    rot:'Linear'},
+        {v:'segmentar', rot:'Segmentar'}]},
+      {k:'padrao', rot:'Padrão ecogênico (lesão não-massa)', campo:'biNmPadrao', tipo:'select', sobDemanda:true, ops:[
+        {v:'hiperecoico', rot:'Hiperecoico', sin:['hiperecogenico','hiperecogênico']},
+        {v:'heterogeneo', rot:'Heterogêneo'},
+        {v:'hipoecoico',  rot:'Hipoecoico', sin:['hipoecogenico','hipoecogênico']}]}
     ]
   },
   orads: {
@@ -7042,17 +7150,36 @@ function calcBiradsLerTela(){
   return achou;
 }
 function calcBirads(){
+  // §13.3 v2025: o tipo de achado troca o formulário (massa é o caminho de sempre)
+  var tipoA=(document.getElementById('biTipoAchado')||{}).value||'massa';
+  var em=document.getElementById('biCampoMassa'), en=document.getElementById('biCampoNaoMassa');
+  if(em) em.style.display=(tipoA==='naoMassa')?'none':'';
+  if(en) en.style.display=(tipoA==='naoMassa')?'':'none';
+  // composição do exame (§13.3): descreve a MAMA, não a lesão — nunca pesa na conta
+  var TEC={minimo:'mínimo (<25%)', discreto:'discreto (25–49%)', moderado:'moderado (50–74%)', acentuado:'acentuado (≥75%)'};
+  var tec=(document.getElementById('biTecGland')||{}).value||'';
+  var tecTxt=tec?('\nComponente de tecido glandular: '+(TEC[tec]||tec)+'.'):'';
+  if(tipoA==='naoMassa'){
+    var opRot=function(k,v){ var D=(CLASSIF.birads.desc||[]).filter(function(x){ return x.k===k; })[0]||{};
+      var o=(D.ops||[]).filter(function(x){ return x.v===v; })[0]||{}; return o.rot||''; };
+    var dist=opRot('distribuicao',(document.getElementById('biNmDist')||{}).value||'');
+    var pad=opRot('padrao',(document.getElementById('biNmPadrao')||{}).value||'');
+    var ped=[]; if(dist) ped.push('distribuição '+dist.toLowerCase()); if(pad) ped.push('padrão ecogênico '+pad.toLowerCase());
+    calcOut('biRes','Lesão não-massa'+(ped.length?(' — '+ped.join(', ')):'')+'.'
+      +'\nCategoria não calculada: o léxico BI-RADS v2025 não fornece conta de categoria por descritores para lesão não-massa — a categoria é decisão clínica.'+tecTxt);
+    return;
+  }
   var esp=(document.getElementById('biEsp')||{}).value||'';
   if(esp){
     var e=BIRADS_ESPECIAIS[esp];
-    if(e) calcOut('biRes','BI-RADS '+e[0]+'. '+e[1]);
+    if(e) calcOut('biRes','BI-RADS '+e[0]+'. '+e[1]+tecTxt);
     return;
   }
   var achou=calcBiradsLerTela();
   // o médico está olhando a tela e sabe o que deixou em branco: basta o essencial
-  if(!achou.forma||!achou.orientacao||!achou.margem){ calcOut('biRes',''); return; }
+  if(!achou.forma||!achou.orientacao||!achou.margem){ calcOut('biRes',tec?tecTxt.replace(/^\n/,''):''); return; }
   var r=biradsAvaliar(achou), n=r.susp.length;
-  calcOut('biRes','BI-RADS '+r.cat+(n?' — descritores suspeitos: '+r.susp.join(', ')+'.':' — descritores benignos (margem circunscrita, orientação paralela, sem sombra acústica).')+'\n'+r.cond+(r.notas.length?'\nNotas: '+r.notas.join('; ')+'.':'')+'\n(Apoio por descritores — a categoria final considera o conjunto clínico-radiológico.)');
+  calcOut('biRes','BI-RADS '+r.cat+(n?' — descritores suspeitos: '+r.susp.join(', ')+'.':' — descritores benignos (margem circunscrita, orientação paralela, sem sombra acústica).')+'\n'+r.cond+(r.notas.length?'\nNotas: '+r.notas.join('; ')+'.':'')+tecTxt+'\n(Apoio por descritores — a categoria final considera o conjunto clínico-radiológico.)');
 }
 function calcOradsLerTela(){
   var achou={};

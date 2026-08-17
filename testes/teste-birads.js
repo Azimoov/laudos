@@ -29,7 +29,8 @@ let falhas = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FALHA ') + m); if (!c) falhas++; };
 
 // ---- DOM de mentira ----
-const state = { biEsp: '', biEco: '', biHalo: false };
+const state = { biEsp: '', biEco: '', biHalo: false, biVasc: '', biElasto: '', biPseudocap: false,
+                biTipoAchado: '', biTecGland: '', biNmDist: '', biNmPadrao: '' };
 const radios = {};
 const RES = {};
 const document = {
@@ -37,6 +38,13 @@ const document = {
     if (id === 'biEsp') return { value: state.biEsp };
     if (id === 'biEco') return { value: state.biEco };
     if (id === 'biHalo') return { checked: state.biHalo };
+    if (id === 'biPseudocap') return { checked: state.biPseudocap };
+    if (id === 'biVasc') return { value: state.biVasc };
+    if (id === 'biElasto') return { value: state.biElasto };
+    if (id === 'biTipoAchado') return { value: state.biTipoAchado };
+    if (id === 'biTecGland') return { value: state.biTecGland };
+    if (id === 'biNmDist') return { value: state.biNmDist };
+    if (id === 'biNmPadrao') return { value: state.biNmPadrao };
     if (id === 'biRes') return RES;
     return null;
   },
@@ -51,14 +59,19 @@ Object.defineProperty(RES, 'textContent', { set(v) { RES._v = v; }, get() { retu
 const src = [
   bloco(/const CLASSIF = \{[\s\S]*?\n\};/, 'CLASSIF'),
   bloco(/const BIRADS_ESPECIAIS = \{[\s\S]*?\n\};/, 'BIRADS_ESPECIAIS'),
+  grab('norm'), grab('classifCasar'), grab('classifLerDescritores'),
+  grab('classifCategoriaDitada'), grab('classifConferir'),
   grab('calcRadio'), grab('calcOut'),
-  grab('biradsAvaliar'), grab('calcBiradsLerTela'), grab('calcBirads')
+  grab('biradsAvaliar'), grab('calcBiradsLerTela'), grab('calcBirads'), grab('processarBirads')
 ].join('\n');
-const api = new Function('document', src + '\nreturn {calcBirads, biradsAvaliar, CLASSIF};')(document);
-const { calcBirads, CLASSIF } = api;
+const api = new Function('document', src + '\nreturn {calcBirads, biradsAvaliar, CLASSIF, processarBirads};')(document);
+const { calcBirads, CLASSIF, processarBirads } = api;
 
 function rodar(c) {
   state.biEsp = c.esp || ''; state.biEco = c.eco || ''; state.biHalo = !!c.halo;
+  state.biVasc = c.vasc || ''; state.biElasto = c.elasto || ''; state.biPseudocap = !!c.pseudocap;
+  state.biTipoAchado = c.tipoAchado || ''; state.biTecGland = c.tec || '';
+  state.biNmDist = c.nmDist || ''; state.biNmPadrao = c.nmPad || '';
   radios.biForma = c.forma; radios.biOri = c.ori; radios.biMarg = c.marg; radios.biPost = c.post;
   RES._v = '';
   calcBirads();
@@ -134,6 +147,82 @@ ok(cat(rodar({ ...benigno, marg: 'espiculada' })) === '4C', 'espiculada sozinha 
 ok(cat(rodar({ forma: 'irregular', ori: 'nao', marg: 'espiculada', eco: 'heterogeneo', post: 'sombra' })) === '5',
    'espiculada + varios suspeitos -> 5');
 ok(rodar({ forma: 'oval', ori: 'paralela' }) === '', 'sem margem, nao arrisca categoria nenhuma');
+
+console.log('=== v2025 §13.3 — os cinco itens pedidos em 12/08, construidos em 17/08 ===');
+// a tela: os seletores novos existem no bloco da mama, com as opcoes NA ORDEM DO MANUAL
+const selVasc = dentroDaMama(/<select id="biVasc"[\s\S]*?<\/select>/, 'select biVasc');
+const opsVasc = [...selVasc.matchAll(/<option value="(\w+)"/g)].map(m => m[1]);
+ok(opsVasc.join(',') === 'avascular,interna,periferica', 'vascularizacao: as 3 do manual (' + opsVasc.join(',') + ')');
+const selEl = dentroDaMama(/<select id="biElasto"[\s\S]*?<\/select>/, 'select biElasto');
+const opsEl = [...selEl.matchAll(/<option value="(\w+)"/g)].map(m => m[1]);
+ok(opsEl.join(',') === 'macia,intermediaria,dura', 'elastografia: macia, intermediaria, dura');
+ok(/biPseudocap/.test(MAMA), 'pseudocapsula ecogenica esta nos achados associados');
+const selDist = dentroDaMama(/<select id="biNmDist"[\s\S]*?<\/select>/, 'select biNmDist');
+const opsDist = [...selDist.matchAll(/<option value="(\w+)"/g)].map(m => m[1]);
+ok(opsDist.join(',') === 'regional,focal,linear,segmentar',
+   'nao-massa: QUATRO distribuicoes na ordem do manual — "difusa" (da 5a ed.) NAO esta');
+const selPad = dentroDaMama(/<select id="biNmPadrao"[\s\S]*?<\/select>/, 'select biNmPadrao');
+const opsPad = [...selPad.matchAll(/<option value="(\w+)"/g)].map(m => m[1]);
+ok(opsPad.join(',') === 'hiperecoico,heterogeneo,hipoecoico',
+   'nao-massa: TRES padroes na ordem do manual — "anecoico" NAO esta');
+const selTec = dentroDaMama(/<select id="biTecGland"[\s\S]*?<\/select>/, 'select biTecGland');
+const opsTec = [...selTec.matchAll(/<option value="(\w+)"/g)].map(m => m[1]);
+ok(opsTec.join(',') === 'minimo,discreto,moderado,acentuado', 'tecido glandular: as 4 faixas do manual');
+
+// a tela e a tabela nao podem divergir — tambem nos novos
+ok(daTabela('vasc').join(',') === opsVasc.join(','), 'vascularizacao: tabela === tela');
+ok(daTabela('elasto').join(',') === opsEl.join(','), 'elastografia: tabela === tela');
+ok(daTabela('distribuicao').join(',') === opsDist.join(','), 'distribuicao nao-massa: tabela === tela');
+ok(daTabela('padrao').join(',') === opsPad.join(','), 'padrao nao-massa: tabela === tela');
+
+console.log('=== decisao do medico (16/08): contam quando suspeitas; ausencia = negativa ===');
+const descDe = k => CLASSIF.birads.desc.find(d => d.k === k);
+ok(descDe('vasc').opcional === true && descDe('elasto').opcional === true,
+   'vascularizacao e elastografia sao OPCIONAIS: nao ditadas, nao cobram cartao');
+ok(descDe('pseudocapsula').opcional === true, 'pseudocapsula e opcional');
+ok(descDe('distribuicao').sobDemanda === true && descDe('padrao').sobDemanda === true,
+   'descritores de nao-massa nunca cobram cartao (sobDemanda)');
+ok(cat(rodar({ ...benigno, vasc: 'interna' })) === '4A', 'vascularizacao INTERNA conta: 4A');
+ok(cat(rodar({ ...benigno, elasto: 'dura' })) === '4A', 'elastografia DURA conta: 4A');
+ok(cat(rodar({ ...benigno, vasc: 'avascular' })) === '3', 'avascular nao pesa: segue 3');
+ok(cat(rodar({ ...benigno, vasc: 'periferica' })) === '3', 'hipervascularizacao periferica nao pesa (§5.6): segue 3');
+ok(cat(rodar({ ...benigno, elasto: 'macia' })) === '3', 'macia nao pesa: segue 3');
+ok(cat(rodar({ ...benigno, elasto: 'intermediaria' })) === '3', 'intermediaria nao pesa: segue 3');
+ok(cat(rodar({ ...benigno, vasc: 'interna', elasto: 'dura' })) === '4B', 'interna + dura = dois suspeitos: 4B');
+ok(cat(rodar({ ...benigno, pseudocap: true })) === '3', 'pseudocapsula e NEUTRA: nao tira da 3');
+ok(!descDe('pseudocapsula').ops.some(o => o.susp), 'pseudocapsula nao carrega marca de suspeicao');
+
+console.log('=== tecido glandular: registra, nao pesa ===');
+const comTec = rodar({ ...benigno, tec: 'moderado' });
+ok(cat(comTec) === '3', 'tecido glandular nao muda a conta');
+ok(/tecido glandular: moderado \(50/.test(comTec), 'e sai escrito no resultado');
+ok(/tecido glandular/.test(rodar({ tec: 'minimo' })), 'so a composicao, sem descritores: sai a composicao');
+ok(!/BI-RADS/.test(rodar({ tec: 'minimo' })), 'e sem categoria nenhuma');
+
+console.log('=== lesao nao-massa: NUNCA uma categoria ===');
+const nm = rodar({ tipoAchado: 'naoMassa', nmDist: 'segmentar', nmPad: 'hipoecoico' });
+ok(/Les.o n.o-massa/.test(nm), 'nao-massa: o resultado diz o que e');
+ok(!/BI-RADS\s+[0-6]/.test(nm), 'e NUNCA imprime uma categoria numerada');
+ok(/n.o calculada/.test(nm) && /decis.o cl.nica/.test(nm), 'diz as claras: categoria e decisao clinica');
+ok(/distribui..o segmentar/.test(nm) && /hipoecoico/.test(nm), 'os descritores ditos aparecem');
+ok(/Les.o n.o-massa\./.test(rodar({ tipoAchado: 'naoMassa' })), 'sem descritores: so o fato, sem inventar');
+// e mesmo com os campos de massa preenchidos por engano, o tipo manda
+ok(!/BI-RADS\s+[0-6]/.test(rodar({ tipoAchado: 'naoMassa', ...benigno })), 'tipo nao-massa ignora os campos de massa');
+
+console.log('=== o laudo automatico (processarBirads) ===');
+const rb = processarBirads([{ localizacao: 'mama direita, QSE', tipo: 'naoMassa',
+                              distribuicao: 'segmentar', padrao: 'hipoecoico' }], '');
+ok(rb.pendencias.length === 0, 'nao-massa NAO cobra forma/margem/orientacao (sao descritores de massa)');
+ok(rb.linhas.length === 1 && /n.o calculada/.test(rb.linhas[0]), 'a linha do laudo diz: categoria nao calculada');
+ok(/distribui..o segmentar/.test(rb.linhas[0]), 'a distribuicao ditada aparece na linha');
+const rb2 = processarBirads([{ localizacao: 'mama esquerda', forma: 'oval', orientacao: 'paralela',
+                               margem: 'circunscrita', eco: 'hipoecoico', posterior: 'sem alteracao' }], '');
+ok(/BI-RADS 3/.test(rb2.linhas[0] || ''), 'massa sem vasc/elasto ditadas: categoria sai normalmente (ausencia = negativa)');
+ok(rb2.pendencias.length === 0, 'e sem cobranca de vascularizacao/elastografia');
+const rb3 = processarBirads([{ localizacao: 'mama esquerda', forma: 'oval', orientacao: 'paralela',
+                               margem: 'circunscrita', eco: 'hipoecoico', posterior: 'sem alteracao',
+                               vasc: 'vascularizacao interna' }], '');
+ok(/BI-RADS 4A/.test(rb3.linhas[0] || ''), 'vascularizacao interna ditada: 4A no laudo automatico');
 
 console.log('=== os termos aposentados nao voltam pela porta dos fundos ===');
 // mesmo que alguem force o valor antigo, ele nao pode contar como descritor suspeito

@@ -5148,12 +5148,18 @@ async function capOrtVarrer(){
     var lista=await capOrtListar();
     for(var i=0;i<lista.length;i++){
       var e=lista[i];
-      if(capOrtSeen.has(e.id)||capOrtFeitos.has(e.id)) continue;
+      if(capOrtSeen.has(e.id)) continue;
+      // exame já capturado continua VIGIADO: o aparelho faz pausas no envio e
+      // imagens podem chegar depois do fechamento (ver capOrtCompletar)
+      if(capOrtFeitos.has(e.id)){ try{ await capOrtCompletar(e); }catch(_){} continue; }
       var st=capOrtStable[e.id]||{n:-1,ciclos:0};
       if(e.nImagens===st.n){ st.ciclos++; } else { st.n=e.nImagens; st.ciclos=0; }
       capOrtStable[e.id]=st;
-      // espera o nº de imagens parar de crescer (o envio ainda pode estar em curso)
-      if(e.nImagens>0 && st.ciclos>=1){ capOrtFeitos.add(e.id); delete capOrtStable[e.id]; await capOrtProcessar(e); }
+      // espera o nº de imagens ficar parado por DOIS ciclos (~8-12 s). Um ciclo só
+      // fechava exame pela metade: o envio do aparelho tem pausas reais (mediana
+      // 18-25 s para chegar inteiro, máximo medido 523 s) — mordeu em 17/08, dia
+      // de atendimento, com exames capturados com 1 imagem quando havia 6.
+      if(e.nImagens>0 && st.ciclos>=2){ capOrtFeitos.add(e.id); delete capOrtStable[e.id]; await capOrtProcessar(e); }
       else if(e.nImagens>0){ capOrtStatusTxt('Recebendo exame de '+(e.paciente||'?')+'… ('+e.nImagens+' imagem(ns))'); }
     }
   }catch(e){ capOrtStatusTxt('Erro ao consultar o agente: '+((e&&e.message)||e)); }
@@ -5452,6 +5458,37 @@ function horaDoEstudoMs(e){
   return isNaN(ms) ? null : ms;
 }
 
+/* O que falta baixar deste estudo? (pura, para o teste exercitar) */
+function capOrtFaltantes(ex, est){
+  var tem={}; ((ex&&ex._instIds)||[]).forEach(function(id){ tem[id]=true; });
+  return ((est&&est.instancias)||[]).filter(function(id){ return !tem[id]; });
+}
+/* Um exame já capturado pode CRESCER: o aparelho faz pausas no envio (máximo medido:
+   523 s) e imagens podem chegar DEPOIS do fechamento da captura. A varredura continua
+   de olho nos estudos feitos: apareceu imagem nova, baixa só o que falta, reencaixa
+   NA ORDEM do estudo (a atrasada pode pertencer ao meio, pela hora de aquisição) e
+   avisa — inclusive para gerar o laudo de novo se ele já tinha saído sem elas.
+   (17/08/2026, dia de atendimento na estável: exames capturados com 1 imagem quando
+   o arquivo tinha 6 — a espera de um ciclo só era menor que as pausas do aparelho.) */
+async function capOrtCompletar(est){
+  var ex=exames.find(function(x){ return x._estudoId===est.id; });
+  if(!ex || !ex._instIds) return;              // exame de antes do conserto: sem o mapa
+  var faltam=capOrtFaltantes(ex, est);
+  if(!faltam.length) return;
+  var mapa={}; ex._instIds.forEach(function(id,i){ mapa[id]=ex.imagens[i]; });
+  var novas=0;
+  for(var i=0;i<faltam.length;i++){
+    try{ mapa[faltam[i]]=await capOrtBaixar(faltam[i]); novas++; }
+    catch(e){ log('Falha ao baixar imagem atrasada: '+((e&&e.message)||e), true); }
+  }
+  if(!novas) return;
+  var ids=(est.instancias||[]).filter(function(id){ return mapa[id]!=null; });
+  ex._instIds=ids; ex.imagens=ids.map(function(id){ return mapa[id]; });
+  renderExames(); capRenderNovos();
+  log('⚠️ '+ex.paciente+': chegaram +'+novas+' imagem(ns) DEPOIS da captura (total '+ex.imagens.length+').'
+      +(ex.laudo?' O laudo já tinha saído SEM elas — gere de novo antes de liberar.':''), true);
+  capOrtStatusTxt('Chegaram +'+novas+' imagem(ns) de '+(ex.paciente||'?')+' — completadas.');
+}
 async function capOrtProcessar(est){
   // Já temos este exame do aparelho na lista? As listas de controle (capOrtSeen/capOrtFeitos)
   // vivem só na memória e são zeradas ao RECARREGAR a página — sem esta conferência o mesmo
@@ -5464,9 +5501,12 @@ async function capOrtProcessar(est){
     return;
   }
   capOrtStatusTxt('🆕 Exame de '+(est.paciente||'?')+' chegou — baixando '+est.nImagens+' imagem(ns)…');
-  var imagens=[];
+  // imagens e instIds andam EMPARELHADOS: é o mapa que permite completar depois
+  // (capOrtCompletar) o que o aparelho ainda não tinha enviado — ou o que falhou aqui
+  var imagens=[], instIds=[];
   for(var i=0;i<(est.instancias||[]).length;i++){
-    try{ imagens.push(await capOrtBaixar(est.instancias[i])); }catch(err){ log('Falha ao baixar imagem: '+err.message,true); }
+    try{ var du=await capOrtBaixar(est.instancias[i]); imagens.push(du); instIds.push(est.instancias[i]); }
+    catch(err){ log('Falha ao baixar imagem: '+err.message,true); }
   }
   if(!imagens.length){ capOrtStatusTxt('Exame de '+(est.paciente||'?')+' sem imagens legíveis — ignorado.'); return; }
   /* 15/08/2026 — nascPac e sexoPac PASSARAM A SER COPIADOS AQUI. O agente já os
@@ -5477,7 +5517,7 @@ async function capOrtProcessar(est){
      aparelho tinha mandado o sexo direitinho. O aviso culpava o aparelho por uma perda
      que era daqui. */
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _instIds:instIds, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');

@@ -53,6 +53,18 @@ ok(/est\.instancias\|\|\[\]\)\.filter/.test(completar) && /ids\.map/.test(comple
 ok(/gere de novo/.test(completar),
    'se o laudo ja tinha saido, o medico e avisado para gerar de novo');
 
+console.log('=== a sessao mora no agente (17/08) ===');
+// A memoria do navegador e por endereco, e a porta do programa e sorteada a
+// cada abertura: fechar a janela apagava o dia inteiro, laudos prontos
+// incluidos (mordeu em 17/08). A copia OFICIAL agora vai para o agente.
+ok(/fetch\(agenteBase\(\)\+'\/sessao'/.test(HTML), 'o app grava e le a sessao no AGENTE');
+ok(/_sessaoDoAgente/.test(HTML), 'a restauracao distingue a copia do agente da do navegador');
+ok(/_instIds:e\._instIds\|\|\[\]/.test(HTML), 'o retrato da sessao leva o mapa das imagens');
+ok(/exames\/laudo\?uid=/.test(HTML), 'o Recuperar pergunta ao BANCO antes de re-gerar');
+ok(/restaurado do banco/.test(HTML), 'laudo restaurado e dito ao medico e nao se re-gera sozinho');
+ok((HTML.match(/laudo_obj:JSON\.stringify\(ex\.laudo/g) || []).length >= 2,
+   'a forma estruturada vai ao banco na GERACAO e na ASSINATURA');
+
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');
 process.exit(falhas ? 1 : 0);

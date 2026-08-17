@@ -221,7 +221,12 @@ def conectar(caminho=None):
 # passa direto. Sem isto, um banco antigo continuaria sem os campos novos e as
 # gravacoes falhariam com "no such column".
 COLUNAS_NOVAS = {
-    'exames': [('transcricao', 'TEXT')],       # 10/08/2026
+    'exames': [('transcricao', 'TEXT'),        # 10/08/2026
+               # 17/08/2026: o laudo ESTRUTURADO como o app o usa (JSON inteiro),
+               # para o "Recuperar" devolver o laudo IDENTICO em vez de re-gerar.
+               # Atualizado a cada assinatura (gravar_final) - e sempre a forma
+               # mais recente. O texto continua em laudo_gerado/laudo_final.
+               ('laudo_obj', 'TEXT')],
 }
 
 
@@ -313,11 +318,11 @@ def gravar_exame(payload, caminho=None):
         cur = con.execute(
             'INSERT INTO exames (paciente_id, data_exame, tipo_exame, indicacao_clinica,'
             ' study_uid, conclusao_codigo, laudo_gerado, json_gerado, modelo_ia,'
-            ' custo_estimado_usd, transcricao) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+            ' custo_estimado_usd, transcricao, laudo_obj) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
             (pid, e.get('data_exame'), e.get('tipo_exame'), e.get('indicacao_clinica'),
              e.get('study_uid'), e.get('conclusao_codigo'), e.get('laudo_gerado'),
              e.get('json_gerado'), e.get('modelo_ia'), e.get('custo_estimado_usd'),
-             e.get('transcricao')))
+             e.get('transcricao'), e.get('laudo_obj')))
         eid = cur.lastrowid
 
         # versao 1 do historico = o que a IA escreveu. As correcoes do medico
@@ -349,7 +354,7 @@ def gravar_exame(payload, caminho=None):
         con.close()
 
 
-def gravar_final(exame_id, laudo_final, caminho=None, motivo=None):
+def gravar_final(exame_id, laudo_final, caminho=None, motivo=None, laudo_obj=None):
     """POST /exames/<id>/final — o laudo assinado pelo medico.
 
     Desde 10/08/2026 NADA e perdido aqui: cada assinatura vira uma linha em
@@ -366,11 +371,42 @@ def gravar_final(exame_id, laudo_final, caminho=None, motivo=None):
         con.execute(
             "UPDATE exames SET laudo_final=?, finalizado_em=datetime('now','localtime')"
             ' WHERE id=?', (laudo_final, exame_id))
+        # 17/08/2026: a forma estruturada acompanha cada assinatura, para o
+        # Recuperar devolver o laudo como o medico o deixou, nao a versao da IA
+        if laudo_obj:
+            con.execute('UPDATE exames SET laudo_obj=? WHERE id=?', (laudo_obj, exame_id))
         con.commit()
         if row['laudo_final']:
             _log('exame %s: nova versao assinada (v%s); a anterior continua guardada'
                  % (exame_id, versao))
         return {'ok': True, 'exame_id': exame_id, 'versao': versao}
+    finally:
+        con.close()
+
+
+def laudo_guardado(study_uid, caminho=None):
+    """GET /exames/laudo?uid=... — o laudo guardado de um exame, pelo study_uid.
+
+    Existe para o "Recuperar" nao re-gerar o que ja existe (17/08/2026: os
+    laudos do dia foram refeitos porque a sessao morreu junto com a janela).
+    Devolve a forma ESTRUTURADA (laudo_obj) quando houver, e os textos como
+    apoio. Sem nome de paciente: quem pergunta ja tem o exame na mao."""
+    uid = str(study_uid or '').strip()
+    if not uid:
+        raise ValueError('uid obrigatorio')
+    con = conectar(caminho)
+    try:
+        r = con.execute(
+            'SELECT id, laudo_obj, laudo_final, laudo_gerado, tipo_exame, finalizado_em'
+            ' FROM exames WHERE study_uid=? ORDER BY id DESC LIMIT 1', (uid,)).fetchone()
+        if r is None:
+            return {'ok': True, 'achou': False}
+        n = con.execute('SELECT COUNT(*) c FROM laudo_versoes WHERE exame_id=?',
+                        (r['id'],)).fetchone()['c']
+        return {'ok': True, 'achou': True, 'exame_id': r['id'],
+                'tipo_exame': r['tipo_exame'], 'laudo_obj': r['laudo_obj'],
+                'laudo_final': r['laudo_final'], 'laudo_gerado': r['laudo_gerado'],
+                'finalizado': bool(r['finalizado_em']), 'versoes': n}
     finally:
         con.close()
 
@@ -591,7 +627,13 @@ def responder(metodo, caminho, corpo):
             # 'motivo' e opcional: o app ainda nao tem campo para ele, mas a
             # rota ja aceita, para nao precisar mexer no agente depois.
             return (200, gravar_final(int(m.group(1)), texto,
-                                      motivo=(corpo or {}).get('motivo')))
+                                      motivo=(corpo or {}).get('motivo'),
+                                      laudo_obj=(corpo or {}).get('laudo_obj')))
+        if metodo == 'GET' and (caminho or '').startswith('/exames/laudo'):
+            # 17/08/2026: o Recuperar pergunta antes de re-gerar
+            from urllib.parse import parse_qs, urlparse
+            uid = (parse_qs(urlparse(caminho).query).get('uid') or [''])[0]
+            return (200, laudo_guardado(uid))
         if metodo == 'GET' and caminho == '/exames/liberados':
             return (200, liberados())
         if metodo == 'GET' and (caminho or '').startswith('/exames/resumo'):

@@ -2490,12 +2490,21 @@ async function salvarSessao(comImagens){
     var db=await dbOpen();
     // _estudoId/_dicom/_captura PRECISAM entrar no snapshot: é por eles que a recuperação
     // sabe que o exame já existe. Sem isso ela recriava tudo e o exame saía DUPLICADO.
-    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_dicom:!!e._dicom,_captura:!!e._captura,_preset:e._preset||''}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
+    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_instIds:e._instIds||[],_dicom:!!e._dicom,_captura:!!e._captura,_preset:e._preset||''}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
     var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||''}; });
     await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();
       // lista vazia = apagou tudo: limpa e não grava nada (senão voltaria um "0 laudos")
       if(snap.length) st.add({quando:Date.now(),exames:snap,audios:audsMeta});
       tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});
+    // 17/08: a cópia OFICIAL vai para o AGENTE (arquivo em disco) — a memória do
+    // navegador é por endereço, e a porta do programa é sorteada a cada abertura:
+    // fechar a janela apagava o dia inteiro, laudos prontos incluídos. A cópia
+    // acima (navegador) vira reserva. Lista vazia = 'null' = apagar lá também.
+    try{
+      fetch(agenteBase()+'/sessao',{method:'POST',headers:{'Content-Type':'application/json'},
+        body: snap.length ? JSON.stringify({quando:Date.now(),exames:snap,audios:audsMeta}) : 'null'
+      }).catch(function(){});
+    }catch(e){}
   }catch(e){}
 }
 /* Throttle: no máx. 1×/5s. Durante o lote salva só texto (leve); fora do lote salva com as fotos. */
@@ -2505,28 +2514,46 @@ function agendarSalvarSessao(){
   if(_sessTimer) return;
   _sessTimer=setTimeout(function(){ _sessTimer=null; if(_sessPend){ _sessPend=false; salvarSessao(!_gerandoEmLote); } }, 5000);
 }
+var _sessaoDoAgente=null;
 async function verificarSessaoSalva(){
   try{
+    // 17/08: a sessão OFICIAL mora no agente — sobrevive à porta sorteada, à
+    // janela fechada e ao reinício do Windows. Vale a mais NOVA das duas cópias.
+    var doAgente=null;
+    try{
+      var ctrlA=new AbortController(); var tA=setTimeout(function(){ctrlA.abort();},2500);
+      var ra=await fetch(agenteBase()+'/sessao',{signal:ctrlA.signal}); clearTimeout(tA);
+      var ja=await ra.json();
+      if(ja && ja.exames && ja.exames.length) doAgente=ja;
+    }catch(e){}
     var db=await dbOpen();
     var lista=await new Promise(function(res,rej){var rq=db.transaction('sessoes').objectStore('sessoes').getAll();rq.onsuccess=function(){res(rq.result||[]);};rq.onerror=function(){rej(rq.error);};});
-    if(!lista.length){ audsBlobLimpar(); return; }
-    var ult=lista[lista.length-1];
+    var doNav=lista.length?lista[lista.length-1]:null;
+    var ult=null;
+    if(doAgente && (!doNav || (doAgente.quando||0)>=(doNav.quando||0))){ ult=doAgente; _sessaoDoAgente=doAgente; }
+    else if(doNav){ ult=doNav; _sessaoDoAgente=null; }
+    if(!ult){ audsBlobLimpar(); return; }
     if(Date.now()-ult.quando>24*3600*1000){ audsBlobLimpar(); return; }   // sessão velha: apaga também os áudios guardados
     var n=ult.exames.length;
     var dt=new Date(ult.quando).toLocaleString('pt-BR');
     var b=document.createElement('div');
     b.id='bannerRecup';
     b.style='position:fixed;bottom:0;left:0;right:0;background:#1f5fa6;color:#fff;padding:13px 18px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:14px;box-shadow:0 -2px 10px rgba(0,0,0,.25);flex-wrap:wrap';
-    b.innerHTML='<span>💾 Sessão anterior encontrada: <b>'+n+' laudo'+(n===1?'':'s')+'</b> gerado'+(n===1?'':'s')+' em '+dt+'</span>'
-      +'<button onclick="restaurarSessao('+ult.id+')" style="background:#fff;color:#1f5fa6;border:0;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer">Restaurar</button>'
-      +'<button onclick="descartarSessao('+ult.id+')" style="background:transparent;color:#c9dff7;border:1px solid #6ea8d8;border-radius:6px;padding:6px 12px;cursor:pointer">Descartar</button>';
+    var idBtn=_sessaoDoAgente?-1:ult.id;   // -1 = veio do agente (não tem id de navegador)
+    b.innerHTML='<span>💾 Sessão anterior encontrada: <b>'+n+' laudo'+(n===1?'':'s')+'</b> gerado'+(n===1?'':'s')+' em '+dt+(_sessaoDoAgente?' (guardada no agente)':'')+'</span>'
+      +'<button onclick="restaurarSessao('+idBtn+')" style="background:#fff;color:#1f5fa6;border:0;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer">Restaurar</button>'
+      +'<button onclick="descartarSessao('+idBtn+')" style="background:transparent;color:#c9dff7;border:1px solid #6ea8d8;border-radius:6px;padding:6px 12px;cursor:pointer">Descartar</button>';
     document.body.appendChild(b);
   }catch(e){}
 }
 async function restaurarSessao(id){
   try{
-    var db=await dbOpen();
-    var sess=await new Promise(function(res,rej){var rq=db.transaction('sessoes').objectStore('sessoes').get(id);rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};});
+    var sess;
+    if(id===-1){ sess=_sessaoDoAgente; }   // 17/08: a cópia veio do agente
+    else{
+      var db=await dbOpen();
+      sess=await new Promise(function(res,rej){var rq=db.transaction('sessoes').objectStore('sessoes').get(id);rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};});
+    }
     if(!sess) return;
     exames=sess.exames.map(function(e){return Object.assign({audios:[],imagens:[],metaConf:1,_liberado:false},e);});   // _liberado/audios salvos no snapshot sobrescrevem os defaults
     _sessaoViva=true;   // restaurou: a partir daqui, apagar tudo tem de valer de verdade
@@ -2545,7 +2572,9 @@ async function restaurarSessao(id){
   }catch(e){ log('Falha ao restaurar: '+e.message,true); }
 }
 async function descartarSessao(id){
-  try{ var db=await dbOpen(); await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');tx.objectStore('sessoes').delete(id);tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}catch(e){}
+  if(id!==-1){ try{ var db=await dbOpen(); await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');tx.objectStore('sessoes').delete(id);tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});}catch(e){} }
+  // descartar é descartar nas DUAS cópias — senão o banner voltava pela do agente
+  try{ fetch(agenteBase()+'/sessao',{method:'POST',headers:{'Content-Type':'application/json'},body:'null'}).catch(function(){}); }catch(e){}
   audsBlobLimpar();
   var b=document.getElementById('bannerRecup'); if(b) b.remove();
 }
@@ -3418,6 +3447,8 @@ function bancoMontarPayload(ex, resp){
            study_uid:String(ex._estudoId||'')||null,
            conclusao_codigo:CODIGOS[cod]?cod:'outro',
            laudo_gerado:textoClinicoLaudo(ex.laudo), json_gerado:JSON.stringify(resp||{}),
+           // 17/08: a forma ESTRUTURADA viaja junto — é ela que o Recuperar devolve
+           laudo_obj:JSON.stringify(ex.laudo||null),
            modelo_ia:cfg.modelo||'', custo_estimado_usd:null,
            transcricao:String(ex._transcricao||'')||null},
     achados:achados
@@ -3447,7 +3478,7 @@ async function bancoEnviarFinal(ex, texto){
   if(!texto) return;
   try{
     if(ex._bancoId==null) throw new Error('exame ainda sem id no banco');
-    var r=await fetch(agenteBase()+'/exames/'+ex._bancoId+'/final',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({laudo_final:texto})});
+    var r=await fetch(agenteBase()+'/exames/'+ex._bancoId+'/final',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({laudo_final:texto, laudo_obj:JSON.stringify(ex.laudo||null)})});
     var j=await r.json();
     if(!r.ok||!j||!j.ok) throw new Error((j&&j.erro)||('HTTP '+r.status));
     bancoStatusAtualizar();
@@ -4595,6 +4626,18 @@ async function capRecuperar(){
             idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
     ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
     ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
+    // 17/08: antes de re-gerar, pergunta ao BANCO — o laudo pode já existir lá.
+    // Restaurado = nada a refazer (e o capAutoVincular respeita, ver lá).
+    try{
+      var rb=await fetch(agenteBase()+'/exames/laudo?uid='+encodeURIComponent(est.id));
+      var jb=await rb.json();
+      if(jb && jb.achou && jb.laudo_obj){
+        ex.laudo=JSON.parse(jb.laudo_obj);
+        log('Laudo de '+ex.paciente+' RESTAURADO do banco ('+(jb.versoes||1)+' versão(ões); veio a mais recente). Nada a refazer.');
+      } else if(jb && jb.achou && (jb.laudo_final||jb.laudo_gerado)){
+        log('⚠️ '+ex.paciente+': o banco guarda só o TEXTO deste laudo (gravado antes do conserto de 17/08). Se re-gerar, confira contra o texto guardado.', true);
+      }
+    }catch(e){}
     exames.push(ex);
     // o ditado guardado volta como áudio do exame (com o WAV original p/ você poder ouvir)
     // dit.quando: a hora que o agente carimbou quando guardou este ditado.
@@ -4721,6 +4764,8 @@ async function capAutoVincular(ex, aCerto){
   if(a.lateralidade && !ex.lateralidade) ex.lateralidade=normLateralidade(a.lateralidade);
   capRenderPendentes(); renderExames(); capRenderNovos();
   if(!ex.tipo){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado, mas o TIPO do exame não foi dito — escolha o tipo e gere.'); log('Diga o tipo do exame no ditado (ex.: "abdome total") para o laudo sair sozinho.',true); return; }
+  // 17/08: laudo RESTAURADO do banco não se re-gera sozinho — regenerar é decisão do médico
+  if(ex.laudo){ capOrtStatusTxt('✅ '+ex.paciente+': ditado vinculado e laudo restaurado do banco — nada a gerar.'); return; }
   if(!auto){ capOrtStatusTxt('🆕 '+ex.paciente+': ditado vinculado. Toque em gerar quando quiser.'); return; }
   if(!await temIA()){ capOrtStatusTxt('Sem IA: ligue o agente na clínica ou configure a chave da API.'); return; }
   capOrtStatusTxt('⚙️ Gerando o laudo de '+ex.paciente+'…');

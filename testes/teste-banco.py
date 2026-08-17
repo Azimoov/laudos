@@ -276,6 +276,34 @@ banco.gravar_final(r3['exame_id'], 'assinado sem uid', caminho=DB)
 ok(None not in uids and '' not in banco.liberados(caminho=DB)['uids'],
    'exame sem study_uid nao entra na lista (nao haveria como casar)')
 
+print('=== laudo estruturado (laudo_obj) e a leitura do Recuperar (17/08) ===')
+# 17/08/2026: os laudos do dia foram refeitos porque a sessao morreu com a
+# janela. O banco passa a guardar a FORMA estruturada (laudo_obj) e a rota
+# /exames/laudo?uid= devolve — o Recuperar restaura em vez de re-gerar.
+pl = payload(nome='Rita Recuperada', cod='777')
+pl['exame']['study_uid'] = 'st-recup-1'
+pl['exame']['laudo_obj'] = '{"corpo":"CORPO ESTRUTURADO","conclusao":"C1"}'
+rr = banco.gravar_exame(pl, DB)
+g = banco.laudo_guardado('st-recup-1', DB)
+ok(g['achou'] and g['laudo_obj'] == pl['exame']['laudo_obj'],
+   'laudo_obj volta IDENTICO pelo study_uid')
+ok(g['finalizado'] is False and g['versoes'] == 1,
+   'antes de assinar: 1 versao, nao finalizado')
+banco.gravar_final(rr['exame_id'], 'TEXTO ASSINADO', DB,
+                   laudo_obj='{"corpo":"CORRIGIDO PELO MEDICO"}')
+g2 = banco.laudo_guardado('st-recup-1', DB)
+ok(g2['laudo_obj'] == '{"corpo":"CORRIGIDO PELO MEDICO"}',
+   'a assinatura ATUALIZA a forma estruturada (volta como o medico deixou)')
+ok(g2['finalizado'] is True and g2['versoes'] == 2,
+   'assinou: 2 versoes no historico e finalizado')
+ok(banco.laudo_guardado('st-nao-existe', DB)['achou'] is False,
+   'uid desconhecido: achou=False, sem erro')
+try:
+    banco.laudo_guardado('', DB)
+    ok(False, 'uid vazio deveria recusar')
+except ValueError:
+    ok(True, 'uid vazio e recusado com erro claro')
+
 print('=== saude ===')
 r = banco.saude(DB)
 ok(r['ok'] and r['total_exames'] >= 6, 'saude responde com o total de exames')

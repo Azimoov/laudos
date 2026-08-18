@@ -46,24 +46,43 @@ ok(/#telaRev2 \.lg\.on\{[^}]*font-weight:700/.test(HTML),
 
 console.log('=== 3. o destaque da foto (botao IMG) tem de saltar aos olhos ===');
 const viva = regra('#telaRev2 .grade img.viva');
-ok(/border:3px solid #0E6E6B/i.test(viva || ''), 'borda de 3px no verde cheio (era 2,5px)');
-ok(/transform:scale\(1\.12\)/.test(viva || ''), 'a foto citada cresce um degrau');
-ok(/box-shadow:0 0 0 4px/.test(viva || ''), 'e ganha um halo em volta');
+ok(/border:3px solid #0B5F5C/i.test(viva || ''), 'borda de 3px no verde escuro');
+// 18/08: o anel era um verde translucido que se perdia; agora e cor CHEIA
+ok(/box-shadow:0 0 0 5px #12B5AC/i.test(viva || ''),
+   'o anel usa o verde-agua ACESO e opaco (#12B5AC), nao um tom translucido');
+ok(!/rgba\(14,110,107,\.32\)/.test(viva || ''), 'o anel lavado de antes saiu');
 ok(/animation:rv2Pisca/.test(viva || ''), 'com um piscar no momento do toque');
 ok(/@keyframes rv2Pisca/.test(HTML), 'e o piscar esta definido');
+ok(/rgba\(18,181,172,1\)/.test(HTML), 'o piscar comeca na cor cheia');
 ok(/z-index:10/.test(viva || ''), 'aparecendo por cima das vizinhas');
 
-console.log('=== 4. passar o mouse aumenta a foto ===');
-const hover = regra('#telaRev2 .grade img:hover');
-ok(!!hover, 'a regra de passar o mouse existe');
-ok(/transform:scale\(1\.9\)/.test(hover || ''), 'a foto quase dobra de tamanho');
-ok(/z-index:20/.test(hover || ''), 'e sobe por cima das outras (nao empurra a grade)');
-ok(/transition:transform/.test(regra('#telaRev2 .grade img') || ''),
-   'o crescimento e suave, nao um salto');
-ok(/#telaRev2 \.grade img\.viva:hover\{transform:scale\(1\.9\)\}/.test(HTML),
-   'a foto ja destacada tambem cresce ao passar o mouse');
-ok(/padding:6px 8px 6px 6px/.test(regra('#telaRev2 .grade') || ''),
-   'a grade tem folga em volta para a foto crescer sem ser cortada');
+console.log('=== 4. passar o mouse mostra a foto GRANDE, fora do quadradinho ===');
+// 18/08/2026: crescer a propria miniatura NAO resolve — a grade tem rolagem
+// (overflow) e corta tudo que passa da borda dela. Era por isso que a foto "so
+// aumentava dentro do quadradinho". A foto grande passou a ser um elemento
+// separado (#rv2Lupa), que vive FORA da grade e nao e cortado por nada.
+ok(/<img id="rv2Lupa"/.test(HTML), 'existe o elemento da foto ampliada (a lupa)');
+ok(!/#telaRev2 [^{]*#rv2Lupa/.test(HTML) && /#rv2Lupa\{position:fixed/.test(HTML),
+   'ela e posicionada na TELA (fixed), nao dentro da grade');
+ok(/z-index:9999/.test(regra('#rv2Lupa') || ''), 'e fica por cima de tudo');
+ok(/pointer-events:none/.test(regra('#rv2Lupa') || ''), 'sem roubar o clique da miniatura');
+ok(/object-fit:contain/.test(regra('#rv2Lupa') || ''),
+   'mostra a imagem INTEIRA (a miniatura e cortada; aqui o medico quer ver tudo)');
+const lupaJs = (function () {
+  const i = HTML.indexOf('function rev2LupaMostrar(');
+  return i < 0 ? '' : HTML.slice(i, HTML.indexOf('\nfunction rev2LupaEsconder'));
+})();
+ok(/r\.width\*3/.test(lupaJs), 'o tamanho e ~300% da miniatura (pedido de 18/08)');
+ok(/window\.innerWidth/.test(lupaJs) && /window\.innerHeight/.test(lupaJs),
+   'e ela nunca sai da tela, por maior que a foto seja');
+ok(/function rev2LupaEsconder/.test(HTML) && /mouseout/.test(HTML),
+   'some quando o mouse sai da foto');
+ok(/addEventListener\('scroll', rev2LupaEsconder/.test(HTML),
+   'e tambem ao rolar a lista de fotos (senao ficaria flutuando sozinha)');
+ok(/rev2LupaEsconder\(\); \}catch\(e\)\{\} \}/.test(HTML),
+   'e ao fechar a tela de revisao');
+ok((HTML.match(/_rv2LupaLigada/g) || []).length === 3,
+   'os ouvintes sao ligados UMA vez (a lista de fotos e redesenhada a cada laudo)');
 
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');

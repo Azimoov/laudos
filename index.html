@@ -316,7 +316,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 
       <h2 class="ab-titulo">Qual a atividade de hoje?</h2>
 
-      <button class="ab-botao" onclick="abEscolher('acumulados')">
+      <button class="ab-botao" onclick="antAbrir()">
         <span class="ab-icone">🗂</span>
         <span style="flex:1">
           <span class="ab-nome">Fazer laudos com fotos e áudios antigos</span>
@@ -676,6 +676,150 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <!-- a foto ampliada mora AQUI, fora da grade: dentro dela seria cortada pela
        rolagem (18/08/2026). Ver rev2LupaLigar. -->
   <img id="rv2Lupa" alt="">
+</div>
+
+<!-- ======================= TELA 1b: FOTOS E ÁUDIOS ANTIGOS (2.0) ===============
+     Desenhada pelo Dr. Daniel em 18/08/2026. É a porta nova para o que a aba
+     "Arquivos acumulados" do 1.0 fazia.
+     O ENCANAMENTO É O MESMO de sempre: o material escolhido aqui vai para as
+     mesmas entradas de arquivo que a aba antiga usa, e quem processa continua
+     sendo `processar()` — a esteira que lê a legenda, identifica o paciente,
+     casa o ditado e gera o laudo, já testada. Esta tela é a porta, não um
+     encanamento novo: duplicar aquela esteira seria criar uma segunda verdade. -->
+<style>
+#telaAntigos{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
+#telaAntigos .ab-folha{max-width:1060px;margin:20px auto;background:#FAFBFC;
+  border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
+#telaAntigos .ab-topo{background:#0E3A40;color:#fff;padding:16px 26px;
+  display:flex;align-items:center;gap:14px}
+#telaAntigos .ab-topo .tit{flex:1;text-align:center;font-size:16px;font-weight:700}
+#telaAntigos .lnk{background:none;border:0;color:#B9D6D4;font-size:13.5px;cursor:pointer;font:inherit}
+#telaAntigos .ab-corpo{padding:22px 26px 26px}
+#telaAntigos .eb{font-size:11.5px;font-weight:700;color:#0E6E6B;letter-spacing:1.2px;margin:0 0 12px 2px}
+#telaAntigos .eb.dep{margin-top:26px}
+#telaAntigos .duas{display:flex;gap:18px;flex-wrap:wrap;align-items:stretch}
+#telaAntigos .duas>*{flex:1 1 420px;min-width:300px}
+#telaAntigos .fonte{background:#fff;border:1px solid #E2E5EA;border-radius:10px;
+  padding:18px 20px;text-align:left;cursor:pointer;font:inherit;color:#1C2430;display:block;
+  transition:border-color .12s ease, background .12s ease}
+#telaAntigos .fonte:hover{border-color:#0E6E6B}
+#telaAntigos .fonte .n{font-size:16.5px;font-weight:700;display:flex;align-items:center;gap:10px}
+#telaAntigos .fonte .s{display:block;font-size:12.5px;color:#6B7480;margin-top:7px}
+#telaAntigos .fonte .selo{margin-left:auto;background:#FBEACB;border:1px solid #B0851C;
+  color:#6B5010;border-radius:14px;padding:4px 13px;font-size:12px;font-weight:600}
+#telaAntigos .fonte.on{background:#0E6E6B;border-color:#0E6E6B;color:#fff}
+#telaAntigos .fonte.on .s{color:#CFE7E5}
+#telaAntigos .cx{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:18px 20px}
+#telaAntigos .cx .lb{font-size:11.5px;font-weight:700;color:#5A6472;letter-spacing:1.1px;margin-bottom:12px}
+#telaAntigos .solta{border:2px dashed #C3CCD6;border-radius:10px;padding:26px 16px;text-align:center;
+  cursor:pointer;transition:border-color .12s ease, background .12s ease}
+#telaAntigos .solta:hover,#telaAntigos .solta.sobre{border-color:#0E6E6B;background:#F2F9F8}
+#telaAntigos .solta .t{font-size:13.5px;color:#3C4753;margin-top:10px}
+#telaAntigos .solta .t2{font-size:12px;color:#8A93A0;margin-top:5px}
+#telaAntigos .minis{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+#telaAntigos .minis img{width:84px;height:52px;object-fit:cover;border-radius:6px;border:1px solid #CBD3DB}
+#telaAntigos .minis .cnt{font-size:12.5px;color:#5A6472}
+#telaAntigos .gravar{display:flex;align-items:center;gap:16px}
+#telaAntigos .bolha{flex:0 0 74px;height:74px;border-radius:50%;background:#0E6E6B;color:#fff;
+  border:0;cursor:pointer;font-size:30px;line-height:1}
+#telaAntigos .bolha.gravando{background:#C43B3B;animation:rv2Pulsa 1.2s ease-in-out infinite}
+#telaAntigos .gravar .n{font-size:15.5px;font-weight:600;color:#1C2430}
+#telaAntigos .gravar .s{display:block;font-size:12.5px;color:#6B7480;margin-top:4px}
+#telaAntigos .risco{border:0;border-top:1px solid #E7EAEE;margin:16px 0 12px}
+#telaAntigos .anexar{background:none;border:0;padding:0;font:inherit;font-size:13px;
+  color:#0E6E6B;text-decoration:underline;cursor:pointer}
+#telaAntigos .arq{display:flex;align-items:center;gap:10px;background:#F4F7F9;border:1px solid #DCE2E8;
+  border-radius:8px;padding:9px 12px;margin-top:11px;font-size:12.5px;color:#26303C}
+#telaAntigos .arq .pl{flex:0 0 26px;height:26px;border-radius:50%;background:#0E6E6B;color:#fff;
+  border:0;cursor:pointer;font-size:11px}
+#telaAntigos .arq .x{margin-left:auto;background:none;border:0;color:#8A93A0;cursor:pointer;font:inherit;font-size:15px}
+#telaAntigos .baixo{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px}
+#telaAntigos .baixo>*{flex:1 1 420px;min-width:300px}
+#telaAntigos .rot{font-size:11.5px;font-weight:700;color:#5A6472;letter-spacing:1.1px;margin-bottom:8px}
+#telaAntigos select,#telaAntigos input[type=text]{width:100%;font:inherit;font-size:13px;
+  color:#12202B;background:#fff;border:1.5px solid #9FB3B2;border-radius:16px;padding:9px 14px;box-sizing:border-box}
+#telaAntigos select{font-weight:600;border-color:#0E6E6B}
+#telaAntigos select option{color:#12202B;background:#fff}
+#telaAntigos .acao{display:block;width:100%;max-width:600px;margin:26px auto 0;background:#0E6E6B;
+  color:#fff;border:0;border-radius:12px;padding:17px 22px;font:inherit;font-size:16.5px;
+  font-weight:700;cursor:pointer}
+#telaAntigos .acao:hover{background:#0B5F5C}
+#telaAntigos .acao:disabled{background:#9FB3B2;cursor:default}
+#telaAntigos .nota{text-align:center;font-size:12px;color:#8A93A0;margin:12px 0 0}
+#telaAntigos .aviso2{display:none;margin:14px auto 0;max-width:700px;padding:11px 14px;
+  background:#FBEACB;border:1px solid #B0851C;border-radius:8px;font-size:13px;color:#6B5010;line-height:1.5}
+</style>
+
+<div id="telaAntigos">
+  <div class="ab-folha">
+    <div class="ab-topo">
+      <button class="lnk" onclick="antFechar()">‹ Início</button>
+      <span class="tit">Fazer laudos com fotos e áudios antigos</span>
+      <span style="width:64px"></span>
+    </div>
+    <div class="ab-corpo">
+
+      <p class="eb">1 · DE ONDE VEM O MATERIAL?</p>
+      <div class="duas">
+        <button class="fonte" id="antFonteArq" onclick="antFonte('arquivados')">
+          <span class="n">Exames arquivados <span class="selo" id="antGuardados">—</span></span>
+          <span class="s">puxa as imagens e o áudio de um exame que você arquivou</span>
+        </button>
+        <button class="fonte on" id="antFonteNovo" onclick="antFonte('novo')">
+          <span class="n">Laudo novo em branco ✓</span>
+          <span class="s">monte do zero com o material abaixo</span>
+        </button>
+      </div>
+
+      <p class="eb dep">2 · MATERIAL DO EXAME</p>
+      <div class="duas">
+        <div class="cx">
+          <div class="lb">IMAGENS</div>
+          <div class="solta" id="antSolta" onclick="document.getElementById('antImgs').click()">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9AA5B1"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+            <div class="t">arraste as imagens de ultrassom aqui</div>
+            <div class="t2">ou toque para escolher — JPG · PNG · DICOM</div>
+          </div>
+          <div class="minis" id="antMinis"></div>
+          <input type="file" id="antImgs" accept="application/pdf,image/*,.dcm" multiple style="display:none">
+        </div>
+
+        <div class="cx">
+          <div class="lb">ÁUDIO</div>
+          <div class="gravar">
+            <button class="bolha" id="antMic" onclick="antGravar()" title="Gravar ditado agora">🎙</button>
+            <span style="flex:1">
+              <span class="n">Gravar ditado agora</span>
+              <span class="s" id="antMicSub">fale o tipo do exame e os achados</span>
+            </span>
+          </div>
+          <hr class="risco">
+          <button class="anexar" onclick="document.getElementById('antAudio').click()">ou anexar um arquivo de áudio antigo…</button>
+          <div id="antArqs"></div>
+          <input type="file" id="antAudio" accept="audio/*,.m4a" multiple style="display:none">
+        </div>
+      </div>
+
+      <div class="baixo">
+        <div>
+          <div class="rot">MODELO DO EXAME</div>
+          <select id="antModelo"></select>
+        </div>
+        <div>
+          <div class="rot">PACIENTE</div>
+          <input type="text" id="antPaciente" placeholder="lido das imagens quando houver — complete na revisão">
+        </div>
+      </div>
+
+      <button class="acao" id="antGerar" onclick="antGerar()">Gerar laudo → enviar para Liberar laudos</button>
+      <p class="nota">o laudo gerado entra na fila de “Liberar laudos” com os mesmos alertas coloridos da revisão</p>
+      <p class="aviso2" id="antAviso"></p>
+    </div>
+  </div>
 </div>
 
 <!-- ======================= TELA 2: REALIZAR EXAMES (2.0) =======================
@@ -8965,6 +9109,205 @@ function abEscolher(aba){
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='inline-block';
   if(aba) mostrarAba(aba);
 }
+/* ============ TELA 1b: FOTOS E ÁUDIOS ANTIGOS (18/08/2026) ============
+   A porta nova para o que a aba "Arquivos acumulados" faz. O material escolhido
+   aqui é DEPOSITADO nas mesmas entradas de arquivo da aba antiga e processado
+   por `processar()`: a esteira que lê a legenda, identifica o paciente, casa o
+   ditado e gera o laudo. Duplicá-la seria criar uma segunda verdade — e a
+   primeira é a que está testada. */
+var _antImgs=[], _antAuds=[], _antMr=null;
+
+function antAbrir(){
+  var t=document.getElementById('telaAbertura'); if(t) t.style.display='none';
+  var a=document.getElementById('telaAntigos'); if(a) a.style.display='block';
+  antModelos(); antContarArquivados(); antPintar();
+  antAvisar('');
+  window.scrollTo(0,0);
+}
+function antFechar(){
+  if(_antMr && _antMr.state==='recording'){ try{ _antMr.stop(); }catch(e){} }
+  var a=document.getElementById('telaAntigos'); if(a) a.style.display='none';
+  var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';
+  try{ abContarPendentes(); }catch(e){}
+  window.scrollTo(0,0);
+}
+function antAvisar(txt, ruim){
+  var p=document.getElementById('antAviso'); if(!p) return;
+  p.textContent=txt||''; p.style.display=txt?'block':'none';
+  p.style.background=ruim?'#FBE0E0':'#FBEACB';
+  p.style.borderColor=ruim?'#B32E2E':'#B0851C';
+  p.style.color=ruim?'#8F2222':'#6B5010';
+  if(txt) log(txt, !!ruim);
+}
+function antModelos(){
+  var s=document.getElementById('antModelo'); if(!s || s.options.length) return;
+  var ks=Object.keys(MODELOS).sort(function(a,b){
+    return String(MODELOS[a].nome||a).localeCompare(String(MODELOS[b].nome||b),'pt-BR',{sensitivity:'base'}); });
+  s.innerHTML='<option value="">Detectar pelo ditado</option>'
+    +ks.map(function(k){ return '<option value="'+esc(k)+'">'+esc(MODELOS[k].nome||k)+'</option>'; }).join('');
+}
+/* quantos exames o agente guardou (é o mesmo número que o "Recuperar" usa) */
+async function antContarArquivados(){
+  var e=document.getElementById('antGuardados'); if(e) e.textContent='—';
+  try{
+    var r=await fetch(agenteBase()+'/exame/ditados');
+    var j=await r.json();
+    var n=Object.keys((j&&j.ditados)||{}).length;
+    if(e) e.textContent=n+' guardado'+(n===1?'':'s');
+  }catch(err){ if(e) e.textContent='agente fora do ar'; }
+}
+function antFonte(qual){
+  var arq=document.getElementById('antFonteArq'), novo=document.getElementById('antFonteNovo');
+  if(qual==='arquivados'){
+    // não muda de tela por conta própria: puxa o material guardado para cá
+    antAvisar('Buscando os exames guardados no computador…');
+    if(arq) arq.classList.add('on'); if(novo) novo.classList.remove('on');
+    capRecuperar().then(function(){
+      var n=exames.filter(function(x){ return x.laudo; }).length;
+      antAvisar(n? ('Recuperados '+n+' laudo(s) — toque em “Liberar laudos” na tela inicial para revisar.')
+                 : 'Nada novo a recuperar. Os exames que já estavam carregados continuam na fila.');
+    }).catch(function(e){ antAvisar('Não consegui recuperar: '+(e&&e.message||e), true); });
+    return;
+  }
+  if(novo) novo.classList.add('on'); if(arq) arq.classList.remove('on');
+  antAvisar('');
+}
+/* ---- imagens: escolher, arrastar, mostrar ---- */
+function antAddImgs(lista){
+  Array.prototype.forEach.call(lista||[], function(f){
+    var t=(f.type||''), nome=(f.name||'');
+    if(t.indexOf('image')===0 || t.indexOf('pdf')>=0 || /\.(dcm|dicom|pdf)$/i.test(nome)) _antImgs.push(f);
+  });
+  antPintar();
+}
+function antAddAuds(lista){
+  Array.prototype.forEach.call(lista||[], function(f){ _antAuds.push(f); });
+  antPintar();
+}
+function antTirarImg(i){ _antImgs.splice(i,1); antPintar(); }
+function antTirarAud(i){ _antAuds.splice(i,1); antPintar(); }
+function antSeg(n){ n=Math.max(0,Math.round(n||0));
+  return n<60 ? (n+' s') : (Math.floor(n/60)+' min '+('0'+(n%60)).slice(-2)+' s'); }
+function antPintar(){
+  var m=document.getElementById('antMinis');
+  if(m){
+    var mostrar=_antImgs.slice(0,3);
+    m.innerHTML=mostrar.map(function(f,i){
+      var u=URL.createObjectURL(f);
+      return '<img src="'+u+'" title="'+esc(f.name||'')+'" onclick="antTirarImg('+i+')" '
+            +'onload="URL.revokeObjectURL(this.src)">'; }).join('')
+      +(_antImgs.length?('<span class="cnt">'+_antImgs.length
+        +(_antImgs.length===1?' imagem adicionada':' imagens adicionadas')+'</span>'):'');
+  }
+  var a=document.getElementById('antArqs');
+  if(a){
+    a.innerHTML=_antAuds.map(function(f,i){
+      return '<div class="arq"><button class="pl" onclick="antOuvir('+i+')" title="ouvir">▶</button>'
+        +'<span>'+esc(f.name||'ditado')+(f._seg?(' · '+antSeg(f._seg)):'')+'</span>'
+        +'<button class="x" onclick="antTirarAud('+i+')" title="tirar">✕</button></div>'; }).join('');
+  }
+  var b=document.getElementById('antGerar');
+  if(b) b.disabled=!(_antImgs.length || _antAuds.length);
+}
+function antOuvir(i){
+  var f=_antAuds[i]; if(!f) return;
+  var au=new Audio(URL.createObjectURL(f)); au.play().catch(function(){});
+}
+/* ---- gravar o ditado agora (mesmo caminho do 1.0: grava e vira arquivo) ---- */
+function antGravar(){
+  var b=document.getElementById('antMic'), s=document.getElementById('antMicSub');
+  if(_antMr && _antMr.state==='recording'){ try{ _antMr.stop(); }catch(e){} return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){
+    antAvisar('Este navegador não grava áudio. Use “anexar um arquivo de áudio antigo”.', true); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+    var mr=new MediaRecorder(st), pedacos=[], t0=Date.now();
+    mr.ondataavailable=function(e){ if(e.data&&e.data.size) pedacos.push(e.data); };
+    mr.onstop=function(){
+      st.getTracks().forEach(function(t){ t.stop(); });
+      if(b) b.classList.remove('gravando');
+      clearInterval(window.__antRel);
+      var seg=Math.round((Date.now()-t0)/1000);
+      var blob=new Blob(pedacos,{type:(mr.mimeType||'audio/webm')});
+      if(!blob.size){ if(s) s.textContent='fale o tipo do exame e os achados';
+        antAvisar('Não gravou nada — o microfone pode estar mudo.', true); return; }
+      var f=new File([blob], 'ditado-gravado-'+new Date().toISOString().slice(11,19).replace(/:/g,'')+'.webm',
+                     {type:blob.type});
+      f._seg=seg; _antAuds.push(f); antPintar();
+      if(s) s.textContent='gravado ('+antSeg(seg)+') — pode gravar outro se quiser';
+      antAvisar('');
+    };
+    if(b) b.classList.add('gravando');
+    mr.start(); _antMr=mr;
+    clearInterval(window.__antRel);
+    window.__antRel=setInterval(function(){
+      if(s) s.textContent='🔴 gravando '+antSeg(Math.round((Date.now()-t0)/1000))+' — toque de novo para parar';
+    }, 500);
+    if(s) s.textContent='🔴 gravando — toque de novo para parar';
+  }).catch(function(e){
+    antAvisar('Não consegui abrir o microfone'+((e&&e.name==='NotAllowedError')
+      ?': o Windows ou o programa negou a permissão. Use “anexar um arquivo de áudio antigo”.':'.'), true);
+  });
+}
+/* ---- gerar: deposita nas entradas de sempre e chama a esteira testada ---- */
+function antParaInput(id, arquivos){
+  var inp=document.getElementById(id); if(!inp) return;
+  var dt=new DataTransfer();
+  arquivos.forEach(function(f){ dt.items.add(f); });
+  inp.files=dt.files;
+}
+async function antGerar(){
+  if(!_antImgs.length && !_antAuds.length){
+    antAvisar('Escolha ao menos as imagens ou um áudio antes de gerar.', true); return; }
+  var b=document.getElementById('antGerar');
+  if(b){ b.disabled=true; b.textContent='Gerando…'; }
+  antAvisar('Processando o material — isso pode levar alguns minutos.');
+  try{
+    // o material vai para as MESMAS entradas que a aba antiga usa
+    antParaInput('inpExames', _antImgs);
+    antParaInput('inpAudios', _antAuds);
+    var mod=(document.getElementById('antModelo')||{}).value||'';
+    var pac=((document.getElementById('antPaciente')||{}).value||'').trim();
+    window.__antForcar={tipo:mod, paciente:pac};   // aplicado depois, em antAplicarEscolhas
+    await processar();
+    antAplicarEscolhas();
+    var prontos=exames.filter(function(x){ return x.laudo; }).length;
+    if(prontos){
+      antAvisar('✅ '+prontos+' laudo(s) pronto(s). Abrindo a fila de revisão…');
+      setTimeout(function(){ antFechar(); abLiberarLaudos(); }, 900);
+    } else {
+      antAvisar('O material foi processado, mas nenhum laudo saiu pronto — confira os avisos no diário.', true);
+    }
+  }catch(e){
+    antAvisar('Falha ao gerar: '+((e&&e.message)||e), true);
+  }finally{
+    if(b){ b.disabled=false; b.textContent='Gerar laudo → enviar para Liberar laudos'; }
+  }
+}
+/* O que o médico escolheu à mão MANDA no que a IA deduziu — mas só onde ele
+   escreveu: campo vazio não apaga o que foi lido da imagem. */
+function antAplicarEscolhas(){
+  var f=window.__antForcar||{}; if(!f.tipo && !f.paciente) return;
+  exames.forEach(function(ex){
+    if(f.tipo) ex.tipo=f.tipo;
+    if(f.paciente) ex.paciente=f.paciente;
+  });
+  window.__antForcar=null;
+}
+function antLigarArrastar(){
+  var z=document.getElementById('antSolta'); if(!z || z._ligado) return;
+  ['dragenter','dragover'].forEach(function(ev){
+    z.addEventListener(ev, function(e){ e.preventDefault(); z.classList.add('sobre'); }); });
+  ['dragleave','drop'].forEach(function(ev){
+    z.addEventListener(ev, function(e){ e.preventDefault(); z.classList.remove('sobre'); }); });
+  z.addEventListener('drop', function(e){ antAddImgs(e.dataTransfer&&e.dataTransfer.files); });
+  var i=document.getElementById('antImgs');
+  if(i) i.addEventListener('change', function(){ antAddImgs(i.files); i.value=''; });
+  var a=document.getElementById('antAudio');
+  if(a) a.addEventListener('change', function(){ antAddAuds(a.files); a.value=''; });
+  z._ligado=true;
+}
+window.addEventListener('DOMContentLoaded', antLigarArrastar);
+
 function abVoltarInicio(){
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
@@ -9034,7 +9377,7 @@ window.addEventListener('DOMContentLoaded', function(){
    essas telas, e uma tela nova amanhã repetiria o defeito sem ninguém notar. Aqui basta
    acrescentar o id à lista. */
 (function(){
-  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2'];
+  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2','telaAntigos'];
   function travarFundo(){
     var algumaAberta = TELAS_CHEIAS.some(function(id){
       var el=document.getElementById(id);

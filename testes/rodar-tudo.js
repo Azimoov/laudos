@@ -32,6 +32,7 @@ const SUITE = [
   { arq: 'teste-formatacao.js', o: 'barra de formatacao da tela de revisao (ida e volta)' },
   { arq: 'teste-tela-revisao.js', o: 'tela de revisao: descritor recalcula e assinar registra' },
   { arq: 'teste-visual-revisao.js', o: 'aparencia da tela de revisao (cores, destaque, mouse)' },
+  { arq: 'teste-tela-antigos.js', o: 'tela de fotos e audios antigos (porta nova, esteira de sempre)' },
   { arq: 'teste-conferente.js', o: 'conferente: segunda leitura do laudo antes de entregar' },
   { arq: 'teste-rede.js', o: 'rede debaixo da transcricao (placa->CPU->nuvem)' },
   { arq: 'teste-provedor.js', o: 'endereco do provedor de IA configuravel' },

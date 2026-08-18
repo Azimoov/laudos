@@ -24,9 +24,20 @@ function grab(name) {
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FALHA ') + m); if (!c) falhas++; };
 
-const src = [grab('norm'), grab('rev2Proc'), grab('rev2Trecho'), grab('rev2AudioDoTrecho')].join('\n');
-const api = new Function(src + '\nreturn {rev2Proc, rev2Trecho, rev2AudioDoTrecho};')();
-const { rev2Proc, rev2Trecho, rev2AudioDoTrecho } = api;
+function bloco(re, oque) {
+  const m = HTML.match(re);
+  if (!m) throw new Error('nao achei o bloco ' + oque);
+  return m[0];
+}
+const src = [grab('norm'), grab('rev2Proc'), grab('rev2Trecho'), grab('rev2AudioDoTrecho'),
+             grab('faltaTitulo'), grab('faltaGrupos'), grab('medidasFaltando'),
+             bloco(/const FALTA\s*=\s*\{[\s\S]*?\n\};/, 'FALTA'),
+             bloco(/const REV2_MOLDURA = [^\n]*/, 'REV2_MOLDURA'),
+             grab('rev2TituloDeMoldura'), grab('rev2Blocos'), grab('rev2Estado')].join('\n');
+const api = new Function(src + '\nreturn {rev2Proc, rev2Trecho, rev2AudioDoTrecho,'
+  + ' rev2Blocos, rev2Estado, rev2TituloDeMoldura};')();
+const { rev2Proc, rev2Trecho, rev2AudioDoTrecho, rev2Blocos, rev2Estado,
+        rev2TituloDeMoldura } = api;
 
 const ex = { laudo: {
   procedencia: [
@@ -72,6 +83,43 @@ ok(rev2AudioDoTrecho(doisAudios, { inicio: 1, fim: 2 }) === doisAudios[0],
 ok(rev2AudioDoTrecho([{}, {}], ex.laudo.trechos[0]) === null,
    'nenhum audio com URL -> nada a tocar (sem erro)');
 ok(rev2AudioDoTrecho([], ex.laudo.trechos[0]) === null, 'lista vazia -> nada a tocar');
+
+console.log('=== o que vira retangulo (decisao do medico, 17/08) ===');
+// "Titulo do exame, descricao, metodo e tecnica nao precisam de retangulo — sao
+// sempre iguais e nao vao mudar." O estrago que isto conserta: a IA escreve
+// **MAMA DIREITA** e na linha seguinte **DESCRICAO:**, e o corte por titulo
+// separava o nome do orgao (com as fichas VOZ/IMG) dos achados (com a cor).
+// o achado em negrito e LONGO, como nos laudos de verdade: negrito com menos de
+// 70 caracteres e lido como titulo pelo faltaTitulo (regra que ja existia)
+const CORPO = ['**MAMA DIREITA**', '**DESCRIÇÃO:**', '',
+               'Mama simétrica.', '',
+               'Parênquima de padrão heterogêneo. **Notou-se imagem nodular, sólida,'
+               + ' hipoecogênica, de forma oval, margens circunscritas, no quadrante'
+               + ' superior externo, distando 5 cm da papila mamária.**', '',
+               '**MAMA ESQUERDA**', '**DESCRIÇÃO:**', '',
+               'Mama simétrica.', '',
+               'Região axilar livre.'].join('\n');
+const bl = rev2Blocos({ corpo: CORPO });
+ok(bl.length === 2, 'orgao + "DESCRICAO" viram UM retangulo por orgao (' + bl.length + ')');
+ok(bl[0].titulo === 'MAMA DIREITA' && bl[1].titulo === 'MAMA ESQUERDA',
+   'o titulo do retangulo e o ORGAO, nunca "DESCRICAO"');
+ok(bl.every(b => /DESCRIÇÃO/.test(b.texto)),
+   'e o cabecalho fixo continua no texto (editavel, so nao vira moldura)');
+ok(rev2TituloDeMoldura('DESCRIÇÃO') && rev2TituloDeMoldura('Técnica')
+   && rev2TituloDeMoldura('MÉTODO') && rev2TituloDeMoldura('achados'),
+   'descricao, tecnica, metodo e achados sao moldura');
+ok(!rev2TituloDeMoldura('MAMA DIREITA') && !rev2TituloDeMoldura('Ovário direito')
+   && !rev2TituloDeMoldura('Endométrio'),
+   'nome de orgao NUNCA e moldura');
+
+console.log('=== e a cor nao se confunde com a moldura (alarme falso de 17/08) ===');
+const exVazio = { laudo: { procedencia: [], trechos: [] } };
+ok(rev2Estado(exVazio, bl[0]) === 'alterado',
+   'orgao com achado em negrito: alterado');
+ok(rev2Estado(exVazio, bl[1]) !== 'alterado',
+   'orgao NORMAL nao vira alterado por causa do "DESCRICAO:" em negrito');
+ok(rev2Estado(exVazio, bl[1]) === 'normal',
+   'e o orgao normal fica cinza, como no desenho');
 
 console.log('=== as amarras no codigo-fonte ===');
 ok(HTML.indexOf('DE ONDE VEIO CADA COISA') >= 0, 'o pedido a IA exige a procedencia (secao/imagem/citacao)');

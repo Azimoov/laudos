@@ -8208,10 +8208,24 @@ function rev2Voltar(){
 function rev2Calculadoras(){ rev2Fechar(); mostrarAba('calc'); }
 
 /* ---- corta o corpo do laudo em retângulos, um por título em negrito ---- */
+/* Títulos que são MOLDURA do laudo, não conteúdo clínico: não abrem retângulo.
+   Decisão do Dr. Daniel em 17/08/2026, depois do primeiro laudo de teste ponta a
+   ponta: "título do exame, descrição, método e técnica não precisam de retângulo
+   — são sempre iguais e não vão mudar". Continuam editáveis, dentro do retângulo
+   do órgão a que pertencem; o que some é a moldura e as fichas VOZ/IMG neles.
+   O estrago que isto conserta: a IA escreve **MAMA DIREITA** e, na linha
+   seguinte, **DESCRIÇÃO:** — e o corte por título separava o nome do órgão (que
+   ficava com as fichas VOZ/IMG) dos achados dele (que ficavam com a cor de
+   alterado). O desenho aprovado quer as duas coisas no MESMO retângulo. */
+const REV2_MOLDURA = /^(descri[çc][ãa]o|achados?|t[ée]cnica|m[ée]todo|exame|relat[óo]rio|laudo|conclus[ãa]o)$/i;
+function rev2TituloDeMoldura(t){ return REV2_MOLDURA.test(String(t||'').trim()); }
+
 function rev2Blocos(L){
   var linhas=String((L&&L.corpo)||'').split('\n'), blocos=[], at=null;
   linhas.forEach(function(li){
     var t=faltaTitulo(li);
+    // moldura: continua no retângulo atual em vez de abrir um novo
+    if(t && rev2TituloDeMoldura(t)) t=null;
     if(t){ at={titulo:t, linhas:[li]}; blocos.push(at); return; }
     if(!at){ at={titulo:'', linhas:[]}; blocos.push(at); }
     at.linhas.push(li);
@@ -8234,8 +8248,17 @@ function rev2Estado(ex, b){
   // a caixinha âmbar DENTRO dele (rev2Caixas). É como está no desenho — o "Ovário
   // direito" continua verde de alterado, com a caixa de conflito por dentro. Repintar
   // o cartão apagaria a informação de que aquele trecho tem um achado.
-  var resto=b.titulo ? b.texto.replace(/\*\*[^*]{1,70}\*\*/,'') : b.texto;
-  if(/\*\*/.test(resto)) return 'alterado';   // negrito além do título = achado patológico
+  // Tira do texto os negritos que são MOLDURA — o título do órgão e os cabeçalhos
+  // fixos ("DESCRIÇÃO:", "TÉCNICA:"). O que sobrar em negrito é achado patológico.
+  // ⚠️ Aqui morava um defeito, achado no laudo de teste de 17/08: a versão antiga
+  // apagava só o PRIMEIRO negrito. Quando "DESCRIÇÃO:" passou a viver dentro do
+  // retângulo do órgão, ele sobrava e pintava de "alterado" uma mama NORMAL —
+  // alarme falso, o pior tipo de erro nesta tela.
+  var resto=b.texto.replace(/\*\*([^*]{1,70})\*\*/g, function(m, t){
+    var lim=String(t).replace(/[:\s]+$/,'').trim();
+    return (lim===b.titulo || rev2TituloDeMoldura(lim)) ? '' : m;
+  });
+  if(/\*\*/.test(resto)) return 'alterado';   // negrito além da moldura = achado patológico
   // informação que veio do ditado (indicação clínica, história) não é "órgão sem
   // alteração": fica branca e legível, em vez de apagada em cinza
   var pr=rev2Proc(ex, b.titulo);

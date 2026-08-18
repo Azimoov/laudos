@@ -29,6 +29,8 @@ const SUITE = [
   { arq: 'teste-birads.js', o: 'calculadora BI-RADS (lexico v2025 conferido no manual)' },
   { arq: 'teste-classif.js', o: 'classificacao automatica TI-RADS/BI-RADS/O-RADS' },
   { arq: 'teste-voz-img.js', o: 'ponte VOZ/IMG da tela de revisao (procedencia conferida)' },
+  { arq: 'teste-formatacao.js', o: 'barra de formatacao da tela de revisao (ida e volta)' },
+  { arq: 'teste-tela-revisao.js', o: 'tela de revisao: descritor recalcula e assinar registra' },
   { arq: 'teste-conferente.js', o: 'conferente: segunda leitura do laudo antes de entregar' },
   { arq: 'teste-rede.js', o: 'rede debaixo da transcricao (placa->CPU->nuvem)' },
   { arq: 'teste-provedor.js', o: 'endereco do provedor de IA configuravel' },

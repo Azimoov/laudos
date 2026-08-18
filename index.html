@@ -2975,6 +2975,19 @@ async function gerarLaudo(exId){
     // Classificações por descritor — TI-RADS (tireoide), BI-RADS (mama) e O-RADS (anexos).
     // A IA anota o que foi ditado; a conta é daqui. Ver CLASSIF e classifAplicar.
     var _cls={linhas:[], alertas:[], pendencias:[], conflitos:[]};
+    /* Os descritores que o médico já escolheu no cartão sobrevivem à
+       regeneração (17/08/2026): o ditado continua sem eles, então sem isto
+       ele perderia o trabalho toda vez que tocasse "Regenerar". */
+    var _escAntes=(ex.laudo&&ex.laudo._descritores)||null;
+    if(_escAntes){
+      ['tirads','birads','orads'].forEach(function(sis){
+        if(!Array.isArray(resp[sis])) return;
+        resp[sis]=resp[sis].map(function(d,i){
+          var e=_escAntes[sis+'|'+i]; if(!e) return d;
+          var n={}; for(var k in d) n[k]=d[k]; for(var c in e) n[c]=e[c]; return n;
+        });
+      });
+    }
     try{
       _cls = classifAplicar(ex, resp, trans);
       if(_cls.linhas.length){
@@ -3017,6 +3030,14 @@ async function gerarLaudo(exId){
       // dado ESTRUTURADO para a tela de revisão desenhar os botões de descritor faltando
       // e a caixa âmbar de conflito, sem ter de reinterpretar o texto do aviso
       classifPendencias:_cls.pendencias, classifConflitos:_cls.conflitos,
+      /* 17/08/2026 — o que a IA ANOTOU, guardado cru, e a conclusão SEM as linhas
+         de categoria. É o que permite recalcular na hora quando o médico toca o
+         descritor que faltava (rev2RecalcularClassif), sem pedir nada à IA: o
+         ditado continua sem aquele descritor, então regenerar traria a mesma
+         pendência de volta — era esse o buraco em que a escolha dele caía. */
+      _classifBruto:{tirads:(resp.tirads||[]), birads:(resp.birads||[]), orads:(resp.orads||[])},
+      _conclusaoBase:(resp.conclusao||mod.conclusao||''),
+      _descritores:_escAntes||undefined,
       // de qual imagem a IA tirou cada seção — ela já estava olhando, agora anota enquanto lê
       procedencia:(Array.isArray(resp.procedencia)?resp.procedencia:[]),
       trechos:trechosEx,
@@ -3574,9 +3595,16 @@ async function gerarInLoco(){
 }
 
 /* ============ Revisão e impressão ============ */
+/* Desenha a formatação do laudo. A ORDEM importa: ** antes de *, senão o
+   itálico come metade do negrito. Ver rev2ParaTexto — as duas pontas do
+   ida-e-volta andam juntas (17/08/2026, quando itálico e sublinhado passaram
+   a sobreviver ao salvar). O sublinhado usa __ , que não aparece em texto
+   clínico; o itálico usa * simples, e por isso vem depois do **. */
 function negrito(t){
   const esc = (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  return esc.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  return esc.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+            .replace(/__(.+?)__/g,'<u>$1</u>')
+            .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g,'$1<i>$2</i>');
 }
 /* Escapa texto que vai para innerHTML. Nome de paciente vem do worksheet do aparelho
    e volta pelo JSON da IA — se alguém cadastrar um nome com HTML na recepção, sem isto
@@ -6163,7 +6191,7 @@ function processarTirads(lista, ditadoTexto){
       obs.push(rot+': TI-RADS não calculado — faltou ditar: '+r.falta.join(', ')+'.');
       // não basta reclamar: manda junto as OPÇÕES, para a tela oferecer o clique
       r.faltaK.forEach(function(ch, j){
-        pendencias.push({sistema:'tirads', achado:rot, chave:ch,
+        pendencias.push({sistema:'tirads', achado:rot, idx:i, chave:ch,
                          rotulo:classifRotulo('tirads',ch), ditado:String((d||{})[ch]||''),
                          opcoes:classifOpcoes('tirads',ch), texto:r.falta[j]});
       });
@@ -6217,7 +6245,7 @@ function processarBirads(lista, ditadoTexto){
       obs.push(rot+': BI-RADS não calculado — faltou ditar: '
                +L.falta.map(function(f){ return f.rot.toLowerCase()+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):''); }).join(', ')+'.');
       L.falta.forEach(function(f){
-        pendencias.push({sistema:'birads', achado:rot, chave:f.k, rotulo:f.rot,
+        pendencias.push({sistema:'birads', achado:rot, idx:i, chave:f.k, rotulo:f.rot,
                          ditado:f.ditado, opcoes:f.ops,
                          texto:f.rot+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):'')});
       });
@@ -6252,7 +6280,7 @@ function processarOrads(lista, ditadoTexto){
       obs.push(rot+': O-RADS não calculado — faltou ditar: '
                +L.falta.map(function(f){ return f.rot.toLowerCase()+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):''); }).join(', ')+'.');
       L.falta.forEach(function(f){
-        pendencias.push({sistema:'orads', achado:rot, chave:f.k, rotulo:f.rot,
+        pendencias.push({sistema:'orads', achado:rot, idx:i, chave:f.k, rotulo:f.rot,
                          ditado:f.ditado, opcoes:f.ops,
                          texto:f.rot+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):'')});
       });
@@ -8352,6 +8380,11 @@ function rev2Render(){
       +rev2Caixas(ex,b)+'</div>';
   }).join('');
   document.getElementById('rv2Blocos').innerHTML=html||'<div class="vaziod">Este laudo está vazio.</div>';
+  // o tamanho de letra escolhido vale para os retângulos recém-desenhados também
+  var _fpx=rev2FonteGuardada();
+  var _fsel=document.getElementById('rv2Fonte'); if(_fsel) _fsel.value=String(_fpx);
+  Array.prototype.forEach.call(document.querySelectorAll('#rv2Blocos .txt'),
+    function(el){ el.style.fontSize=_fpx+'px'; });
 
   // ---- imagens ----
   var imgs=ex.imagens||[];
@@ -8414,16 +8447,61 @@ function rev2AbrirOpcoes(i){
   var d=document.getElementById('rv2po'+i); if(d) d.style.display=(d.style.display==='none')?'flex':'none';
 }
 /* o médico escolheu o descritor que faltava: entra no laudo e a conta refaz */
+/* Refaz a conta da classificação com o que a IA anotou MAIS o que o médico
+   escolheu no cartão. Não chama a IA: o ditado continua sem aquele descritor,
+   então pedir de novo traria a mesma pendência de volta.
+   (17/08/2026 — até aqui a escolha do médico era gravada num canto que ninguém
+   lia. O cartão parecia funcionar e não funcionava.) */
+function rev2RecalcularClassif(){
+  var ex=rev2Ex(); if(!ex||!ex.laudo) return null;
+  var bruto=ex.laudo._classifBruto; if(!bruto) return null;
+  var escolhas=ex.laudo._descritores||{};
+  var comEscolhas={};
+  ['tirads','birads','orads'].forEach(function(sis){
+    comEscolhas[sis]=(bruto[sis]||[]).map(function(d,i){
+      var e=escolhas[sis+'|'+i];
+      if(!e) return d;
+      var novo={}; for(var k in d) novo[k]=d[k];
+      for(var c in e) novo[c]=e[c];
+      return novo;
+    });
+  });
+  var r;
+  try{ r=classifAplicar(ex, comEscolhas, ex._transcricao||''); }
+  catch(e){ log('Não consegui recalcular a classificação: '+e.message, true); return null; }
+  ex.laudo.classifPendencias=r.pendencias;
+  ex.laudo.classifConflitos=r.conflitos;
+  // a conclusão é remontada da BASE: sem isso a categoria antiga ficaria
+  // empilhada com a nova, e o médico assinaria duas categorias
+  var base=String(ex.laudo._conclusaoBase||'');
+  ex.laudo.conclusao = r.linhas.length ? (base?base+'\n':'')+r.linhas.join('\n') : base;
+  // os avisos de classificação também se refazem; os outros ficam como estavam
+  var outros=(ex.laudo.alertas||[]).filter(function(a){ return a.tipo!=='calculo'&&a.tipo!=='faltando'; });
+  ex.laudo.alertas=outros.concat(r.alertas||[]);
+  return r;
+}
 function rev2Escolher(i, valor){
   var ex=rev2Ex(); if(!ex) return;
   var p=(ex.laudo.classifPendencias||[])[i]; if(!p) return;
   ex.laudo._descritores=ex.laudo._descritores||{};
-  var chaveAchado=p.sistema+'|'+p.achado;
+  var chaveAchado=p.sistema+'|'+(p.idx==null?p.achado:p.idx);
   (ex.laudo._descritores[chaveAchado]=ex.laudo._descritores[chaveAchado]||{})[p.chave]=valor;
   var rot=((p.opcoes||[]).filter(function(o){return o.v===valor;})[0]||{}).rot||valor;
-  log('Descritor preenchido em '+p.achado+': '+p.rotulo+' = '+rot+'. Toque "Regenerar laudo pela IA" para recalcular a categoria.');
-  var cx=document.getElementById('rv2p'+i);
-  if(cx){ cx.className='caixa ver'; cx.innerHTML=esc(p.rotulo+': '+rot+' — anotado. Regenere o laudo para recalcular a categoria.'); }
+  var antes=(ex.laudo.classifPendencias||[]).length;
+  var r=rev2RecalcularClassif();
+  if(!r){   // laudo antigo, sem o que a IA anotou guardado: cai no caminho de antes
+    log('Descritor anotado em '+p.achado+': '+p.rotulo+' = '+rot
+       +'. Este laudo é anterior a 17/08 — toque "Regenerar laudo pela IA" para recalcular.');
+    var cx0=document.getElementById('rv2p'+i);
+    if(cx0){ cx0.className='caixa ver'; cx0.innerHTML=esc(p.rotulo+': '+rot+' — anotado.'); }
+    return;
+  }
+  var agora=(ex.laudo.classifPendencias||[]).length;
+  var linha=(r.linhas||[]).filter(function(t){ return rev2Casa(p.achado, t)||t.indexOf(p.achado)>=0; })[0]
+            || (r.linhas||[])[0] || '';
+  if(agora<antes && linha) log('✅ '+p.rotulo+' = '+rot+'. '+linha.replace(/\s+$/,''));
+  else log('Anotado: '+p.rotulo+' = '+rot+(agora?(' — ainda falta(m) '+agora+' descritor(es).'):'.'));
+  rev2Render();
 }
 function rev2DitarDescritor(i){
   var ex=rev2Ex(); if(!ex) return;
@@ -8498,10 +8576,18 @@ function rev2Tocar(i){
   window.__rv2Par=setTimeout(function(){ try{ el.pause(); }catch(e){} }, Math.max(500,(fim-ini)*1000));
 }
 
-/* edição: o texto volta para o laudo com os ** de negrito preservados */
+/* edição: o texto volta para o laudo com a formatação preservada.
+   17/08/2026 — ANTES só o negrito sobrevivia: itálico e sublinhado eram
+   apagados aqui, calados. O médico tocava o botão, via o texto mudar na tela
+   e perdia tudo ao salvar. O desenho diz que a barra "tem de funcionar de
+   verdade", então o formato do laudo passou a carregar os três:
+       **negrito**   *itálico*   __sublinhado__
+   Quem desenha de volta é `negrito()` — as duas pontas andam juntas. */
 function rev2ParaTexto(el){
   var h=el.innerHTML
     .replace(/<(b|strong)[^>]*>/gi,'**').replace(/<\/(b|strong)>/gi,'**')
+    .replace(/<(i|em)[^>]*>/gi,'*').replace(/<\/(i|em)>/gi,'*')
+    .replace(/<u[^>]*>/gi,'__').replace(/<\/u>/gi,'__')
     .replace(/<br\s*\/?>/gi,'\n').replace(/<\/div>|<\/p>/gi,'\n')
     .replace(/<[^>]+>/g,'');
   var d=document.createElement('textarea'); d.innerHTML=h;
@@ -8522,14 +8608,48 @@ function rev2Editou(el){
   // vendo o "✓" de uma conferência que já não vale
   rev2Render();
 }
+/* Tamanho da letra NA TELA de revisão (não muda o laudo impresso). Fica
+   guardado: quem precisa de letra maior precisa dela todo dia. */
 function rev2Fonte(px){
   Array.prototype.forEach.call(document.querySelectorAll('#rv2Blocos .txt'), function(el){ el.style.fontSize=px+'px'; });
+  try{ localStorage.setItem('grev2Fonte', String(px)); }catch(e){}
 }
+function rev2FonteGuardada(){
+  var px; try{ px=localStorage.getItem('grev2Fonte'); }catch(e){}
+  px=parseInt(px||'12',10); return (px>=10&&px<=16)?px:12;
+}
+/* PINCEL DE FORMATAÇÃO — 1º toque copia, 2º toque aplica.
+   17/08/2026: antes ele MENTIA. Dizia "Formatação copiada" e, no segundo
+   toque, apenas apagava a formatação do destino — nunca copiou nada de
+   ninguém. Agora ele lê de verdade os três atributos que o laudo sabe
+   guardar (negrito, itálico, sublinhado) e os reproduz no destino, ligando
+   o que falta e desligando o que sobra. */
 function rev2CopiarFmt(){
   var s=window.getSelection();
-  if(_rev2Fmt===null){ _rev2Fmt=(s&&String(s).trim())?'copiado':null;
-    log(_rev2Fmt?'Formatação copiada — selecione o destino e toque de novo.':'Selecione primeiro o texto de origem.'); return; }
-  fmtCmd('removeFormat'); _rev2Fmt=null;
+  var temSel=s && s.rangeCount && String(s).trim();
+  var btn=document.querySelector('#telaRev2 .fmt button[title="Copiar formatação"]');
+  if(_rev2Fmt===null){
+    if(!temSel){ log('Selecione primeiro o texto de ORIGEM (o que já está do jeito que você quer).', true); return; }
+    _rev2Fmt={ bold:document.queryCommandState('bold'),
+               italic:document.queryCommandState('italic'),
+               underline:document.queryCommandState('underline') };
+    if(btn) btn.style.background='#CDE8E4';
+    var quais=['bold','italic','underline'].filter(function(k){ return _rev2Fmt[k]; })
+      .map(function(k){ return {bold:'negrito',italic:'itálico',underline:'sublinhado'}[k]; });
+    log('Formatação copiada ('+(quais.length?quais.join(' + '):'sem formatação')+') — selecione o destino e toque de novo.');
+    return;
+  }
+  if(!temSel){ log('Selecione o texto de DESTINO e toque de novo.', true); return; }
+  ['bold','italic','underline'].forEach(function(k){
+    if(document.queryCommandState(k)!==_rev2Fmt[k]) document.execCommand(k);
+  });
+  _rev2Fmt=null;
+  if(btn) btn.style.background='';
+  // o texto mudou: devolve ao laudo sem esperar o clique fora
+  var alvo=s.anchorNode&&(s.anchorNode.nodeType===1?s.anchorNode:s.anchorNode.parentElement);
+  var cx=alvo&&alvo.closest?alvo.closest('#rv2Blocos .txt'):null;
+  if(cx) rev2Editou(cx);
+  log('Formatação aplicada.');
 }
 function rev2Fundo(k){ window.__fundo=k; try{ exLocalSalvar&&exLocalSalvar(k); }catch(e){} }
 function rev2TrocarModelo(k){
@@ -8584,6 +8704,19 @@ async function rev2Aprovar(comImpressao){
   var ex=rev2Ex(); if(!ex) return;
   rev2Preparar();
   try{ await salvarLaudoPasta(); }catch(e){ log('Falha ao salvar na pasta: '+e.message, true); }
+  /* 17/08/2026 — ISTO FALTAVA, e o buraco era fundo: a tela nova salvava o
+     arquivo e marcava como liberado, mas NUNCA registrava o laudo. Três perdas
+     de uma vez, todas caladas:
+       1. o laudo não entrava no histórico → não seria achado como EXAME
+          ANTERIOR do paciente na próxima vez;
+       2. a versão assinada não chegava ao banco (laudo_versoes) → o par
+          "IA escreveu → médico corrigiu" ficava sem a correção;
+       3. o exame não entrava na lista de liberados → ao recuperar depois de
+          fechar a janela, voltava como NÃO liberado (o estrago de 12/08).
+     Falhar aqui não pode ser silencioso: é o mesmo aviso alto do caminho antigo. */
+  try{ salvarLaudoHistorico(window.__revAtual); }
+  catch(e){ log('FALHA AO GUARDAR NO HISTORICO: '+e.message
+    +' — o laudo pode nao estar salvo. Confira o Historico antes de fechar.', true); }
   if(comImpressao){ try{ window.print(); }catch(e){} }
   ex._liberado=true;
   try{ agendarSalvarSessao(); }catch(e){}
@@ -8603,6 +8736,9 @@ async function rev2SalvarApenas(){
   rev2Preparar();
   try{ await salvarLaudoPasta(); log('Laudo salvo (sem assinar).'); }
   catch(e){ log('Falha ao salvar: '+e.message, true); }
+  // registra também: salvar sem assinar continua sendo salvar (ver rev2Aprovar)
+  try{ salvarLaudoHistorico(window.__revAtual); }
+  catch(e){ log('FALHA AO GUARDAR NO HISTORICO: '+e.message+' — confira o Historico.', true); }
 }
 function rev2Aprender(){ rev2Preparar(); try{ aprenderAgora(); }catch(e){ log('Falha: '+e.message, true); } }
 function diaRevisarPendentes(){

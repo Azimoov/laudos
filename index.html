@@ -567,8 +567,11 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #rv2Lupa{position:fixed;z-index:9999;display:none;object-fit:contain;
   background:#05141B;border:3px solid #12B5AC;border-radius:10px;
   box-shadow:0 20px 55px rgba(5,20,27,.62);pointer-events:none;
-  opacity:0;transform:scale(.28);
-  transition:transform .19s cubic-bezier(.2,.85,.3,1.12), opacity .15s ease}
+  opacity:0;transform:scale(.16);
+  /* 18/08: o crescer estava discreto demais. Começa MENOR (16%), demora mais
+     (.32s) e passa um pouco do ponto antes de assentar — o olho precisa ver o
+     movimento, não só o antes e o depois. */
+  transition:transform .32s cubic-bezier(.16,.9,.28,1.28), opacity .2s ease}
 #rv2Lupa.aberta{opacity:1;transform:scale(1)}
 @media (prefers-reduced-motion:reduce){
   #rv2Lupa{transition-duration:.01ms}
@@ -8623,8 +8626,11 @@ var _rv2LupaLigada=false;
 function rev2LupaMostrar(img){
   var lupa=document.getElementById('rv2Lupa'); if(!lupa||!img) return;
   var r=img.getBoundingClientRect();
-  var larg=Math.round(r.width*3);                       // ~300% da miniatura
-  larg=Math.max(300, Math.min(larg, Math.round(window.innerWidth*0.5)));
+  /* 18/08: 300% ainda ficava pequeno numa tela grande — a foto tem de ser
+     GRANDE, é nela que o médico confere a medida. Agora ocupa metade da largura
+     da tela (até 820 px), com piso de 480 px. */
+  var larg=Math.round(Math.min(820, window.innerWidth*0.5));
+  larg=Math.max(480, Math.min(larg, window.innerWidth-40));
   lupa.src=img.src;
   lupa.style.width=larg+'px';
   lupa.style.height='auto';
@@ -8655,7 +8661,7 @@ function rev2LupaEsconder(){
   clearTimeout(window.__rv2LupaFim);
   window.__rv2LupaFim=setTimeout(function(){
     lupa.style.display='none'; lupa.removeAttribute('src');
-  }, 210);
+  }, 340);
 }
 /* Ligada UMA vez, na caixa que não é redesenhada: o conteúdo das fotos é
    refeito a cada laudo, e ouvir em cada <img> vazaria ouvintes. */
@@ -8822,8 +8828,10 @@ function rev2Ouvir(aoTerminar){
         rev2Status('transcrevendo…');
         var b64=await new Promise(function(res){
           var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.readAsDataURL(blob); });
+        // `rapido`: é uma frase curta de comando, não o ditado de um exame — busca
+        // direta em vez de ampla, para não deixar o médico esperando (18/08/2026)
         var r=await fetch(agenteBase()+'/transcrever',{method:'POST',headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({audioBase64:b64})});
+              body:JSON.stringify({audioBase64:b64, rapido:true})});
         var j=await r.json();
         if(j&&j.ok&&j.texto){ aoTerminar(j.texto); rev2Status('✅ transcrito — confira o texto e toque em enviar.'); }
         else rev2Status('Não consegui transcrever'+((j&&j.erro)?(': '+String(j.erro).slice(0,90)):' — fale mais perto e tente de novo.'), true);

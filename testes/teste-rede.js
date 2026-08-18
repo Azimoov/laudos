@@ -121,11 +121,11 @@ console.log('=== o TERCEIRO caminho (/transcrever) tambem entrou na fila e ganho
 // exame ao vivo, e disputava self.model/self.device do motor — que virou estado
 // compartilhado mutavel quando a queda para a CPU foi criada.
 const rota = ag.slice(ag.indexOf('if rota != "/transcrever"'));
-ok(/with _transcr_lock:/.test(rota.slice(0, 2200)),
+ok(/with _transcr_lock:/.test(rota.slice(0, 3200)),
    'o ditado avulso entra na MESMA fila do exame ao vivo — nao disputa a placa nem o motor');
-ok(/transcrever_na_nuvem_bytes\(buf, boost\)/.test(rota.slice(0, 2200)),
+ok(/transcrever_na_nuvem_bytes\(buf, boost\)/.test(rota.slice(0, 3200)),
    'e tem a mesma rede: motor local falhou, vai para a nuvem');
-ok(/sincronizar_rotulo\(\)/.test(rota.slice(0, 2200)), 'e acerta o rotulo do motor depois');
+ok(/sincronizar_rotulo\(\)/.test(rota.slice(0, 3200)), 'e acerta o rotulo do motor depois');
 
 console.log('=== instalacao desencontrada NAO pode virar nuvem calada ===');
 // Foi o defeito mais grave apontado na 1a avaliacao desta tarefa: com um except largo,

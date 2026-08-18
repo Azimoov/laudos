@@ -72,7 +72,8 @@ const lupaJs = (function () {
   const i = HTML.indexOf('function rev2LupaMostrar(');
   return i < 0 ? '' : HTML.slice(i, HTML.indexOf('\nfunction rev2LupaEsconder'));
 })();
-ok(/r\.width\*3/.test(lupaJs), 'o tamanho e ~300% da miniatura (pedido de 18/08)');
+ok(/window\.innerWidth\*0\.5/.test(lupaJs),
+   'o tamanho sai da TELA, nao da miniatura (300% ainda ficava pequeno numa tela grande)');
 ok(/window\.innerWidth/.test(lupaJs) && /window\.innerHeight/.test(lupaJs),
    'e ela nunca sai da tela, por maior que a foto seja');
 ok(/function rev2LupaEsconder/.test(HTML) && /mouseout/.test(HTML),
@@ -86,10 +87,15 @@ ok((HTML.match(/_rv2LupaLigada/g) || []).length === 3,
 
 console.log('=== 5. a foto CRESCE e ENCOLHE (18/08, "como na 1.0") ===');
 const lupaCss = regra('#rv2Lupa');
-ok(/opacity:0/.test(lupaCss || '') && /transform:scale\(\.28\)/.test(lupaCss || ''),
-   'ela nasce pequena e invisivel');
+ok(/opacity:0/.test(lupaCss || '') && /transform:scale\(\.16\)/.test(lupaCss || ''),
+   'ela nasce BEM pequena (16%) e invisivel — 18/08: "o crescimento ficou discreto"');
 ok(/#rv2Lupa\.aberta\{opacity:1;transform:scale\(1\)\}/.test(HTML), 'e se abre ate o tamanho cheio');
-ok(/transition:transform \.19s/.test(lupaCss || ''), 'com transicao (o crescer e visivel, nao um estalo)');
+ok(/transition:transform \.32s/.test(lupaCss || ''),
+   'com transicao LONGA o bastante para o olho ver o movimento (.32s)');
+ok(/1\.28\)/.test(lupaCss || ''), 'e passando um pouco do ponto antes de assentar');
+ok(/Math\.min\(820, window\.innerWidth\*0\.5\)/.test(HTML),
+   'a foto ocupa metade da largura da tela (ate 820px), nao 300% da miniatura');
+ok(/Math\.max\(480,/.test(HTML), 'com piso de 480px: nunca sai pequena');
 ok(/transformOrigin=\(x < r\.left\)/.test(HTML),
    'crescendo A PARTIR do lado onde esta a miniatura, para o olho seguir o caminho');
 ok(/classList\.remove\('aberta'\)/.test(HTML), 'ao sair o mouse ela ENCOLHE');

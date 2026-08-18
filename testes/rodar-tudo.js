@@ -17,6 +17,7 @@ const SUITE = [
   { arq: 'teste-auditoria.js', o: 'XSS, JSON da IA, registro de consumo' },
   { arq: 'teste-fila.js', o: 'fila de reprocessamento' },
   { arq: 'teste-captura-completa.js', o: 'captura ao vivo: exame que chega em partes nao fica pela metade' },
+  { arq: 'teste-historico-indice.js', o: 'busca do exame anterior pelo indice leve' },
   { arq: 'teste-onda.js', o: 'grafico do microfone' },
   { arq: 'teste-bipe.js', o: 'aviso sonoro' },
   { arq: 'teste-birads.js', o: 'calculadora BI-RADS (lexico v2025 conferido no manual)' },

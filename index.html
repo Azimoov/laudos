@@ -2925,10 +2925,10 @@ async function gerarLaudo(exId){
     const anterior = usados[0] || null;
     ex._antUsados = usados.map(function(L){ return {id:L.id, data:L.data||''}; });
     const regrasSeg = anterior ? regrasDeSeguimento(ex.tipo) : '';
-    const anteriorTxt = usados.map(function(L,i){
-      var t=textoDoLaudoAnterior(L, Math.floor(9000/usados.length));
+    const anteriorTxt = (await Promise.all(usados.map(async function(L,i){
+      var t=await histTextoAnterior(L, Math.floor(9000/usados.length));
       return t ? ('--- EXAME ANTERIOR '+(i+1)+' de '+usados.length+' — realizado em '+(L.data||'data não registrada')+' ---\n'+t) : '';
-    }).filter(Boolean).join('\n\n');
+    }))).filter(Boolean).join('\n\n');
     if(anteriorTxt) log('Exame anterior de '+ex.paciente+' localizado ('+usados.map(function(L){return L.data||'sem data';}).join(', ')+') — entrou no laudo como comparação.');
     else if(ant.pendentes.length) log('⚠️ '+ex.paciente+' pode já ter exame aqui ('+(ant.pendentes[0].data||'sem data')+'), mas falta confirmar se é a mesma pessoa — laudo saiu SEM comparação.', true);
     else if(histBuscaIncompleta()) log('⚠️ Busca de exame anterior INCOMPLETA ('+_histDiscoErro+'): procurei só na cópia do navegador, que é podada. Ligue o agente para procurar no computador.', true);
@@ -3613,17 +3613,46 @@ async function histParaBusca(){
   _histDiscoTentou=true;
   try{
     var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},8000);
-    var r=await fetch(agenteBase()+'/dados/glaudos',{signal:ctrl.signal}); clearTimeout(t);
-    var j=await r.json();
-    if(!j||!j.ok||j.valor==null) throw new Error('o agente não devolveu o histórico');
-    var arr=JSON.parse(j.valor);
-    if(!Array.isArray(arr)) throw new Error('histórico do disco fora do formato');
-    _histDisco=arr; _histDiscoErro='';
+    /* 17/08/2026 — ÍNDICE, não o histórico inteiro. Para PROCURAR o exame anterior
+       bastam nome, código, tipo e data (442 caracteres por laudo); o desenho pronto
+       do laudo pesa 10.730 e só é buscado para o laudo que entra na comparação
+       (ver histTextoAnterior). Medido aqui: 317 laudos = 3,6 MB antes, 140 KB agora
+       — e isso era baixado toda vez que o programa abria. A regra de QUEM é o mesmo
+       paciente não se mexeu: continua só aqui no app. */
+    var r=await fetch(agenteBase()+'/historico/indice',{signal:ctrl.signal});
+    var j=await r.json(); clearTimeout(t);
+    if(!j||!j.ok||!Array.isArray(j.laudos)) throw new Error('o agente não devolveu o índice');
+    _histDisco=j.laudos; _histDiscoErro='';
     return _histDisco;
   }catch(e){
     _histDiscoErro=(e&&e.name==='AbortError')?'o agente não respondeu a tempo':((e&&e.message)||String(e));
+    // agente antigo (sem a rota do índice): caminho de antes, inteiro
+    try{
+      var r2=await fetch(agenteBase()+'/dados/glaudos');
+      var j2=await r2.json();
+      if(j2&&j2.ok&&j2.valor!=null){
+        var arr=JSON.parse(j2.valor);
+        if(Array.isArray(arr)){ _histDisco=arr; _histDiscoErro=''; return _histDisco; }
+      }
+    }catch(e2){}
     return lerHistorico();
   }
+}
+/* O texto do laudo anterior para a comparação. O índice não traz o desenho:
+   busca-se aqui, um laudo por vez, e só o que realmente vai ao pedido da IA. */
+var _histHtml={};
+async function histTextoAnterior(reg, limite){
+  if(!reg) return '';
+  if(reg.html) return textoDoLaudoAnterior(reg, limite);
+  var id=reg.id;
+  if(_histHtml[id]==null){
+    try{
+      var r=await fetch(agenteBase()+'/historico/laudo?id='+encodeURIComponent(id));
+      var j=await r.json();
+      _histHtml[id]=(j&&j.ok&&typeof j.html==='string')?j.html:'';
+    }catch(e){ _histHtml[id]=''; }
+  }
+  return _histHtml[id] ? textoDoLaudoAnterior({html:_histHtml[id]}, limite) : '';
 }
 function histBuscaIncompleta(){ return !_histDisco; }
 function histRecarregar(){ _histDisco=null; _histDiscoTentou=false; return histParaBusca(); }

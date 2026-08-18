@@ -411,6 +411,36 @@ def laudo_guardado(study_uid, caminho=None):
         con.close()
 
 
+def garantir_transcricao(study_uid, texto, caminho=None):
+    """Grava o ditado no exame SE o banco ainda nao tiver um.
+
+    Existe por causa de uma perda silenciosa (17/08/2026): a pasta de ditados se
+    apaga sozinha em 7 dias, e 8 exames reais tinham o ditado SO la — o banco
+    nunca o recebeu (eram de 10/08, o dia em que a coluna nasceu). Sem o ditado,
+    o par "o que foi falado -> o que a IA escreveu -> o que o medico corrigiu"
+    fica manco, e e justamente esse par que tem valor de treino.
+
+    NUNCA sobrescreve: se o banco ja tem um ditado, o daqui e ignorado.
+    Devolve 'gravado' | 'ja_tinha' | 'sem_exame' | 'vazio'."""
+    texto = str(texto or '').strip()
+    uid = str(study_uid or '').strip()
+    if not texto or not uid:
+        return 'vazio'
+    con = conectar(caminho)
+    try:
+        r = con.execute('SELECT id, transcricao FROM exames WHERE study_uid=?'
+                        ' ORDER BY id DESC LIMIT 1', (uid,)).fetchone()
+        if r is None:
+            return 'sem_exame'
+        if (r['transcricao'] or '').strip():
+            return 'ja_tinha'
+        con.execute('UPDATE exames SET transcricao=? WHERE id=?', (texto, r['id']))
+        con.commit()
+        return 'gravado'
+    finally:
+        con.close()
+
+
 def liberados(caminho=None):
     """GET /exames/liberados — study_uid dos exames que ja foram assinados.
 

@@ -343,6 +343,12 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <span class="ab-selo" id="abPendentes" style="display:none"></span>
         <span class="ab-seta">›</span>
       </button>
+      <!-- 17/08/2026: sem isto, tocar "Liberar laudos" com a sessão vazia
+           escrevia a explicação no diário — que fica ATRÁS desta tela. O médico
+           tocava o botão e não acontecia nada visível; parecia programa velho. -->
+      <p id="abAviso" style="display:none;margin:10px 2px 0;padding:11px 14px;
+        background:#FBF3E1;border:1px solid #C99B2E;border-radius:8px;
+        font-size:13px;color:#6B5416;line-height:1.5"></p>
 
       <div class="ab-rodape">
         <button class="ab-cfg" onclick="abEscolher(null); alternarConfig();">⚙︎ Configurações</button>
@@ -8819,23 +8825,40 @@ function abVoltarInicio(){
    Para quem entrou pela abertura só para assinar laudos de ontem, isso seria ligar o
    consultório sem paciente nenhum. Por isso a tela agora lembra DE ONDE veio
    (`_rev2Origem`, declarada junto das outras variáveis da tela de revisão). */
+/* A explicação aparece NA TELA DE ABERTURA, não só no diário: o diário fica
+   atrás desta tela, e um botão que não responde parece programa quebrado.
+   (17/08/2026 — foi exatamente o que aconteceu com o Dr. Daniel.) */
+function abAvisar(texto){
+  var p=document.getElementById('abAviso');
+  if(p){ p.textContent=texto; p.style.display='block'; }
+  log(texto);
+}
 function abLiberarLaudos(){
+  var p=document.getElementById('abAviso'); if(p) p.style.display='none';
   var fila=rev2Fila();
   if(fila.length){ _rev2Origem='abertura'; rev2Abrir(fila[0].id); return; }
+  // há sessão guardada esperando um toque em "Restaurar"? é a causa mais comum
+  if(!exames.length && document.getElementById('bannerRecup')){
+    abAvisar('Há uma sessão guardada esperando: toque em “Restaurar”, na barra azul '
+            +'no rodapé desta tela, e depois em “Liberar laudos” de novo.');
+    var b=document.getElementById('bannerRecup');
+    if(b) b.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
   /* Nada para liberar. A mensagem diz QUAL dos casos é, porque o selo de pendentes na
      tela de abertura vem do BANCO (pelo agente) e a fila vem do que está aberto nesta
      sessão — os dois podem discordar, e "não há nada" sem explicação faria o médico achar
      que o programa perdeu laudo. */
   var comLaudo=exames.filter(function(x){ return x.laudo; }).length;
   if(!exames.length)
-    log('Nenhum exame nesta sessão para liberar. Os laudos aparecem aqui depois que o '
+    abAvisar('Nenhum exame nesta sessão para liberar. Os laudos aparecem aqui depois que o '
         +'aparelho enviar as imagens. Se você espera encontrar laudos de outro dia, eles '
         +'estão guardados no computador — abra por "Recuperar exames".');
   else if(comLaudo===0)
-    log('Há '+exames.length+' exame(s) nesta sessão, mas nenhum tem laudo gerado ainda — '
+    abAvisar('Há '+exames.length+' exame(s) nesta sessão, mas nenhum tem laudo gerado ainda — '
         +'não há o que assinar.');
   else
-    log('Todos os laudos desta sessão já foram revisados e assinados. 🎉');
+    abAvisar('Todos os laudos desta sessão já foram revisados e assinados. 🎉');
 }
 
 window.addEventListener('DOMContentLoaded', function(){

@@ -454,12 +454,19 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaRev2 .cab .l1{display:block;font-size:16px;font-weight:700;color:#1C2430}
 #telaRev2 .cab .l2{display:block;font-size:12px;color:#6B7480;margin-top:6px}
 #telaRev2 .cab .fundo{font-size:11.5px;color:#8A93A0}
-#telaRev2 .cab select{display:block;margin-top:6px;min-width:200px;padding:6px 10px;
-  border:1px solid #9FB3B2;border-radius:14px;font:inherit;font-size:12.5px;background:#fff}
+/* 17/08/2026: a letra vinha branca em fundo branco — o seletor herdava a cor
+   clara do cabeçalho e ficava ILEGÍVEL. Cor explícita, sempre. */
+#telaRev2 .cab select{display:block;margin-top:6px;min-width:200px;padding:7px 11px;
+  border:1.5px solid #0E6E6B;border-radius:14px;font:inherit;font-size:13px;
+  background:#fff;color:#12202B;font-weight:600}
+#telaRev2 .cab select option{color:#12202B;background:#fff}
 #telaRev2 .legenda{display:flex;gap:8px;flex-wrap:wrap}
 #telaRev2 .lg{border:0;border-radius:15px;padding:8px 16px;font-size:11.5px;font-weight:600;
-  cursor:pointer;font-family:inherit;background:#F1F3F5;color:#77808C;border:1px solid #C9D0D8}
-#telaRev2 .lg.on{color:#fff;border-color:transparent}
+  cursor:pointer;font-family:inherit;background:#EDF0F3;color:#66707C;border:1px solid #C2CAD3}
+/* aceso = cor CHEIA e letra branca em negrito: é a legenda das cores do laudo,
+   tem de gritar de longe (17/08/2026 — antes o aceso e o apagado se pareciam) */
+#telaRev2 .lg.on{color:#fff;border-color:transparent;font-weight:700;
+  box-shadow:0 2px 6px rgba(12,32,43,.28)}
 /* calmo: leu e está limpo. Não acende — mas fica clicável e mostra o ✓ no rótulo,
    porque no toque não há passar o mouse para ler a dica. */
 #telaRev2 .lg.calmo{color:#4F6B5E;border-color:#B6CFC2;background:#F2F7F4;cursor:pointer}
@@ -489,15 +496,22 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaRev2 .bloco.normal .tit,#telaRev2 .bloco.normal .txt{color:#8A93A0}
 #telaRev2 .bloco.info .tit{color:#1C2430}
 #telaRev2 .bloco.info .txt{color:#26303C}
-#telaRev2 .bloco.alterado{background:#EAF4F3;border-color:#9CC5C2}
-#telaRev2 .bloco.alterado .barra{background:#0E6E6B}
-#telaRev2 .bloco.falta{background:#FBECEC;border-color:#C43B3B}
-#telaRev2 .bloco.falta .barra{background:#C43B3B}
-#telaRev2 .bloco.falta .tit{color:#C43B3B}
-#telaRev2 .bloco.conflito{background:#FBF3E1;border-color:#C99B2E}
-#telaRev2 .bloco.conflito .barra{background:#C99B2E}
-#telaRev2 .bloco.ia{background:#FBF1F7;border-color:#D9A5C2}
-#telaRev2 .bloco.ia .barra{background:#B94A7E}
+/* CORES VIVAS (17/08/2026, pedido do Dr. Daniel: "estão muito lavadas").
+   O fundo continua claro — é atrás de texto clínico e precisa deixar ler —, mas
+   ganhou saturação; quem carrega a cor de verdade é a BARRA (agora 7 px), a
+   borda e o TÍTULO, que passam a usar o tom cheio da paleta do desenho. */
+#telaRev2 .bloco .barra{width:7px}
+#telaRev2 .bloco.alterado{background:#DCF0EE;border-color:#0E6E6B}
+#telaRev2 .bloco.alterado .barra{background:#0B5F5C}
+#telaRev2 .bloco.alterado .tit{color:#0B5F5C}
+#telaRev2 .bloco.falta{background:#FBE0E0;border-color:#C43B3B}
+#telaRev2 .bloco.falta .barra{background:#B32E2E}
+#telaRev2 .bloco.falta .tit{color:#A62828}
+#telaRev2 .bloco.conflito{background:#FBEFD2;border-color:#C99B2E}
+#telaRev2 .bloco.conflito .barra{background:#B0851C}
+#telaRev2 .bloco.conflito .tit{color:#8A6612}
+#telaRev2 .bloco.ia{background:#FBE6F0;border-color:#B94A7E}
+#telaRev2 .bloco.ia .barra{background:#A83A6C}
 #telaRev2 .bloco.ia .tit{font-size:11.5px;letter-spacing:.8px;color:#8A3A64}
 #telaRev2 .selo{margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0}
 #telaRev2 .selo button{border:0;border-radius:10px;padding:3px 10px;font-size:10px;font-weight:700;
@@ -506,24 +520,44 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaRev2 .selo .img{background:#3D6FB4}
 #telaRev2 .selo .hora{font-size:11px;color:#0E6E6B}
 /* --- a caixinha âmbar dentro do retângulo: conflito e descritor em falta --- */
-#telaRev2 .caixa{margin-top:10px;border-radius:8px;padding:10px 12px;font-size:12px}
-#telaRev2 .caixa.amb{background:#FBF3E1;border:1px solid #C99B2E;color:#8A6A1F}
-#telaRev2 .caixa.ver{background:#fff;border:1px solid #D97070;color:#B04A4A}
+/* caixas de dentro do retângulo — cores cheias (17/08/2026) */
+#telaRev2 .caixa{margin-top:10px;border-radius:8px;padding:10px 12px;font-size:12px;
+  border-left-width:5px!important;border-left-style:solid!important}
+#telaRev2 .caixa.amb{background:#FBEACB;border:1px solid #B0851C;border-left-color:#B0851C;color:#6B5010;font-weight:500}
+#telaRev2 .caixa.ver{background:#FBE0E0;border:1px solid #B32E2E;border-left-color:#B32E2E;color:#8F2222;font-weight:500}
 #telaRev2 .caixa .fichas{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-#telaRev2 .caixa .ficha{background:#fff;border:1px solid #C99B2E;color:#8A6A1F;border-radius:11px;
-  padding:4px 12px;font-size:11px;cursor:pointer;font-family:inherit}
-#telaRev2 .caixa .ficha:hover{background:#FDF8EC}
-#telaRev2 .caixa.ver .ficha{border-color:#D97070;color:#B04A4A}
-#telaRev2 .caixa.ver .ficha:hover{background:#FDF3F3}
-#telaRev2 .caixa .ficha.mic{border-color:#0E6E6B;color:#0E6E6B}
+#telaRev2 .caixa .ficha{background:#fff;border:1.5px solid #B0851C;color:#6B5010;border-radius:11px;
+  padding:5px 13px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit}
+#telaRev2 .caixa .ficha:hover{background:#B0851C;color:#fff}
+#telaRev2 .caixa.ver .ficha{border-color:#B32E2E;color:#8F2222}
+#telaRev2 .caixa.ver .ficha:hover{background:#B32E2E;color:#fff}
+#telaRev2 .caixa .ficha.mic{border-color:#0B5F5C;color:#0B5F5C}
+#telaRev2 .caixa .ficha.mic:hover{background:#0B5F5C;color:#fff}
 #telaRev2 .caixa .abrir{background:none;border:1px solid currentColor;border-radius:11px;
   padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;color:inherit;margin-left:8px}
 /* --- coluna da direita --- */
-#telaRev2 .grade{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:280px;overflow:auto;
-  padding-right:4px}
+/* espaço em volta para a foto poder CRESCER sem ser cortada pela rolagem */
+#telaRev2 .grade{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:300px;overflow:auto;
+  padding:6px 8px 6px 6px}
 #telaRev2 .grade img{width:100%;height:78px;object-fit:cover;border-radius:6px;border:1px solid #CBD3DB;
-  cursor:pointer;background:#E3E8ED}
-#telaRev2 .grade img.viva{border:2.5px solid #0E6E6B}
+  cursor:pointer;background:#E3E8ED;transition:transform .16s ease, box-shadow .16s ease;
+  position:relative;z-index:1}
+/* PASSAR O MOUSE AUMENTA A FOTO (pedido do Dr. Daniel, 17/08). Cresce sobre as
+   vizinhas (z-index) — quem passa o mouse quer ver aquela, não empurrar as outras. */
+#telaRev2 .grade img:hover{transform:scale(1.9);z-index:20;
+  box-shadow:0 10px 26px rgba(12,32,43,.45);border-color:#0E6E6B}
+/* DESTAQUE DA FOTO CITADA (botão IMG). Antes era uma borda de 2,5 px que se
+   perdia na tela; agora a foto se destaca de longe: borda cheia, halo, um degrau
+   de tamanho e um piscar curto no momento do toque. */
+#telaRev2 .grade img.viva{border:3px solid #0E6E6B;transform:scale(1.12);z-index:10;
+  box-shadow:0 0 0 4px rgba(14,110,107,.32), 0 6px 18px rgba(12,32,43,.3);
+  animation:rv2Pisca 1.05s ease-out 2}
+#telaRev2 .grade img.viva:hover{transform:scale(1.9)}
+@keyframes rv2Pisca{
+  0%{box-shadow:0 0 0 0 rgba(14,110,107,.75), 0 6px 18px rgba(12,32,43,.3)}
+  70%{box-shadow:0 0 0 14px rgba(14,110,107,0), 0 6px 18px rgba(12,32,43,.3)}
+  100%{box-shadow:0 0 0 4px rgba(14,110,107,.32), 0 6px 18px rgba(12,32,43,.3)}
+}
 #telaRev2 .vaziod{background:#fff;border:1px dashed #CBD4DC;border-radius:8px;padding:18px;
   text-align:center;font-size:12px;color:#8A93A0}
 #telaRev2 .tocador{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:12px 14px;

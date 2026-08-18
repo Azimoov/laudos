@@ -304,6 +304,28 @@ try:
 except ValueError:
     ok(True, 'uid vazio e recusado com erro claro')
 
+print('=== o ditado nao se perde quando a pasta dos 7 dias e limpa (17/08) ===')
+# A pasta ditados\ e rede de CURTO prazo; o banco e o arquivo definitivo. Em
+# 17/08 oito exames reais tinham o ditado so na pasta e iam sumir calados.
+pg = payload(nome='Guarda Ditado', cod='gd-1')
+pg['exame']['study_uid'] = 'uid-guarda'
+pg['exame'].pop('transcricao', None)
+rg = banco.gravar_exame(pg, DB)
+ok(banco.garantir_transcricao('uid-inexistente', 'texto', DB) == 'sem_exame',
+   'ditado sem exame no banco: nao ha onde guardar (orfao)')
+ok(banco.garantir_transcricao('uid-guarda', '   ', DB) == 'vazio',
+   'ditado vazio nao vira gravacao')
+ok(banco.garantir_transcricao('uid-guarda', 'O DITADO ORIGINAL', DB) == 'gravado',
+   'exame sem ditado no banco: o ditado e gravado')
+ok(banco.garantir_transcricao('uid-guarda', 'OUTRO TEXTO QUALQUER', DB) == 'ja_tinha',
+   'exame que ja tem ditado: o segundo e recusado')
+import sqlite3 as _s
+_c = _s.connect(DB)
+ok(_c.execute('SELECT transcricao FROM exames WHERE id=?',
+              (rg['exame_id'],)).fetchone()[0] == 'O DITADO ORIGINAL',
+   'e o ditado que ja estava NUNCA e sobrescrito')
+_c.close()
+
 print('=== saude ===')
 r = banco.saude(DB)
 ok(r['ok'] and r['total_exames'] >= 6, 'saude responde com o total de exames')

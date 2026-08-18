@@ -84,6 +84,49 @@ ok(/rev2LupaEsconder\(\); \}catch\(e\)\{\} \}/.test(HTML),
 ok((HTML.match(/_rv2LupaLigada/g) || []).length === 3,
    'os ouvintes sao ligados UMA vez (a lista de fotos e redesenhada a cada laudo)');
 
+console.log('=== 5. a foto CRESCE e ENCOLHE (18/08, "como na 1.0") ===');
+const lupaCss = regra('#rv2Lupa');
+ok(/opacity:0/.test(lupaCss || '') && /transform:scale\(\.28\)/.test(lupaCss || ''),
+   'ela nasce pequena e invisivel');
+ok(/#rv2Lupa\.aberta\{opacity:1;transform:scale\(1\)\}/.test(HTML), 'e se abre ate o tamanho cheio');
+ok(/transition:transform \.19s/.test(lupaCss || ''), 'com transicao (o crescer e visivel, nao um estalo)');
+ok(/transformOrigin=\(x < r\.left\)/.test(HTML),
+   'crescendo A PARTIR do lado onde esta a miniatura, para o olho seguir o caminho');
+ok(/classList\.remove\('aberta'\)/.test(HTML), 'ao sair o mouse ela ENCOLHE');
+ok(/__rv2LupaFim=setTimeout/.test(HTML),
+   'e so some depois de encolher — por tempo fixo, nao esperando o aviso de fim da transicao');
+ok(/janela estiver sem desenhar quadros/.test(HTML),
+   'com o porque anotado: esperar o fim da transicao deixaria a foto pendurada para sempre');
+
+console.log('=== 6. letra preta tambem no seletor de MODELO do exame ===');
+ok(/#telaRev2 \.dir select\{[^}]*color:#12202B/.test(HTML), 'o seletor de modelo tem cor escura propria');
+ok(/#telaRev2 \.dir select option\{color:#12202B/.test(HTML), 'as opcoes dele tambem');
+
+console.log('=== 7. o microfone do "peca a IA correcoes" avisa o que houve ===');
+// 18/08: o medico tocou, falou, e nada aconteceu — nem o texto, nem uma explicacao.
+// Todo aviso ia para o diario, que fica ATRAS desta tela. Erro invisivel = erro nenhum.
+const ouvir = grabFn('rev2Ouvir');
+ok(/function rev2Status/.test(HTML), 'existe um aviso proprio da tela (nao so o diario)');
+ok(/rv2PedidoStatus/.test(HTML.slice(HTML.indexOf('function rev2Status'), HTML.indexOf('function rev2Status') + 400)),
+   'que escreve embaixo da caixa de texto, onde o medico esta olhando');
+ok(!/log\('Nao consegui abrir o microfone/.test(ouvir) && /rev2Status\(/.test(ouvir),
+   'os avisos do microfone passaram do diario para a tela');
+ok(/gravando \('\+seg\+'s\)/.test(ouvir), 'mostra que esta gravando e ha quantos segundos');
+ok(/toque no microfone de novo para parar/.test(ouvir), 'e diz como parar (nao e obvio)');
+ok(/NotAllowedError/.test(ouvir), 'permissao negada vira uma explicacao, nao silencio');
+ok(/microfone pode estar mudo/.test(ouvir), 'microfone mudo tambem e dito');
+
+function grabFn(name) {
+  const i = HTML.indexOf('function ' + name + '(');
+  if (i < 0) return '';
+  let d = 0, s = false;
+  for (let j = i; j < HTML.length; j++) {
+    if (HTML[j] === '{') { d++; s = true; }
+    else if (HTML[j] === '}') { d--; if (s && d === 0) return HTML.slice(i, j + 1); }
+  }
+  return '';
+}
+
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');
 process.exit(falhas ? 1 : 0);

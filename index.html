@@ -561,17 +561,31 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 /* A LUPA: a foto ampliada, fora de qualquer caixa com rolagem, por cima de tudo.
    ~300% do tamanho da miniatura, e `contain` para mostrar a imagem INTEIRA — a
    miniatura é cortada (cover), e o que o médico quer ver aqui é o exame todo. */
+/* A foto CRESCE ao entrar e ENCOLHE ao sair (18/08/2026, como na linha 1.0):
+   ela nasce pequena, na direção da miniatura, e se abre. Sem isso ela
+   "aparecia" de estalo, e o olho perdia de onde ela veio. */
 #rv2Lupa{position:fixed;z-index:9999;display:none;object-fit:contain;
   background:#05141B;border:3px solid #12B5AC;border-radius:10px;
-  box-shadow:0 20px 55px rgba(5,20,27,.62);pointer-events:none}
+  box-shadow:0 20px 55px rgba(5,20,27,.62);pointer-events:none;
+  opacity:0;transform:scale(.28);
+  transition:transform .19s cubic-bezier(.2,.85,.3,1.12), opacity .15s ease}
+#rv2Lupa.aberta{opacity:1;transform:scale(1)}
+@media (prefers-reduced-motion:reduce){
+  #rv2Lupa{transition-duration:.01ms}
+}
 #telaRev2 .vaziod{background:#fff;border:1px dashed #CBD4DC;border-radius:8px;padding:18px;
   text-align:center;font-size:12px;color:#8A93A0}
 #telaRev2 .tocador{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:12px 14px;
   margin-top:14px;font-size:11px;color:#6B7480}
 #telaRev2 .lb{font-size:11.5px;font-weight:700;color:#5A6472;letter-spacing:.8px;margin:18px 0 8px}
+/* 18/08/2026: a letra do "Modelo do exame" também saía clara demais — mesma
+   causa do seletor de fundo: herdava a cor do texto ao redor. Cor explícita. */
 #telaRev2 .dir select,#telaRev2 .dir textarea{width:100%;font:inherit;font-size:12.5px;
-  border:1px solid #C9D0D8;border-radius:8px;padding:8px 10px;background:#fff;box-sizing:border-box}
-#telaRev2 .dir select{border-radius:15px;border-color:#9FB3B2}
+  border:1px solid #C9D0D8;border-radius:8px;padding:8px 10px;background:#fff;
+  box-sizing:border-box;color:#12202B}
+#telaRev2 .dir select{border-radius:15px;border:1.5px solid #0E6E6B;font-size:13px;
+  font-weight:600;color:#12202B}
+#telaRev2 .dir select option{color:#12202B;background:#fff}
 #telaRev2 .dir textarea{min-height:64px;resize:vertical}
 #telaRev2 .pedido{display:flex;gap:8px;align-items:flex-start}
 #telaRev2 .mic{flex:0 0 40px;height:40px;border-radius:50%;background:#0E6E6B;color:#fff;border:0;
@@ -8625,10 +8639,23 @@ function rev2LupaMostrar(img){
   y=Math.max(8, Math.min(y, window.innerHeight-alt-8));
   lupa.style.left=Math.round(Math.max(8,x))+'px';
   lupa.style.top=Math.round(y)+'px';
+  // cresce a PARTIR do lado onde está a miniatura, para o olho seguir o caminho
+  lupa.style.transformOrigin=(x < r.left) ? 'right center' : 'left center';
+  clearTimeout(window.__rv2LupaFim);
+  void lupa.offsetWidth;               // sela a posição antes de animar
+  lupa.classList.add('aberta');        // ← aqui ela cresce
 }
 function rev2LupaEsconder(){
   var lupa=document.getElementById('rv2Lupa');
-  if(lupa){ lupa.style.display='none'; lupa.removeAttribute('src'); }
+  if(!lupa || lupa.style.display==='none') return;
+  lupa.classList.remove('aberta');     // ← aqui ela encolhe
+  // só some DEPOIS de encolher. Tempo fixo em vez de esperar o fim da transição:
+  // se a janela estiver sem desenhar quadros, o aviso de fim nunca chegaria e a
+  // foto ficaria pendurada na tela para sempre.
+  clearTimeout(window.__rv2LupaFim);
+  window.__rv2LupaFim=setTimeout(function(){
+    lupa.style.display='none'; lupa.removeAttribute('src');
+  }, 210);
 }
 /* Ligada UMA vez, na caixa que não é redesenhada: o conteúdo das fotos é
    refeito a cada laudo, e ouvir em cada <img> vazaria ouvintes. */
@@ -8766,29 +8793,56 @@ async function rev2Regerar(){
   catch(e){ if(st) st.textContent='⚠️ falha: '+e.message; }
 }
 /* microfone: usa o agente para transcrever o que o médico falar */
+/* Avisos do microfone aparecem NA PRÓPRIA TELA (18/08/2026).
+   O médico tocou o microfone, falou, e não apareceu nada na caixa de texto —
+   e nada explicou por quê. A razão: todo aviso ia para o diário, que fica
+   ATRÁS desta tela (ela é uma folha por cima de tudo). Erro invisível é o
+   mesmo que erro nenhum: o programa parece simplesmente não funcionar. */
+function rev2Status(txt, ruim){
+  var s=document.getElementById('rv2PedidoStatus');
+  if(s){ s.textContent=txt||''; s.style.color=ruim?'#A62828':'#0B5F5C';
+         s.style.fontWeight=ruim?'600':'500'; }
+  if(txt) log(txt, !!ruim);
+}
 function rev2Ouvir(aoTerminar){
   var b=document.getElementById('rv2Mic');
-  if(!navigator.mediaDevices||!window.MediaRecorder){ log('Este navegador não grava áudio.', true); return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){
+    rev2Status('Este navegador não grava áudio.', true); return; }
+  rev2Status('abrindo o microfone…');
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
     var mr=new MediaRecorder(st), pedacos=[];
-    mr.ondataavailable=function(e){ pedacos.push(e.data); };
+    mr.ondataavailable=function(e){ if(e.data&&e.data.size) pedacos.push(e.data); };
     mr.onstop=async function(){
       st.getTracks().forEach(function(t){ t.stop(); });
       if(b) b.classList.remove('gravando');
+      clearInterval(window.__rv2MicRel);
       try{
-        var blob=new Blob(pedacos), b64=await new Promise(function(res){
+        var blob=new Blob(pedacos, {type:(mr.mimeType||'audio/webm')});
+        if(!blob.size){ rev2Status('Não gravou nada — o microfone pode estar mudo.', true); return; }
+        rev2Status('transcrevendo…');
+        var b64=await new Promise(function(res){
           var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.readAsDataURL(blob); });
         var r=await fetch(agenteBase()+'/transcrever',{method:'POST',headers:{'Content-Type':'application/json'},
               body:JSON.stringify({audioBase64:b64})});
         var j=await r.json();
-        if(j&&j.ok&&j.texto) aoTerminar(j.texto); else log('Não entendi o que foi dito.', true);
-      }catch(e){ log('Falha ao transcrever: '+e.message, true); }
+        if(j&&j.ok&&j.texto){ aoTerminar(j.texto); rev2Status('✅ transcrito — confira o texto e toque em enviar.'); }
+        else rev2Status('Não consegui transcrever'+((j&&j.erro)?(': '+String(j.erro).slice(0,90)):' — fale mais perto e tente de novo.'), true);
+      }catch(e){ rev2Status('Falha ao transcrever: '+e.message, true); }
     };
     if(b) b.classList.add('gravando');
     mr.start();
     window.__rv2Mr=mr;
-    setTimeout(function(){ try{ mr.state!=='inactive'&&mr.stop(); }catch(e){} }, 12000);
-  }).catch(function(){ log('Não consegui abrir o microfone.', true); });
+    // o médico precisa VER que está gravando e quanto tempo resta
+    var seg=0;
+    clearInterval(window.__rv2MicRel);
+    window.__rv2MicRel=setInterval(function(){
+      seg++; rev2Status('🎙 gravando ('+seg+'s) — toque no microfone de novo para parar');
+      if(seg>=30){ try{ mr.state!=='inactive'&&mr.stop(); }catch(e){} }
+    }, 1000);
+    rev2Status('🎙 gravando — toque no microfone de novo para parar');
+  }).catch(function(e){
+    rev2Status('Não consegui abrir o microfone'+((e&&e.name==='NotAllowedError')?': o Windows ou o programa negou a permissão.':'.'), true);
+  });
 }
 function rev2PedidoVoz(){
   if(window.__rv2Mr && window.__rv2Mr.state==='recording'){ try{ window.__rv2Mr.stop(); }catch(e){} return; }

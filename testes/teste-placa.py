@@ -174,7 +174,7 @@ ok("reservar_placa" not in aq.split("def ")[0],
    "o aquecimento nao decide mais nada sozinho: quem decide e a reserva")
 
 print("=== e o aquecimento chegou na instalacao que ATENDE ===")
-app_est = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop", "Projeto WBOT",
+app_est = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                        "_repo", "index.html")
 h = open(app_est, encoding="utf-8").read()
 ok("transcritor/carregar" in h, "o app estavel pede o carregamento do motor ao abrir")

@@ -13,7 +13,9 @@ const path = require('path');
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 const RAIZ = 'C:/Users/serru';
-const ASR = path.join(RAIZ, 'OneDrive/Desktop/Projeto WBOT/ditado-local/src/asr.py');
+// O projeto sai da localizacao DESTE arquivo (mudou de endereco em 17/08/2026)
+const PROJETO = path.join(__dirname, '..', '..');
+const ASR = path.join(PROJETO, 'ditado-local', 'src', 'asr.py');
 const AG = path.join(RAIZ, 'Laudos USG 2.0/agente/agente-laudos.py');
 
 let falhas = 0;
@@ -207,7 +209,7 @@ ok(/SEM TEXTO[\s\S]{0,120}a transcri[çc][ãa]o falhou/.test(HTML),
 ok(/ou[çc]a o [áa]udio e dite de novo/.test(HTML), 'dizendo o que fazer');
 
 console.log('=== a guarda do montador cobre TODO o pacote de src ===');
-const MONTAR = leia(path.join(RAIZ, 'OneDrive/Desktop/Projeto WBOT/laudos-programa/instalador/montar.ps1'));
+const MONTAR = leia(path.join(PROJETO, 'laudos-programa', 'instalador', 'montar.ps1'));
 ok(!!MONTAR, 'achei o montar.ps1');
 ok(/foreach \(\$arq in @\('src\\asr\.py', 'src\\dictionary\.py', 'src\\__init__\.py'\)\)/.test(MONTAR),
    'confere os TRES arquivos que o agente importa, nao so o asr.py');
@@ -248,7 +250,7 @@ ok(/not reservar_placa\(\)/.test(gm2), 'e quem tenta reservar e o carregamento d
 ok(/"cpu", "int8"/.test(gm2), '...caindo para o processador quando a placa ja e de outro');
 
 console.log('=== o aquecimento chegou na instalacao que ATENDE ===');
-const appEstavel = leia(path.join(RAIZ, 'OneDrive/Desktop/Projeto WBOT/_repo/index.html'));
+const appEstavel = leia(path.join(PROJETO, '_repo', 'index.html'));
 ok(!!appEstavel, 'achei o app estavel');
 ok(/transcritor\/carregar/.test(appEstavel),
    'o app que atende pede o carregamento do motor ao abrir — antes ninguem pedia');

@@ -10,7 +10,13 @@ const fs = require('fs');
 const path = require('path');
 
 const AQUI = __dirname;
-const PY = 'C:/Users/serru/OneDrive/Desktop/Claude code/ditado-local/.venv/Scripts/python.exe';
+// Sai da propria localizacao deste arquivo, nunca de um caminho gravado a mao.
+// Em 17/08/2026 o projeto MUDOU DE ENDERECO (o medico desligou a sincronizacao
+// da Area de Trabalho com o OneDrive e o Windows devolveu o Desktop ao lugar
+// original). O caminho fixo daqui apontava para uma pasta que nem existia mais,
+// e as suites de Python passaram a ser PULADAS em silencio — verde por ausencia,
+// que e o pior tipo de verde.
+const PY = path.join(AQUI, '..', '..', 'ditado-local', '.venv', 'Scripts', 'python.exe');
 
 const SUITE = [
   { arq: 'checar-sintaxe.js', o: 'sintaxe do index.html' },

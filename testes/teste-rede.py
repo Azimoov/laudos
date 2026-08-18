@@ -10,7 +10,9 @@ import os
 import sys
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-DITADO = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop", "Projeto WBOT", "ditado-local")
+# Sai da localizacao DESTE arquivo: o projeto mudou de endereco em 17/08/2026
+PROJETO = os.path.abspath(os.path.join(AQUI, "..", ".."))
+DITADO = os.path.join(PROJETO, "ditado-local")
 sys.path.insert(0, DITADO)
 
 falhas = 0

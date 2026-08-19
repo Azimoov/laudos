@@ -343,6 +343,18 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <span class="ab-selo" id="abPendentes" style="display:none"></span>
         <span class="ab-seta">›</span>
       </button>
+
+      <!-- 19/08/2026: o médico quis um lugar para VOLTAR a um laudo já assinado —
+           por dia, e podendo revisar como se o exame tivesse acabado de sair. -->
+      <button class="ab-botao" onclick="hisAbrir()">
+        <span class="ab-icone">🗂</span>
+        <span style="flex:1">
+          <span class="ab-nome">Histórico</span>
+          <span class="ab-sub" style="display:block">todos os laudos já liberados, separados por dia — abra e revise de novo</span>
+        </span>
+        <span class="ab-selo" id="hisSelo" style="display:none"></span>
+        <span class="ab-seta">›</span>
+      </button>
       <!-- 17/08/2026: sem isto, tocar "Liberar laudos" com a sessão vazia
            escrevia a explicação no diário — que fica ATRÁS desta tela. O médico
            tocava o botão e não acontecia nada visível; parecia programa velho. -->
@@ -696,6 +708,36 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 <style>
 #telaAntigos{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
+/* ⚠️ UMA REGRA POR TELA, nunca "#telaA,#telaB{...}": o teste ponta a ponta varre o CSS
+   procurando as telas de tela cheia e tira o "#" do começo do seletor. Um seletor com
+   duas telas vira "telaAntigos, #telaHistorico" e a tela não é reconhecida — foi o que
+   aconteceu ao criar esta aqui, em 19/08/2026. O teste pegou. */
+#telaHistorico{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
+#telaHistorico .ab-folha{max-width:1060px;margin:20px auto;background:#FAFBFC;
+  border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
+#telaHistorico .ab-topo{background:#0E3A40;color:#fff;padding:16px 26px;
+  display:flex;align-items:center;gap:14px}
+#telaHistorico .ab-topo .tit{flex:1;text-align:center;font-size:16px;font-weight:700}
+#telaHistorico .lnk{background:none;border:0;color:#B9D6D4;font-size:13.5px;cursor:pointer;font:inherit}
+#telaHistorico .ab-corpo{padding:22px 26px 26px}
+#telaHistorico .nota{font-size:12.5px;color:#6B5416;background:#FBF3E1;border:1px solid #C99B2E;
+  border-radius:8px;padding:10px 13px;margin:0 0 12px}
+#telaHistorico .bt{background:#0E6E6B;color:#fff;border:0;border-radius:8px;padding:9px 15px;
+  font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+#telaHistorico .bt.cinza{background:#E6E9ED;color:#3A424D}
+#telaHistorico .bt.peq{padding:6px 12px;font-size:12.5px}
+/* uma "pasta" por dia */
+#telaHistorico .dia{border:1px solid #DFE3E8;border-radius:11px;background:#fff;margin-top:12px;overflow:hidden}
+#telaHistorico .dia>summary{cursor:pointer;padding:12px 16px;font-weight:700;font-size:14.5px;
+  color:#12303A;background:#F2F5F7;display:flex;align-items:center;gap:10px;list-style:none}
+#telaHistorico .dia>summary::-webkit-details-marker{display:none}
+#telaHistorico .dia>summary::before{content:'🗂';font-size:16px}
+#telaHistorico .dia .cont{font-weight:400;color:#6B7480;font-size:12.5px;margin-left:auto}
+#telaHistorico .lin{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid #EEF1F4;flex-wrap:wrap}
+#telaHistorico .lin .nome{flex:1;min-width:180px;font-size:14px;color:#1C2430}
+#telaHistorico .lin .tag{background:#EDF1F4;border-radius:12px;padding:2px 9px;font-size:11.5px;color:#4A5560}
+#telaHistorico .lin .selo{background:#E4F1EA;color:#1F6B45;border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:600}
 #telaAntigos .ab-folha{max-width:1060px;margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaAntigos .ab-topo{background:#0E3A40;color:#fff;padding:16px 26px;
@@ -757,6 +799,32 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaAntigos .aviso2{display:none;margin:14px auto 0;max-width:700px;padding:11px 14px;
   background:#FBEACB;border:1px solid #B0851C;border-radius:8px;font-size:13px;color:#6B5010;line-height:1.5}
 </style>
+
+<!-- ======================= TELA: HISTÓRICO (19/08/2026) =======================
+     Pedido do Dr. Daniel: um lugar para voltar a QUALQUER laudo já liberado,
+     separado em pastas do dia, e poder revisar "como se tivesse acabado de fazer
+     o exame". Os laudos desta sessão reabrem na tela de revisão inteira (imagens,
+     áudio, blocos editáveis); os de outros dias abrem o desenho guardado para ler,
+     imprimir e salvar de novo — as imagens daquele dia não ficam no histórico. -->
+<div id="telaHistorico">
+  <div class="ab-folha">
+    <div class="ab-topo">
+      <button class="lnk" onclick="hisFechar()">‹ Início</button>
+      <span class="tit">Histórico de laudos</span>
+      <span style="width:64px"></span>
+    </div>
+    <div class="ab-corpo">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <input id="hisBusca" type="search" placeholder="procurar por nome do paciente…"
+          oninput="hisPintar()"
+          style="flex:1;min-width:200px;padding:9px 11px;border:1px solid #c8d0da;border-radius:8px;font-size:14px">
+        <button class="bt cinza" onclick="hisRecarregar()">↻ Atualizar</button>
+      </div>
+      <p class="nota" id="hisAviso" style="display:none"></p>
+      <div id="hisLista"></div>
+    </div>
+  </div>
+</div>
 
 <div id="telaAntigos">
   <div class="ab-folha">
@@ -8603,7 +8671,7 @@ function rev2Abrir(exId){
     return;
   }
   _rev2Id=exId;
-  ['telaAbertura','telaExames','telaDia','telaRevisao'].forEach(function(id){
+  ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos'].forEach(function(id){
     var e=document.getElementById(id); if(e) e.style.display='none';
   });
   var t=document.getElementById('telaRev2'); if(t) t.style.display='block';
@@ -8617,6 +8685,8 @@ function rev2Fechar(){ var t=document.getElementById('telaRev2'); if(t) t.style.
    Ver o comentário em abLiberarLaudos. */
 function rev2Voltar(){
   rev2Fechar();
+  // veio do Histórico: volta para lá, não para o painel do dia (que ligaria a gravação)
+  if(_rev2Origem==='historico'){ _rev2Origem='dia'; hisAbrir(); return; }
   if(_rev2Origem==='abertura'){ _rev2Origem='dia'; abVoltarInicio(); return; }
   diaAbrir();
 }
@@ -8706,7 +8776,12 @@ function rev2Render(){
   var L=ex.laudo, fila=rev2Fila(), pos=fila.map(function(x){return x.id;}).indexOf(ex.id)+1;
   var c=L.cab||{};
 
-  document.getElementById('rv2Tit').textContent='Revisão de laudos — '+fila.length+' pendente'+(fila.length===1?'':'s');
+  /* Laudo JÁ ASSINADO reaberto (pelo Histórico ou por "Liberar laudos" com a fila vazia):
+     o título não pode falar em pendências — ele não está na fila. Dizer "já assinado" no
+     alto é o que evita o médico achar que está revisando algo que ainda falta entregar. */
+  document.getElementById('rv2Tit').textContent = ex._liberado
+    ? ('Relendo laudo JÁ ASSINADO — '+(ex.paciente||'')+(fila.length?('  ·  '+fila.length+' pendente'+(fila.length===1?'':'s')+' na fila'):''))
+    : ('Revisão de laudos — '+fila.length+' pendente'+(fila.length===1?'':'s'));
 
   // ---- cabeçalho: qual laudo, quem, e o fundo ----
   var hora=ex._quando?new Date(ex._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
@@ -9575,6 +9650,19 @@ function abLiberarLaudos(){
   var p=document.getElementById('abAviso'); if(p) p.style.display='none';
   var fila=rev2Fila();
   if(fila.length){ _rev2Origem='abertura'; rev2Abrir(fila[0].id); return; }
+  /* 19/08/2026 — "não me deixa entrar". Fila vazia NÃO é motivo para trancar a porta:
+     o médico pode querer reabrir um laudo que já assinou (foi o caso do Raimundo, cujo
+     arquivo tinha ido parar na pasta temporária e precisava ser salvo de novo).
+     Se há laudos assinados NESTA sessão, entra no mais recente, em modo releitura. */
+  var liberados=exames.filter(function(x){ return x.laudo && x._liberado; })
+                      .sort(function(a,b){ return (b._quando||0)-(a._quando||0); });
+  if(liberados.length){
+    _rev2Origem='abertura';
+    rev2Abrir(liberados[0].id);
+    log('Nenhum laudo pendente — abri o último já assinado ('+(liberados[0].paciente||'')+'). '
+       +'Use o Histórico para escolher outro.');
+    return;
+  }
   // há sessão guardada esperando um toque em "Restaurar"? é a causa mais comum
   if(!exames.length && document.getElementById('bannerRecup')){
     abAvisar('Há uma sessão guardada esperando: toque em “Restaurar”, na barra azul '
@@ -9596,7 +9684,143 @@ function abLiberarLaudos(){
     abAvisar('Há '+exames.length+' exame(s) nesta sessão, mas nenhum tem laudo gerado ainda — '
         +'não há o que assinar.');
   else
-    abAvisar('Todos os laudos desta sessão já foram revisados e assinados. 🎉');
+    abAvisar('Todos os laudos desta sessão já foram revisados e assinados. 🎉 '
+        +'Para reabrir um deles, use o Histórico, logo abaixo.');
+}
+
+/* ============ TELA DE HISTÓRICO (19/08/2026) ============
+   Pedido do médico: ver todos os laudos já liberados, em pastas do dia, e poder
+   revisar de novo "como se tivesse acabado de fazer o exame".
+   DUAS PROCEDÊNCIAS, e a diferença importa e é dita na tela:
+   - laudos DESTA sessão: o exame inteiro ainda está na memória (imagens, áudio,
+     alertas), então reabrem na tela de revisão completa, editável;
+   - laudos de OUTROS dias: o histórico guarda o desenho do laudo, não as imagens
+     (elas foram tiradas de propósito, senão a cota estoura). Abrem para ler,
+     imprimir e salvar de novo — e é isso que a etiqueta na linha diz. */
+var _hisIndice=[], _hisCarregando=false;
+function hisAvisar(txt, ruim){
+  var p=document.getElementById('hisAviso'); if(!p) return;
+  // limpa o texto ao esconder: aviso velho guardado reaparece na próxima vez que algo
+  // mostrar a caixa, dizendo coisa que já não é verdade
+  if(!txt){ p.style.display='none'; p.textContent=''; return; }
+  p.textContent=txt; p.style.display='block';
+  p.style.background=ruim?'#FBE9E9':'#FBF3E1';
+  p.style.borderColor=ruim?'#C25B5B':'#C99B2E';
+  p.style.color=ruim?'#7A2E2E':'#6B5416';
+}
+async function hisAbrir(){
+  var t=document.getElementById('telaAbertura'); if(t) t.style.display='none';
+  var h=document.getElementById('telaHistorico'); if(h) h.style.display='block';
+  window.scrollTo(0,0);
+  await hisCarregar();
+}
+function hisFechar(){
+  var h=document.getElementById('telaHistorico'); if(h) h.style.display='none';
+  var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';
+  try{ abContarPendentes(); }catch(e){}
+  window.scrollTo(0,0);
+}
+async function hisCarregar(){
+  if(_hisCarregando) return;
+  _hisCarregando=true;
+  hisAvisar('carregando o histórico…');
+  try{
+    var arr=await histParaBusca();          // índice do agente, com queda para a cópia local
+    _hisIndice=Array.isArray(arr)?arr.slice():[];
+    hisAvisar(histBuscaIncompleta()
+      ? 'Mostrando só a cópia guardada no navegador — o agente não respondeu, então pode faltar laudo antigo. Ligue o agente e toque em Atualizar.'
+      : '', histBuscaIncompleta());
+  }catch(e){
+    _hisIndice=[]; hisAvisar('Não consegui ler o histórico: '+((e&&e.message)||e), true);
+  }
+  _hisCarregando=false;
+  hisPintar();
+}
+async function hisRecarregar(){ _hisCarregando=false; try{ histRecarregar(); }catch(e){} await hisCarregar(); }
+/* A data de um registro do histórico. 'data' é a do EXAME (dd/mm/aaaa) e é a que o
+   médico procura; 'ts' (quando foi salvo) é só a reserva para registro antigo sem data. */
+function hisDia(r){
+  var d=String(r&&r.data||'').trim();
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d;
+  if(r&&r.ts){ var x=new Date(r.ts);
+    return ('0'+x.getDate()).slice(-2)+'/'+('0'+(x.getMonth()+1)).slice(-2)+'/'+x.getFullYear(); }
+  return 'sem data';
+}
+function hisOrdemDia(dia){
+  var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dia);
+  return m ? (m[3]+m[2]+m[1]) : '0';    // 'sem data' vai para o fim
+}
+/* O exame desta sessão que corresponde a um registro do histórico (se houver):
+   é o que permite reabrir a revisão inteira em vez de só mostrar o desenho. */
+function hisExameDaSessao(r){
+  if(!r||!r.id) return null;
+  return exames.filter(function(x){ return x.histKey===r.id && x.laudo; })[0]||null;
+}
+function hisPintar(){
+  var div=document.getElementById('hisLista'); if(!div) return;
+  var q=norm((document.getElementById('hisBusca')||{}).value||'');
+  var lista=_hisIndice.filter(function(r){ return !q || norm(r.paciente||'').indexOf(q)>=0; });
+  var selo=document.getElementById('hisSelo');
+  if(selo){ if(_hisIndice.length){ selo.style.display=''; selo.textContent=_hisIndice.length; } else selo.style.display='none'; }
+  if(!lista.length){
+    div.innerHTML='<p class="nota" style="display:block">'
+      +(q?'Nenhum laudo com esse nome.':'Nenhum laudo no histórico ainda. Os laudos entram aqui quando você assina ou salva na tela de revisão.')
+      +'</p>';
+    return;
+  }
+  var porDia={};
+  lista.forEach(function(r){ var d=hisDia(r); (porDia[d]=porDia[d]||[]).push(r); });
+  var dias=Object.keys(porDia).sort(function(a,b){ return hisOrdemDia(b).localeCompare(hisOrdemDia(a)); });
+  div.innerHTML=dias.map(function(dia, iDia){
+    var regs=porDia[dia].slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+    var linhas=regs.map(function(r){
+      var ex=hisExameDaSessao(r);
+      var nomeTipo=(MODELOS[r.tipo]&&MODELOS[r.tipo].nome)||r.tipo||'';
+      return '<div class="lin">'
+        +'<span class="nome"><b>'+esc(r.paciente||'(sem nome)')+'</b>'
+          +(nomeTipo?' <span class="tag">'+esc(nomeTipo)+'</span>':'')
+          +(ex?' <span class="selo">revisão completa</span>':'')+'</span>'
+        +'<button class="bt peq" onclick="hisRevisar('+JSON.stringify(String(r.id)).replace(/"/g,'&quot;')+')">'
+          +(ex?'Revisar de novo':'Abrir laudo')+'</button>'
+        +'</div>';
+    }).join('');
+    return '<details class="dia"'+(iDia===0?' open':'')+'>'
+      +'<summary>'+esc(dia)+'<span class="cont">'+regs.length+' laudo'+(regs.length>1?'s':'')+'</span></summary>'
+      +linhas+'</details>';
+  }).join('');
+}
+/* Abre um laudo do histórico. Sessão atual -> revisão inteira. Outro dia -> o desenho
+   guardado, numa janela de leitura/impressão (as imagens daquele dia não estão aqui). */
+async function hisRevisar(id){
+  var r=_hisIndice.filter(function(x){ return String(x.id)===String(id); })[0];
+  if(!r){ hisAvisar('Não achei esse laudo no histórico.', true); return; }
+  var ex=hisExameDaSessao(r);
+  if(ex){
+    hisAvisar('');
+    var h=document.getElementById('telaHistorico'); if(h) h.style.display='none';
+    _rev2Origem='historico';
+    rev2Abrir(ex.id);
+    return;
+  }
+  hisAvisar('abrindo o laudo guardado…');
+  try{
+    var html=r.html;
+    if(!html){
+      var resp=await fetch(agenteBase()+'/historico/laudo?id='+encodeURIComponent(r.id));
+      var j=await resp.json();
+      html=(j&&j.ok&&typeof j.html==='string')?j.html:'';
+    }
+    if(!html) throw new Error('o desenho deste laudo não está guardado');
+    var w=window.open('', '_blank');
+    if(!w) throw new Error('o navegador bloqueou a janela — permita janelas para este endereço');
+    w.document.write('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+      +'<title>Laudo - '+esc(r.paciente||'')+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff}'
+      +laudoCssText()+'@media print{@page{size:A4;margin:8mm}}</style></head><body>'+html+'</body></html>');
+    w.document.close();
+    hisAvisar('Laudo de '+(r.paciente||'')+' aberto em outra janela — dá para ler, imprimir e salvar. '
+      +'Este é de outro dia: as imagens do exame não ficam guardadas no histórico, por isso ele não '
+      +'abre na tela de revisão editável.');
+  }catch(e){ hisAvisar('Não consegui abrir: '+((e&&e.message)||e), true); }
 }
 
 window.addEventListener('DOMContentLoaded', function(){
@@ -9614,7 +9838,7 @@ window.addEventListener('DOMContentLoaded', function(){
    essas telas, e uma tela nova amanhã repetiria o defeito sem ninguém notar. Aqui basta
    acrescentar o id à lista. */
 (function(){
-  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2','telaAntigos'];
+  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2','telaAntigos','telaHistorico'];
   function travarFundo(){
     var algumaAberta = TELAS_CHEIAS.some(function(id){
       var el=document.getElementById(id);

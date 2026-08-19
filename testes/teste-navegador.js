@@ -277,7 +277,7 @@ const VERIFICACOES = `(async () => {
   // continua POR BAIXO ocupando ~4.000 px — a janela mantinha a barra dela, rolando um
   // conteudo invisivel, ao lado da barra da propria tela.
   // So se pega num navegador de verdade: nenhuma funcao isolada mostra isso.
-  const TELAS = ['telaAbertura', 'telaExames', 'telaDia', 'telaRev2', 'telaAntigos'];
+  const TELAS = ['telaAbertura', 'telaExames', 'telaDia', 'telaRev2', 'telaAntigos', 'telaHistorico'];
   const contarBarras = () => {
     const de = document.documentElement;
     let n = (window.innerWidth - de.clientWidth) > 2 ? 1 : 0;

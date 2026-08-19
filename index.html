@@ -6202,25 +6202,29 @@ async function copiarCalc(id){
    A margem é definida pela IG da PRIMEIRA ultrassonografia e vale para as seguintes —
    mas só se a paciente trouxe esse primeiro exame. Sem ele, não há como calcular:
    fica apenas a IG estimada pela biometria.
-   Intervalos meio-abertos [inferior, superior): 9 semanas cai em ±5 dias (o mais conservador). */
+   Intervalos meio-abertos [inferior, superior): 9 semanas cai em ±7 dias (início da 2ª faixa). */
 // exames obstétricos sequenciais (2º/3º trim.): são os que usam margem de erro do 1º USG
 const EX_OBST_SEQ = {obst23:true, obst_gemelar:true};
-/* [médico] — PROCEDÊNCIA CONFIRMADA EM 15/08/2026: os valores abaixo são do próprio
-   Dr. Daniel (ele o disse com todas as letras quando a auditoria externa apontou a
-   tabela como "sem fonte"). Mesma categoria dos 13 cm do baço e 16 cm do fígado adulto.
-   ⚠️ PENDÊNCIA REGISTRADA: ele pediu fonte melhor. Candidata: ACOG Committee Opinion 700
-   (2017) — existe (PMID 28426621, verificado), mas as faixas não puderam ser LIDAS
-   (site bloqueia acesso automático; abstract não as traz). Fontes secundárias relatam
-   que o ACOG daria ±5-7 dias no 1º trimestre (aqui: ±3) e ±21+ no 3º (aqui: ±20) — se
-   correto, esta tabela e mais confiante que o ACOG nas duas pontas. NÃO trocar sem ler
-   o documento: regra do projeto. Ver conhecimento/referencias-do-programa.md §3.2. */
+/* [primária] — TROCADA EM 19/08/2026: o Dr. Daniel leu o ACOG Committee Opinion No. 700
+   (mai/2017) e mandou o PDF; a leitura foi feita direto no documento (não em resumo de
+   terceiros). Fonte: ACOG Committee on Obstetric Practice. Methods for Estimating the Due
+   Date. Obstet Gynecol 2017;129:e150-4. PMID 28426621, DOI 10.1097/AOG.0000000000002046.
+   As 5 primeiras faixas são os cortes exatos da Tabela 1 do documento ("single-point
+   cutoffs... chosen based on expert review") — nenhum número inventado ou arredondado.
+   A última faixa (28 semanas em diante) tem DOIS números no documento: 21 dias é o
+   limiar para trocar a data provável do parto (uma decisão diferente: "vale mudar a
+   data?"); ±21-30 dias é o que o texto chama de "accuracy" (precisão) nessa fase. O
+   médico decidiu (19/08/2026) usar o teto de 21 dias mesmo — não o número maior de
+   precisão (30) que eu tinha sugerido por ser mais conservador.
+   Tabela anterior [médico] (±3 a ±20, sem fonte) fica só no histórico do git.
+   Ver conhecimento/referencias-do-programa.md §3.2. */
 const MARGEM_IG = [
-  {de:6,  ate:9,  dias:3},
-  {de:9,  ate:12, dias:5},
-  {de:12, ate:18, dias:7},
-  {de:18, ate:24, dias:10},
-  {de:24, ate:30, dias:15},
-  {de:30, ate:39, dias:20}
+  {de:6,  ate:9,  dias:5},   // ate 8s6d — ACOG Tabela 1
+  {de:9,  ate:14, dias:7},   // 9s0d a 13s6d — ACOG Tabela 1
+  {de:14, ate:16, dias:7},   // 14s0d a 15s6d — ACOG Tabela 1
+  {de:16, ate:22, dias:10},  // 16s0d a 21s6d — ACOG Tabela 1
+  {de:22, ate:28, dias:14},  // 22s0d a 27s6d — ACOG Tabela 1
+  {de:28, ate:39, dias:21}   // 28s0d em diante — limiar do ACOG, teto escolhido pelo medico
 ];
 function margemErroIG(semanas){
   var s=parseFloat(semanas);
@@ -6229,7 +6233,7 @@ function margemErroIG(semanas){
     var f=MARGEM_IG[i];
     if(s>=f.de && s<f.ate) return {dias:f.dias, faixa:f.de+'–'+f.ate+' semanas'};
   }
-  if(s>=39) return {dias:20, faixa:'30–39 semanas (acima da tabela — usada a última faixa)'};
+  if(s>=39) return {dias:21, faixa:'28 semanas em diante (acima da tabela — usada a última faixa)'};
   return null;   // abaixo de 6 semanas: fora da tabela
 }
 /* Aplica na conclusão: preenche a variação em dias e corrige a frase da IG.

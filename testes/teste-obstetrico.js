@@ -21,7 +21,7 @@ const MARGEM = (HTML.match(/const MARGEM_IG = \[[\s\S]*?\n\];/) || [])[0];
 const app = new Function(MARGEM + '\n'
   + ['margemErroIG', 'obstParseIG', 'obstIgTexto', 'processarObstetrico', 'obstAplicarNaConclusao'].map(grab).join('\n')
   + '\n return {margemErroIG, obstParseIG, obstIgTexto, processarObstetrico, obstAplicarNaConclusao};')();
-const { obstParseIG, obstIgTexto, processarObstetrico, obstAplicarNaConclusao } = app;
+const { margemErroIG, obstParseIG, obstIgTexto, processarObstetrico, obstAplicarNaConclusao } = app;
 
 // conclusao como o modelo do medico entrega, com os pontilhados
 const MODELO = 'Foi observado Gravidez de feto único, com vitalidade normal.\n'
@@ -44,6 +44,23 @@ ok(obstParseIG('2w1d') === null, 'semanas abaixo do possivel sao recusadas');
 ok(obstIgTexto({ sem: 34, dias: 2 }) === '34 semanas e 2 dias', 'texto em portugues');
 ok(obstIgTexto({ sem: 34, dias: 1 }) === '34 semanas e 1 dia', 'um dia no singular');
 ok(obstIgTexto({ sem: 34, dias: 0 }) === '34 semanas', 'zero dia nao vira "e 0 dias"');
+
+console.log('=== margem de erro da IG — ACOG CO 700, Tabela 1 (fonte primaria, 19/08/2026) ===');
+ok(margemErroIG(5.9) === null, 'abaixo de 6 semanas: fora da tabela');
+ok(margemErroIG(6).dias === 5, '6 semanas: ate 8s6d -> 5 dias');
+ok(margemErroIG(8.9).dias === 5, '8,9 semanas: ainda na faixa ate 8s6d -> 5 dias');
+ok(margemErroIG(9).dias === 7, '9 semanas: entra 9s0d-13s6d -> 7 dias');
+ok(margemErroIG(13.9).dias === 7, '13,9 semanas: ainda 9s0d-13s6d -> 7 dias');
+ok(margemErroIG(14).dias === 7, '14 semanas: entra 14s0d-15s6d -> 7 dias (mesmo valor, faixa diferente)');
+ok(margemErroIG(15.9).dias === 7, '15,9 semanas: ainda 14s0d-15s6d -> 7 dias');
+ok(margemErroIG(16).dias === 10, '16 semanas: entra 16s0d-21s6d -> 10 dias');
+ok(margemErroIG(21.9).dias === 10, '21,9 semanas: ainda 16s0d-21s6d -> 10 dias');
+ok(margemErroIG(22).dias === 14, '22 semanas: entra 22s0d-27s6d -> 14 dias');
+ok(margemErroIG(27.9).dias === 14, '27,9 semanas: ainda 22s0d-27s6d -> 14 dias');
+ok(margemErroIG(28).dias === 21, '28 semanas: entra 28s+ -> 21 dias (teto escolhido pelo medico, nao os 30 da precisao)');
+ok(margemErroIG(38.9).dias === 21, '38,9 semanas: ainda 28s+ -> 21 dias');
+ok(margemErroIG(39).dias === 21, '39 semanas: cai no reforco acima da tabela -> ainda 21 dias');
+ok(margemErroIG(45).dias === 21, '45 semanas: acima da tabela, usa a ultima faixa -> 21 dias');
 
 console.log('=== NAO trouxe o USG de primeiro trimestre -> AUA ===');
 let r = processarObstetrico(Object.assign({ trouxe_usg_primeiro_trimestre: false }, FOTO));

@@ -45,6 +45,7 @@ const SUITE = [
   { arq: 'teste-caixapreta.js', o: 'caixa-preta da gravacao (janela fechou)' },
   { arq: 'teste-gravagente.js', o: 'gravacao continua pelo agente' },
   { arq: 'teste-obstetrico.js', o: 'idade gestacional (AUA x GA) do obstetrico' },
+  { arq: 'teste-doppler-arterial.js', o: 'Doppler arterial de MMII: modelo, dizeres e velocidade ausente' },
   { arq: 'teste-fila-banco.js', o: 'banco estruturado - lado do app (payload e fila)' },
   { arq: 'teste-buffer.py', o: 'fita de audio do agente', py: true },
   { arq: 'teste-cache.py', o: 'cache da listagem DICOM', py: true },

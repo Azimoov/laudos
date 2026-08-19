@@ -2270,7 +2270,12 @@ const SINONIMOS_TIPO = {      // termo impresso/ditado -> chave em MODELOS (edit
   parede_abdominal:['parede abdominal','hernia','parede'],
   partes_moles:['partes moles','parte mole','tecido subcutaneo','nodulo subcutaneo'],
   ombro:['ombro'], cotovelo:['cotovelo'], punho:['punho'], mao:['mao','quirodactilo'],
-  joelho:['joelho'], tornozelo:['tornozelo'], pe:['pe','pododactilo']
+  joelho:['joelho'], tornozelo:['tornozelo'], pe:['pe','pododactilo'],
+  // 19/08/2026: primeiro exame VASCULAR do programa. "doppler arterial" sozinho ja
+  // basta — o aparelho costuma imprimir so isso; o membro vem da lateralidade.
+  doppler_arterial_mmii:['doppler arterial','arterial mmii','arterial membro inferior',
+    'doppler arterial de membros inferiores','doppler arterial mmii','arterial de membro inferior',
+    'eco doppler arterial','duplex arterial']
 };
 // Presets ambíguos do aparelho: URO serve p/ rins E próstata; GYN p/ transvaginal E pélvica.
 // Tipos compatíveis contam como "tipo bateu" no vínculo, e o tipo DITADO corrige o do exame.
@@ -2810,7 +2815,7 @@ function pausarRec(){ const m=recAtivo(); if(!m) return; try{ if(m.state==='reco
 function atualizarPausa(){ const m=recAtivo(); const els=document.querySelectorAll('.btnPausa'); for(let i=0;i<els.length;i++){ els[i].style.display = m?'inline-block':'none'; els[i].textContent = (m&&m.state==='paused')?'▶ Retomar':'⏸ Pausar'; } }
 setInterval(atualizarPausa, 400);function nomeCompleto(nome){ return String(nome||'').replace(/\s+/g,' ').trim(); }
 function normLateralidade(s){ const t=norm(s); if(/esquerd/.test(t)) return 'Esquerdo'; if(/direit/.test(t)) return 'Direito'; if(/bilater|ambos|os dois|dois lados/.test(t)) return 'Bilateral'; return ''; }
-const TIPOS_COM_LATERALIDADE = new Set(['ombro','cotovelo','punho','mao','joelho','tornozelo','pe','partes_moles']);
+const TIPOS_COM_LATERALIDADE = new Set(['ombro','cotovelo','punho','mao','joelho','tornozelo','pe','partes_moles','doppler_arterial_mmii']);
 function nomeAudio(nomePac, tipoTexto, lateralidade){ const pn=nomeCompleto(nomePac); const k=mapTipo(tipoTexto); const tn=(k&&MODELOS[k])?MODELOS[k].nome:(tipoTexto||''); const lat=(k&&TIPOS_COM_LATERALIDADE.has(k))?normLateralidade(lateralidade):''; const tnLat=(tn?tn:'')+(lat?(tn?' '+lat:lat):''); return ((pn||'Sem nome')+(tnLat?' - '+tnLat:'')).trim(); }
 function nomeArquivoSeguro(s){ return ((s||'audio').replace(/[^A-Za-z0-9 ÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇÑáàâãéèêíïóôõöúüçñ_-]/g,' ').replace(/  +/g,' ').trim())||'audio'; }
 function playerLinha(url){
@@ -3148,6 +3153,7 @@ async function gerarLaudo(exId){
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), use o texto padrão correspondente do médico como BASE do vocabulário, mas NÃO o cole mecanicamente: integre-o reescrevendo o parágrafo do órgão como um texto único, fluido e gramaticalmente correto, como um médico redigiria. Ajuste a CONCLUSÃO de acordo.\n\n"+
 "REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- CORREÇÃO FALADA (prioridade máxima): o médico dita enquanto examina e se corrige em voz alta. Quando ele disser 'corrigindo', 'na verdade', 'desconsidere', 'esquece', 'me enganei' ou equivalente, DESCARTE por completo o que ele disse antes sobre aquele ponto e use SOMENTE a versão que vem depois. Vale para medida, lado, órgão, diagnóstico e qualquer outro dado. Ex.: 'rim direito com 9 centímetros... corrigindo: 11 centímetros' -> vale 11, e o 9 não aparece em lugar nenhum do laudo. NUNCA escreva as duas versões, nunca escreva a palavra 'corrigindo' no laudo, e NÃO registre isso como divergência em 'observacoes_para_o_medico' — o médico se corrigir é o funcionamento normal, não um problema.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. NÃO corte nem resuma conteúdo para caber em uma página: se o laudo for naturalmente longo, pode ocupar duas páginas.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade apenas se constar no ditado ou nas imagens; caso contrário deixe em branco.\n- DADOS CLÍNICOS: se o médico ditar orientação de dados clínicos (citar 'dados clínicos' e em seguida o quadro), resuma objetivamente o que foi dito e registre em dados_clinicos; se nada disso for dito, deixe vazio.\n- ACHADO ADICIONAL: se o médico disser 'adicionalmente' seguido de um diagnóstico, trata-se de um achado incidental (fora do que se procura habitualmente naquele exame): NÃO faça qualquer referência a ele no CORPO/DESCRIÇÃO do laudo; apenas ACRESCENTE ao FINAL da conclusão, em nova linha, exatamente: Observação: notou-se adicionalmente, sem ônus ao paciente, [o diagnóstico dito]. (troque [o diagnóstico dito] pelo que foi ditado após 'adicionalmente').\n- CISTO SIMPLES / NÓDULO BI-RADS 3 (mama): são achados simples e comuns — NÃO importa quantos há em cada lado e NUNCA invente número de lesões. Havendo em AMBOS os lados, a conclusão deve ser apenas, em linha única: Exame ecográfico compatível com cistos simples bilateralmente. (para cistos) ou Exame ecográfico compatível com nódulos mamários bilateralmente. (para nódulos BI-RADS 3). Havendo em apenas um lado, conclua de forma análoga citando o lado, também sem contar as lesões.\n- MAMA — MEDIDAS LIDAS NA IMAGEM (não são ditadas; leia das legendas do aparelho): para nódulo, microcistos agrupados ou massa sólido-cística é OBRIGATÓRIO informar a distância da lesão à papila mamária (mamilo), indicada na imagem no formato <número>P (ex.: 5P = 5 cm da papila mamária; 3P = 3 cm da papila mamária). Inclua isso na descrição da lesão, ex.: 'distando 5 cm da papila mamária'. Além disso, quando a imagem trouxer uma medida da parte superior da lesão até a superfície, acrescente também a distância da lesão à pele, ex.: 'situada a X cm da pele'. NÃO invente esses valores: só inclua se estiverem na imagem; se não houver o valor, não cite a distância.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n- VESÍCULA BILIAR (exames abdominais): 'VB' = vesícula biliar. Se o médico disser 'VB ok' (ou 'vesícula ok/normal'), é apenas uma confirmação de que a vesícula está presente e sem patologia — descreva a vesícula como normal e NÃO escreva a sigla 'VB ok' no laudo. Se o ditado indicar que a vesícula foi RETIRADA (colecistectomia, vesícula ausente, pós-operatório de retirada), NUNCA descreva uma vesícula biliar normal: registre a ausência da vesícula (paciente colecistectomizada) e remova do corpo qualquer descrição de vesícula biliar normal. Em especial, quando o médico disser que a vesícula biliar tem 'status pós-cirúrgico', escreva no CORPO exatamente a frase: Vesícula biliar não visibilizada, status pós-cirúrgico. — e NÃO inclua isso na conclusão.\n- TÍTULO DO EXAME (campo 'titulo' do JSON): comece pelo título do modelo e ajuste conforme o ditado. (a) PARTES MOLES: acrescente entre parênteses o LOCAL/região ditado — ex.: 'Exame de partes moles (região escapular)', 'Exame de partes moles (membro superior direito)', 'Exame de partes moles (ombro esquerdo)'. (b) Exames com lateralidade (ombro, joelho, mama, bolsa escrotal, punho, etc.): inclua o lado ditado — ex.: 'Exame do ombro direito', 'Exame do joelho esquerdo'. Se o local/lado não for ditado, mantenha o título do modelo, sem parênteses. NUNCA invente o lado/local: use apenas o que o médico ditou ou o que estiver legível nas imagens.\n- CORPO DO LAUDO — PRESERVAÇÃO INTEGRAL: Mantenha TODOS os itens/seções do CORPO do modelo na resposta. Ao inserir um achado patológico de um DIZER PADRÃO, incorpore-o apenas na seção correspondente do modelo (ex.: 'Fáscia muscular' para hérnia inguinal), preservando os demais itens com texto normal. Nunca substitua o CORPO inteiro pelo DIZER PADRÃO nem omita seções não afetadas pela patologia.\n- HÉRNIA INGUINAL: na ausência de indicação explícita de unilateralidade no ditado (palavras 'direita', 'esquerda' ou 'unilateral'), descreva sempre como bilateral, usando o dizer padrão de hérnia inguinal bilateral.\n- PRÓSTATA — PÓS-MICCIONAL: se nas imagens NÃO houver nenhuma cena com o texto 'pós-miccional' (ou equivalente como 'pós micção', 'residual', 'post void'), OU se houver uma cena com esse texto mas sem medida de volume visível, escreva exatamente: Volume pós-miccional: desprezível. — NÃO use o dizer padrão de volume pós-miccional com placeholder nesse caso.\n- FORMATO DA CONCLUSÃO (campo 'conclusao'): com DOIS OU MAIS diagnósticos, escreva 'Exame ecográfico compatível com:' e, em seguida, cada diagnóstico em sua própria linha, numerado com '1- ', '2- ', '3- ' e assim por diante. Com APENAS UM diagnóstico, escreva em linha única: 'Exame ecográfico compatível com <diagnóstico>.' (sem lista numerada). Não inclua a palavra 'Conclusão' no campo — ela já é inserida automaticamente.\n\n"+
 "MODELO DE LAUDO ('**' = negrito):\nTÍTULO: "+mod.titulo+"\nTÉCNICA: "+mod.tecnica+"\nCORPO:\n"+mod.corpo+"\nCONCLUSÃO: "+mod.conclusao+(mod.extra?"\nTEXTO FIXO APÓS A CONCLUSÃO (inserido automaticamente pelo app DEPOIS da conclusão — NÃO inclua este texto no campo conclusao nem no corpo; o conclusao deve conter apenas a conclusão diagnóstica):\n"+mod.extra:"")+"\n\n"+
+(EX_DOPPLER_ART[ex.tipo] ? "DOPPLER ARTERIAL DE MEMBRO INFERIOR — instruções próprias:\n- Este laudo é de UM membro só. Complete o '.....' do título e do corpo com o LADO (DIREITO ou ESQUERDO) que o médico ditou ou que estiver legível nas imagens; se não houver lado em lugar nenhum, mantenha os pontilhados e registre o fato em observacoes_para_o_medico. NUNCA descreva os dois membros no mesmo laudo.\n- VELOCIDADES: preencha 'velocidade de pico sistólico de ..... cm/s' de cada segmento com o valor de PVS/PSV lido nas legendas das imagens do aparelho ou ditado pelo médico. Copie o número, NUNCA o estime a partir da imagem. Se um segmento não tiver velocidade nem no ditado nem nas imagens, DEIXE OS PONTILHADOS INTACTOS — o aplicativo apaga a frase sozinho e avisa o médico; não invente e não reescreva a frase por conta própria.\n- Para cada segmento, descreva na ordem: perviedade, parede (placas), e comportamento ao Doppler (padrão espectral e velocidade). Segmento não citado no ditado permanece com o texto normal do modelo.\n- NÃO calcule nem escreva porcentagem de estenose por conta própria: a categoria (menor que 50%, 50-69%, 70-99%) é decisão do médico e só entra se ele a ditar.\n\n" : "")+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico — seções da região deste exame):\n"+bizusParaTipo(ex.tipo)+"\n\n"+
 (cadastro ? "DADOS DO CADASTRO (lidos do worksheet do aparelho — use como VERDADE para nome, idade e data do exame no cabeçalho, salvo se o ditado corrigir explicitamente):\n"+cadastro+"\n\n" : "")+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
@@ -3217,6 +3223,17 @@ async function gerarLaudo(exId){
         if(ob.faltando.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+ob.faltando.join(' ');
           alertas.push({tipo:'faltando', texto:ob.faltando.join('\n')}); }
       }catch(e){}
+    }
+    // Doppler arterial: velocidade que não veio sai do texto e vira aviso nominal
+    if(EX_DOPPLER_ART[ex.tipo]){
+      try{
+        const dp = processarDopplerArterial(resp.corpo||mod.corpo);
+        resp.corpo = dp.corpo;
+        if(dp.obs.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+dp.obs.join(' ');
+          alertas.push({tipo:'calculo', texto:dp.obs.join('\n')}); }
+        if(dp.faltando.length){ obsFinal = (obsFinal?obsFinal+' | ':'')+dp.faltando.join(' ');
+          alertas.push({tipo:'faltando', texto:dp.faltando.join('\n')}); }
+      }catch(e){ log('Falha ao conferir as velocidades de '+ex.paciente+': '+e.message, true); }
     }
     // o que o APP sabe sobre o exame anterior (a IA não tem como saber): acende o
     // quadro azul quando comparou, e o VERMELHO quando a identidade está em aberto
@@ -4310,8 +4327,8 @@ function renderRegras(){
 function excluirRegra(id){ gravarRegras(lerRegras().filter(function(r){return r.id!==id;})); renderRegras(); }
 function limparRegras(){ if(!confirm('Apagar TODOS os aprendizados guardados?')) return; gravarRegras([]); renderRegras(); }
 /* ============ Editor de BIZUS (dizeres padrão), por região — salvo no navegador ============ */
-const BIZUS_SECOES = ['MAMA','ABDOMINAL TOTAL','TRANSVAGINAL','TIREOIDE','PAREDE ABDOMINAL','JOELHO','PARTES MOLES','REGIÃO CERVICAL','OMBRO','PUNHO','PROSTATA','BOLSA ESCROTAL','OBSTÉTRICO'];
-const BIZUS_NOMES = {'MAMA':'Mama','ABDOMINAL TOTAL':'Abdome total','TRANSVAGINAL':'Transvaginal','TIREOIDE':'Tireoide','PAREDE ABDOMINAL':'Parede abdominal (hérnias)','JOELHO':'Joelho','PARTES MOLES':'Partes moles','REGIÃO CERVICAL':'Região cervical','OMBRO':'Ombro','PUNHO':'Punho','PROSTATA':'Próstata','BOLSA ESCROTAL':'Bolsa escrotal','OBSTÉTRICO':'Obstétrico'};
+const BIZUS_SECOES = ['MAMA','ABDOMINAL TOTAL','TRANSVAGINAL','TIREOIDE','PAREDE ABDOMINAL','JOELHO','PARTES MOLES','REGIÃO CERVICAL','OMBRO','PUNHO','PROSTATA','BOLSA ESCROTAL','OBSTÉTRICO','DOPPLER ARTERIAL MMII'];
+const BIZUS_NOMES = {'MAMA':'Mama','ABDOMINAL TOTAL':'Abdome total','TRANSVAGINAL':'Transvaginal','TIREOIDE':'Tireoide','PAREDE ABDOMINAL':'Parede abdominal (hérnias)','JOELHO':'Joelho','PARTES MOLES':'Partes moles','REGIÃO CERVICAL':'Região cervical','OMBRO':'Ombro','PUNHO':'Punho','PROSTATA':'Próstata','BOLSA ESCROTAL':'Bolsa escrotal','OBSTÉTRICO':'Obstétrico','DOPPLER ARTERIAL MMII':'Doppler arterial (membro inferior)'};
 function bizusEfetivo(){ try{ return localStorage.getItem('gbizus')||BIZUS; }catch(e){ return BIZUS; } }
 /* Corte de custo: na geração do laudo, envia só as seções de BIZUS da região do exame.
    Tipo sem mapa (ex.: modelo personalizado) ou seção não encontrada => arquivo completo (comportamento antigo). */
@@ -4326,7 +4343,8 @@ const BIZUS_POR_TIPO = {
   parede_abdominal:['PAREDE ABDOMINAL'],
   partes_moles:['PARTES MOLES','REGIÃO CERVICAL'],
   ombro:['OMBRO','PARTES MOLES'], cotovelo:['PARTES MOLES'], punho:['PUNHO','PARTES MOLES'], mao:['PUNHO','PARTES MOLES'],
-  joelho:['JOELHO','PARTES MOLES'], tornozelo:['PARTES MOLES'], pe:['PARTES MOLES']
+  joelho:['JOELHO','PARTES MOLES'], tornozelo:['PARTES MOLES'], pe:['PARTES MOLES'],
+  doppler_arterial_mmii:['DOPPLER ARTERIAL MMII']
 };
 function bizusParaTipo(tipo){
   var completo=bizusEfetivo();
@@ -6357,6 +6375,55 @@ function obstAplicarNaConclusao(txt, dados){
                 '(com variação de até +/- '+d.margem+' dias)');
   }
   return t;
+}
+/* ============ Doppler arterial de MMII: velocidade que não veio não vira pontilhado ============
+   Decisão do Dr. Daniel em 19/08/2026. O modelo normal PEDE a velocidade de pico sistólico de
+   cada segmento, porque ele quer o número registrado quando existe. Mas quando o ditado não cita
+   velocidade e as imagens não a trazem, a IA deixa os pontilhados — e um laudo cheio de
+   "velocidade de pico sistólico de ..... cm/s" não é um laudo entregável.
+   Então o APP apaga a oração da velocidade e devolve a redação sem número ("e velocidades
+   normais"), que é exatamente como o médico escreve quando não mede. O que ele NÃO quer é que
+   isso passe despercebido: cada segmento sem velocidade acende a caixa VERMELHA (dados faltando)
+   da tela de liberar laudos, nominalmente.
+   Por que no código e não na IA: apagar texto é decisão determinística e precisa acontecer
+   sempre igual — pedir isso à IA seria transformar uma regra em sorteio. Mesmo princípio do
+   obstétrico acima (o app escolhe; a IA só copia os números). */
+const EX_DOPPLER_ART = {doppler_arterial_mmii:true};
+/* Casa a oração da velocidade AINDA NÃO PREENCHIDA (pontilhados intactos). Exige o "cm/s"
+   para nunca comer uma frase que a IA tenha reescrito com número de verdade. */
+const RE_VEL_VAZIA = /,\s*com velocidade de pico sist[óo]lico de\s*\.{3,}\s*cm\/s/gi;
+function processarDopplerArterial(corpo){
+  var res={corpo:String(corpo||''), obs:[], faltando:[], semVel:[], comVel:0};
+  if(!res.corpo) return res;
+  var linhas=res.corpo.split('\n');
+  var segAtual='';
+  for(var i=0;i<linhas.length;i++){
+    // guarda o nome do segmento mais recente, para o aviso dizer QUAL artéria ficou sem número
+    var mSeg=linhas[i].match(/^\*\*(.+?):?\*\*\s*$/);
+    if(mSeg){ segAtual=mSeg[1].replace(/:$/,'').trim(); continue; }
+    RE_VEL_VAZIA.lastIndex=0;
+    if(RE_VEL_VAZIA.test(linhas[i])){
+      RE_VEL_VAZIA.lastIndex=0;
+      linhas[i]=linhas[i].replace(RE_VEL_VAZIA, ' e velocidades normais');
+      // "trifásico e velocidades normais e velocidades normais" nunca acontece porque a
+      // oração casada some inteira; mas a frase pode ficar com espaço duplo se a IA mexeu
+      linhas[i]=linhas[i].replace(/\s{2,}/g,' ');
+      if(segAtual && res.semVel.indexOf(segAtual)<0) res.semVel.push(segAtual);
+    } else if(/velocidade de pico sist[óo]lico de\s*\d/i.test(linhas[i])){
+      res.comVel++;
+    }
+  }
+  res.corpo=linhas.join('\n');
+  if(res.semVel.length){
+    res.faltando.push('Não encontrei a velocidade de pico sistólico de: '+res.semVel.join(', ')
+      +'. O laudo saiu com a redação sem número ("padrão espectral trifásico e velocidades normais") '
+      +'— confira se a medida existe nas imagens antes de liberar.');
+  }
+  if(res.comVel){
+    res.obs.push('Velocidade de pico sistólico registrada em '+res.comVel
+      +(res.comVel===1?' segmento.':' segmentos.'));
+  }
+  return res;
 }
 function tiradsCategoria(pts){ if(pts<=1) return {tr:1,desc:'benigno'}; if(pts===2) return {tr:2,desc:'não suspeito'}; if(pts===3) return {tr:3,desc:'levemente suspeito'}; if(pts<=6) return {tr:4,desc:'moderadamente suspeito'}; return {tr:5,desc:'altamente suspeito'}; }
 function tiradsConduta(tr, tam){

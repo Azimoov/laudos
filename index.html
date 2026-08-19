@@ -652,8 +652,15 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
           <button class="bt larga" onclick="rev2Regerar()">🤖 Regenerar laudo pela IA</button>
           <div class="lb">PEÇA À IA CORREÇÕES</div>
           <div class="pedido">
-            <textarea id="rv2Pedido" placeholder="escreva ou dite o ajuste — ex.: “medir o útero nos três eixos”"></textarea>
+            <textarea id="rv2Pedido" placeholder="escreva ou dite o ajuste — ex.: “medir o útero nos três eixos”" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();rev2PedidoEnviar();}"></textarea>
             <button class="mic" id="rv2Mic" onclick="rev2PedidoVoz()" title="Falar o pedido">🎙</button>
+          </div>
+          <!-- 19/08/2026: a caixa existia, o microfone existia, e NÃO HAVIA COMO ENVIAR.
+               Nada lia o texto: "Regenerar" ignorava o pedido e nenhum botão o aplicava.
+               Escrever e não ter para onde mandar é o mesmo que a caixa não existir. -->
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button class="bt" id="rv2PedidoBt" onclick="rev2PedidoEnviar()" title="Aplica o pedido ao laudo que está na tela (Ctrl+Enter)">✏️ Aplicar ao laudo</button>
+            <button class="bt cinza" id="rv2PedidoBtRe" onclick="rev2Regerar()" title="Refaz o laudo do zero pelo modelo, obedecendo o pedido acima">🤖 Refazer com esta ordem</button>
           </div>
           <p class="info" id="rv2PedidoStatus"></p>
         </div>
@@ -3107,9 +3114,17 @@ function ligarAudio(aIdx, exId, marcado){
 
 /* ============ Geração do laudo ============ */
 var _gerandoEmLote=false;
-async function gerarLaudo(exId){
+/* opts.correcao (19/08/2026): uma ordem do médico que vale MAIS que o ditado e que as
+   imagens. Nasceu de um caso real: ele ditou "membro superior direito" num exame que era
+   da PERNA, e o aparelho ainda estava etiquetado com o exame da paciente anterior
+   ("COTOVELO DIREITO"). Ditado e imagem diziam a mesma coisa errada, então a IA escreveu
+   um laudo de braço e descartou o modelo de perna inteiro. Pedir "troque superior por
+   inferior" no laudo pronto só conserta a palavra — o modelo continua perdido. Regerar
+   COM a correção refaz o laudo do modelo certo, com a ordem no topo da hierarquia. */
+async function gerarLaudo(exId, opts){
   const ex = exames.find(e=>e.id===exId);
   if(!ex){ return; }
+  const correcaoMedico = (opts && String(opts.correcao||'').trim()) || '';
   if(!ex.tipo){ log('Escolha o tipo de exame de '+ex.paciente+'.', true); return; }
   await garantirFundo();
   const btn = document.getElementById('btnGerar'+exId);
@@ -3158,6 +3173,7 @@ async function gerarLaudo(exId){
 (cadastro ? "DADOS DO CADASTRO (lidos do worksheet do aparelho — use como VERDADE para nome, idade e data do exame no cabeçalho, salvo se o ditado corrigir explicitamente):\n"+cadastro+"\n\n" : "")+
 "DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
+(correcaoMedico ? "⚠️ CORREÇÃO DIRETA DO MÉDICO — PRIORIDADE MÁXIMA, ACIMA DE TUDO:\nO médico está refazendo este laudo e deu a ordem abaixo. Ela vale MAIS que o ditado e MAIS que as legendas das imagens: onde houver conflito, a ordem do médico vence e o que estiver no ditado ou na imagem em sentido contrário deve ser IGNORADO por completo, sem ser mencionado no laudo nem em observacoes_para_o_medico como divergência.\nORDEM: "+correcaoMedico+"\n\n" : "")+
 (regrasAprend ? "REGRAS APRENDIDAS COM AS CORREÇÕES DO MÉDICO (cumpra à risca; têm prioridade sobre o estilo padrão quando houver conflito):\n"+regrasAprend+"\n\n" : "")+
 (anteriorTxt ? "EXAME ANTERIOR DO MESMO PACIENTE — "+(usados.length>1?("OS "+usados.length+" LAUDOS PRÉVIOS NA ÍNTEGRA, do mais recente para o mais antigo"):("LAUDO PRÉVIO NA ÍNTEGRA, realizado em "+(anterior.data||'data não registrada')))+" (mesmo tipo de exame):\n"+anteriorTxt+"\n\n"+
 (usados.length>1 ? "Com mais de um exame anterior, a REFERÊNCIA PRINCIPAL é o mais recente ("+(anterior.data||'data não registrada')+"); os mais antigos servem só para descrever a evolução ao longo do tempo, sempre citando a data de cada um.\n" : "")+
@@ -3253,6 +3269,22 @@ async function gerarLaudo(exId){
       if(_anosRef!=null)
         _corpoFinal = refEscreverNoCorpo({corpo:_corpoFinal}, _anosRef, ex.sexoPac||'');
     }catch(e){ log('Falha ao escrever a referência no corpo de '+ex.paciente+': '+e.message, true); }
+    /* Doppler arterial: as travas rodam sobre o laudo PRONTO (título + corpo + conclusão
+       já montados), porque o membro errado pode aparecer em qualquer um dos três. */
+    if(EX_DOPPLER_ART[ex.tipo]){
+      try{
+        var _dpConf = conferirDopplerArterial(
+          {titulo:resp.titulo||mod.titulo, corpo:_corpoFinal, conclusao:conclusaoFinal}, trans);
+        if(_dpConf.divergencia.length){
+          obsFinal = (obsFinal?obsFinal+' | ':'')+_dpConf.divergencia.join(' ');
+          alertas.push({tipo:'divergencia', texto:_dpConf.divergencia.join('\n')});
+        }
+        if(_dpConf.faltando.length){
+          obsFinal = (obsFinal?obsFinal+' | ':'')+_dpConf.faltando.join(' ');
+          alertas.push({tipo:'faltando', texto:_dpConf.faltando.join('\n')});
+        }
+      }catch(e){ log('Falha ao conferir o Doppler de '+ex.paciente+': '+e.message, true); }
+    }
     ex.laudo = {cab:resp.cabecalho||{}, corpo:_corpoFinal, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas,
       // dado ESTRUTURADO para a tela de revisão desenhar os botões de descritor faltando
       // e a caixa âmbar de conflito, sem ter de reinterpretar o texto do aviso
@@ -6425,6 +6457,56 @@ function processarDopplerArterial(corpo){
   }
   return res;
 }
+/* ============ Doppler arterial: as três travas de 19/08/2026 ============
+   Nasceram de um laudo real que saiu errado E SEM UM ÚNICO AVISO. O que houve:
+     - o médico ditou "ultrassom Doppler arterial do MEMBRO SUPERIOR direito";
+     - o exame era da PERNA (no mesmo ditado: "estica agora a perna", "a parte dessa
+       perna que é o que mais importa");
+     - o aparelho ainda estava etiquetado com o exame da paciente ANTERIOR
+       ("COTOVELO DIREITO"), então as imagens confirmaram o engano;
+     - a IA, com ditado e imagem concordando, escreveu um laudo de braço e jogou fora o
+       modelo de perna inteiro — as sete artérias sumiram;
+     - a caixa de alertas saiu VAZIA, porque nada disso era conferido.
+   Duas fontes concordando não são duas provas quando as duas vêm do mesmo engano.
+   Estas travas não bloqueiam nada: elas ACENDEM. Quem decide é o médico. */
+const DOP_TERMOS_SUPERIOR = ['membro superior','membros superiores','braço','braco','braquial',
+  'antebraço','antebraco','radial','ulnar','axilar','subclávia','subclavia','cotovelo','punho','ombro'];
+const DOP_TERMOS_PERNA = ['perna','coxa','panturrilha','tornozelo','pé direito','pe direito',
+  'pé esquerdo','pe esquerdo','joelho','pantorrilha'];
+const DOP_ARTERIAS = ['femoral comum','femoral profunda','femoral superficial','poplítea',
+  'poplitea','tibial anterior','tibial posterior','fibular'];
+/* Confere o laudo PRONTO de Doppler arterial de MMII. Devolve só avisos — nunca altera o texto:
+   trocar membro por conta própria seria o programa decidindo anatomia, que não é papel dele. */
+function conferirDopplerArterial(L, transcricao){
+  var res={faltando:[], divergencia:[]};
+  if(!L) return res;
+  var texto=norm([L.titulo||'', L.corpo||'', L.conclusao||''].join(' \n '));
+  var trans=norm(transcricao||'');
+
+  // TRAVA 1 — o laudo é de MMII mas fala de braço
+  var achouSup=DOP_TERMOS_SUPERIOR.filter(function(t){ return texto.indexOf(norm(t))>=0; });
+  if(achouSup.length){
+    res.divergencia.push('⚠ CONTRADIÇÃO DE MEMBRO: este exame é de Doppler arterial de membro '
+      +'INFERIOR, mas o laudo fala em '+achouSup.join(', ')+'. Confira ANTES de liberar — '
+      +'pode ser engano de fala no ditado ou etiqueta antiga no aparelho.');
+    // TRAVA 1b — e o ditado ainda por cima fala de perna: aí a contradição está provada
+    var achouPerna=DOP_TERMOS_PERNA.filter(function(t){ return trans.indexOf(norm(t))>=0; });
+    if(achouPerna.length){
+      res.divergencia.push('⚠ O DITADO CONTRADIZ O LAUDO: o laudo diz '+achouSup[0]
+        +', mas no ditado você falou em '+achouPerna.join(', ')+'. O laudo provavelmente saiu '
+        +'do membro errado.');
+    }
+  }
+  // TRAVA 2 — o modelo foi descartado (a IA reescreveu tudo por conta própria)
+  var presentes=DOP_ARTERIAS.filter(function(a){ return texto.indexOf(norm(a))>=0; });
+  if(presentes.length<4){
+    res.faltando.push('⚠ O MODELO DO EXAME NÃO FOI SEGUIDO: das artérias do modelo, só '
+      +(presentes.length?('encontrei '+presentes.length+' ('+presentes.join(', ')+')'):'não encontrei nenhuma')
+      +'. O laudo foi reescrito por fora do modelo — confira segmento por segmento, e note que '
+      +'a conferência de velocidades não vale neste laudo.');
+  }
+  return res;
+}
 function tiradsCategoria(pts){ if(pts<=1) return {tr:1,desc:'benigno'}; if(pts===2) return {tr:2,desc:'não suspeito'}; if(pts===3) return {tr:3,desc:'levemente suspeito'}; if(pts<=6) return {tr:4,desc:'moderadamente suspeito'}; return {tr:5,desc:'altamente suspeito'}; }
 function tiradsConduta(tr, tam){
   if(tr<=2) return 'sem indicação de PAAF ou seguimento pela classificação';
@@ -9007,11 +9089,56 @@ function rev2TrocarModelo(k){
   ex.tipo=k; log('Modelo trocado para "'+((MODELOS[k]||{}).nome||k)+'". Toque "Regenerar laudo pela IA" para refazer o texto.');
   rev2Render();
 }
+/* Refaz o laudo INTEIRO pelo modelo. Se houver texto na caixa de pedido, ele vai junto
+   como ORDEM DE PRIORIDADE MÁXIMA (ver gerarLaudo/opts.correcao) — é o caminho para
+   consertar um laudo que saiu do membro/órgão errado: só trocar a palavra no texto pronto
+   deixaria o modelo perdido. */
 async function rev2Regerar(){
   var ex=rev2Ex(); if(!ex) return;
-  var st=document.getElementById('rv2PedidoStatus'); if(st) st.textContent='regenerando o laudo…';
-  try{ await gerarLaudo(ex.id); rev2Render(); if(st) st.textContent='✅ laudo refeito.'; }
-  catch(e){ if(st) st.textContent='⚠️ falha: '+e.message; }
+  var t=document.getElementById('rv2Pedido');
+  var pedido=(t&&t.value||'').trim();
+  rev2Status(pedido ? 'refazendo o laudo com a sua ordem…' : 'regenerando o laudo…');
+  try{
+    await gerarLaudo(ex.id, pedido?{correcao:pedido}:undefined);
+    rev2Render();
+    if(pedido && t) t.value='';
+    rev2Status(pedido ? '✅ laudo refeito obedecendo a sua ordem — confira.' : '✅ laudo refeito.');
+  }
+  catch(e){ rev2Status('⚠️ falha: '+((e&&e.message)||e), true); }
+}
+/* Aplica o pedido ao laudo QUE ESTÁ NA TELA, sem refazer do zero — para ajustes pequenos.
+   Mesma esteira da tela antiga (revChatEnviar), com o modelo auxiliar barato. */
+async function rev2PedidoEnviar(){
+  var ex=rev2Ex(); if(!ex||!ex.laudo){ rev2Status('Não há laudo aberto para ajustar.', true); return; }
+  var t=document.getElementById('rv2Pedido');
+  var inst=(t&&t.value||'').trim();
+  if(!inst){ rev2Status('Escreva ou dite o ajuste primeiro — ex.: "corrija a lateralidade para esquerdo".', true); return; }
+  if(!await temIA()){ rev2Status('Sem IA: ligue o agente na clínica ou configure a chave da API.', true); return; }
+  var bt=document.getElementById('rv2PedidoBt'), btRe=document.getElementById('rv2PedidoBtRe');
+  if(bt) bt.disabled=true; if(btRe) btRe.disabled=true;
+  rev2Status('🤖 aplicando: “'+inst.slice(0,80)+(inst.length>80?'…':'')+'”');
+  try{
+    var L=ex.laudo;
+    var prompt="Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Um laudo está em revisão e o médico pediu um ajuste.\n\n"
+      +"LAUDO ATUAL (com ** de negrito):\nTÍTULO: "+(L.titulo||'')+"\nCORPO:\n"+(L.corpo||'')+"\nCONCLUSÃO: "+(L.conclusao||'')+"\n\n"
+      +"PEDIDO DO MÉDICO (cumpra exatamente; altere SOMENTE o necessário e preserve todo o resto do laudo):\n"+inst+"\n\n"
+      +"REGRAS: mantenha o estilo, a ortografia e a estrutura do laudo; achados patológicos em **negrito**; exatamente UMA linha em branco entre parágrafos; NUNCA invente medidas ou achados que não foram pedidos nem constem do laudo.\n\n"
+      +"Responda SOMENTE em JSON válido: {\"titulo\":\"\",\"corpo\":\"\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\"} — corpo com ** para negrito e \\n para quebras. ECONOMIA: preencha APENAS os campos que você alterou; os que não mudaram devem vir como \"\" (string vazia).";
+    var resp=await openai([{type:'text',text:prompt}], true, {modelo: cfg.modeloAux||cfg.modelo});
+    if(!resp) throw new Error('a IA devolveu uma resposta vazia — tente de novo');
+    if(!(resp.titulo||resp.corpo||resp.conclusao||resp.observacoes_para_o_medico))
+      throw new Error('a IA não alterou nada — reformule o pedido');
+    if(resp.titulo) L.titulo=resp.titulo;
+    if(resp.corpo) L.corpo=resp.corpo;
+    if(resp.conclusao) L.conclusao=resp.conclusao;
+    if(resp.observacoes_para_o_medico) L.obs=resp.observacoes_para_o_medico;
+    // a base do loop de aprendizado tem de acompanhar, senão mudança da IA vira "correção do médico"
+    try{ ex.laudoBaseTexto=textoBaseLaudo(L); }catch(e){}
+    if(t) t.value='';
+    rev2Render();
+    rev2Status('✅ ajuste aplicado — confira o laudo.');
+  }catch(e){ rev2Status('⚠️ falha: '+((e&&e.message)||e), true); }
+  if(bt) bt.disabled=false; if(btRe) btRe.disabled=false;
 }
 /* microfone: usa o agente para transcrever o que o médico falar */
 /* Avisos do microfone aparecem NA PRÓPRIA TELA (18/08/2026).

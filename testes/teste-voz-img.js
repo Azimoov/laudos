@@ -33,11 +33,18 @@ const src = [grab('norm'), grab('rev2Proc'), grab('rev2Trecho'), grab('rev2Audio
              grab('faltaTitulo'), grab('faltaGrupos'), grab('medidasFaltando'),
              bloco(/const FALTA\s*=\s*\{[\s\S]*?\n\};/, 'FALTA'),
              bloco(/const REV2_MOLDURA = [^\n]*/, 'REV2_MOLDURA'),
-             grab('rev2TituloDeMoldura'), grab('rev2Blocos'), grab('rev2Estado')].join('\n');
+             // 19/08/2026: o corte de retangulos passou a distinguir negrito de MEDIDA
+             // de negrito de TITULO — ver rev2NegritoDeMedida no index.html
+             bloco(/const REV2_ROTULO_MEDIDA = [^\n]*/, 'REV2_ROTULO_MEDIDA'),
+             grab('rev2TituloDeMoldura'), grab('rev2NegritoDeMedida'),
+             grab('rev2TituloDeBloco'), grab('rev2CorpoVisivel'),
+             grab('rev2Blocos'), grab('rev2Estado')].join('\n');
 const api = new Function(src + '\nreturn {rev2Proc, rev2Trecho, rev2AudioDoTrecho,'
-  + ' rev2Blocos, rev2Estado, rev2TituloDeMoldura};')();
+  + ' rev2Blocos, rev2Estado, rev2TituloDeMoldura, rev2NegritoDeMedida,'
+  + ' rev2TituloDeBloco, rev2CorpoVisivel};')();
 const { rev2Proc, rev2Trecho, rev2AudioDoTrecho, rev2Blocos, rev2Estado,
-        rev2TituloDeMoldura } = api;
+        rev2TituloDeMoldura, rev2NegritoDeMedida, rev2TituloDeBloco,
+        rev2CorpoVisivel } = api;
 
 const ex = { laudo: {
   procedencia: [

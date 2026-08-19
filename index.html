@@ -285,12 +285,25 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   padding:9px 20px;font-size:13.5px;color:#4A5560;cursor:pointer}
 #telaAbertura .ab-cfg:hover{background:#F1F4F7}
 #btnVoltarInicio{display:none;margin-right:8px}
+/* contador de exames do dia (19/08/2026) */
+#telaAbertura .ab-cont{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}
+#telaAbertura .ab-cont .n{flex:1 1 120px;background:#fff;border:1px solid #DFE3E8;
+  border-radius:10px;padding:12px 14px;text-align:center}
+#telaAbertura .ab-cont .n b{display:block;font-size:25px;line-height:1.1;color:#0E3A40}
+#telaAbertura .ab-cont .n span{display:block;font-size:11.5px;color:#6B7480;margin-top:3px;
+  letter-spacing:.4px;text-transform:uppercase}
+#telaAbertura .ab-cont .n.pend b{color:#C43B3B}
+#telaAbertura .ab-cont .n.ok b{color:#1F7A3D}
 </style>
 
 <div id="telaAbertura">
   <div class="ab-folha">
     <div class="ab-topo"><span class="ab-marca">Laudos USG</span><span class="ab-data" id="abData"></span></div>
     <div class="ab-corpo">
+      <!-- 19/08/2026: contador de exames do dia, pedido do médico. Os números vêm do
+           BANCO (pelo agente), não da sessão aberta: assim valem mesmo depois de fechar
+           a janela, e não zeram quando a sessão é recuperada. -->
+      <div class="ab-cont" id="abContador" style="display:none"></div>
       <div class="ab-eb">O SISTEMA CONFERE SOZINHO</div>
       <div class="ab-card">
         <div class="ab-linha">
@@ -408,6 +421,9 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
 #telaDia .bt:hover{background:#E7F1F0}
 #telaDia .bt.forte{background:#C43B3B;border-color:#C43B3B;color:#fff}
+/* ação secundária: existe sempre, mas não disputa o olho com "Revisar" */
+#telaDia .bt.cinza{border-color:#C3CAD2;color:#5A646F}
+#telaDia .bt.cinza:hover{background:#EEF1F4}
 #telaDia .bt.forte:hover{background:#A93030}
 #telaDia .vazio{background:#fff;border:1px dashed #CBD4DC;border-radius:10px;padding:26px;
   text-align:center;font-size:13px;color:#8A93A0}
@@ -525,6 +541,17 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaRev2 .bloco.ia{background:#FBE6F0;border-color:#B94A7E}
 #telaRev2 .bloco.ia .barra{background:#A83A6C}
 #telaRev2 .bloco.ia .tit{font-size:11.5px;letter-spacing:.8px;color:#8A3A64}
+/* IMPRESSÃO DIAGNÓSTICA (19/08/2026) — antes era rosa e dizia "TEXTO GERADO POR IA",
+   o que não era verdade: a conclusão padrão vem do modelo do médico, e a que ele mesmo
+   reescreve continuava com o carimbo. Agora é um cinza um pouco MAIS ESCURO que o dos
+   retângulos normais (#8A93A0), como ele pediu: distingue sem afirmar procedência. */
+#telaRev2 .bloco.conclusao{background:#F4F6F8;border-color:#C3CAD2}
+#telaRev2 .bloco.conclusao .tit{font-size:11.5px;letter-spacing:.8px;color:#5A646F}
+#telaRev2 .bloco.conclusao .txt{color:#46505C}
+/* DADOS CLÍNICOS — o que o médico ditou de história/indicação. Contexto, não achado. */
+#telaRev2 .bloco.clinico{background:#F1F5F9;border-color:#B9C7D4}
+#telaRev2 .bloco.clinico .tit{font-size:11.5px;letter-spacing:.8px;color:#3D5A72}
+#telaRev2 .bloco.clinico .txt{color:#34495C}
 #telaRev2 .selo{margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0}
 #telaRev2 .selo button{border:0;border-radius:10px;padding:3px 10px;font-size:10px;font-weight:700;
   color:#fff;cursor:pointer;font-family:inherit}
@@ -659,6 +686,9 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
           <div class="eb">IMAGENS (<span id="rv2NImg">0</span>)</div>
           <div id="rv2Imgs"></div>
           <div class="tocador" id="rv2Tocador">nenhum trecho selecionado — toque em <b>VOZ</b> num trecho do laudo</div>
+          <!-- 19/08/2026: ouvir o ditado INTEIRO. Sem isto, exame transcrito na nuvem
+               (que não traz marcação de tempo) ficava sem nenhuma forma de ser ouvido. -->
+          <button class="bt larga" id="rv2BtInteiro" onclick="rev2Inteiro()">🔊 Ouvir o ditado inteiro</button>
           <div class="lb">MODELO DO EXAME</div>
           <select id="rv2Modelo" onchange="rev2TrocarModelo(this.value)"></select>
           <button class="bt larga" onclick="rev2Regerar()">🤖 Regenerar laudo pela IA</button>
@@ -682,8 +712,12 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <button class="bt forte" onclick="rev2Aprovar(false)">Aprovar e assinar → próximo laudo</button>
         <button class="bt" onclick="rev2Aprovar(true)">Aprovar, assinar e imprimir → próximo laudo</button>
       </div>
+      <div id="rv2Ignorados" style="display:none;align-items:center;gap:10px;justify-content:center;
+        padding:8px 14px;margin:0 0 6px;background:#FBF3E1;border:1px solid #C99B2E;border-radius:8px;
+        font-size:12.5px;color:#6B5416"></div>
       <div class="rodapeBt2">
-        <button class="bt cinza" onclick="rev2Depois()">Deixar para depois</button>
+        <button class="bt cinza" onclick="rev2Depois()" title="vai para o fim da fila — ainda aparece hoje">Deixar para depois</button>
+        <button class="bt cinza" onclick="rev2Ignorar()" title="sai da sequência de liberação — não reaparece até você trazer de volta">Ignorar por enquanto</button>
         <button class="bt cinza" onclick="rev2SalvarApenas()">Salvar apenas</button>
         <button class="bt" onclick="rev2Aprender()">Aprender com correções</button>
       </div>
@@ -3257,7 +3291,7 @@ async function gerarLaudo(exId, opts){
     const partes = [{type:'text', text:
 "Você é o assistente de laudos do "+cfg.medico+", médico ultrassonografista (Brasil). Sua tarefa: preencher o MODELO DE LAUDO abaixo com os dados do exame.\n\n"+
 "FONTES (em ordem de prioridade):\n1. DITADO DO MÉDICO (transcrição) — é a fonte principal de achados e medidas.\n2. IMAGENS DO EXAME — leia as legendas do aparelho (nome do paciente, data, medidas como Dist/Vol/Peso) e use-as para preencher medidas que o ditado não citou.\n3. DIZERES PADRÃO — quando o ditado citar uma patologia (ex.: esteatose, cisto renal, mioma, nódulo BI-RADS), use o texto padrão correspondente do médico como BASE do vocabulário, mas NÃO o cole mecanicamente: integre-o reescrevendo o parágrafo do órgão como um texto único, fluido e gramaticalmente correto, como um médico redigiria. Ajuste a CONCLUSÃO de acordo.\n\n"+
-"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- CORREÇÃO FALADA (prioridade máxima): o médico dita enquanto examina e se corrige em voz alta. Quando ele disser 'corrigindo', 'na verdade', 'desconsidere', 'esquece', 'me enganei' ou equivalente, DESCARTE por completo o que ele disse antes sobre aquele ponto e use SOMENTE a versão que vem depois. Vale para medida, lado, órgão, diagnóstico e qualquer outro dado. Ex.: 'rim direito com 9 centímetros... corrigindo: 11 centímetros' -> vale 11, e o 9 não aparece em lugar nenhum do laudo. NUNCA escreva as duas versões, nunca escreva a palavra 'corrigindo' no laudo, e NÃO registre isso como divergência em 'observacoes_para_o_medico' — o médico se corrigir é o funcionamento normal, não um problema.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. NÃO corte nem resuma conteúdo para caber em uma página: se o laudo for naturalmente longo, pode ocupar duas páginas.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade apenas se constar no ditado ou nas imagens; caso contrário deixe em branco.\n- DADOS CLÍNICOS: se o médico ditar orientação de dados clínicos (citar 'dados clínicos' e em seguida o quadro), resuma objetivamente o que foi dito e registre em dados_clinicos; se nada disso for dito, deixe vazio.\n- ACHADO ADICIONAL: se o médico disser 'adicionalmente' seguido de um diagnóstico, trata-se de um achado incidental (fora do que se procura habitualmente naquele exame): NÃO faça qualquer referência a ele no CORPO/DESCRIÇÃO do laudo; apenas ACRESCENTE ao FINAL da conclusão, em nova linha, exatamente: Observação: notou-se adicionalmente, sem ônus ao paciente, [o diagnóstico dito]. (troque [o diagnóstico dito] pelo que foi ditado após 'adicionalmente').\n- CISTO SIMPLES / NÓDULO BI-RADS 3 (mama): são achados simples e comuns — NÃO importa quantos há em cada lado e NUNCA invente número de lesões. Havendo em AMBOS os lados, a conclusão deve ser apenas, em linha única: Exame ecográfico compatível com cistos simples bilateralmente. (para cistos) ou Exame ecográfico compatível com nódulos mamários bilateralmente. (para nódulos BI-RADS 3). Havendo em apenas um lado, conclua de forma análoga citando o lado, também sem contar as lesões.\n- MAMA — MEDIDAS LIDAS NA IMAGEM (não são ditadas; leia das legendas do aparelho): para nódulo, microcistos agrupados ou massa sólido-cística é OBRIGATÓRIO informar a distância da lesão à papila mamária (mamilo), indicada na imagem no formato <número>P (ex.: 5P = 5 cm da papila mamária; 3P = 3 cm da papila mamária). Inclua isso na descrição da lesão, ex.: 'distando 5 cm da papila mamária'. Além disso, quando a imagem trouxer uma medida da parte superior da lesão até a superfície, acrescente também a distância da lesão à pele, ex.: 'situada a X cm da pele'. NÃO invente esses valores: só inclua se estiverem na imagem; se não houver o valor, não cite a distância.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n- VESÍCULA BILIAR (exames abdominais): 'VB' = vesícula biliar. Se o médico disser 'VB ok' (ou 'vesícula ok/normal'), é apenas uma confirmação de que a vesícula está presente e sem patologia — descreva a vesícula como normal e NÃO escreva a sigla 'VB ok' no laudo. Se o ditado indicar que a vesícula foi RETIRADA (colecistectomia, vesícula ausente, pós-operatório de retirada), NUNCA descreva uma vesícula biliar normal: registre a ausência da vesícula (paciente colecistectomizada) e remova do corpo qualquer descrição de vesícula biliar normal. Em especial, quando o médico disser que a vesícula biliar tem 'status pós-cirúrgico', escreva no CORPO exatamente a frase: Vesícula biliar não visibilizada, status pós-cirúrgico. — e NÃO inclua isso na conclusão.\n- TÍTULO DO EXAME (campo 'titulo' do JSON): comece pelo título do modelo e ajuste conforme o ditado. (a) PARTES MOLES: acrescente entre parênteses o LOCAL/região ditado — ex.: 'Exame de partes moles (região escapular)', 'Exame de partes moles (membro superior direito)', 'Exame de partes moles (ombro esquerdo)'. (b) Exames com lateralidade (ombro, joelho, mama, bolsa escrotal, punho, etc.): inclua o lado ditado — ex.: 'Exame do ombro direito', 'Exame do joelho esquerdo'. Se o local/lado não for ditado, mantenha o título do modelo, sem parênteses. NUNCA invente o lado/local: use apenas o que o médico ditou ou o que estiver legível nas imagens.\n- CORPO DO LAUDO — PRESERVAÇÃO INTEGRAL: Mantenha TODOS os itens/seções do CORPO do modelo na resposta. Ao inserir um achado patológico de um DIZER PADRÃO, incorpore-o apenas na seção correspondente do modelo (ex.: 'Fáscia muscular' para hérnia inguinal), preservando os demais itens com texto normal. Nunca substitua o CORPO inteiro pelo DIZER PADRÃO nem omita seções não afetadas pela patologia.\n- HÉRNIA INGUINAL: na ausência de indicação explícita de unilateralidade no ditado (palavras 'direita', 'esquerda' ou 'unilateral'), descreva sempre como bilateral, usando o dizer padrão de hérnia inguinal bilateral.\n- PRÓSTATA — PÓS-MICCIONAL: se nas imagens NÃO houver nenhuma cena com o texto 'pós-miccional' (ou equivalente como 'pós micção', 'residual', 'post void'), OU se houver uma cena com esse texto mas sem medida de volume visível, escreva exatamente: Volume pós-miccional: desprezível. — NÃO use o dizer padrão de volume pós-miccional com placeholder nesse caso.\n- FORMATO DA CONCLUSÃO (campo 'conclusao'): com DOIS OU MAIS diagnósticos, escreva 'Exame ecográfico compatível com:' e, em seguida, cada diagnóstico em sua própria linha, numerado com '1- ', '2- ', '3- ' e assim por diante. Com APENAS UM diagnóstico, escreva em linha única: 'Exame ecográfico compatível com <diagnóstico>.' (sem lista numerada). Não inclua a palavra 'Conclusão' no campo — ela já é inserida automaticamente.\n\n"+
+"REGRAS RÍGIDAS:\n- NUNCA invente medidas, datas ou achados. Onde faltar dado, mantenha os pontilhados (.....) do modelo.\n- CORREÇÃO FALADA (prioridade máxima): o médico dita enquanto examina e se corrige em voz alta. Quando ele disser 'corrigindo', 'na verdade', 'desconsidere', 'esquece', 'me enganei' ou equivalente, DESCARTE por completo o que ele disse antes sobre aquele ponto e use SOMENTE a versão que vem depois. Vale para medida, lado, órgão, diagnóstico e qualquer outro dado. Ex.: 'rim direito com 9 centímetros... corrigindo: 11 centímetros' -> vale 11, e o 9 não aparece em lugar nenhum do laudo. NUNCA escreva as duas versões, nunca escreva a palavra 'corrigindo' no laudo, e NÃO registre isso como divergência em 'observacoes_para_o_medico' — o médico se corrigir é o funcionamento normal, não um problema.\n- Se o título ou o corpo do modelo tiver '.....' no lugar do LADO (DIREITO/ESQUERDO) ou da região examinada, preencha com o que o médico ditou; se não ditado, mantenha os pontilhados.\n- INTEGRAÇÃO FLUIDA (obrigatório): ao inserir um achado num órgão, EDITE a frase de normalidade desse órgão para que não haja contradição. Errado: manter 'Sistema Pielocalicial sem dilatações' e depois descrever cálculo calicinal; manter 'parênquima normal' e depois descrever cistos no parênquima. Certo: reescrever, ex.: 'parênquima com espessura preservada, apresentando as formações císticas descritas a seguir'.\n- NÃO repita a mesma frase padrão para achados semelhantes: combine-os numa única frase bem redigida. Ex.: em vez de três frases 'Notou-se imagem hiperecogênica...', escreva 'Notaram-se duas imagens hiperecogênicas, providas de sombra acústica posterior, nos grupos calicinais superior e inferior, medindo ..... cm e ..... cm, respectivamente'.\n- Toda medida pendente leva unidade: escreva 'medindo ..... cm' (nunca 'medindo .....' solto).\n- DATAS sempre no formato dia/mês/ano (ex.: 11/06/2026) — nunca ano-mês-dia.\n- Todo trecho que descreva ALTERAÇÃO PATOLÓGICA (achado anormal) deve estar em negrito (**...**), além dos negritos já existentes do modelo.\n- COERÊNCIA DO NEGRITO (obrigatório): se o MESMO achado aparece em mais de uma estrutura do mesmo exame, ele vai em negrito em TODAS, sem exceção. Ex.: se o tendão supraespinhal tem **tendinopatia** em negrito, o subescapular com tendinopatia também tem de vir em negrito. O aplicativo pinta de VERDE (alterado) o quadro de cada estrutura pelo negrito: uma estrutura alterada que ficou sem negrito aparece ao médico como NORMAL, e isso é erro grave. Antes de responder, releia o laudo e confira que nenhum achado ficou sem negrito.\n- ESPAÇAMENTO: mantenha exatamente UMA linha em branco entre parágrafos, como nos modelos — nunca duas ou mais, e nenhuma linha em branco extra. NÃO corte nem resuma conteúdo para caber em uma página: se o laudo for naturalmente longo, pode ocupar duas páginas.\n- Releia o laudo final como um todo antes de responder: ele deve soar como redigido por um humano, sem remendos nem repetições.\n- Mantenha o estilo, a ortografia e a estrutura do modelo do médico (ele escreve assim e quer assim).\n- Órgãos não citados no ditado permanecem com o texto normal do modelo.\n- Cabeçalho: extraia nome do paciente e data do exame das legendas das imagens, e idade apenas se constar no ditado ou nas imagens; caso contrário deixe em branco.\n- DADOS CLÍNICOS: se o médico ditar orientação de dados clínicos (citar 'dados clínicos' e em seguida o quadro), resuma objetivamente o que foi dito e registre em dados_clinicos; se nada disso for dito, deixe vazio.\n- ACHADO ADICIONAL: se o médico disser 'adicionalmente' seguido de um diagnóstico, trata-se de um achado incidental (fora do que se procura habitualmente naquele exame): NÃO faça qualquer referência a ele no CORPO/DESCRIÇÃO do laudo; apenas ACRESCENTE ao FINAL da conclusão, em nova linha, exatamente: Observação: notou-se adicionalmente, sem ônus ao paciente, [o diagnóstico dito]. (troque [o diagnóstico dito] pelo que foi ditado após 'adicionalmente').\n- CISTO SIMPLES / NÓDULO BI-RADS 3 — **SÓ NO EXAME DE MAMA**: são achados simples e comuns — NÃO importa quantos há em cada MAMA e NUNCA invente número de lesões. Havendo em AMBOS os lados, a conclusão deve ser apenas, em linha única: Exame ecográfico compatível com cistos simples bilateralmente. (para cistos) ou Exame ecográfico compatível com nódulos mamários bilateralmente. (para nódulos BI-RADS 3). Havendo em apenas um lado, conclua de forma análoga citando o lado, também sem contar as lesões. ⚠️ ESTA REGRA NÃO VALE PARA NENHUM OUTRO ÓRGÃO: em rim, fígado, tireoide, ovário e qualquer outro, cistos e nódulos são CONTADOS e descritos um a um, com as medidas de cada um, como manda a regra de combinar achados semelhantes numa frase só. Dois cistos no mesmo rim são DOIS cistos no laudo — ex.: 'Notaram-se duas formações císticas simples no rim direito, medindo 1,2 cm e 0,8 cm.'\n- MAMA — MEDIDAS LIDAS NA IMAGEM (não são ditadas; leia das legendas do aparelho): para nódulo, microcistos agrupados ou massa sólido-cística é OBRIGATÓRIO informar a distância da lesão à papila mamária (mamilo), indicada na imagem no formato <número>P (ex.: 5P = 5 cm da papila mamária; 3P = 3 cm da papila mamária). Inclua isso na descrição da lesão, ex.: 'distando 5 cm da papila mamária'. Além disso, quando a imagem trouxer uma medida da parte superior da lesão até a superfície, acrescente também a distância da lesão à pele, ex.: 'situada a X cm da pele'. NÃO invente esses valores: só inclua se estiverem na imagem; se não houver o valor, não cite a distância.\n- Se o ditado citar uma patologia que NÃO conste nos DIZERES PADRÃO, crie a descrição completa com base no seu conhecimento médico de ultrassonografia (descritores ecográficos consagrados para essa patologia), imitando o estilo dos dizeres do médico, e preencha medidas apenas com o que constar no ditado ou nas imagens. OBRIGATÓRIO: declare em 'observacoes_para_o_medico' que a descrição dessa patologia foi criada a partir do conhecimento da IA (cite qual patologia).\n- Em 'observacoes_para_o_medico' liste avisos: dados ilegíveis, divergência entre ditado e imagens, medidas ausentes, ou se o nome do paciente nas imagens não confere.\n- VESÍCULA BILIAR (exames abdominais): 'VB' = vesícula biliar. Se o médico disser 'VB ok' (ou 'vesícula ok/normal'), é apenas uma confirmação de que a vesícula está presente e sem patologia — descreva a vesícula como normal e NÃO escreva a sigla 'VB ok' no laudo. Se o ditado indicar que a vesícula foi RETIRADA (colecistectomia, vesícula ausente, pós-operatório de retirada), NUNCA descreva uma vesícula biliar normal: registre a ausência da vesícula (paciente colecistectomizada) e remova do corpo qualquer descrição de vesícula biliar normal. Em especial, quando o médico disser que a vesícula biliar tem 'status pós-cirúrgico', escreva no CORPO exatamente a frase: Vesícula biliar não visibilizada, status pós-cirúrgico. — e NÃO inclua isso na conclusão.\n- TÍTULO DO EXAME (campo 'titulo' do JSON): comece pelo título do modelo e ajuste conforme o ditado. (a) PARTES MOLES: acrescente entre parênteses o LOCAL/região ditado — ex.: 'Exame de partes moles (região escapular)', 'Exame de partes moles (membro superior direito)', 'Exame de partes moles (ombro esquerdo)'. (b) Exames com lateralidade (ombro, joelho, mama, bolsa escrotal, punho, etc.): inclua o lado ditado — ex.: 'Exame do ombro direito', 'Exame do joelho esquerdo'. Se o local/lado não for ditado, mantenha o título do modelo, sem parênteses. NUNCA invente o lado/local: use apenas o que o médico ditou ou o que estiver legível nas imagens.\n- CORPO DO LAUDO — PRESERVAÇÃO INTEGRAL: Mantenha TODOS os itens/seções do CORPO do modelo na resposta. Ao inserir um achado patológico de um DIZER PADRÃO, incorpore-o apenas na seção correspondente do modelo (ex.: 'Fáscia muscular' para hérnia inguinal), preservando os demais itens com texto normal. Nunca substitua o CORPO inteiro pelo DIZER PADRÃO nem omita seções não afetadas pela patologia.\n- HÉRNIA INGUINAL: na ausência de indicação explícita de unilateralidade no ditado (palavras 'direita', 'esquerda' ou 'unilateral'), descreva sempre como bilateral, usando o dizer padrão de hérnia inguinal bilateral.\n- PRÓSTATA — PÓS-MICCIONAL: se nas imagens NÃO houver nenhuma cena com o texto 'pós-miccional' (ou equivalente como 'pós micção', 'residual', 'post void'), OU se houver uma cena com esse texto mas sem medida de volume visível, escreva exatamente: Volume pós-miccional: desprezível. — NÃO use o dizer padrão de volume pós-miccional com placeholder nesse caso.\n- FORMATO DA CONCLUSÃO (campo 'conclusao'): com DOIS OU MAIS diagnósticos, escreva 'Exame ecográfico compatível com:' e, em seguida, cada diagnóstico em sua própria linha, numerado com '1- ', '2- ', '3- ' e assim por diante. Com APENAS UM diagnóstico, escreva em linha única: 'Exame ecográfico compatível com <diagnóstico>.' (sem lista numerada). Não inclua a palavra 'Conclusão' no campo — ela já é inserida automaticamente.\n\n"+
 "MODELO DE LAUDO ('**' = negrito):\nTÍTULO: "+mod.titulo+"\nTÉCNICA: "+mod.tecnica+"\nCORPO:\n"+mod.corpo+"\nCONCLUSÃO: "+mod.conclusao+(mod.extra?"\nTEXTO FIXO APÓS A CONCLUSÃO (inserido automaticamente pelo app DEPOIS da conclusão — NÃO inclua este texto no campo conclusao nem no corpo; o conclusao deve conter apenas a conclusão diagnóstica):\n"+mod.extra:"")+"\n\n"+
 (EX_DOPPLER_ART[ex.tipo] ? "DOPPLER ARTERIAL DE MEMBRO INFERIOR — instruções próprias:\n- Este laudo é de UM membro só. Complete o '.....' do título e do corpo com o LADO (DIREITO ou ESQUERDO) que o médico ditou ou que estiver legível nas imagens; se não houver lado em lugar nenhum, mantenha os pontilhados e registre o fato em observacoes_para_o_medico. NUNCA descreva os dois membros no mesmo laudo.\n- VELOCIDADES: preencha 'velocidade de pico sistólico de ..... cm/s' de cada segmento com o valor de PVS/PSV lido nas legendas das imagens do aparelho ou ditado pelo médico. Copie o número, NUNCA o estime a partir da imagem. Se um segmento não tiver velocidade nem no ditado nem nas imagens, DEIXE OS PONTILHADOS INTACTOS — o aplicativo apaga a frase sozinho e avisa o médico; não invente e não reescreva a frase por conta própria.\n- Para cada segmento, descreva na ordem: perviedade, parede (placas), e comportamento ao Doppler (padrão espectral e velocidade). Segmento não citado no ditado permanece com o texto normal do modelo.\n- NÃO calcule nem escreva porcentagem de estenose por conta própria: a categoria (menor que 50%, 50-69%, 70-99%) é decisão do médico e só entra se ele a ditar.\n\n" : "")+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico — seções da região deste exame):\n"+bizusParaTipo(ex.tipo)+"\n\n"+
@@ -3687,7 +3721,10 @@ async function salvarSessao(comImagens){
     // _estudoId/_dicom/_captura PRECISAM entrar no snapshot: é por eles que a recuperação
     // sabe que o exame já existe. Sem isso ela recriava tudo e o exame saía DUPLICADO.
     var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_instIds:e._instIds||[],_dicom:!!e._dicom,_captura:!!e._captura,_preset:e._preset||''}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
-    var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||''}; });
+    /* _estudoAudio e trechos entram no retrato (19/08/2026): sem eles, reabrir a janela
+       devolvia o ditado MUDO (a URL não se refazia) e sem marcação de tempo (o botão VOZ
+       morria). Os dois são baratos — um id e uma lista de tempos, sem áudio junto. */
+    var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||'', _estudoAudio:a._estudoAudio||'', trechos:(a.trechos||[])}; });
     await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();
       // lista vazia = apagou tudo: limpa e não grava nada (senão voltaria um "0 laudos")
       if(snap.length) st.add({quando:Date.now(),exames:snap,audios:audsMeta});
@@ -3757,7 +3794,16 @@ async function restaurarSessao(id){
     var comSom=0;
     try{
       var blobs=await audsBlobLer(); var porIdx={}; blobs.forEach(function(bb){ porIdx[bb.idx]=bb.blob; });
-      (sess.audios||[]).forEach(function(sa){ var bl=porIdx[sa.idx]; if(bl) comSom++; audios.push(Object.assign({}, sa, {blob:bl||null, url:bl?URL.createObjectURL(bl):null, pendente:sa.exameId==null})); });
+      /* A URL do áudio VOLTA na restauração (19/08/2026). Antes só era refeita a partir do
+         blob guardado no navegador — e o ditado do agente não tem blob, ele mora no disco do
+         computador. Então, mesmo os áudios que já tinham endereço voltavam mudos depois de
+         recarregar a janela. Com _estudoAudio, o endereço se refaz sozinho. */
+      (sess.audios||[]).forEach(function(sa){
+        var bl=porIdx[sa.idx]; if(bl) comSom++;
+        var url = bl ? URL.createObjectURL(bl)
+                     : (sa._estudoAudio ? (agenteBase()+'/exame/audio/'+encodeURIComponent(sa._estudoAudio)) : null);
+        audios.push(Object.assign({}, sa, {blob:bl||null, url:url, pendente:sa.exameId==null}));
+      });
     }catch(e){}
     var b=document.getElementById('bannerRecup'); if(b) b.remove();
     renderExames(); renderRevisao();
@@ -5636,10 +5682,18 @@ function micSom(tipo){
     if(!micAudioCtx) micAudioCtx=new AC();
     if(micAudioCtx.state==='suspended') micAudioCtx.resume();
     var t0=micAudioCtx.currentTime;
-    // reinício: dois tons descendentes, discreto. morto: três tons, mais insistente.
-    // falta (F2e): dois tons SUBINDO — de ouvido não se confunde com problema de microfone.
-    var notas=(tipo==='morto')?[[494,0],[392,0.20],[330,0.40]]
-             :(tipo==='falta')?[[587,0],[784,0.17]]
+    /* CADA AVISO TEM O SEU SOM (19/08/2026). O médico ouviu o mesmo toque para "exame
+       chegou" e para "o microfone reiniciou e você perdeu segundos de ditado" — e são
+       coisas opostas: uma é boa notícia, a outra é perda. A causa era `micSom()` chamado
+       SEM argumento no laudo pronto: caía no ramo final, que é o mesmo do 'reinicio'.
+       Agora cada evento tem desenho próprio, e os quatro se distinguem de ouvido:
+         morto    — três tons DESCENDO, grave e insistente: algo parou de funcionar
+         reinicio — dois tons descendo, curto: houve perda, mas o programa se recuperou
+         falta    — dois tons SUBINDO: falta uma medida, é pedido de ação
+         pronto   — três tons SUBINDO em acorde, mais agudo: laudo pronto, boa notícia */
+    var notas=(tipo==='morto')  ?[[494,0],[392,0.20],[330,0.40]]
+             :(tipo==='falta')  ?[[587,0],[784,0.17]]
+             :(tipo==='pronto') ?[[659,0],[880,0.12],[1175,0.24]]
              :[[880,0],[660,0.15]];
     notas.forEach(function(n){
       var o=micAudioCtx.createOscillator(), g=micAudioCtx.createGain();
@@ -5973,6 +6027,16 @@ async function capOrtProcessar(est){
       if(res.texto && res.texto.trim()){
         capAvisarMotor(res);
         var a=capAudioDoAgente(res.texto, res.origem, null, res.trechos);
+        /* 19/08/2026 — O ÁUDIO NÃO TOCAVA. Este é o caminho do dia a dia (o exame chega do
+           aparelho e o agente fecha o ditado), e era o ÚNICO dos três que nunca preenchia
+           a URL: capAudioDoAgente nasce com url:null, a parada manual e a recuperação
+           preenchiam depois, e aqui ninguém preenchia. Resultado: todo exame capturado ao
+           vivo ficava sem tocador — "o áudio deste exame não está disponível para tocar".
+           O agente já guardava o WAV com o nome do estudo e já servia em /exame/audio/.
+           _estudoAudio fica gravado junto para a URL poder ser REFEITA depois de recarregar
+           a janela ou restaurar a sessão (o áudio do agente não tem blob para sobreviver). */
+        a._estudoAudio=est.id;
+        a.url=agenteBase()+'/exame/audio/'+encodeURIComponent(est.id);
         var meta=await capClassificarDitado(res.texto, est.descricao);
         a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
         a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
@@ -6083,7 +6147,8 @@ async function capRecuperar(){
       : 'Ditado recuperado ('+(dit.quandoTexto||'')+')';
     if(falhou) log('⚠️ O ditado de '+(est.paciente||'?')+' voltou SEM TEXTO: a transcrição não '
                   +'chegou a terminar. O áudio está guardado e pode ser ouvido.', true);
-    if(dit.temAudio) a.url=agenteBase()+'/exame/audio/'+est.id;
+    // _estudoAudio junto com a URL: é o que permite refazer o endereço ao restaurar a sessão
+    if(dit.temAudio){ a._estudoAudio=est.id; a.url=agenteBase()+'/exame/audio/'+encodeURIComponent(est.id); }
     var meta=await capClassificarDitado(dit.texto||'', est.descricao);
     a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
     a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
@@ -8074,9 +8139,24 @@ async function abContarPendentes(){
   try{
     var j=await (await fetch(agenteBase()+'/exames/resumo')).json();
     var n=(j&&j.pendentes)||0;
-    var s=document.getElementById('abPendentes'); if(!s) return;
-    if(n>0){ s.style.display=''; s.textContent=n+(n===1?' pendente':' pendentes'); }
-    else{ s.style.display='none'; }
+    var s=document.getElementById('abPendentes');
+    if(s){
+      if(n>0){ s.style.display=''; s.textContent=n+(n===1?' pendente':' pendentes'); }
+      else{ s.style.display='none'; }
+    }
+    /* Contador de exames do dia (19/08/2026). Números do BANCO, via agente:
+       'gerados' = laudos que nasceram hoje · 'liberados' = assinados · 'pendentes' = a
+       assinar. 'pendentesTotal' conta também os de dias anteriores que ficaram para trás,
+       e só aparece quando é maior — senão o médico olharia um número sem saber que ele
+       carrega atraso de outro dia. */
+    var c=document.getElementById('abContador'); if(!c) return;
+    var g=(j&&j.gerados)||0, lb=(j&&j.liberados)||0, pt=(j&&j.pendentesTotal)||0;
+    if(!g && !lb && !n){ c.style.display='none'; return; }
+    var html='<div class="n"><b>'+g+'</b><span>laudos hoje</span></div>'
+            +'<div class="n ok"><b>'+lb+'</b><span>assinados</span></div>'
+            +'<div class="n'+(n?' pend':'')+'"><b>'+n+'</b><span>a assinar</span></div>';
+    if(pt>n) html+='<div class="n'+(pt-n?' pend':'')+'"><b>'+(pt-n)+'</b><span>de dias anteriores</span></div>';
+    c.innerHTML=html; c.style.display='flex';
   }catch(e){}
 }
 
@@ -8594,10 +8674,17 @@ function diaRenderLista(){
     d.innerHTML=lista.map(function(x){
       var hora=x._quando?new Date(x._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
       var tipo=(MODELOS[x.tipo]&&MODELOS[x.tipo].nome)||x.tipo||'tipo ainda não identificado';
-      var sit, acoes, classe='';
+      /* 19/08/2026 — OS BOTÕES COEXISTEM, não se substituem (pedido do médico).
+         Antes era um if/else: cada situação mostrava UM botão só, e o anterior sumia.
+         Na prática ele precisa dos três ao mesmo tempo — reabrir um exame já assinado
+         para acrescentar foto, revisar de novo, e abrir a pasta. Quem manda no que
+         aparece é o que FAZ SENTIDO para aquele exame, não o estado dele:
+           - "Revisar": existe laudo (assinado ou não);
+           - "Abrir na pasta": foi liberado (é quando existe pasta);
+           - "Reabrir exame": sempre — é a porta para receber mais ditado ou imagem. */
+      var sit, classe='', bts=[];
       if(x._liberado){
         sit='<span class="sit pronto">revisado e assinado ✓</span>';
-        acoes='<button class="bt" onclick="diaAbrirNaPasta('+x.id+')">Abrir na pasta de destino</button>';
       }else if(x.laudo){
         // F2e: recalculado a cada volta (5 s). Preencheu a medida? o cartão desacende sozinho.
         var flt=[]; try{ flt=medidasFaltando(x.laudo); }catch(_){}
@@ -8605,17 +8692,25 @@ function diaRenderLista(){
           var nomes=flt.slice(0,2).map(function(z){ return z.rotulo; }).join(', ');
           classe=' falta';
           sit='<span class="sit falta">faltou medir: '+esc(nomes)+(flt.length>2?(' +'+(flt.length-2)+''):'')+'</span>';
-          acoes='<button class="bt forte" onclick="diaRevisar('+x.id+')">Revisar e completar</button>';
           if(!_diaBipou[x.id]){ _diaBipou[x.id]=1; bipar=true; }
         }else{
           delete _diaBipou[x.id];   // completou: pode voltar a avisar se abrir buraco de novo
           sit='<span class="sit aguarda">laudo pronto — aguarda revisão</span>';
-          acoes='<button class="bt" onclick="diaRevisar('+x.id+')">Revisar</button>';
         }
       }else{
         sit='<span class="sit">aguardando o ditado ser processado</span>';
-        acoes='<button class="bt" onclick="diaReabrir('+x.id+')">Reabrir exame</button>';
       }
+      if(x.laudo){
+        var faltou=classe===' falta';
+        bts.push('<button class="bt'+(faltou?' forte':'')+'" onclick="diaRevisar('+x.id+')">'
+                +(faltou?'Revisar e completar':'Revisar')+'</button>');
+      }
+      if(x._liberado){
+        bts.push('<button class="bt" onclick="diaAbrirNaPasta('+x.id+')">Abrir na pasta de destino</button>');
+      }
+      bts.push('<button class="bt cinza" onclick="diaReabrir('+x.id+')" '
+              +'title="devolve o exame para receber mais ditado ou imagens">Reabrir exame</button>');
+      var acoes=bts.join('');
       return '<div class="item'+classe+'"><span class="hr">'+hora+'</span>'
         +'<span class="quem"><span class="nm">'+esc(x.paciente||'(sem nome)')+'</span>'
         +'<span class="tp">'+esc(tipo)+'</span></span>'+sit
@@ -8644,6 +8739,15 @@ function diaRevisar(exId){ _rev2Origem='dia'; diaFechar(); rev2Abrir(exId); }
      rosa      = impressão diagnóstica (texto gerado por IA)
      cinza     = sem alteração — apagado de propósito, para o olho ir no que importa */
 var _rev2Id=null, _rev2Fim={}, _rev2Fmt=null;
+/* 19/08/2026 — IGNORAR POR ENQUANTO, que não é "deixar para depois".
+   "Deixar para depois" (_rev2Fim) manda para o FIM da fila: o laudo reaparece no mesmo
+   dia, e quando sobram dois ou três ele volta a cada passagem. O médico pediu um jeito de
+   um laudo SAIR da sequência de liberação — ele resolve aquele caso noutra hora, e não
+   quer topar com ele de novo entre um paciente e outro.
+   Sai da fila, mas NÃO some do mundo: continua no painel do dia e no Histórico, e o
+   rodapé da revisão diz quantos estão ignorados, com um toque para trazer de volta.
+   Some sozinho ao ser assinado (rev2Aprovar limpa as duas marcas). */
+var _rev2Ignorado={};
 /* De onde se entrou nesta tela: 'dia' (tela 3) ou 'abertura'. Decide para onde o botão
    "Voltar ao painel" devolve — ver abLiberarLaudos. Fica declarado aqui, junto das outras
    variáveis da tela, e não lá embaixo: assim já vale mesmo se algo chamar rev2Voltar antes
@@ -8651,7 +8755,7 @@ var _rev2Id=null, _rev2Fim={}, _rev2Fmt=null;
 var _rev2Origem='dia';
 
 function rev2Fila(){
-  var l=exames.filter(function(x){ return x.laudo && !x._liberado; });
+  var l=exames.filter(function(x){ return x.laudo && !x._liberado && !_rev2Ignorado[x.id]; });
   // "deixar para depois" manda para o FIM da fila; nunca reaparece no topo
   l.sort(function(a,b){
     var fa=_rev2Fim[a.id]?1:0, fb=_rev2Fim[b.id]?1:0;
@@ -8705,18 +8809,114 @@ function rev2Calculadoras(){ rev2Fechar(); mostrarAba('calc'); }
 const REV2_MOLDURA = /^(descri[çc][ãa]o|achados?|t[ée]cnica|m[ée]todo|exame|relat[óo]rio|laudo|conclus[ãa]o)$/i;
 function rev2TituloDeMoldura(t){ return REV2_MOLDURA.test(String(t||'').trim()); }
 
+/* ============ NEGRITO DE MEDIDA × NEGRITO DE TÍTULO (19/08/2026) ============
+   Neste programa o negrito faz TRÊS trabalhos diferentes:
+     • TÍTULO DE ÓRGÃO    (**Próstata:**)              → abre retângulo
+     • MEDIDA / VALOR     (**Peso: ..... g**)          → não é título NEM achado
+     • ACHADO PATOLÓGICO  (**cisto de 8 mm**)          → pinta o retângulo de verde
+   Até hoje o código separava os três só por dois sinais frágeis: ter pontilhado e
+   caber em 70 caracteres. Enquanto a medida estava vazia (`.....`) ela era ignorada;
+   assim que o médico PREENCHIA, ela virava título e virava achado. Foi a causa única
+   de quatro defeitos relatados no mesmo dia:
+     - útero fatiado em várias caixas (transvaginal tem 4 negritos de medida);
+     - próstata NORMAL pintada de verde ("alterado") — alarme falso, o pior erro desta tela;
+     - medida repetida, em cima do texto e FORA da caixa de edição;
+     - linha inteira em negrito virando título e sumindo do campo editável.
+   Um negrito é MEDIDA quando começa por um rótulo de medida (Peso, Volume, Dimensões…)
+   ou quando já começa pelo próprio valor (pontilhado ou número). Achado clínico começa
+   por palavra descritiva ("cisto", "nódulo"), então não casa em nenhum dos dois. */
+const REV2_ROTULO_MEDIDA = /^(volumes?|pesos?|dimens[õo]es|medidas?|espessuras?|di[âa]metros?|comprimentos?|[áa]reas?|[íi]ndices?|circunfer[êe]ncias?)\b/i;
+function rev2NegritoDeMedida(t){
+  var s=String(t||'').trim();
+  if(!s) return false;
+  if(REV2_ROTULO_MEDIDA.test(s)) return true;   // "Peso: 25 g", "Volume total: 8 cm³"
+  return /^[\s.]*[\d.]/.test(s);                // já começa pelo valor: "..... mm", "8 x 4 cm"
+}
+/* O título de um RETÂNGULO é mais exigente que faltaTitulo (que serve a outra coisa e
+   continua como estava, com três suítes em cima dela):
+     1. o negrito tem de abrir a linha — senão "medindo **8 mm.**" viraria título, e o
+        desenho do retângulo (que corta o título do início do texto) duplicaria a medida;
+     2. não pode ser medida;
+     3. não pode ser moldura ("DESCRIÇÃO:", "TÉCNICA:"). */
+function rev2TituloDeBloco(linha){
+  var m=String(linha||'').match(/^\s*\*\*([^*]{1,70})\*\*/);
+  if(!m) return null;
+  var t=m[1].replace(/[:\s]+$/,'').trim();
+  if(!t || FALTA.pont.test(m[1])) return null;
+  if(rev2NegritoDeMedida(t) || rev2TituloDeMoldura(t)) return null;
+  return t;
+}
+
 function rev2Blocos(L){
   var linhas=String((L&&L.corpo)||'').split('\n'), blocos=[], at=null;
   linhas.forEach(function(li){
-    var t=faltaTitulo(li);
-    // moldura: continua no retângulo atual em vez de abrir um novo
-    if(t && rev2TituloDeMoldura(t)) t=null;
+    var t=rev2TituloDeBloco(li);
     if(t){ at={titulo:t, linhas:[li]}; blocos.push(at); return; }
     if(!at){ at={titulo:'', linhas:[]}; blocos.push(at); }
     at.linhas.push(li);
   });
   blocos.forEach(function(b){ b.texto=b.linhas.join('\n').replace(/^\n+|\n+$/g,''); });
   return blocos.filter(function(b){ return b.texto.trim(); });
+}
+/* ⚠️ A LISTA QUE A TELA DESENHA — uma só, usada pelo desenho E pela edição.
+   rev2Editou acha o bloco pelo ÍNDICE. Enquanto os retângulos extras (dados clínicos na
+   frente, impressão no fim) eram montados só dentro do rev2Render, as duas listas
+   discordavam e editar um retângulo gravava em OUTRO. Quem mexer aqui mexe nos dois. */
+function rev2BlocosDaTela(L){
+  var blocos=rev2Blocos(L);
+  var dc=String((L&&L.cab&&L.cab.dados_clinicos)||'').trim();
+  if(dc) blocos.unshift({titulo:'DADOS CLÍNICOS', texto:dc, _dc:true});
+  if(L&&L.conclusao) blocos.push({titulo:'IMPRESSÃO DIAGNÓSTICA · toque para editar',
+                                  texto:String(L.conclusao), _conc:true});
+  return blocos;
+}
+/* Separa o título do corpo do retângulo. Devolve {cab, txt}: 'cab' é o negrito do título
+   (que o desenho mostra à parte e a edição precisa recolocar) e 'txt' é o que fica
+   editável. Nunca devolve 'txt' vazio — linha inteiramente em negrito continua editável. */
+function rev2CorpoVisivel(b){
+  if(!b || b._conc || b._dc || !b.titulo) return {cab:'', txt:(b&&b.texto)||''};
+  var m=b.texto.match(/^\s*\*\*[^*]{1,70}\*\*:?[ \t]*/);
+  if(!m) return {cab:'', txt:b.texto};
+  var resto=b.texto.slice(m[0].length);
+  if(!resto.trim()) return {cab:'', txt:b.texto};
+  return {cab:m[0], txt:resto};
+}
+/* ============ ACHADO EM NEGRITO NUM ÓRGÃO E SEM NEGRITO NOUTRO (19/08/2026) ============
+   Caso real do médico: no mesmo exame de ombro, o supraespinhal veio com **tendinopatia**
+   em negrito (e o retângulo acendeu verde, correto) e o subescapular veio com a MESMA
+   tendinopatia sem negrito — retângulo cinza, como se estivesse normal. O desenho estava
+   certo; quem foi incoerente foi a IA.
+   Esta conferência não precisa saber medicina: usa só a coerência INTERNA do laudo. Se um
+   termo está em negrito em algum lugar do laudo, ele deveria estar em negrito em todos.
+   Não altera o texto — acende aviso, e quem decide é o médico. */
+function rev2TermosAchado(L){
+  var termos={};
+  String((L&&L.corpo)||'').replace(/\*\*([^*]+?)\*\*/g, function(m, t){
+    var s=String(t).replace(/[:.\s]+$/,'').trim();
+    // só termos curtos, alfabéticos e que não sejam título/moldura/medida
+    if(s.length>=5 && s.split(/\s+/).length<=4 && /^[A-Za-zÀ-ÿ\s-]+$/.test(s)
+       && !rev2TituloDeMoldura(s) && !rev2NegritoDeMedida(s)) termos[s.toLowerCase()]=s;
+    return m;
+  });
+  return termos;
+}
+function alertasAchadoSemNegrito(L){
+  try{
+    var termos=rev2TermosAchado(L); var chaves=Object.keys(termos);
+    if(!chaves.length) return [];
+    var achados=[];
+    rev2Blocos(L).forEach(function(b){
+      // texto do bloco SEM o que já está em negrito: o que sobrar é texto simples
+      var simples=b.texto.replace(/\*\*[^*]+?\*\*/g, ' ');
+      chaves.forEach(function(k){
+        if(norm(simples).indexOf(norm(k))>=0)
+          achados.push('“'+termos[k]+'” aparece em NEGRITO em outra parte do laudo, mas em '
+            +'“'+(b.titulo||'um trecho sem título')+'” está sem negrito — ali o retângulo fica '
+            +'CINZA, como se não houvesse alteração. Confira se é achado nos dois.');
+      });
+    });
+    return achados.length ? [{tipo:'divergencia', texto:achados.join('\n')}] : [];
+  }catch(e){ return []; }
 }
 /* casa o "achado" de uma pendência/conflito com o título de um retângulo */
 function rev2Casa(achado, titulo){
@@ -8725,7 +8925,8 @@ function rev2Casa(achado, titulo){
   return a===t || a.indexOf(t)>=0 || t.indexOf(a)>=0;
 }
 function rev2Estado(ex, b){
-  if(b._ia) return 'ia';
+  if(b._dc) return 'clinico';        // dados clínicos: contexto do exame, não achado
+  if(b._conc) return 'conclusao';    // impressão diagnóstica: cinza mais escuro (ver CSS)
   // Pontilhado em branco pinta o cartão INTEIRO de vermelho: ali a falta é a história
   // toda daquele trecho ("Ovário esquerdo — falta a medida", no desenho).
   if(medidasFaltando({corpo:b.texto}).length) return 'falta';
@@ -8739,9 +8940,17 @@ function rev2Estado(ex, b){
   // apagava só o PRIMEIRO negrito. Quando "DESCRIÇÃO:" passou a viver dentro do
   // retângulo do órgão, ele sobrava e pintava de "alterado" uma mama NORMAL —
   // alarme falso, o pior tipo de erro nesta tela.
-  var resto=b.texto.replace(/\*\*([^*]{1,70})\*\*/g, function(m, t){
+  /* ⚠️ SEM LIMITE DE 70 CARACTERES AQUI (19/08/2026). O limite existia para "parecer
+     título", mas neste ponto a pergunta é outra: "isto é achado?". A próstata tem
+     **Dimensões: ..... x ..... x ..... cm (em seus diâmetros transversal, longitudinal e
+     anteroposterior).** — 100+ caracteres. Com o limite, esse negrito não era casado, não
+     era apagado, sobrava, e pintava de VERDE ("alterado") uma próstata rigorosamente
+     normal. E o verde só aparecia DEPOIS de o médico preencher as medidas, porque até lá
+     o vermelho de "falta medida" mascarava. Agora cai fora todo negrito que seja o
+     título, moldura ou MEDIDA — de qualquer tamanho. O que sobrar é achado de verdade. */
+  var resto=b.texto.replace(/\*\*([^*]+?)\*\*/g, function(m, t){
     var lim=String(t).replace(/[:\s]+$/,'').trim();
-    return (lim===b.titulo || rev2TituloDeMoldura(lim)) ? '' : m;
+    return (lim===b.titulo || rev2TituloDeMoldura(lim) || rev2NegritoDeMedida(lim)) ? '' : m;
   });
   if(/\*\*/.test(resto)) return 'alterado';   // negrito além da moldura = achado patológico
   // informação que veio do ditado (indicação clínica, história) não é "órgão sem
@@ -8779,9 +8988,20 @@ function rev2Render(){
   /* Laudo JÁ ASSINADO reaberto (pelo Histórico ou por "Liberar laudos" com a fila vazia):
      o título não pode falar em pendências — ele não está na fila. Dizer "já assinado" no
      alto é o que evita o médico achar que está revisando algo que ainda falta entregar. */
+  var nIgn=Object.keys(_rev2Ignorado).length;
   document.getElementById('rv2Tit').textContent = ex._liberado
     ? ('Relendo laudo JÁ ASSINADO — '+(ex.paciente||'')+(fila.length?('  ·  '+fila.length+' pendente'+(fila.length===1?'':'s')+' na fila'):''))
-    : ('Revisão de laudos — '+fila.length+' pendente'+(fila.length===1?'':'s'));
+    : ('Revisão de laudos — '+fila.length+' pendente'+(fila.length===1?'':'s')
+       +(nIgn?('  ·  '+nIgn+' ignorado'+(nIgn===1?'':'s')):''));
+  /* Laudo ignorado não pode virar laudo esquecido: o rodapé diz quantos são e traz de volta. */
+  var elIgn=document.getElementById('rv2Ignorados');
+  if(elIgn){
+    elIgn.innerHTML = nIgn
+      ? (nIgn+' laudo'+(nIgn===1?'':'s')+' fora da sequência de liberação — '
+        +'<button class="bt cinza" style="padding:4px 12px;font-size:12.5px" onclick="rev2TrazerIgnorados()">trazer de volta</button>')
+      : '';
+    elIgn.style.display = nIgn ? 'flex' : 'none';
+  }
 
   // ---- cabeçalho: qual laudo, quem, e o fundo ----
   var hora=ex._quando?new Date(ex._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
@@ -8789,8 +9009,18 @@ function rev2Render(){
   var opFundo=Object.keys(FUNDOS||{}).map(function(k){
     return '<option value="'+esc(k)+'"'+((window.__fundo||'branco')===k?' selected':'')+'>'+esc((FUNDOS[k]&&FUNDOS[k].nome)||k)+'</option>';
   }).join('');
+  /* TIPO DE EXAME COM A REGIÃO (19/08/2026, pedido do médico): o nome do modelo sozinho
+     ("Partes moles") não diz QUAL região foi examinada, e é justamente nesses exames que a
+     área precisa estar à vista. O TÍTULO do laudo já carrega isso ("...PARTES MOLES
+     (região escapular)"), porque a IA é mandada completá-lo — então é o título que vale
+     aqui, com o nome do modelo como reserva. Lateralidade entra quando o tipo a tem. */
+  var _tituloLaudo=String(L.titulo||'').replace(/^RELAT[ÓO]RIO\s+ULTRASSONOGR[ÁA]FICO\s*(DE\s+|DO\s+|DA\s+)?/i,'').trim();
+  var _lado=(TIPOS_COM_LATERALIDADE.has(ex.tipo)&&ex.lateralidade)?(' '+ex.lateralidade):'';
+  var _oQue=(_tituloLaudo||tipo)+((_lado && (_tituloLaudo||tipo).toLowerCase().indexOf(String(ex.lateralidade||'').toLowerCase())<0)?_lado:'');
+  /* "Laudo 0 de 0" aparecia ao reler um laudo já assinado, que não está na fila. */
+  var _posTxt = (pos>0 && fila.length) ? ('Laudo '+pos+' de '+fila.length+' — ') : '';
   document.getElementById('rv2Cab').innerHTML=
-     '<span class="qual"><span class="l1">Laudo '+pos+' de '+fila.length+' — '+esc(tipo)+' · '+hora+'</span>'
+     '<span class="qual"><span class="l1">'+_posTxt+esc(_oQue)+' · '+hora+'</span>'
     +'<span class="l2">Paciente: '+esc(c.nome||ex.paciente||'(sem nome)')+(c.idade?(', '+esc(c.idade)):'')
     +(ex._dicom?' — identificada pelo aparelho':'')+'</span></span>'
     +'<span><span class="fundo">Fundo do laudo</span>'
@@ -8798,7 +9028,8 @@ function rev2Render(){
 
   // ---- os alertas, que são a legenda das cores ----
   var lista=alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
-                             .concat(alertasReferencia(L));
+                             .concat(alertasReferencia(L))
+                             .concat(alertasAchadoSemNegrito(L));
   var porTipo={}, calmos={};
   lista.forEach(function(a){
     var txt=String((a&&a.texto)||'').trim(); if(!txt) return;
@@ -8821,9 +9052,13 @@ function rev2Render(){
     +esc((porTipo.conferente||[]).join('\n') || calmos.conferente || '')+'</div>';
 
   // ---- o laudo estruturado ----
-  var blocos=rev2Blocos(L);
-  if(L.conclusao) blocos.push({titulo:'IMPRESSÃO — TEXTO GERADO POR IA · TOQUE PARA EDITAR',
-                               texto:String(L.conclusao), _ia:true, _conc:true});
+  /* DADOS CLÍNICOS entram como primeiro retângulo e a IMPRESSÃO como último — ver
+     rev2BlocosDaTela, que é a mesma lista usada pela edição.
+     Dados clínicos não apareciam em retângulo nenhum (19/08/2026) porque vivem no
+     CABEÇALHO, e rev2Blocos só corta o corpo. A impressão deixou de ser rotulada
+     "texto gerado por IA": o rótulo era fixo e valia até para a conclusão do modelo do
+     médico e para a que ele mesmo reescreveu. */
+  var blocos=rev2BlocosDaTela(L);
   var html=blocos.map(function(b,i){
     var est=rev2Estado(ex,b), pr=rev2Proc(ex,b.titulo), selo='';
     if(pr && pr.imagem_n>0 && (ex.imagens||[]).length>=pr.imagem_n)
@@ -8831,7 +9066,15 @@ function rev2Render(){
     var tr=pr?rev2Trecho(ex,pr.citacao):null, trI=tr?((L.trechos||[]).indexOf(tr)):-1;
     if(tr && trI>=0) selo+='<button class="voz" onclick="rev2Tocar('+trI+')" title="ouvir só este pedaço do ditado">VOZ</button>'
                 +'<span class="hora">'+rev2Rel(tr.inicio)+'</span>';
-    var corpoTxt=b._conc?b.texto:b.texto.replace(/^\*\*[^*]{1,70}\*\*:?\s*/,'');
+    /* Corta o título do começo do texto SÓ quando ele É o título deste retângulo, e nunca
+       a ponto de esvaziar o corpo (ver rev2CorpoVisivel). Antes cortava qualquer negrito
+       inicial de até 70 caracteres, e isso causava dois estragos:
+         - bloco sem título começando por moldura ("**DESCRIÇÃO:**"): a palavra era cortada
+           e não era desenhada em lugar nenhum — sumia da tela;
+         - linha inteiramente em negrito (**Peso: 25 g (Normal até 30 g)**): o corte
+           consumia a linha toda, o campo editável ficava VAZIO e o conteúdo só existia no
+           título, que não é editável — texto fora do quadrado de edição. */
+    var corpoTxt=rev2CorpoVisivel(b).txt;
     return '<div class="bloco '+est+'" id="rv2b'+i+'" data-est="'+est+'">'
       +(/^(alterado|falta|conflito|ia)$/.test(est)?'<span class="barra"></span>':'')
       +(b.titulo?('<div class="tit">'+esc(b.titulo)+(est==='alterado'?' — alterado':'')
@@ -8852,10 +9095,25 @@ function rev2Render(){
   // ---- imagens ----
   var imgs=ex.imagens||[];
   document.getElementById('rv2NImg').textContent=imgs.length;
-  document.getElementById('rv2Imgs').innerHTML=imgs.length
-    ? '<div class="grade">'+imgs.map(function(d,i){
-        return '<img src="'+d+'" id="rv2i'+(i+1)+'" onclick="ampliarImg(this)" title="imagem '+(i+1)+'">'; }).join('')+'</div>'
-    : '<div class="vaziod">Sem imagens neste exame.</div>';
+  /* 19/08/2026 — ACRESCENTAR FOTO QUE FALTOU, aqui mesmo. O médico mandou um exame com
+     uma foto a menos e não teve por onde acrescentar depois: o download automático do
+     aparelho só roda com a espera ligada e pula estudo já visto; o "📷 Nova foto" da aba
+     antiga só abre a WEBCAM; arrastar e soltar só existe na tela de fotos antigas e cria
+     exame NOVO. E é justamente aqui, na revisão, que ele PERCEBE que falta a foto.
+     Dois caminhos, os dois nesta tela: buscar de novo no aparelho, ou escolher o arquivo. */
+  document.getElementById('rv2Imgs').innerHTML=
+    (imgs.length
+      ? '<div class="grade">'+imgs.map(function(d,i){
+          return '<img src="'+d+'" id="rv2i'+(i+1)+'" onclick="ampliarImg(this)" title="imagem '+(i+1)+'">'; }).join('')+'</div>'
+      : '<div class="vaziod">Sem imagens neste exame.</div>')
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+    +(ex._estudoId?'<button class="bt cinza" style="flex:1;min-width:150px" onclick="rev2BuscarImagens()" '
+      +'title="baixa do aparelho as imagens deste exame que ainda não chegaram">⤓ Buscar fotos no aparelho</button>':'')
+    +'<button class="bt cinza" style="flex:1;min-width:130px" onclick="document.getElementById(\'rv2InpFoto\').click()" '
+      +'title="escolher um arquivo de imagem para juntar a este exame">🖼 Anexar foto…</button>'
+    +'<input type="file" id="rv2InpFoto" accept="image/*" multiple style="display:none" onchange="rev2AnexarFotos(this)">'
+    +'</div>'
+    +'<p class="info" id="rv2ImgStatus" style="margin:6px 0 0"></p>';
 
   // ---- modelo do exame ----
   var sel=document.getElementById('rv2Modelo');
@@ -8872,7 +9130,10 @@ function rev2Render(){
     // foi a nuvem, refazer não traz hora nenhuma — a nuvem não devolve marcação.
     +' · '+((L.trechos||[]).length
             ? ((L.trechos||[]).length+' trecho(s) com hora')
-            : 'sem marcação de tempo — o botão de voz não funciona neste exame');
+            // 19/08/2026: deixou de ser um beco. Sem marcação de tempo não há VOZ por
+            // trecho, mas o ditado INTEIRO continua ouvível — e é isso que se diz.
+            : 'sem marcação de tempo (transcrito na nuvem) — não há VOZ por trecho, '
+              +'mas dá para ouvir o ditado inteiro no botão ao lado');
 }
 function rev2Rel(s){ s=Math.max(0,Math.round(s||0)); return Math.floor(s/60)+' min '+('0'+(s%60)).slice(-2)+' s'; }
 
@@ -9091,6 +9352,105 @@ function rev2AudioDoTrecho(lista, trecho){
   if(u){ for(var i=0;i<lista.length;i++){ if(lista[i].url===u) return lista[i]; } }
   return lista[0];
 }
+/* ============ ACRESCENTAR FOTO A UM EXAME QUE JÁ EXISTE (19/08/2026) ============
+   Ver o comentário em rev2Render, nas imagens: até hoje não havia caminho nenhum para
+   isso depois que o laudo nascia. Nenhum dos dois caminhos abaixo regera o laudo sozinho
+   — acrescentar imagem é decisão do médico, e refazer o texto também: quem manda nisso é
+   o botão "Refazer com esta ordem". */
+function rev2ImgStatus(txt, ruim){
+  var p=document.getElementById('rv2ImgStatus'); if(!p) return;
+  p.textContent=txt||''; p.style.color=ruim?'#A62828':'#0B5F5C'; p.style.fontWeight=ruim?'600':'500';
+  if(txt) log(txt, !!ruim);
+}
+/* Busca no aparelho as imagens deste estudo que ainda não estão no exame. Compara pelo id
+   da instância DICOM, então rodar duas vezes não duplica foto. */
+async function rev2BuscarImagens(){
+  var ex=rev2Ex(); if(!ex) return;
+  if(!ex._estudoId){ rev2ImgStatus('Este exame não veio do aparelho — use "Anexar foto…".', true); return; }
+  rev2ImgStatus('procurando no aparelho…');
+  try{
+    var r=await fetch(agenteBase()+'/dicom/estudos');
+    var j=await r.json();
+    var est=((j&&j.estudos)||[]).filter(function(e){ return e.id===ex._estudoId; })[0];
+    if(!est){ rev2ImgStatus('O aparelho não tem mais este exame na lista.', true); return; }
+    var jaTem=(ex._instIds||[]).slice();
+    var novos=(est.instancias||est.instances||[]).filter(function(id){ return jaTem.indexOf(id)<0; });
+    if(!novos.length){ rev2ImgStatus('Nenhuma foto nova — o exame já tem todas as do aparelho.'); return; }
+    var baixadas=0;
+    for(var i=0;i<novos.length;i++){
+      try{
+        var rp=await fetch(agenteBase()+'/dicom/imagem/'+encodeURIComponent(novos[i]));
+        var bl=await rp.blob();
+        var dataUrl=await new Promise(function(res,rej){
+          var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=rej; fr.readAsDataURL(bl);
+        });
+        ex.imagens=(ex.imagens||[]).concat([dataUrl]);
+        ex._instIds=(ex._instIds||[]).concat([novos[i]]);
+        baixadas++;
+      }catch(e){}
+    }
+    rev2Render();
+    rev2ImgStatus(baixadas
+      ? ('✅ '+baixadas+' foto(s) trazida(s) do aparelho. Confira, e refaça o laudo se elas mudarem o texto.')
+      : 'Achei fotos novas, mas não consegui baixar nenhuma.', !baixadas);
+    try{ agendarSalvarSessao(); }catch(e){}
+  }catch(e){ rev2ImgStatus('Falha ao falar com o agente: '+((e&&e.message)||e), true); }
+}
+/* Anexa arquivos de imagem escolhidos à mão (a foto que o médico exportou do aparelho). */
+async function rev2AnexarFotos(inp){
+  var ex=rev2Ex(); if(!ex || !inp || !inp.files || !inp.files.length) return;
+  var arqs=Array.prototype.slice.call(inp.files);
+  inp.value='';                                   // permite escolher o mesmo arquivo de novo
+  rev2ImgStatus('lendo '+arqs.length+' arquivo(s)…');
+  var n=0;
+  for(var i=0;i<arqs.length;i++){
+    try{
+      var d=await new Promise(function(res,rej){
+        var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=rej; fr.readAsDataURL(arqs[i]);
+      });
+      if(String(d).indexOf('data:image')!==0) continue;
+      ex.imagens=(ex.imagens||[]).concat([d]); n++;
+    }catch(e){}
+  }
+  rev2Render();
+  rev2ImgStatus(n ? ('✅ '+n+' foto(s) anexada(s). Confira, e refaça o laudo se elas mudarem o texto.')
+                  : 'Nenhum dos arquivos era imagem.', !n);
+  try{ agendarSalvarSessao(); }catch(e){}
+}
+/* ============ OUVIR O DITADO INTEIRO (19/08/2026) ============
+   A tela nova só sabia tocar PEDAÇO, e só quando havia marcação de tempo — que não existe
+   quando a transcrição foi feita na nuvem. Nesses exames o médico ficava sem nenhuma forma
+   de ouvir o próprio ditado. O áudio está guardado no computador o tempo todo (o agente o
+   serve em /exame/audio/), então o que faltava era um tocador comum. */
+function rev2AudiosDoExame(){
+  var ex=rev2Ex(); if(!ex) return [];
+  return audios.filter(function(x){ return x.exameId===ex.id && x.url; });
+}
+function rev2Inteiro(){
+  var el=document.getElementById('rv2Audio'), cx=document.getElementById('rv2Tocador');
+  var lista=rev2AudiosDoExame();
+  if(!lista.length || !el){
+    if(cx) cx.textContent='este exame não tem áudio guardado para tocar '
+      +'(ou o agente está desligado — o áudio mora no computador, não na janela).';
+    return;
+  }
+  clearTimeout(window.__rv2Par);              // toca até o fim: não é trecho
+  var a=lista[0];
+  if(el.src!==a.url) el.src=a.url;
+  el.currentTime=0;
+  el.play().then(function(){
+    if(cx) cx.innerHTML='▶ ditado inteiro — <b>'+esc(a.nome||'gravação do exame')+'</b>'
+      +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
+  }).catch(function(e){
+    if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). '
+      +'O agente precisa estar ligado.';
+  });
+}
+function rev2Parar(){
+  var el=document.getElementById('rv2Audio'); if(el){ try{ el.pause(); }catch(e){} }
+  var cx=document.getElementById('rv2Tocador');
+  if(cx) cx.innerHTML='parado — toque <b>VOZ</b> num trecho, ou ouça o ditado inteiro.';
+}
 function rev2Tocar(i){
   var ex=rev2Ex(); if(!ex) return;
   var tr=(((ex.laudo||{}).trechos)||[])[i]; if(!tr) return;
@@ -9126,14 +9486,19 @@ function rev2ParaTexto(el){
 function rev2Editou(el){
   var ex=rev2Ex(); if(!ex) return;
   var i=parseInt(el.getAttribute('data-bloco'),10);
-  var blocos=rev2Blocos(ex.laudo), novo=rev2ParaTexto(el);
-  // o bloco da impressão. Repinta ANTES de sair: era o único bloco que não repintava,
-  // e logo a conclusão, que é um dos cinco assuntos que o conferente olha.
-  if(i===blocos.length){ ex.laudo.conclusao=novo; rev2Render(); return; }
+  /* MESMA lista do desenho (rev2BlocosDaTela): o índice do retângulo tem de valer nas
+     duas pontas, senão editar um grava em outro. */
+  var blocos=rev2BlocosDaTela(ex.laudo), novo=rev2ParaTexto(el);
   var b=blocos[i]; if(!b) return;
-  var cab=(b.texto.match(/^\*\*[^*]{1,70}\*\*:?\s*/)||[''])[0];
-  blocos[i].texto=cab+novo;
-  ex.laudo.corpo=blocos.map(function(x){ return x.texto; }).join('\n\n');
+  // dados clínicos moram no CABEÇALHO, não no corpo — voltam para lá
+  if(b._dc){ ex.laudo.cab=ex.laudo.cab||{}; ex.laudo.cab.dados_clinicos=novo; rev2Render(); return; }
+  // a impressão. Repinta ANTES de sair: era o único bloco que não repintava, e logo a
+  // conclusão, que é um dos cinco assuntos que o conferente olha.
+  if(b._conc){ ex.laudo.conclusao=novo; rev2Render(); return; }
+  b.texto=rev2CorpoVisivel(b).cab+novo;
+  // só os retângulos do CORPO voltam para o corpo do laudo
+  ex.laudo.corpo=blocos.filter(function(x){ return !x._dc && !x._conc; })
+                       .map(function(x){ return x.texto; }).join('\n\n');
   // o texto mudou: a legenda tem de ser repintada AGORA, senão o médico assina
   // vendo o "✓" de uma conferência que já não vale
   rev2Render();
@@ -9336,7 +9701,7 @@ async function rev2Aprovar(comImpressao){
   if(comImpressao){ try{ window.print(); }catch(e){} }
   ex._liberado=true;
   try{ agendarSalvarSessao(); }catch(e){}
-  delete _rev2Fim[ex.id];
+  delete _rev2Fim[ex.id]; delete _rev2Ignorado[ex.id];   // assinado: as duas marcas perdem sentido
   var prox=rev2Fila()[0];
   if(prox) rev2Abrir(prox.id);
   else { log('🎉 Todos os laudos revisados.'); rev2Voltar(); }
@@ -9347,6 +9712,28 @@ function rev2Depois(){
   var prox=rev2Fila().filter(function(x){ return x.id!==ex.id; })[0];
   if(prox) rev2Abrir(prox.id);
   else { log('Este é o único laudo pendente — ele continua aqui.'); rev2Render(); }
+}
+/* Tira o laudo da SEQUÊNCIA de liberação (ver _rev2Ignorado). Ele continua no painel do
+   dia e no Histórico — o que muda é que a revisão para de oferecê-lo. */
+function rev2Ignorar(){
+  var ex=rev2Ex(); if(!ex) return;
+  _rev2Ignorado[ex.id]=1; delete _rev2Fim[ex.id];
+  log('Laudo de '+(ex.paciente||'?')+' fora da sequência de liberação. '
+     +'Ele continua no painel do dia e no Histórico; use "trazer de volta" no rodapé da revisão.');
+  try{ agendarSalvarSessao(); }catch(e){}
+  var prox=rev2Fila()[0];
+  if(prox) rev2Abrir(prox.id);
+  else { log('Não sobrou laudo na fila.'); rev2Voltar(); }
+}
+/* Devolve TODOS os ignorados para a fila. Um botão só: são poucos por dia, e escolher
+   um a um pediria outra tela para um caso que se resolve com "traga tudo de volta". */
+function rev2TrazerIgnorados(){
+  var n=Object.keys(_rev2Ignorado).length; if(!n) return;
+  _rev2Ignorado={};
+  log(n+' laudo(s) de volta à sequência de liberação.');
+  try{ agendarSalvarSessao(); }catch(e){}
+  var prox=rev2Fila()[0];
+  if(prox) rev2Abrir(prox.id); else rev2Render();
 }
 async function rev2SalvarApenas(){
   rev2Preparar();
@@ -9370,17 +9757,45 @@ function diaRevisarPendentes(){
    ou imagens de novo. */
 function diaReabrir(exId){
   var x=exames.find(function(e){ return e.id===exId; }); if(!x) return;
+  /* Reabrir um exame JÁ ASSINADO o devolve para a fila de pendentes — é o que permite
+     acrescentar a foto que faltou, mas o médico precisa saber que aquele laudo volta a
+     aparecer como "a liberar". Perguntar só quando há o que desfazer. */
+  if(x._liberado && !confirm('O laudo de '+(x.paciente||'este paciente')
+      +' já foi assinado.\n\nReabrir devolve o exame para receber mais ditado ou imagens, e ele '
+      +'volta para a fila de laudos a liberar.\n\nO arquivo já salvo na pasta continua lá.\n\nReabrir?'))
+    return;
   x._liberado=false;
   diaFechar(); mostrarAba('captura');
   try{ capRenderNovos(); capRenderPendentes(); }catch(_){}
   log('Exame de '+(x.paciente||'?')+' reaberto — ele volta a receber ditado e imagens.');
   try{ agendarSalvarSessao(); }catch(_){}
 }
+/* ABRIR A PASTA DE VERDADE (19/08/2026). Antes esta função só reabria o laudo na tela —
+   o comentário antigo dizia que o navegador não comanda o computador, o que é verdade,
+   mas o AGENTE comanda: ele é um processo local. Agora ela pede ao agente que abra o
+   Explorer na pasta do dia (e na subpasta do paciente, quando ela existe).
+   Só NOMES de pasta são enviados; quem procura o caminho é o agente, dentro do perfil do
+   usuário — ver a rota /abrir/pasta em agente-laudos.py. */
 async function diaAbrirNaPasta(exId){
-  // O navegador NÃO abre o Explorer: por segurança, uma página não comanda o
-  // computador. O que dá para fazer daqui é reabrir o laudo já salvo.
-  log('O laudo está salvo na pasta de destino. Abrindo a versão guardada aqui.');
-  diaRevisar(exId);
+  var raiz=(pastaLaudoH&&pastaLaudoH.name)||'';
+  if(!raiz){
+    log('Ainda não há pasta de destino escolhida nesta sessão — escolha uma ao salvar, '
+       +'ou use "Revisar" para abrir o laudo na tela.', true);
+    return;
+  }
+  var x=exames.find(function(e){ return e.id===exId; });
+  var sub=x?nomeArquivoSeguro((x.laudo&&x.laudo.cab&&x.laudo.cab.nome)||x.paciente||''):'';
+  try{
+    var r=await fetch(agenteBase()+'/abrir/pasta',{method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({raiz:raiz, sub:sub})});
+    var j=await r.json();
+    if(j&&j.ok) log('Abri a pasta: '+j.pasta);
+    else log('Não consegui abrir a pasta: '+((j&&j.erro)||'o agente não respondeu')
+            +'. Ela é "'+raiz+'", dentro do seu perfil.', true);
+  }catch(e){
+    log('Não consegui falar com o agente para abrir a pasta ('+((e&&e.message)||e)
+       +'). Ligue o agente e tente de novo.', true);
+  }
 }
 function diaEncerrar(){
   if(!confirm('Encerrar o dia? A gravação contínua será desligada.')) return;
@@ -9403,10 +9818,10 @@ function exTelaOcupada(){
 function exLaudoPronto(exId, nomePac){
   var m=exModo();
   if(m==='arquivo'){ log('Laudo de '+(nomePac||'')+' arquivado — revise e assine em “Liberar laudos”.'); return; }
-  if(m==='lista'){ log('✅ Laudo de '+(nomePac||'')+' pronto — está na lista de revisão.'); try{ micSom(); }catch(e){} return; }
+  if(m==='lista'){ log('✅ Laudo de '+(nomePac||'')+' pronto — está na lista de revisão.'); try{ micSom('pronto'); }catch(e){} return; }
   if(exTelaOcupada()){
     log('✅ Laudo de '+(nomePac||'')+' pronto — entrou na fila. O da tela continua até você liberar.');
-    try{ micSom(); }catch(e){}
+    try{ micSom('pronto'); }catch(e){}
     return;
   }
   abrirRevisao(exId);

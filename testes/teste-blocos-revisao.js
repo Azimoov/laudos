@@ -29,6 +29,7 @@ const api = new Function([
   pega(/const FALTA\s*=\s*\{[\s\S]*?\n\};/, 'FALTA'),
   pega(/const REV2_MOLDURA = [^\n]*/, 'REV2_MOLDURA'),
   pega(/const REV2_ROTULO_MEDIDA = [^\n]*/, 'REV2_ROTULO_MEDIDA'),
+  pega(/const REV2_PALAVRA_MEDIDA = [^\n]*/, 'REV2_PALAVRA_MEDIDA'),
   grab('norm'), grab('faltaTitulo'), grab('faltaGrupos'), grab('faltaTrecho'),
   grab('medidasFaltando'), grab('rev2TituloDeMoldura'), grab('rev2NegritoDeMedida'),
   grab('rev2TituloDeBloco'), grab('rev2Blocos'), grab('rev2BlocosDaTela'),
@@ -49,9 +50,26 @@ console.log('=== negrito de MEDIDA nao se confunde com achado nem com titulo ===
  ['..... mm.', true], ['8 x 4 x 3 cm. Volume: 12 cm³.', true], ['Volume total da glândula: 9 cm³', true],
  ['Espessura 0,4 cm', true], ['Medida: 8 cm', true],
  ['nódulo hipoecogênico medindo 0,8 cm', false], ['tendinopatia', false],
- ['Próstata', false], ['esteatose hepática', false], ['cisto simples de 8 mm', false]
+ ['Próstata', false], ['esteatose hepática', false], ['cisto simples de 8 mm', false],
+ // ⚠️ ACHADO QUE COMECA POR NUMERO — a primeira versao desta funcao (19/08/2026) tratava
+ // qualquer negrito iniciado por digito como medida, e isso SILENCIARIA estes quatro:
+ // o orgao ficaria cinza, como se normal. Achado silenciado e pior que alarme falso.
+ ['2 cistos simples no rim direito', false], ['3 nódulos hipoecogênicos', false],
+ ['1,2 cm de nódulo sólido', false], ['2 cálculos calicinais', false],
+ // e a medida com faixa de referencia, que COMECA por numero, continua sendo medida
+ ['25 g (Normal até 30 g)', true]
 ].forEach(([t, esperado]) => ok(rev2NegritoDeMedida(t) === esperado,
   (esperado ? 'medida: ' : 'NAO e medida: ') + JSON.stringify(t.slice(0, 46))));
+
+console.log('=== e o achado que comeca por numero ACENDE VERDE de verdade ===');
+[['**Rim direito:** tópico, apresentando **2 cistos simples no rim direito**.', 'alterado'],
+ ['**Rim direito:** tópico, com **3 nódulos hipoecogênicos**.', 'alterado'],
+ ['**Próstata:** homogênea.\n**Peso: 25 g (Normal até 30 g)**', 'normal']
+].forEach(([corpo, esperado]) => {
+  const b = rev2Blocos({ corpo })[0];
+  ok(rev2Estado(EX, b) === esperado,
+    'estado "' + esperado + '" para: ' + JSON.stringify(corpo.slice(0, 52)));
+});
 
 console.log('=== item 7 — utero em UMA caixa, nao em varias ===');
 let bl = rev2Blocos({ corpo: preenchido('transvaginal') });

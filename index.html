@@ -8831,11 +8831,23 @@ function rev2TituloDeMoldura(t){ return REV2_MOLDURA.test(String(t||'').trim());
    ou quando já começa pelo próprio valor (pontilhado ou número). Achado clínico começa
    por palavra descritiva ("cisto", "nódulo"), então não casa em nenhum dos dois. */
 const REV2_ROTULO_MEDIDA = /^(volumes?|pesos?|dimens[õo]es|medidas?|espessuras?|di[âa]metros?|comprimentos?|[áa]reas?|[íi]ndices?|circunfer[êe]ncias?)\b/i;
+/* Palavras que uma MEDIDA pode conter sem deixar de ser medida: unidades, os próprios
+   rótulos, e as palavrinhas de ligação das faixas de referência ("Normal até 30 g"). */
+const REV2_PALAVRA_MEDIDA = /cm³|cm3|cm|mm|ml|cc|kg|g|%|volumes?|pesos?|medidas?|dimens[õo]es|espessuras?|di[âa]metros?|comprimentos?|[áa]reas?|normal|at[ée]|por|de|e|a/gi;
 function rev2NegritoDeMedida(t){
   var s=String(t||'').trim();
   if(!s) return false;
   if(REV2_ROTULO_MEDIDA.test(s)) return true;   // "Peso: 25 g", "Volume total: 8 cm³"
-  return /^[\s.]*[\d.]/.test(s);                // já começa pelo valor: "..... mm", "8 x 4 cm"
+  if(!/^[\s.]*[\d.]/.test(s)) return false;     // não começa por valor: não é medida
+  /* ⚠️ COMEÇAR POR NÚMERO NÃO BASTA — e a primeira versão desta função, escrita hoje
+     mesmo, errava nisso. Ela dizia que todo negrito começado por dígito era medida, e
+     isso APAGARIA achados de verdade: "**2 cistos simples no rim direito**" e
+     "**3 nódulos hipoecogênicos**" ficariam CINZA, como se o órgão estivesse normal.
+     Achado silenciado é pior que o alarme falso que esta função veio consertar.
+     Agora: só é medida se, tirados números, pontuação e palavras de medida, não sobrar
+     palavra nenhuma. "8 x 4 x 3 cm. Volume: 12 cm³." não sobra nada → medida.
+     "2 cistos simples no rim direito" sobra "cistossimplesnorimdireito" → achado. */
+  return s.replace(/[\d.,;:\s()x×\/-]/g,'').replace(REV2_PALAVRA_MEDIDA,'').length===0;
 }
 /* O título de um RETÂNGULO é mais exigente que faltaTitulo (que serve a outra coisa e
    continua como estava, com três suítes em cima dela):

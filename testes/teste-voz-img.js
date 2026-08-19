@@ -36,6 +36,7 @@ const src = [grab('norm'), grab('rev2Proc'), grab('rev2Trecho'), grab('rev2Audio
              // 19/08/2026: o corte de retangulos passou a distinguir negrito de MEDIDA
              // de negrito de TITULO — ver rev2NegritoDeMedida no index.html
              bloco(/const REV2_ROTULO_MEDIDA = [^\n]*/, 'REV2_ROTULO_MEDIDA'),
+             bloco(/const REV2_PALAVRA_MEDIDA = [^\n]*/, 'REV2_PALAVRA_MEDIDA'),
              grab('rev2TituloDeMoldura'), grab('rev2NegritoDeMedida'),
              grab('rev2TituloDeBloco'), grab('rev2CorpoVisivel'),
              grab('rev2Blocos'), grab('rev2Estado')].join('\n');

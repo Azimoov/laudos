@@ -25,30 +25,40 @@ function grab(n) {
 }
 const pega = (re, oque) => { const m = HTML.match(re); if (!m) throw new Error('nao achei ' + oque); return m[0]; };
 
-const api = new Function([
+const MODELOS = new Function(DADOS + '\n;return MODELOS;')();
+// MODELOS entra como PARAMETRO: rev2MoldeDoModelo consulta os modelos do medico para
+// saber o que ja era estrutura antes de o exame existir.
+const api = new Function('MODELOS', [
   pega(/const FALTA\s*=\s*\{[\s\S]*?\n\};/, 'FALTA'),
   pega(/const REV2_MOLDURA = [^\n]*/, 'REV2_MOLDURA'),
   pega(/const REV2_ROTULO_MEDIDA = [^\n]*/, 'REV2_ROTULO_MEDIDA'),
   pega(/const REV2_PALAVRA_MEDIDA = [^\n]*/, 'REV2_PALAVRA_MEDIDA'),
+  pega(/const REV2_NEGACAO = [^\n]*/, 'REV2_NEGACAO'),
   grab('norm'), grab('faltaTitulo'), grab('faltaGrupos'), grab('faltaTrecho'),
   grab('medidasFaltando'), grab('rev2TituloDeMoldura'), grab('rev2NegritoDeMedida'),
+  grab('rev2Assinatura'), grab('rev2MoldeDoModelo'),
   grab('rev2TituloDeBloco'), grab('rev2Blocos'), grab('rev2BlocosDaTela'),
   grab('rev2CorpoVisivel'), grab('rev2Proc'), grab('rev2Estado'),
   grab('rev2TermosAchado'), grab('alertasAchadoSemNegrito')
 ].join('\n') + '\nreturn {rev2NegritoDeMedida, rev2TituloDeBloco, rev2Blocos, rev2BlocosDaTela,'
-  + ' rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito};')();
+  + ' rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito, rev2Proc};')(MODELOS);
 const { rev2NegritoDeMedida, rev2TituloDeBloco, rev2Blocos, rev2BlocosDaTela,
-        rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito } = api;
-const MODELOS = new Function(DADOS + '\n;return MODELOS;')();
+        rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito, rev2Proc } = api;
 const EX = { laudo: {} };
 // laudo PREENCHIDO: era so depois de preencher as medidas que os defeitos apareciam
 const preenchido = k => MODELOS[k].corpo.replace(/\.{5}/g, '8');
 
 console.log('=== negrito de MEDIDA nao se confunde com achado nem com titulo ===');
+// ⚠️ A heuristica e a RESERVA, e ficou de proposito CONSERVADORA na 2a rodada: na duvida
+// ela diz "achado", porque achado silenciado e pior que alarme falso. Quem reconhece os
+// rotulos compridos do medico ("Dimensoes: ... em seus diametros transversal...") e o
+// MOLDE tirado do modelo — testado logo abaixo, no estado do retangulo.
 [['Peso: 25 g (Normal até 30 g)', true], ['Volume pré miccional: 364 ml', true],
- ['Dimensões: 3,2 x 3,9 x 3,6 cm (em seus diâmetros transversal, longitudinal e anteroposterior).', true],
  ['..... mm.', true], ['8 x 4 x 3 cm. Volume: 12 cm³.', true], ['Volume total da glândula: 9 cm³', true],
  ['Espessura 0,4 cm', true], ['Medida: 8 cm', true],
+ // este NAO e reconhecido pela heuristica (sobra "em seus diametros transversal...") e
+ // esta certo assim: quem o reconhece e o molde
+ ['Dimensões: 3,2 x 3,9 x 3,6 cm (em seus diâmetros transversal, longitudinal e anteroposterior).', false],
  ['nódulo hipoecogênico medindo 0,8 cm', false], ['tendinopatia', false],
  ['Próstata', false], ['esteatose hepática', false], ['cisto simples de 8 mm', false],
  // ⚠️ ACHADO QUE COMECA POR NUMERO — a primeira versao desta funcao (19/08/2026) tratava
@@ -85,8 +95,10 @@ ok(/Endométrio/i.test(utero.texto) && /Volume total/i.test(utero.texto),
   'endometrio e volume tambem — o utero e um bloco so');
 
 console.log('=== item 8 — prostata NORMAL nao pode ficar verde ===');
+// ⚠️ o exame leva o TIPO: e por ele que rev2Estado acha o modelo do medico e sabe o que
+// ja era estrutura. Sem o tipo cai na heuristica de reserva, que e mais desconfiada.
 bl = rev2Blocos({ corpo: preenchido('prostata') });
-bl.forEach(b => ok(rev2Estado(EX, b) === 'normal',
+bl.forEach(b => ok(rev2Estado({ tipo: 'prostata', laudo: {} }, b) === 'normal',
   'prostata normal: "' + b.titulo + '" fica cinza, nao verde'));
 console.log('=== e um achado de verdade CONTINUA acendendo verde ===');
 const comAchado = '**Próstata:** Com parênquima heterogêneo, apresentando **nódulo hipoecogênico medindo 0,8 cm** no lobo direito.\n**Peso: 25 g (Normal até 30 g)**';
@@ -175,6 +187,68 @@ console.log('=== item 16 — o cabecalho diz a REGIAO, nao so o tipo ===');
 ok(/_tituloLaudo=String\(L\.titulo\|\|''\)/.test(HTML), 'usa o titulo do laudo, que carrega a regiao');
 ok(/Laudo '\+pos\+' de '\+fila\.length/.test(HTML) === false || /_posTxt/.test(HTML),
   '"Laudo 0 de 0" nao aparece mais em laudo ja assinado');
+
+// ===================================================================================
+// 2ª RODADA — o que uma avaliacao independente pegou e as suites acima NAO pegavam.
+// Licao de processo: as assercoes de regex sobre o texto do index.html provam que o
+// COMENTARIO existe, nao que o comportamento esta certo; e testar so 3 modelos deixa
+// 23 de fora. Daqui em diante, os dois lados varrem TODOS os modelos.
+// ===================================================================================
+console.log('=== TODOS os 26 modelos NORMAIS: nenhum verde falso ===');
+Object.keys(MODELOS).filter(k => k !== 'outro').forEach(k => {
+  const verdes = rev2Blocos({ corpo: preenchido(k) })
+    .filter(b => rev2Estado({ tipo: k, laudo: {} }, b) === 'alterado')
+    .map(b => b.titulo || '(sem titulo)');
+  ok(verdes.length === 0, 'modelo normal "' + k + '" sem verde falso'
+    + (verdes.length ? ' — acendeu: ' + verdes.join(', ') : ''));
+});
+
+console.log('=== os 12 achados REAIS tem de acender verde (regressao achada na 2a rodada) ===');
+// 8 destes 12 ficaram CINZA na 1a versao: hiperplasia por volume, endometrio espessado,
+// aneurisma de aorta, area hipoecogenica, infarto esplenico, massa ovariana, IR elevado e
+// peso prostatico. Achado silenciado e o erro que chega ao paciente.
+[['prostata', '**Próstata:** aumentada, com **Volume aumentado: 78 cm³**.'],
+ ['prostata', '**Próstata:** **Peso: 82 g (acima do normal)**'],
+ ['abdominal', '**Fígado** com **Área hipoecogênica** no lobo direito.'],
+ ['transvaginal', '**Útero:** normal.\nEndométrio com **Espessura de 18 mm, acima do esperado**'],
+ ['abdominal', '**Grandes vasos** com **Diâmetro de 5,2 cm — aneurisma** de aorta.'],
+ ['rins', '**RIM DIREITO:** **Índice de resistividade de 0,95, elevado**'],
+ ['abdominal', '**Baço** com **Área de infarto** esplênica.'],
+ ['transvaginal', '**Ovário direito:** **Medida aumentada, com massa sólida de 6 cm**'],
+ ['rins', '**RIM DIREITO:** com **3 cistos simples**.'],
+ ['ombro', '**Tendão supraespinhal:** com **5 mm de rotura transfixante**.'],
+ ['mama', '**MAMA DIREITA** com **Nódulo** sólido.'],
+ ['rins', '**RIM DIREITO:** com **Cálculo de 1,5 cm**.']
+].forEach(([tipo, corpo]) => {
+  const acendeu = rev2Blocos({ corpo }).some(b => rev2Estado({ tipo, laudo: {} }, b) === 'alterado');
+  ok(acendeu, 'ACENDE: ' + corpo.replace(/\n/g, ' ').slice(0, 62));
+});
+
+console.log('=== a regra do molde: o que ja vinha do modelo nao e achado ===');
+ok(/function rev2MoldeDoModelo/.test(HTML), 'existe o molde tirado do modelo do medico');
+ok(/_molde\[rev2Assinatura\(lim\)\]/.test(HTML), 'rev2Estado consulta o molde');
+ok(/replace\(\/\[\\d\.,\]\+\/g,'#'\)/.test(HTML), 'a assinatura ignora os numeros ("..... cm" = "8 cm")');
+// obst23: **..... bpm.** e **..... cm. Grau .....** nao existem como palavra de medida,
+// e viravam verde falso no obstetrico normal ate o molde entrar
+ok(rev2Blocos({ corpo: preenchido('obst23') })
+     .every(b => rev2Estado({ tipo: 'obst23', laudo: {} }, b) !== 'alterado'),
+   'obstetrico normal (bpm, Grau) sem verde falso');
+
+console.log('=== aviso do item 6: nao pode gritar em exame normal ===');
+Object.keys(MODELOS).filter(k => k !== 'outro').forEach(k => {
+  ok(alertasAchadoSemNegrito({ corpo: preenchido(k) }, k).length === 0,
+    'modelo normal "' + k + '" nao dispara o aviso de negrito');
+});
+ok(alertasAchadoSemNegrito({ corpo:
+  '**Tendão supraespinhal:** com **tendinopatia**.\n\n**Tendão subescapular:** sem tendinopatia.' },
+  'ombro').length === 0, 'NEGACAO ("sem tendinopatia") nao dispara — senao o aviso mandaria '
+  + 'pintar de verde uma estrutura normal');
+ok(alertasAchadoSemNegrito({ corpo:
+  '**RIM DIREITO:** com **litíase renal**.\n\n**RIM ESQUERDO:** ausência de litíase renal.' },
+  'rins').length === 0, '"ausencia de" tambem nao dispara');
+ok(alertasAchadoSemNegrito({ corpo:
+  '**Tendão supraespinhal:** com **tendinopatia**.\n\n**Tendão subescapular:** espessado, com tendinopatia, sem rotura.' },
+  'ombro').length === 1, 'mas o caso REAL do medico continua acendendo');
 
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

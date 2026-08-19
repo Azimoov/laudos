@@ -5459,7 +5459,10 @@ async function capToggleRec(){
     if(resP && resP.texto && resP.texto.trim()){
       capAvisarMotor(resP);
       var aP=capAudioDoAgente(resP.texto, 'botao', null, resP.trechos);
-      if(resP.ditadoId) aP.url=agenteBase()+'/exame/audio/'+resP.ditadoId;
+      // _estudoAudio junto: sem ele, este áudio volta MUDO ao recarregar a janela, porque a
+      // URL só se refaz a partir dele (o ditado do agente não tem blob no navegador)
+      if(resP.ditadoId){ aP._estudoAudio=resP.ditadoId;
+        aP.url=agenteBase()+'/exame/audio/'+encodeURIComponent(resP.ditadoId); }
       try{
         var mP=await capClassificarDitado(resP.texto, '');
         aP.nomePaciente=mP.nome_paciente||''; aP.tipoExame=mP.tipo_exame||'';
@@ -8831,23 +8834,47 @@ function rev2TituloDeMoldura(t){ return REV2_MOLDURA.test(String(t||'').trim());
    ou quando já começa pelo próprio valor (pontilhado ou número). Achado clínico começa
    por palavra descritiva ("cisto", "nódulo"), então não casa em nenhum dos dois. */
 const REV2_ROTULO_MEDIDA = /^(volumes?|pesos?|dimens[õo]es|medidas?|espessuras?|di[âa]metros?|comprimentos?|[áa]reas?|[íi]ndices?|circunfer[êe]ncias?)\b/i;
-/* Palavras que uma MEDIDA pode conter sem deixar de ser medida: unidades, os próprios
-   rótulos, e as palavrinhas de ligação das faixas de referência ("Normal até 30 g"). */
-const REV2_PALAVRA_MEDIDA = /cm³|cm3|cm|mm|ml|cc|kg|g|%|volumes?|pesos?|medidas?|dimens[õo]es|espessuras?|di[âa]metros?|comprimentos?|[áa]reas?|normal|at[ée]|por|de|e|a/gi;
+/* Palavras que uma MEDIDA pode conter sem deixar de ser medida: unidades, os rótulos e as
+   palavrinhas das faixas de referência ("Volume total da glândula", "Normal até 30 g").
+   ⚠️ ANCORADA (^...$) e testada PALAVRA A PALAVRA. A primeira versão listava as unidades
+   soltas num regex global — e "g", "e", "a" apagavam TODA letra g, e, a do texto, fazendo
+   sobrar vazio em frases que não eram medida nenhuma. */
+const REV2_PALAVRA_MEDIDA = /^(cm³|cm3|cm|mm|ml|cc|kg|g|bpm|grau|graus|volumes?|pesos?|medidas?|dimens[õo]es|espessuras?|di[âa]metros?|comprimentos?|[áa]reas?|[íi]ndices?|circunfer[êe]ncias?|normal|at[ée]|de|da|do|e|total|gl[âa]ndula|pr[ée]|p[óo]s|miccional|fetal)$/i;
 function rev2NegritoDeMedida(t){
   var s=String(t||'').trim();
   if(!s) return false;
-  if(REV2_ROTULO_MEDIDA.test(s)) return true;   // "Peso: 25 g", "Volume total: 8 cm³"
-  if(!/^[\s.]*[\d.]/.test(s)) return false;     // não começa por valor: não é medida
-  /* ⚠️ COMEÇAR POR NÚMERO NÃO BASTA — e a primeira versão desta função, escrita hoje
-     mesmo, errava nisso. Ela dizia que todo negrito começado por dígito era medida, e
-     isso APAGARIA achados de verdade: "**2 cistos simples no rim direito**" e
-     "**3 nódulos hipoecogênicos**" ficariam CINZA, como se o órgão estivesse normal.
-     Achado silenciado é pior que o alarme falso que esta função veio consertar.
-     Agora: só é medida se, tirados números, pontuação e palavras de medida, não sobrar
-     palavra nenhuma. "8 x 4 x 3 cm. Volume: 12 cm³." não sobra nada → medida.
-     "2 cistos simples no rim direito" sobra "cistossimplesnorimdireito" → achado. */
-  return s.replace(/[\d.,;:\s()x×\/-]/g,'').replace(REV2_PALAVRA_MEDIDA,'').length===0;
+  if(!(REV2_ROTULO_MEDIDA.test(s) || /^[\s.]*[\d.]/.test(s))) return false;
+  /* ⚠️ COMEÇAR POR RÓTULO OU POR NÚMERO NÃO BASTA — e as duas primeiras versões desta
+     função, ambas de hoje, erraram cada uma para um lado. Uma avaliação independente
+     mostrou o estrago: "**Volume aumentado: 78 cm³**" (hiperplasia), "**Área de infarto**",
+     "**Diâmetro de 5,2 cm — aneurisma**" e mais cinco achados REAIS eram tratados como
+     medida e ficavam CINZA, como se o órgão estivesse normal.
+     A regra agora é: sobrou alguma PALAVRA que não seja de medida? Então é achado.
+     "Volume total da glândula: 9 cm³" → só palavras de medida → medida.
+     "Volume aumentado: 78 cm³"       → sobra "aumentado"     → ACHADO. */
+  return s.replace(/[\d.,;:()x×\/%-]+/g,' ').split(/\s+/).filter(Boolean)
+          .every(function(p){ return REV2_PALAVRA_MEDIDA.test(p); });
+}
+/* ============ O QUE JÁ ESTAVA NO MODELO NÃO É ACHADO (19/08/2026, 2ª rodada) ============
+   Classificar o negrito pela APARÊNCIA não fecha: "**8 bpm.**" é medida e não parece nada,
+   "**Volume aumentado: 78 cm³**" é achado e começa por rótulo de medida. Tentei dos dois
+   jeitos e errei dos dois lados — verde falso no obstétrico normal, e achado real ficando
+   cinza. A pergunta certa não é "o que este negrito parece?", e sim:
+                    ELE JÁ ESTAVA NO MODELO DO MÉDICO?
+   O modelo só tem estrutura — títulos de órgão e rótulos de medida. Negrito que aparece
+   ALÉM do que o modelo trazia foi acrescentado ao descrever ESTE exame, e é isso que o
+   verde marca. A comparação ignora os números: "..... cm" do modelo e "8 cm" do laudo são
+   a mesma coisa. A heurística acima continua como reserva, para laudo cujo modelo mudou. */
+function rev2Assinatura(s){
+  return String(s||'').replace(/[\d.,]+/g,'#').replace(/\s+/g,' ').trim().toLowerCase();
+}
+function rev2MoldeDoModelo(tipo){
+  var mod=tipo&&MODELOS[tipo]; if(!mod) return null;
+  var set={};
+  String(mod.corpo||'').replace(/\*\*([^*]+?)\*\*/g, function(m,t){
+    set[rev2Assinatura(String(t).replace(/[:\s]+$/,''))]=1; return m;
+  });
+  return set;
 }
 /* O título de um RETÂNGULO é mais exigente que faltaTitulo (que serve a outra coisa e
    continua como estava, com três suítes em cima dela):
@@ -8906,30 +8933,48 @@ function rev2CorpoVisivel(b){
    Esta conferência não precisa saber medicina: usa só a coerência INTERNA do laudo. Se um
    termo está em negrito em algum lugar do laudo, ele deveria estar em negrito em todos.
    Não altera o texto — acende aviso, e quem decide é o médico. */
-function rev2TermosAchado(L){
-  var termos={};
+/* Negação antes do termo: "sem tendinopatia", "ausência de litíase", "não há derrame".
+   Sem isto o aviso convidava o médico a pôr negrito numa coisa que ele acabou de DESCARTAR
+   — e negrito numa negação pintaria de VERDE uma estrutura normal. O aviso viraria a
+   fábrica do defeito que ele veio caçar. */
+const REV2_NEGACAO = /(sem|ausência|ausencia|não|nao|nega|descartad[ao]|livre)\s+(de\s+|sinais?\s+de\s+|h[áa]\s+)?$/i;
+function rev2TermosAchado(L, tipo){
+  var termos={}, molde=rev2MoldeDoModelo(tipo);
+  var titulos={}; rev2Blocos(L).forEach(function(b){ if(b.titulo) titulos[norm(b.titulo)]=1; });
   String((L&&L.corpo)||'').replace(/\*\*([^*]+?)\*\*/g, function(m, t){
     var s=String(t).replace(/[:.\s]+$/,'').trim();
-    // só termos curtos, alfabéticos e que não sejam título/moldura/medida
-    if(s.length>=5 && s.split(/\s+/).length<=4 && /^[A-Za-zÀ-ÿ\s-]+$/.test(s)
-       && !rev2TituloDeMoldura(s) && !rev2NegritoDeMedida(s)) termos[s.toLowerCase()]=s;
+    if(s.length<5 || s.split(/\s+/).length>4 || !/^[A-Za-zÀ-ÿ\s-]+$/.test(s)) return m;
+    if(rev2TituloDeMoldura(s) || rev2NegritoDeMedida(s)) return m;
+    // ⚠️ o que JÁ VINHA DO MODELO não é achado: "Grandes vasos" e "Artéria femoral comum"
+    // aparecem em negrito e depois em texto simples nos próprios modelos normais do médico,
+    // e o aviso acendia em TODO abdominal e TODO Doppler. Aviso que grita todo dia não é lido.
+    if(molde && molde[rev2Assinatura(s)]) return m;
+    if(titulos[norm(s)]) return m;                 // título de órgão não é achado
+    termos[s.toLowerCase()]=s;
     return m;
   });
   return termos;
 }
-function alertasAchadoSemNegrito(L){
+function alertasAchadoSemNegrito(L, tipo){
   try{
-    var termos=rev2TermosAchado(L); var chaves=Object.keys(termos);
+    var termos=rev2TermosAchado(L, tipo); var chaves=Object.keys(termos);
     if(!chaves.length) return [];
     var achados=[];
     rev2Blocos(L).forEach(function(b){
-      // texto do bloco SEM o que já está em negrito: o que sobrar é texto simples
+      // texto do bloco SEM o que já está em negrito: o que sobrar é texto simples.
+      // Só interessa bloco onde o termo NÃO está em negrito — se já está, nada a avisar.
+      if(/\*\*/.test(b.texto) && chaves.some(function(k){
+           return norm(b.texto.match(/\*\*[^*]+?\*\*/g)?b.texto.match(/\*\*[^*]+?\*\*/g).join(' '):'').indexOf(norm(k))>=0;
+         })) { /* segue: pode haver outro termo sem negrito neste mesmo bloco */ }
       var simples=b.texto.replace(/\*\*[^*]+?\*\*/g, ' ');
       chaves.forEach(function(k){
-        if(norm(simples).indexOf(norm(k))>=0)
-          achados.push('“'+termos[k]+'” aparece em NEGRITO em outra parte do laudo, mas em '
-            +'“'+(b.titulo||'um trecho sem título')+'” está sem negrito — ali o retângulo fica '
-            +'CINZA, como se não houvesse alteração. Confira se é achado nos dois.');
+        var alvo=norm(k), texto=norm(simples), i=texto.indexOf(alvo);
+        if(i<0) return;
+        // negação imediatamente antes? então não é achado ali — é o contrário dele
+        if(REV2_NEGACAO.test(texto.slice(Math.max(0,i-28), i))) return;
+        achados.push('“'+termos[k]+'” aparece em NEGRITO em outra parte do laudo, mas em '
+          +'“'+(b.titulo||'um trecho sem título')+'” está sem negrito — ali o retângulo fica '
+          +'CINZA, como se não houvesse alteração. Confira se é achado nos dois.');
       });
     });
     return achados.length ? [{tipo:'divergencia', texto:achados.join('\n')}] : [];
@@ -8965,9 +9010,12 @@ function rev2Estado(ex, b){
      normal. E o verde só aparecia DEPOIS de o médico preencher as medidas, porque até lá
      o vermelho de "falta medida" mascarava. Agora cai fora todo negrito que seja o
      título, moldura ou MEDIDA — de qualquer tamanho. O que sobrar é achado de verdade. */
+  var _molde=rev2MoldeDoModelo(ex&&ex.tipo);
   var resto=b.texto.replace(/\*\*([^*]+?)\*\*/g, function(m, t){
     var lim=String(t).replace(/[:\s]+$/,'').trim();
-    return (lim===b.titulo || rev2TituloDeMoldura(lim) || rev2NegritoDeMedida(lim)) ? '' : m;
+    if(lim===b.titulo || rev2TituloDeMoldura(lim)) return '';
+    if(_molde && _molde[rev2Assinatura(lim)]) return '';   // já vinha do modelo: é estrutura
+    return rev2NegritoDeMedida(lim) ? '' : m;              // reserva, p/ modelo desconhecido
   });
   if(/\*\*/.test(resto)) return 'alterado';   // negrito além da moldura = achado patológico
   // informação que veio do ditado (indicação clínica, história) não é "órgão sem
@@ -8977,10 +9025,22 @@ function rev2Estado(ex, b){
   return 'normal';
 }
 /* de onde veio a informação daquele retângulo (a IA anotou enquanto lia as imagens) */
+/* Casa a seção que a IA anotou com o título do retângulo. A igualdade EXATA era frágil
+   demais (19/08/2026): a IA escreve a seção com a própria grafia, e "Supraespinhal" ou
+   "Tendão supra-espinhal" não casavam com "Tendão supraespinhal" — as fichas VOZ e IMG
+   sumiam sem dizer por quê. Agora, se a igualdade falhar, aceita conter/estar contido
+   (mesma regra que rev2Casa já usa para os conflitos), com hífen tratado como espaço.
+   Exigir 4 letras evita casar por pedaço curto demais ("mão" dentro de "mama"). */
 function rev2Proc(ex, titulo){
   var lista=((ex.laudo||{}).procedencia)||[], n=norm(titulo);
   if(!n) return null;
+  var achatar=function(s){ return norm(String(s||'').replace(/-/g,' ')); };
+  var nn=achatar(titulo);
   for(var i=0;i<lista.length;i++){ if(norm(lista[i].secao||'')===n) return lista[i]; }
+  for(var j=0;j<lista.length;j++){
+    var s=achatar(lista[j].secao||'');
+    if(s.length>=4 && nn.length>=4 && (s.indexOf(nn)>=0 || nn.indexOf(s)>=0)) return lista[j];
+  }
   return null;
 }
 /* acha o trecho do ditado pela citação que a IA copiou dele */
@@ -9046,7 +9106,7 @@ function rev2Render(){
   // ---- os alertas, que são a legenda das cores ----
   var lista=alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
                              .concat(alertasReferencia(L))
-                             .concat(alertasAchadoSemNegrito(L));
+                             .concat(alertasAchadoSemNegrito(L, ex&&ex.tipo));
   var porTipo={}, calmos={};
   lista.forEach(function(a){
     var txt=String((a&&a.texto)||'').trim(); if(!txt) return;
@@ -9390,8 +9450,23 @@ async function rev2BuscarImagens(){
     var j=await r.json();
     var est=((j&&j.estudos)||[]).filter(function(e){ return e.id===ex._estudoId; })[0];
     if(!est){ rev2ImgStatus('O aparelho não tem mais este exame na lista.', true); return; }
+    var todas=(est.instancias||est.instances||[]);
+    /* ⚠️ EXAME SEM O MAPA DAS INSTÂNCIAS. Exame vindo da recuperação (ou de sessão salva
+       antes de 19/08) tem _estudoId mas NÃO tem _instIds — e sem esse mapa a comparação
+       achava que NENHUMA foto já estava aqui e baixava TODAS de novo, dobrando as imagens
+       do laudo. Uma avaliação independente pegou isto: 3 fotos viravam 6 na primeira busca.
+       Sem o mapa não dá para saber QUAIS são as que já vieram, mas dá para saber QUANTAS:
+       o aparelho devolve as instâncias em ordem, então as primeiras N correspondem às N
+       imagens que o exame já tem. Semear assim é conservador — no pior caso deixa de
+       trazer uma foto (o médico repete), e nunca duplica o que já está no laudo. */
+    if(!ex._instIds || !ex._instIds.length){
+      var n=(ex.imagens||[]).length;
+      ex._instIds=todas.slice(0, n);
+      if(n) rev2ImgStatus('Este exame veio de uma sessão antiga, sem o mapa das imagens — '
+        +'considerei que as '+n+' primeiras do aparelho já estão aqui.');
+    }
     var jaTem=(ex._instIds||[]).slice();
-    var novos=(est.instancias||est.instances||[]).filter(function(id){ return jaTem.indexOf(id)<0; });
+    var novos=todas.filter(function(id){ return jaTem.indexOf(id)<0; });
     if(!novos.length){ rev2ImgStatus('Nenhuma foto nova — o exame já tem todas as do aparelho.'); return; }
     var baixadas=0;
     for(var i=0;i<novos.length;i++){
@@ -9807,8 +9882,10 @@ async function diaAbrirNaPasta(exId){
       headers:{'Content-Type':'application/json'}, body:JSON.stringify({raiz:raiz, sub:sub})});
     var j=await r.json();
     if(j&&j.ok) log('Abri a pasta: '+j.pasta);
-    else log('Não consegui abrir a pasta: '+((j&&j.erro)||'o agente não respondeu')
-            +'. Ela é "'+raiz+'", dentro do seu perfil.', true);
+    else log('Não consegui abrir a pasta "'+raiz+'": '+((j&&j.erro)||'o agente não respondeu')
+            +'. O agente só procura dentro da sua pasta de usuário (Área de Trabalho, '
+            +'OneDrive, Documentos). Se os laudos vão para outro disco (D:, rede), esse '
+            +'botão não alcança — abra pelo Explorer.', true);
   }catch(e){
     log('Não consegui falar com o agente para abrir a pasta ('+((e&&e.message)||e)
        +'). Ligue o agente e tente de novo.', true);

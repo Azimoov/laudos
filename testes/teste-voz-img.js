@@ -38,11 +38,18 @@ const src = [grab('norm'), grab('rev2Proc'), grab('rev2Trecho'), grab('rev2Audio
              bloco(/const REV2_ROTULO_MEDIDA = [^\n]*/, 'REV2_ROTULO_MEDIDA'),
              bloco(/const REV2_PALAVRA_MEDIDA = [^\n]*/, 'REV2_PALAVRA_MEDIDA'),
              grab('rev2TituloDeMoldura'), grab('rev2NegritoDeMedida'),
+             // 2a rodada de 19/08: o estado do retangulo passou a consultar o MODELO do
+             // medico (o que ja era estrutura antes do exame existir) — ver rev2MoldeDoModelo
+             grab('rev2Assinatura'), grab('rev2MoldeDoModelo'),
              grab('rev2TituloDeBloco'), grab('rev2CorpoVisivel'),
              grab('rev2Blocos'), grab('rev2Estado')].join('\n');
-const api = new Function(src + '\nreturn {rev2Proc, rev2Trecho, rev2AudioDoTrecho,'
+// MODELOS entra no ambiente porque rev2MoldeDoModelo o consulta. Aqui os casos de teste
+// nao passam `tipo`, entao o molde vem nulo e vale a heuristica de reserva — de proposito:
+// esta suite testa a moldura, nao o molde (que tem suite propria em teste-blocos-revisao).
+const MODELOS = {};
+const api = new Function('MODELOS', src + '\nreturn {rev2Proc, rev2Trecho, rev2AudioDoTrecho,'
   + ' rev2Blocos, rev2Estado, rev2TituloDeMoldura, rev2NegritoDeMedida,'
-  + ' rev2TituloDeBloco, rev2CorpoVisivel};')();
+  + ' rev2TituloDeBloco, rev2CorpoVisivel};')(MODELOS);
 const { rev2Proc, rev2Trecho, rev2AudioDoTrecho, rev2Blocos, rev2Estado,
         rev2TituloDeMoldura, rev2NegritoDeMedida, rev2TituloDeBloco,
         rev2CorpoVisivel } = api;

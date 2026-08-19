@@ -2932,10 +2932,29 @@ async function gerarPdfImagens(imagens, paciente){
   }
   return doc.output('blob');
 }
+/* 19/08/2026 — POR QUE A PERMISSÃO É CONFERIDA ANTES DO PDF.
+   Dois laudos de hoje (18:15 e 19:01) foram parar em AppData\Local\Temp em vez da pasta
+   do dia, e nada disse ao médico. A causa: a permissão de escrever na pasta (File System
+   Access) precisa do GESTO do clique, e este código gerava o PDF das imagens ANTES de
+   pedi-la — com 8 imagens, a geração consome o gesto, requestPermission já não vale, e o
+   salvar caía calado no caminho de "baixar arquivo", que no WebView2 é a pasta temporária.
+   Temp é o pior destino possível: o Windows limpa quando quer, e o CLAUDE.md proíbe dado
+   deste projeto dentro de AppData\Local.
+   Agora: pede a pasta e a permissão PRIMEIRO, com o gesto fresco; só depois faz o trabalho
+   lento. E se ainda assim cair no plano B, o aviso é ALTO e devolvido a quem chamou —
+   erro invisível é erro nenhum, e este some com o laudo. */
 async function salvarLaudoPasta(){
-  const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return; }
+  const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return false; }
   const pac=(window.__revAtual&&window.__revAtual.paciente)?window.__revAtual.paciente:'laudo';
   const base=nomeArquivoSeguro(pac);
+  // ---- primeiro a pasta, enquanto o clique ainda conta como gesto do usuário ----
+  let destino=null;
+  if(suportaFS()){
+    if(!pastaLaudoH){ try{ await garantirPasta(); }catch(e){} }
+    if(pastaLaudoH){
+      try{ if(await fsPermissao(pastaLaudoH)) destino=pastaLaudoH; }catch(e){}
+    }
+  }
   const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+'@media print{.fundoLaudo{position:fixed;top:0;left:0;width:100vw;height:100vh;}.laudoFolha.comFundo{min-height:0;}@page{size:A4;margin:8mm;}}</style></head><body>'+area.innerHTML+'</body></html>';
   const laudoBlob=new Blob([html],{type:'text/html'});
   const ex=(window.__revAtual&&window.__revAtual.exId!=null)?exames.find(function(e){return e.id===window.__revAtual.exId;}):null;
@@ -2946,25 +2965,29 @@ async function salvarLaudoPasta(){
     try{ pdfBlob=await gerarPdfImagens(imgs, pac); }
     catch(e){ log('PDF das imagens não gerado ('+e.message+') — salvando sem ele.', true); }
   }
-  if(suportaFS()){
-    const h=pastaLaudoH;
-    if(h && (await fsPermissao(h))){
-      try{
-        const nomePasta=await pastaLivre(h, base); const sub=await h.getDirectoryHandle(nomePasta,{create:true});
-        await fsEscrever(sub, 'Laudo - '+base+'.html', laudoBlob);
-        for(let i=0;i<imgBlobs.length;i++){ await fsEscrever(sub, 'foto-'+(i+1)+'.jpg', imgBlobs[i]); }
-        if(pdfBlob) await fsEscrever(sub, 'Fotos - '+base+'.pdf', pdfBlob);
-        log('Salvo na pasta "'+nomePasta+'": laudo + '+imgBlobs.length+' foto(s)'+(pdfBlob?' + PDF das imagens (6/página)':'')+'.');
-        return;
-      }catch(e){ log('Falha ao salvar na pasta ('+e.message+'). Compartilhando...', true); }
-    }
+  if(destino){
+    try{
+      const nomePasta=await pastaLivre(destino, base); const sub=await destino.getDirectoryHandle(nomePasta,{create:true});
+      await fsEscrever(sub, 'Laudo - '+base+'.html', laudoBlob);
+      for(let i=0;i<imgBlobs.length;i++){ await fsEscrever(sub, 'foto-'+(i+1)+'.jpg', imgBlobs[i]); }
+      if(pdfBlob) await fsEscrever(sub, 'Fotos - '+base+'.pdf', pdfBlob);
+      log('Salvo na pasta "'+nomePasta+'": laudo + '+imgBlobs.length+' foto(s)'+(pdfBlob?' + PDF das imagens (6/página)':'')+'.');
+      window.__ultimoSalvar={ok:true, pasta:nomePasta};
+      return true;
+    }catch(e){ log('Falha ao salvar na pasta ('+e.message+'). Compartilhando...', true); }
   }
   const files=[new File([laudoBlob], 'Laudo - '+base+'.html', {type:'text/html'})];
   for(let i=0;i<imgBlobs.length;i++){ files.push(new File([imgBlobs[i]], base+' - foto '+(i+1)+'.jpg', {type:imgBlobs[i].type||'image/jpeg'})); }
   if(pdfBlob) files.push(new File([pdfBlob], 'Fotos - '+base+'.pdf', {type:'application/pdf'}));
-  try{ if(navigator.canShare && navigator.canShare({files:files})){ await navigator.share({files:files, title:pac}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  try{ if(navigator.canShare && navigator.canShare({files:files})){ await navigator.share({files:files, title:pac}); window.__ultimoSalvar={ok:true, pasta:'compartilhamento'}; return true; } }catch(e){ if(e&&e.name==='AbortError'){ window.__ultimoSalvar={ok:false, motivo:'cancelado'}; return false; } }
   for(let i=0;i<files.length;i++){ const u=URL.createObjectURL(files[i]); const an=document.createElement('a'); an.href=u; an.download=files[i].name; document.body.appendChild(an); an.click(); setTimeout(function(){URL.revokeObjectURL(u);an.remove();},2500); }
-  log('Baixados: laudo + '+imgBlobs.length+' foto(s)'+(pdfBlob?' + PDF das imagens':'')+'.');
+  /* Plano B EXECUTADO: o arquivo NÃO está na pasta do dia. No programa de mesa isso
+     manda para a pasta temporária do Windows, que se limpa sozinha. Aviso alto. */
+  window.__ultimoSalvar={ok:false, motivo:'baixado'};
+  log('⚠ ATENÇÃO: NÃO salvei na pasta do dia — o laudo de '+pac+' foi BAIXADO '
+     +'(no programa isso vai para a pasta temporária do Windows, que se apaga sozinha). '
+     +'Escolha a pasta de destino e salve de novo.', true);
+  return false;
 }
 
 // Controle de UI do gravador por exame. estado: 'idle' | 'rec' | 'pause'
@@ -9209,7 +9232,19 @@ function rev2Preparar(){ try{ abrirRevisao(_rev2Id, true); }catch(e){} }
 async function rev2Aprovar(comImpressao){
   var ex=rev2Ex(); if(!ex) return;
   rev2Preparar();
-  try{ await salvarLaudoPasta(); }catch(e){ log('Falha ao salvar na pasta: '+e.message, true); }
+  /* O resultado do salvar aparece NESTA TELA. Antes só ia para o diário, que fica atrás
+     dela: em 19/08 dois laudos caíram na pasta temporária e o médico não teve como saber. */
+  var _okSalvar=false;
+  try{ _okSalvar=await salvarLaudoPasta(); }
+  catch(e){ log('Falha ao salvar na pasta: '+e.message, true); }
+  if(!_okSalvar){
+    rev2Status('⚠ NÃO foi salvo na pasta do dia — veja o aviso e salve de novo antes de fechar.', true);
+    if(!confirm('O laudo NÃO foi salvo na pasta do dia (ele foi baixado para a pasta temporária, que o Windows apaga sozinha).\n\nAssinar mesmo assim?\n\nOK = assinar · Cancelar = voltar e escolher a pasta')){
+      return;   // sai SEM assinar: o médico vai escolher a pasta e salvar de novo
+    }
+  } else {
+    rev2Status('✅ salvo na pasta "'+((window.__ultimoSalvar&&window.__ultimoSalvar.pasta)||'destino')+'".');
+  }
   /* 17/08/2026 — ISTO FALTAVA, e o buraco era fundo: a tela nova salvava o
      arquivo e marcava como liberado, mas NUNCA registrava o laudo. Três perdas
      de uma vez, todas caladas:
@@ -9240,8 +9275,12 @@ function rev2Depois(){
 }
 async function rev2SalvarApenas(){
   rev2Preparar();
-  try{ await salvarLaudoPasta(); log('Laudo salvo (sem assinar).'); }
-  catch(e){ log('Falha ao salvar: '+e.message, true); }
+  try{
+    var ok=await salvarLaudoPasta();
+    if(ok){ rev2Status('✅ salvo na pasta "'+((window.__ultimoSalvar&&window.__ultimoSalvar.pasta)||'destino')+'" (sem assinar).'); log('Laudo salvo (sem assinar).'); }
+    else  { rev2Status('⚠ NÃO foi salvo na pasta do dia — escolha a pasta de destino e salve de novo.', true); }
+  }
+  catch(e){ rev2Status('⚠ falha ao salvar: '+((e&&e.message)||e), true); }
   // registra também: salvar sem assinar continua sendo salvar (ver rev2Aprovar)
   try{ salvarLaudoHistorico(window.__revAtual); }
   catch(e){ log('FALHA AO GUARDAR NO HISTORICO: '+e.message+' — confira o Historico.', true); }

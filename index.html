@@ -4217,7 +4217,12 @@ function montarRevAnterior(ex){
 const ALERTAS = [
   {k:'identificacao', nome:'Conflito de identificação',     cor:'#D2601A', vazio:'Nome, idade e data conferem'},
   {k:'anterior',      nome:'Exame anterior identificado',   cor:'#3D6FB4', vazio:'Nenhum exame anterior deste paciente'},
-  {k:'divergencia',   nome:'Ditado incompatível com imagens',cor:'#C99B2E', vazio:'Ditado e imagens batem'},
+  /* 19/08/2026 — o nome era "Ditado incompatível com imagens", e passou a mentir quando esta
+     categoria ganhou dois avisos que não falam de imagem: a contradição de membro no Doppler
+     (laudo de perna dizendo braço) e o achado em negrito num órgão e sem negrito noutro.
+     Rótulo errado esconde aviso: o médico lê "imagens" e ignora um alerta que era sobre o
+     texto. O nome novo cobre os três sem prometer qual é a fonte da divergência. */
+  {k:'divergencia',   nome:'Divergência — confira',           cor:'#C99B2E', vazio:'Nada divergente no laudo'},
   {k:'faltando',      nome:'Dados faltando',                cor:'#C43B3B', vazio:'Nenhuma medida ou dado em falta'},
   {k:'iacriou',       nome:'Texto gerado por IA',           cor:'#B94A7E', vazio:'Nenhum texto criado pela IA'},
   // "Classificação calculada", nunca "pela IA": a IA anota os descritores, o app calcula

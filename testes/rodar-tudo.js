@@ -34,6 +34,7 @@ const SUITE = [
   { arq: 'teste-visual-revisao.js', o: 'aparencia da tela de revisao (cores, destaque, mouse)' },
   { arq: 'teste-tela-antigos.js', o: 'tela de fotos e audios antigos (porta nova, esteira de sempre)' },
   { arq: 'teste-conferente.js', o: 'conferente: segunda leitura do laudo antes de entregar' },
+  { arq: 'teste-mama-bloco1.js', o: 'pacote de mama bloco 1: modelo e dizeres padrao' },
   { arq: 'teste-bizus-guarda.js', o: 'dizeres padrao (BIZUS): guarda contra valor salvo ilegivel' },
   { arq: 'teste-rede.js', o: 'rede debaixo da transcricao (placa->CPU->nuvem)' },
   { arq: 'teste-provedor.js', o: 'endereco do provedor de IA configuravel' },

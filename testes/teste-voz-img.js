@@ -152,6 +152,35 @@ const editouSrc = grab('rev2Editou');
 ok(!/procedencia/.test(editouSrc),
    'a edicao do medico NAO reescreve a procedencia — congelada na geracao (decisao de 17/08)');
 
+console.log('=== 20/08/2026: a ficha VOZ com trecho vindo da NUVEM ===');
+// Ter marcacao de tempo e condicao NECESSARIA, nao suficiente: a ficha VOZ so nasce
+// quando a procedencia casa com o titulo E a citacao e reencontrada num trecho. Depois
+// de a nuvem passar a devolver hora (whisper-1 + verbose_json), faltava provar que a
+// ponte INTEIRA fecha com trechos daquele formato — a segmentacao do whisper-1 e mais
+// grossa que a do motor local, e era ai que isto poderia falhar calado.
+//
+// Os trechos abaixo NAO sao inventados: foram colhidos da OpenAI de verdade em
+// 20/08/2026, com audio sintetico (nenhum dado de paciente), e ficam aqui congelados
+// para a bateria nao gastar chamada nem depender de rede.
+const trechosDaNuvem = [
+  { inicio: 1.0, fim: 5.0, texto: 'Figado de contornos regulares e dimensões normais.' },
+  { inicio: 6.0, fim: 8.0, texto: 'Rim direito sem cálculos.' },
+  { inicio: 9.0, fim: 12.0, texto: 'Vesícula biliar de paredes finas.' },
+];
+const exNuvem = { laudo: { trechos: trechosDaNuvem, procedencia: [
+  { secao: 'Fígado', citacao: 'contornos regulares e dimensões normais', imagem_n: 0 },
+  { secao: 'Rim direito', citacao: 'Rim direito sem cálculos', imagem_n: 0 },
+  { secao: 'Vesícula biliar', citacao: 'paredes finas', imagem_n: 0 } ] } };
+[['Fígado', 0], ['Rim direito', 1], ['Vesícula biliar', 2]].forEach(function (par) {
+  const pr = rev2Proc(exNuvem, par[0]);
+  const tr = pr ? rev2Trecho(exNuvem, pr.citacao) : null;
+  const trI = tr ? trechosDaNuvem.indexOf(tr) : -1;
+  ok(trI === par[1],
+     '"' + par[0] + '": a VOZ nasce e aponta o trecho certo (' + par[1] + '), vindo da nuvem');
+});
+ok(rev2Trecho(exNuvem, 'baço aumentado com nódulo hipoecoico') === null,
+   'e a trava de 17/08 continua de pe: citacao que nao esta no ditado nao ganha botao');
+
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');
 process.exit(falhas ? 1 : 0);

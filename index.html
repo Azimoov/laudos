@@ -5905,8 +5905,17 @@ function capAvisarMotor(j){
   // o agente já manda o próprio aviso no fechamento do exame: dois textos quase iguais
   // sobre a mesma coisa viram barulho, e barulho é o que faz aviso deixar de ser lido
   if(/NUVEM/i.test(String(j.aviso||''))) return;
-  log('⚠️ Este ditado foi transcrito na NUVEM (o motor de voz local falhou). O texto veio, '
-     +'mas SEM marcação de tempo — o botão de voz da revisão não funciona neste exame.', true);
+  /* 19/08/2026: a frase deixou de ser fixa. Desde que a cadeia da nuvem pede
+     verbose_json ao whisper-1, um ditado de nuvem PODE vir com hora — e mandar o médico
+     não usar um botão que funciona é tão ruim quanto deixá-lo clicar num que não
+     funciona. Quem manda é o que chegou (trechos), não por onde chegou (motor). */
+  var comHora = !!(j.trechos && j.trechos.length);
+  log('⚠️ Este ditado foi transcrito na NUVEM (o motor de voz local falhou). '
+     +(comHora
+       ? ('O texto veio COM marcação de tempo ('+j.trechos.length+' trecho(s)) — o botão '
+         +'de voz da revisão funciona normalmente.')
+       : 'O texto veio, mas SEM marcação de tempo — o botão de voz da revisão não '
+        +'funciona neste exame.'), true);
 }
 function capAudioDoAgente(texto, origem, quandoSeg, trechos){
   var idx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
@@ -9292,7 +9301,10 @@ function rev2Render(){
             ? ((L.trechos||[]).length+' trecho(s) com hora')
             // 19/08/2026: deixou de ser um beco. Sem marcação de tempo não há VOZ por
             // trecho, mas o ditado INTEIRO continua ouvível — e é isso que se diz.
-            : 'sem marcação de tempo (transcrito na nuvem) — não há VOZ por trecho, '
+            // O "(transcrito na nuvem)" saiu daqui de propósito: desde que a cadeia da
+            // nuvem pede verbose_json ao whisper-1, nuvem já não é sinônimo de sem hora,
+            // e afirmar a causa aqui virou chute. O que a tela sabe é que não há hora.
+            : 'sem marcação de tempo — não há VOZ por trecho, '
               +'mas dá para ouvir o ditado inteiro no botão ao lado');
 }
 function rev2Rel(s){ s=Math.max(0,Math.round(s||0)); return Math.floor(s/60)+' min '+('0'+(s%60)).slice(-2)+' s'; }

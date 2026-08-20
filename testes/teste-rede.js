@@ -100,14 +100,36 @@ ok(/name="language"[\s\S]{0,40}pt|campo\("language", "pt"\)/.test(nuvem), 'em po
 ok(/Termos: /.test(nuvem), 'e leva o vocabulario de ultrassom junto, para nao errar termo medico');
 ok(/if st == 200:/.test(nuvem) && /raise RuntimeError\("a nuvem nao transcreveu/.test(nuvem),
    'so o 200 vira texto; o resto vira erro claro, nunca texto vazio');
-ok(/sem marcacao de tempo|sem marca de tempo/i.test(nuvem),
-   'o LIMITE esta escrito: a nuvem devolve texto sem hora, entao o botao de VOZ nao vale ali');
+ok(/nao sabe marcar tempo|sem marcacao de tempo|sem marca de tempo/i.test(nuvem),
+   'o LIMITE continua escrito: modelo que nao marca tempo devolve trechos vazios');
+ok(/`trechos` vem vazio/i.test(nuvem),
+   'e o contrato diz o que sai nesse caso, em vez de deixar quem chama adivinhar');
+// 19/08/2026: o formato deixou de ser fixo. verbose_json (o unico que traz `segments`)
+// so vale para o whisper-1; pedi-lo aos dois modelos novos derruba a cadeia inteira num
+// 400 logo na primeira tentativa — trocaria "ditado sem hora" por "ditado nenhum".
+ok(/NUVEM_MODELOS_COM_HORA/.test(ag), 'existe a lista de quem sabe marcar tempo');
+ok(/NUVEM_MODELOS_COM_HORA = \{"whisper-1"\}/.test(ag),
+   'e so o whisper-1 esta nela — os dois modelos novos recusam verbose_json');
+ok(/"verbose_json" if com_hora else "json"/.test(nuvem),
+   'o formato e escolhido POR MODELO, nunca fixado para todos');
+ok(/com_hora = modelo in NUVEM_MODELOS_COM_HORA/.test(nuvem),
+   'e quem decide e a lista, dentro do laco de tentativas');
+ok(/return texto, trechos/.test(nuvem), 'a funcao devolve (texto, trechos), nao so o texto');
+const trad = defPy(ag, '_trechos_da_nuvem');
+ok(/"inicio":[\s\S]{0,200}"fim":[\s\S]{0,200}"texto":/.test(trad),
+   'e traduz os segments para o MESMO formato do motor local (inicio/fim/texto)');
+ok(/seg\.get\("start"\)/.test(trad) && /seg\.get\("end"\)/.test(trad),
+   'lendo start/end, que sao os nomes que a OpenAI usa');
+ok(/except \(AttributeError, TypeError, ValueError\)/.test(trad),
+   'segmento torto nao contamina os que vieram certos, nem derruba o ditado');
 
 const tf = defPy(ag, 'transcrever_audio_f32');
 ok(/except Exception[\s\S]{0,700}transcrever_na_nuvem\(audio, boost\)/.test(tf),
    'o motor local falhou -> a nuvem entra, com o audio que so existe aqui dentro');
-ok(/trechos, origem = \[\], "nuvem"/.test(tf),
-   'e os trechos vem vazios de proposito — nao se inventa hora que a nuvem nao deu');
+ok(/cru, trechos = transcrever_na_nuvem\(audio, boost\)/.test(tf),
+   'e a hora que a nuvem devolveu e APROVEITADA, em vez de zerada na marra');
+ok(!/trechos, origem = \[\], "nuvem"/.test(tf),
+   'a forma antiga (trechos sempre vazios) nao sobrou em lugar nenhum');
 ok(/return texto, trechos, origem/.test(tf), 'quem chama recebe tambem POR ONDE o ditado saiu');
 ok((ag.match(/texto, trechos, motor = transcrever_audio_f32/g) || []).length === 2,
    'as duas chamadas de exame do agente foram atualizadas (botao e exame fechado)');
@@ -123,8 +145,8 @@ console.log('=== o TERCEIRO caminho (/transcrever) tambem entrou na fila e ganho
 const rota = ag.slice(ag.indexOf('if rota != "/transcrever"'));
 ok(/with _transcr_lock:/.test(rota.slice(0, 3200)),
    'o ditado avulso entra na MESMA fila do exame ao vivo — nao disputa a placa nem o motor');
-ok(/transcrever_na_nuvem_bytes\(buf, boost\)/.test(rota.slice(0, 3200)),
-   'e tem a mesma rede: motor local falhou, vai para a nuvem');
+ok(/cru, _ = transcrever_na_nuvem_bytes\(buf, boost\)/.test(rota.slice(0, 3200)),
+   'e tem a mesma rede: motor local falhou, vai para a nuvem (a hora aqui nao serve)');
 ok(/sincronizar_rotulo\(\)/.test(rota.slice(0, 3200)), 'e acerta o rotulo do motor depois');
 
 console.log('=== instalacao desencontrada NAO pode virar nuvem calada ===');

@@ -49,8 +49,13 @@ ok(/\.catch\(function\(e\)\{/.test(INT), 'falha ao tocar vira mensagem, nao sile
 ok(/o agente está desligado/.test(INT), 'e a mensagem diz a causa mais provavel');
 
 console.log('=== item 13 — o rodape deixou de ser um beco sem saida ===');
-ok(/sem marcação de tempo \(transcrito na nuvem\) — não há VOZ por trecho/.test(HTML),
-  'explica POR QUE nao ha VOZ por trecho');
+// 19/08/2026 (2a passagem): o rodape dava "(transcrito na nuvem)" como CAUSA. Desde que a
+// cadeia da nuvem pede verbose_json ao whisper-1, nuvem ja nao e sinonimo de sem hora — a
+// causa virou chute, e o rodape passou a afirmar so o que a tela de fato sabe.
+ok(/sem marcação de tempo — não há VOZ por trecho/.test(HTML),
+  'diz que nao ha VOZ por trecho, sem chutar a causa');
+ok(!/\(transcrito na nuvem\) — não há VOZ/.test(HTML),
+  'e a causa que virou chute saiu do rodape');
 ok(/mas dá para ouvir o ditado inteiro no botão ao lado/.test(HTML),
   'e aponta a saida, em vez de so dizer que nao funciona');
 

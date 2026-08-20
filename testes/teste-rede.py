@@ -236,9 +236,12 @@ mod.__dict__.update({"time": __import__("time"), "json": __import__("json"),
 exec(compile(fonte[ini:fim], "nuvem", "exec"), mod.__dict__)
 
 ia_falso.resposta = (200, b'{"text":"figado de contornos regulares"}')
-r = mod.transcrever_na_nuvem_bytes(b"RIFF" + b"\0" * 1000, ["hepatomegalia", "esteatose"])
+r, tr = mod.transcrever_na_nuvem_bytes(b"RIFF" + b"\0" * 1000, ["hepatomegalia", "esteatose"])
 ok(r == "figado de contornos regulares", "200 com texto -> devolve o texto")
+ok(tr == [], "o 1o modelo da cadeia nao marca tempo: trechos vazios, sem inventar hora")
 c = chamadas[-1]
+ok(b'name="response_format"\r\n\r\njson\r\n' in c["corpo"],
+   "e ao 1o modelo pede json simples — verbose_json ali daria 400 e derrubaria a cadeia")
 ok(c["caminho"] == "/audio/transcriptions", "bate na rota de transcricao da OpenAI")
 ok(c["ctype"].startswith("multipart/form-data; boundary="), "com o tipo certo")
 lim = c["ctype"].split("boundary=")[1].encode()
@@ -276,8 +279,57 @@ except RuntimeError as e:
     ok("ilegivel" in str(e) or "nao transcreveu" in str(e), "200 com corpo ilegivel nao vira texto vazio")
 
 ia_falso.resposta = (200, b'{"semTexto":1}')
-r = mod.transcrever_na_nuvem_bytes(b"RIFF", [])
+r, tr = mod.transcrever_na_nuvem_bytes(b"RIFF", [])
 ok(r == "", "200 sem o campo de texto devolve vazio, e quem chama decide")
+
+print("--- 19/08/2026: a hora que o whisper-1 DEVOLVE deixa de ser jogada fora ---")
+# O item 13 da leva de 19/08 ficou parcial por isto: a cadeia pedia `json` a todos os
+# modelos, entao NENHUM exame de nuvem tinha hora e o botao de VOZ ficava morto. Só o
+# whisper-1 aceita verbose_json — e ele e justamente o ULTIMO da cadeia, o que atende
+# quando os dois novos falham.
+chamadas.clear()
+ia_falso.resposta = (400, b'{"error":{"message":"model not found"}}')
+
+
+def responder_por_modelo(caminho, corpo, ctype, timeout=None):
+    """Os dois primeiros recusam; o whisper-1 responde COM segments."""
+    chamadas.append({"caminho": caminho, "corpo": corpo, "ctype": ctype})
+    if b'name="model"\r\n\r\nwhisper-1\r\n' in corpo:
+        return (200, b'{"text":"figado normal. rim direito sem calculos.",'
+                     b'"segments":[{"start":0.0,"end":2.5,"text":" figado normal."},'
+                     b'{"start":2.5,"end":6.25,"text":" rim direito sem calculos."}]}')
+    return (400, b'{"error":{"message":"unsupported response_format"}}')
+
+
+mod.ia_encaminhar = responder_por_modelo
+texto, trechos = mod.transcrever_na_nuvem_bytes(b"RIFF", ["figado"])
+ok(len(chamadas) == 3, "a cadeia andou ate o whisper-1 (%d tentativas)" % len(chamadas))
+ok(b'name="response_format"\r\n\r\nverbose_json\r\n' in chamadas[-1]["corpo"],
+   "e SO para ele o formato pedido foi verbose_json")
+ok(b'name="response_format"\r\n\r\njson\r\n' in chamadas[0]["corpo"],
+   "os dois primeiros continuaram no json simples")
+ok(texto == "figado normal. rim direito sem calculos.", "o texto sai igual ao de antes")
+ok(len(trechos) == 2, "e agora vem COM hora: %d trecho(s)" % len(trechos))
+ok(trechos[0] == {"inicio": 0.0, "fim": 2.5, "texto": "figado normal."},
+   "no MESMO formato do motor local (inicio/fim/texto), e com o texto aparado")
+ok(trechos[1]["inicio"] == 2.5 and trechos[1]["fim"] == 6.25, "o 2o trecho conserva os segundos")
+ok(sorted(trechos[0].keys()) == ["fim", "inicio", "texto"],
+   "sem campo a mais: a tela de revisao nao pode saber de onde o trecho veio")
+
+print("--- resposta torta nao pode custar o DITADO, so a hora ---")
+for corpo_torto, oquee in [
+        (b'{"text":"tem texto","segments":null}', "segments nulo"),
+        (b'{"text":"tem texto"}', "sem o campo segments"),
+        (b'{"text":"tem texto","segments":[{"start":"x","end":1,"text":"a"}]}', "start ilegivel"),
+        (b'{"text":"tem texto","segments":[{"start":0,"end":1,"text":"   "}]}', "segmento vazio"),
+        (b'{"text":"tem texto","segments":["isto nao e um objeto"]}', "segmento que nem e objeto")]:
+    mod.ia_encaminhar = lambda c, b, t, timeout=None, _r=corpo_torto: (200, _r)
+    mod.NUVEM_MODELOS = ["whisper-1"]      # vai direto ao que pede verbose_json
+    tx, trs = mod.transcrever_na_nuvem_bytes(b"RIFF", [])
+    ok(tx == "tem texto" and trs == [],
+       "%s: o ditado chega inteiro e a hora vem vazia, sem estourar" % oquee)
+mod.NUVEM_MODELOS = ["gpt-4o-transcribe", "gpt-4o-mini-transcribe", "whisper-1"]
+mod.ia_encaminhar = ia_falso
 
 print("--- audio grande demais e avisado, nao descoberto pelo erro cru ---")
 chamadas.clear()
@@ -303,7 +355,9 @@ nuvem_chamou = {"n": 0}
 
 def nuvem_falsa(audio, boost):
     nuvem_chamou["n"] += 1
-    return "  texto cru da nuvem  "
+    # 19/08/2026: a nuvem passou a devolver (texto, trechos) — e aqui ela devolve hora,
+    # que e o caso do whisper-1 no fim da cadeia.
+    return "  texto cru da nuvem  ", [{"inicio": 0.0, "fim": 1.5, "texto": "  trecho cru  "}]
 
 
 def motor_quebrado():
@@ -328,13 +382,19 @@ texto, trechos, motor = mod2.transcrever_audio_f32([0.0] * 16000)
 ok(nuvem_chamou["n"] == 1, "a nuvem FOI chamada (%d vez) — o ramo funciona" % nuvem_chamou["n"])
 ok(motor == "nuvem", 'e a origem volta como "nuvem"')
 ok(texto == "texto cru da nuvem", "o texto sai aparado, sem passar pelo dicionario que nao existe")
-ok(trechos == [], "sem trechos, porque a nuvem nao devolve hora")
+# 19/08/2026: era `trechos == []` fixo. Este ramo (motor local nem carregou) tambem passou
+# a repassar a hora que a nuvem deu — senao o whisper-1 marcaria tempo para o agente
+# jogar fora dois metros adiante, e o botao de VOZ seguiria morto sem motivo.
+ok(len(trechos) == 1 and trechos[0]["inicio"] == 0.0,
+   "e a hora que a nuvem devolveu chega inteira a quem chamou")
 
-# e quando o DIC existe, ele TEM de ser usado
+# e quando o DIC existe, ele TEM de ser usado — no texto E nos trechos
 mod2.DIC = type("D", (), {"apply_replacements": staticmethod(lambda t: t.strip().upper())})()
 nuvem_chamou["n"] = 0
-texto2, _, _ = mod2.transcrever_audio_f32([0.0] * 16000)
+texto2, trechos2, _ = mod2.transcrever_audio_f32([0.0] * 16000)
 ok(texto2 == "TEXTO CRU DA NUVEM", "com o dicionario disponivel, ele e aplicado")
+ok(trechos2[0]["texto"] == "TRECHO CRU",
+   "e aplicado TAMBEM nos trechos — senao a ficha VOZ mostraria o termo medico cru")
 
 print("=== o pre-salvamento NAO pode duplicar o audio da pasta clinica ===")
 # Regressao real da rodada passada: guardar_ditado passou a rodar duas vezes por exame,

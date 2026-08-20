@@ -100,10 +100,15 @@ ok(/name="language"[\s\S]{0,40}pt|campo\("language", "pt"\)/.test(nuvem), 'em po
 ok(/Termos: /.test(nuvem), 'e leva o vocabulario de ultrassom junto, para nao errar termo medico');
 ok(/if st == 200:/.test(nuvem) && /raise RuntimeError\("a nuvem nao transcreveu/.test(nuvem),
    'so o 200 vira texto; o resto vira erro claro, nunca texto vazio');
-ok(/nao sabe marcar tempo|sem marcacao de tempo|sem marca de tempo/i.test(nuvem),
+// \s+ entre as palavras de proposito: estas frases vivem em docstring e QUEBRAM de
+// linha. Ja mordeu duas vezes nesta tarefa — a assercao falhava por causa do "\n    "
+// no meio da frase, e nao porque o texto tivesse sumido.
+ok(/nao\s+marca\s+tempo|nao\s+sabe\s+marcar\s+tempo|sem\s+marcacao\s+de\s+tempo/i.test(nuvem),
    'o LIMITE continua escrito: modelo que nao marca tempo devolve trechos vazios');
-ok(/`trechos` vem vazio/i.test(nuvem),
+ok(/`trechos`\s+(vazio|so\s+vem\s+vazio)/i.test(nuvem),
    'e o contrato diz o que sai nesse caso, em vez de deixar quem chama adivinhar');
+ok(/perder\s+a\s+hora\s+e\s+aceitavel,\s+perder\s+o\s+ditado\s+nao/i.test(nuvem),
+   'com a ordem de prioridade escrita: a hora nunca custa o ditado');
 // 19/08/2026: o formato deixou de ser fixo. verbose_json (o unico que traz `segments`)
 // so vale para o whisper-1; pedi-lo aos dois modelos novos derruba a cadeia inteira num
 // 400 logo na primeira tentativa — trocaria "ditado sem hora" por "ditado nenhum".
@@ -114,6 +119,19 @@ ok(/"verbose_json" if com_hora else "json"/.test(nuvem),
    'o formato e escolhido POR MODELO, nunca fixado para todos');
 ok(/com_hora = modelo in NUVEM_MODELOS_COM_HORA/.test(nuvem),
    'e quem decide e a lista, dentro do laco de tentativas');
+// 20/08/2026, decisao do medico: a VOZ por trecho tem de valer SEMPRE que a nuvem
+// atender, e nao so quando os dois modelos novos tambem falharem.
+const cad = defPy(ag, '_cadeia_da_nuvem');
+ok(/return com \+ sem/.test(cad),
+   'com preferir_hora, quem marca tempo vai para a FRENTE da fila');
+ok(/if not preferir_hora:[\s\S]{0,60}return list\(NUVEM_MODELOS\)/.test(cad),
+   'e sem ela a ordem antiga (melhor termo medico primeiro) fica intacta');
+ok(/for m in NUVEM_MODELOS if m not in NUVEM_MODELOS_COM_HORA/.test(cad),
+   'os que nao marcam tempo continuam na fila DEPOIS — nunca removidos');
+ok(/transcrever_na_nuvem_bytes\(wav_bytes\(audio\), boost, preferir_hora=True\)/.test(nuvem),
+   'o DITADO DE EXAME pede hora: e dele que a tela de revisao depende');
+ok(/def transcrever_na_nuvem_bytes\(wav, boost, preferir_hora=False\)/.test(nuvem),
+   'e o padrao e nao pedir — quem precisa da hora pede, em vez de todos pagarem');
 ok(/return texto, trechos/.test(nuvem), 'a funcao devolve (texto, trechos), nao so o texto');
 const trad = defPy(ag, '_trechos_da_nuvem');
 ok(/"inicio":[\s\S]{0,200}"fim":[\s\S]{0,200}"texto":/.test(trad),

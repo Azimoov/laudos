@@ -282,6 +282,45 @@ ia_falso.resposta = (200, b'{"semTexto":1}')
 r, tr = mod.transcrever_na_nuvem_bytes(b"RIFF", [])
 ok(r == "", "200 sem o campo de texto devolve vazio, e quem chama decide")
 
+print("--- 20/08/2026: no DITADO DE EXAME quem marca tempo atende PRIMEIRO ---")
+# Decisao do medico: a VOZ por trecho e funcionalidade importante e nao pode depender de
+# os dois modelos novos TAMBEM falharem. Com preferir_hora, o whisper-1 abre a fila.
+chamadas.clear()
+ia_falso.resposta = (200, b'{"text":"ok","segments":[{"start":0,"end":1,"text":"ok"}]}')
+tx, trs = mod.transcrever_na_nuvem_bytes(b"RIFF", [], preferir_hora=True)
+ok(len(chamadas) == 1, "atendeu na PRIMEIRA tentativa (%d), sem gastar as outras" % len(chamadas))
+ok(b'name="model"\r\n\r\nwhisper-1\r\n' in chamadas[0]["corpo"],
+   "e quem atendeu foi o whisper-1, que e o unico que marca tempo")
+ok(len(trs) == 1, "entao o ditado de exame ja sai COM hora na 1a tentativa")
+
+print("--- mas a frase curta de comando NAO troca termo por hora ---")
+chamadas.clear()
+ia_falso.resposta = (200, b'{"text":"medir o utero nos tres eixos"}')
+tx2, trs2 = mod.transcrever_na_nuvem_bytes(b"RIFF", [])          # padrao: preferir_hora=False
+ok(b'name="model"\r\n\r\ngpt-4o-transcribe\r\n' in chamadas[0]["corpo"],
+   "ali continua na frente o modelo que acerta mais termo medico")
+ok(trs2 == [], "e sem hora, que ali nao serve para nada")
+
+print("--- e se o whisper-1 estiver fora do ar, o ditado ainda SAI (sem hora) ---")
+# A ordem muda; a fila nao encurta. Trocar "ditado sem hora" por "ditado nenhum" seria
+# pagar caro demais por uma funcionalidade de conforto.
+chamadas.clear()
+
+
+def whisper_fora(caminho, corpo, ctype, timeout=None):
+    chamadas.append({"caminho": caminho, "corpo": corpo, "ctype": ctype})
+    if b'name="model"\r\n\r\nwhisper-1\r\n' in corpo:
+        return (503, b'{"error":{"message":"service unavailable"}}')
+    return (200, b'{"text":"o ditado saiu assim mesmo"}')
+
+
+mod.ia_encaminhar = whisper_fora
+tx3, trs3 = mod.transcrever_na_nuvem_bytes(b"RIFF", [], preferir_hora=True)
+ok(tx3 == "o ditado saiu assim mesmo", "o ditado nao se perde por causa da hora")
+ok(trs3 == [], "so a hora se perde")
+ok(len(chamadas) == 2, "e o modelo de reserva foi tentado logo depois (%d chamadas)" % len(chamadas))
+mod.ia_encaminhar = ia_falso
+
 print("--- 19/08/2026: a hora que o whisper-1 DEVOLVE deixa de ser jogada fora ---")
 # O item 13 da leva de 19/08 ficou parcial por isto: a cadeia pedia `json` a todos os
 # modelos, entao NENHUM exame de nuvem tinha hora e o botao de VOZ ficava morto. Só o

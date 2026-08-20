@@ -26,6 +26,7 @@ const SUITE = [
   { arq: 'teste-onda.js', o: 'grafico do microfone' },
   { arq: 'teste-bipe.js', o: 'aviso sonoro' },
   { arq: 'teste-birads.js', o: 'calculadora BI-RADS' },
+  { arq: 'teste-bizus-guarda.js', o: 'dizeres padrao (BIZUS): guarda contra valor salvo ilegivel' },
   { arq: 'teste-anterior.js', o: 'comparacao com o exame anterior (F2b)' },
   { arq: 'teste-alertas.js', o: 'painel de alertas por categoria' },
   { arq: 'teste-caixapreta.js', o: 'caixa-preta da gravacao (janela fechou)' },

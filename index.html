@@ -3175,7 +3175,34 @@ function limparRegras(){ if(!confirm('Apagar TODOS os aprendizados guardados?'))
 /* ============ Editor de BIZUS (dizeres padrão), por região — salvo no navegador ============ */
 const BIZUS_SECOES = ['MAMA','ABDOMINAL TOTAL','TRANSVAGINAL','TIREOIDE','PAREDE ABDOMINAL','JOELHO','PARTES MOLES','REGIÃO CERVICAL','OMBRO','PUNHO','PROSTATA','BOLSA ESCROTAL','OBSTÉTRICO'];
 const BIZUS_NOMES = {'MAMA':'Mama','ABDOMINAL TOTAL':'Abdome total','TRANSVAGINAL':'Transvaginal','TIREOIDE':'Tireoide','PAREDE ABDOMINAL':'Parede abdominal (hérnias)','JOELHO':'Joelho','PARTES MOLES':'Partes moles','REGIÃO CERVICAL':'Região cervical','OMBRO':'Ombro','PUNHO':'Punho','PROSTATA':'Próstata','BOLSA ESCROTAL':'Bolsa escrotal','OBSTÉTRICO':'Obstétrico'};
-function bizusEfetivo(){ try{ return localStorage.getItem('gbizus')||BIZUS; }catch(e){ return BIZUS; } }
+/* 20/08/2026 — A TRAVA QUE FALTAVA, e ela custou 20 dias de laudo.
+   Em 30/07 ficou salvo, no lugar dos dizeres padrão, um texto de teste de 37 caracteres
+   ("MEUS DIZERES PADRÃO — texto do médico"). A partir dali foi ISSO que a IA recebeu como
+   "dizeres padrão do médico" em TODO exame: os 42 mil caracteres de BIZUS do código, das
+   14 regiões, nunca mais chegaram nela.
+   POR QUE PASSOU DESPERCEBIDO, que é a parte que importa: a memória do navegador morre a
+   cada abertura (o programa serve o app numa porta SORTEADA, e memória de navegador é por
+   endereço), então quem manda de verdade é o valor guardado no disco do agente — ele vence
+   a sincronização de abertura todas as vezes. Um valor ruim em disco não é um episódio: é
+   permanente, e silencioso.
+   A TRAVA: valor salvo sem NENHUMA seção reconhecível não é dizer padrão, é lixo — e lixo
+   não pode substituir o arquivo inteiro calado. Isto nunca recusa edição de verdade: tudo
+   que sai do editor passa por bizusMontar, que sempre escreve "NOME:\n\n" em cada região. */
+function bizusEfetivo(){
+  var salvo=null;
+  try{ salvo=localStorage.getItem('gbizus'); }catch(e){ return BIZUS; }
+  if(salvo==null || !String(salvo).trim()) return BIZUS;
+  if(!bizusParse(salvo).secoes.length){
+    if(!bizusEfetivo.__avisou){          // uma vez por sessão: aviso repetido vira ruído
+      bizusEfetivo.__avisou=true;
+      try{ log('⚠️ Os dizeres padrão (BIZUS) guardados estão ilegíveis — nenhuma região '
+              +'reconhecida neles. Usando os do sistema, para o laudo não sair sem dizeres. '
+              +'Se você tinha BIZUS personalizados, refaça em Configurações → editor de BIZUS.', true); }catch(e){}
+    }
+    return BIZUS;
+  }
+  return salvo;
+}
 /* Corte de custo: na geração do laudo, envia só as seções de BIZUS da região do exame.
    Tipo sem mapa (ex.: modelo personalizado) ou seção não encontrada => arquivo completo (comportamento antigo). */
 const BIZUS_POR_TIPO = {
@@ -3355,10 +3382,22 @@ function salvarBizus(){
 }
 function restaurarBizus(){
   if(!confirm('Restaurar os BIZUS originais do código? Suas edições serão apagadas.')) return;
-  try{ localStorage.removeItem('gbizus'); }catch(e){}
+  /* 20/08/2026: limpar SÓ o navegador não restaurava nada — o botão desfazia sozinho.
+     A memória do navegador morre a cada abertura, e a sincronização traz de volta o que
+     está no disco do agente. Enquanto o disco guardasse o valor antigo, ele voltava na
+     abertura seguinte, e o médico via "restaurado" sem nada ter sido restaurado.
+     Tem de apagar nos DOIS lugares. `valor: null` é o apagar que a sincronização já
+     entende: ela só traz para o navegador o que vem diferente de nulo. E o `__ts` sai
+     junto — deixá-lo para trás faz o disco e o navegador empatarem, e empate congela o
+     estado no lugar de resolvê-lo. */
+  try{ localStorage.removeItem('gbizus'); localStorage.removeItem('gbizus__ts'); }catch(e){}
+  try{
+    fetch(agenteBase()+'/dados/gbizus',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({valor:null, ts:Date.now()})}).catch(function(){});
+  }catch(e){}
   var cont=document.getElementById('bizusEditor'); if(cont){ cont.__aberto=false; abrirEditorBizus(); }
   var st=document.getElementById('bizusStatus'); if(st) st.textContent='';
-  log('BIZUS restaurados ao padrão.');
+  log('BIZUS restaurados ao padrão — no navegador e no computador.');
 }
 
 /* ============ Editor de MODELOS de laudo (estruturados) — salvo no navegador ============ */

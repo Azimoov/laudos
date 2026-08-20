@@ -40,7 +40,11 @@ const src = [grab('norm'), grab('rev2Proc'), grab('rev2Trecho'), grab('rev2Audio
              grab('rev2TituloDeMoldura'), grab('rev2NegritoDeMedida'),
              // 2a rodada de 19/08: o estado do retangulo passou a consultar o MODELO do
              // medico (o que ja era estrutura antes do exame existir) — ver rev2MoldeDoModelo
-             grab('rev2Assinatura'), grab('rev2MoldeDoModelo'),
+             grab('rev2Assinatura'), grab('rev2MoldeDoTexto'), grab('rev2MoldeDoModelo'),
+             grab('rev2MoldeDoLaudo'),
+             // 3a rodada: rev2Proc passou a respeitar LADO (a ficha VOZ tocava o ditado do
+             // outro lado quando a secao vinha sem lateralidade)
+             bloco(/const REV2_LADOS = [^\n]*/, 'REV2_LADOS'), grab('rev2LadoDe'),
              grab('rev2TituloDeBloco'), grab('rev2CorpoVisivel'),
              grab('rev2Blocos'), grab('rev2Estado')].join('\n');
 // MODELOS entra no ambiente porque rev2MoldeDoModelo o consulta. Aqui os casos de teste

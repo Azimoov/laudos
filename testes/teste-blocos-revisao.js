@@ -34,16 +34,24 @@ const api = new Function('MODELOS', [
   pega(/const REV2_ROTULO_MEDIDA = [^\n]*/, 'REV2_ROTULO_MEDIDA'),
   pega(/const REV2_PALAVRA_MEDIDA = [^\n]*/, 'REV2_PALAVRA_MEDIDA'),
   pega(/const REV2_NEGACAO = [^\n]*/, 'REV2_NEGACAO'),
-  grab('norm'), grab('faltaTitulo'), grab('faltaGrupos'), grab('faltaTrecho'),
+  pega(/const REV2_NEGACAO_POS = [^\n]*/, 'REV2_NEGACAO_POS'),
+  pega(/const REV2_LADOS = [^\n]*/, 'REV2_LADOS'),
+  grab('norm'), grab('rev2LadoDe'), grab('faltaTitulo'), grab('faltaApara'),
+  grab('faltaPalavraNua'), grab('faltaGrupos'), grab('faltaTrecho'),
   grab('medidasFaltando'), grab('rev2TituloDeMoldura'), grab('rev2NegritoDeMedida'),
-  grab('rev2Assinatura'), grab('rev2MoldeDoModelo'),
+  grab('rev2Assinatura'), grab('rev2MoldeDoTexto'), grab('rev2MoldeDoModelo'),
+  grab('rev2MoldeDoLaudo'),
   grab('rev2TituloDeBloco'), grab('rev2Blocos'), grab('rev2BlocosDaTela'),
   grab('rev2CorpoVisivel'), grab('rev2Proc'), grab('rev2Estado'),
   grab('rev2TermosAchado'), grab('alertasAchadoSemNegrito')
 ].join('\n') + '\nreturn {rev2NegritoDeMedida, rev2TituloDeBloco, rev2Blocos, rev2BlocosDaTela,'
-  + ' rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito, rev2Proc};')(MODELOS);
+  + ' rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito, rev2Proc, rev2MoldeDoTexto, rev2Assinatura};')(MODELOS);
 const { rev2NegritoDeMedida, rev2TituloDeBloco, rev2Blocos, rev2BlocosDaTela,
-        rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito, rev2Proc } = api;
+        rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito, rev2Proc,
+        rev2MoldeDoTexto, rev2Assinatura } = api;
+/* Exame como ele existe DE VERDADE depois da 3ª rodada: com o molde CONGELADO no laudo.
+   Testar sem isso mede um programa que não existe. */
+const comMolde = (tipo, corpo) => ({ tipo, laudo: { corpo, _molde: rev2MoldeDoTexto(MODELOS[tipo].corpo) } });
 const EX = { laudo: {} };
 // laudo PREENCHIDO: era so depois de preencher as medidas que os defeitos apareciam
 const preenchido = k => MODELOS[k].corpo.replace(/\.{5}/g, '8');
@@ -226,7 +234,8 @@ console.log('=== os 12 achados REAIS tem de acender verde (regressao achada na 2
 
 console.log('=== a regra do molde: o que ja vinha do modelo nao e achado ===');
 ok(/function rev2MoldeDoModelo/.test(HTML), 'existe o molde tirado do modelo do medico');
-ok(/_molde\[rev2Assinatura\(lim\)\]/.test(HTML), 'rev2Estado consulta o molde');
+ok(/_molde\.titulos\[as\] \|\| _molde\.medidas\[as\]/.test(HTML),
+  'rev2Estado consulta o molde — titulos E medidas, que o modelo separa sozinho');
 ok(/replace\(\/\[\\d\.,\]\+\/g,'#'\)/.test(HTML), 'a assinatura ignora os numeros ("..... cm" = "8 cm")');
 // obst23: **..... bpm.** e **..... cm. Grau .....** nao existem como palavra de medida,
 // e viravam verde falso no obstetrico normal ate o molde entrar
@@ -235,20 +244,116 @@ ok(rev2Blocos({ corpo: preenchido('obst23') })
    'obstetrico normal (bpm, Grau) sem verde falso');
 
 console.log('=== aviso do item 6: nao pode gritar em exame normal ===');
+// ⚠️ o 2o parametro e o MOLDE, nao o tipo (mudou na 3a rodada, junto com o congelamento)
+const moldeDe = k => rev2MoldeDoTexto(MODELOS[k].corpo);
 Object.keys(MODELOS).filter(k => k !== 'outro').forEach(k => {
-  ok(alertasAchadoSemNegrito({ corpo: preenchido(k) }, k).length === 0,
+  ok(alertasAchadoSemNegrito({ corpo: preenchido(k) }, moldeDe(k)).length === 0,
     'modelo normal "' + k + '" nao dispara o aviso de negrito');
 });
 ok(alertasAchadoSemNegrito({ corpo:
   '**Tendão supraespinhal:** com **tendinopatia**.\n\n**Tendão subescapular:** sem tendinopatia.' },
-  'ombro').length === 0, 'NEGACAO ("sem tendinopatia") nao dispara — senao o aviso mandaria '
+  moldeDe('ombro')).length === 0, 'NEGACAO ("sem tendinopatia") nao dispara — senao o aviso mandaria '
   + 'pintar de verde uma estrutura normal');
 ok(alertasAchadoSemNegrito({ corpo:
   '**RIM DIREITO:** com **litíase renal**.\n\n**RIM ESQUERDO:** ausência de litíase renal.' },
-  'rins').length === 0, '"ausencia de" tambem nao dispara');
+  moldeDe('rins')).length === 0, '"ausencia de" tambem nao dispara');
 ok(alertasAchadoSemNegrito({ corpo:
   '**Tendão supraespinhal:** com **tendinopatia**.\n\n**Tendão subescapular:** espessado, com tendinopatia, sem rotura.' },
-  'ombro').length === 1, 'mas o caso REAL do medico continua acendendo');
+  moldeDe('ombro')).length === 1, 'mas o caso REAL do medico continua acendendo');
+
+// ===================================================================================
+// 3ª RODADA — as tres REGRESSOES que a 2a leva criou, achadas por avaliacao independente.
+// A licao: eu classificava o negrito pela APARENCIA, e nao fecha. O modelo do medico ja
+// separa titulo de medida sozinho — no modelo, medida SEMPRE tem pontilhado e titulo
+// NUNCA tem. Daí saem os dois conjuntos, e o molde e CONGELADO no laudo ao nascer.
+// ===================================================================================
+console.log('=== R1 — achado que ABRE a linha nao pode virar titulo (0 de 8 acendiam) ===');
+[['abdominal', '**Baço** normal.\n**Área de infarto**'],
+ ['mama', '**MAMA DIREITA**\n**Nódulo sólido BI-RADS 4**'],
+ ['rins', '**RIM DIREITO:** normal.\n**Trombose venosa profunda**'],
+ ['ombro', '**Tendão supraespinhal:** ok.\n**Rotura completa do tendão**']
+].forEach(([t, c]) => {
+  const e = comMolde(t, c), bl = rev2Blocos(e.laudo, e.laudo._molde);
+  ok(bl.some(b => rev2Estado(e, b) === 'alterado'), 'ACENDE: ' + c.split('\n')[1]);
+  ok(bl.length === 1, 'e NAO fatia o orgao num retangulo proprio: ' + c.split('\n')[1]);
+});
+{
+  const e = comMolde('obst23', MODELOS.obst23.corpo.replace(/\.{5}/g, '8'));
+  const bl = rev2Blocos(e.laudo, e.laudo._molde);
+  ok(bl.length <= 2, 'obst23 preenchido continua com poucos retangulos (virou 6 na 2a rodada) — deu ' + bl.length);
+  ok(bl.every(b => rev2Estado(e, b) !== 'alterado'), 'e sem verde falso');
+}
+
+console.log('=== R3 — laudo pronto nao pode mudar de cor depois ===');
+{
+  // laudo de PROSTATA normal, com o molde congelado, avaliado como se o tipo tivesse sido
+  // trocado para "rins" no cartao: 25 combinacoes davam verde falso antes do congelamento
+  const cong = { tipo: 'rins', laudo: { corpo: preenchido('prostata'),
+                                        _molde: rev2MoldeDoTexto(MODELOS.prostata.corpo) } };
+  ok(rev2Blocos(cong.laudo, cong.laudo._molde).every(b => rev2Estado(cong, b) !== 'alterado'),
+    'trocar o TIPO do exame nao repinta o laudo — o molde vai congelado nele');
+  ok(/_molde:rev2MoldeDoTexto\(mod\.corpo\)/.test(HTML), 'o molde e congelado na geracao');
+  ok(/if\(L\._molde && L\._molde\.titulos\) return L\._molde;/.test(HTML),
+    'e tem prioridade sobre o modelo de agora');
+}
+
+console.log('=== o modelo separa titulo de medida sozinho (pontilhado) ===');
+{
+  const m = rev2MoldeDoTexto(MODELOS.prostata.corpo);
+  ok(!!m.titulos[rev2Assinatura('Próstata')], '"Próstata" (sem pontilhado) e TITULO');
+  ok(!!m.medidas[rev2Assinatura('Peso: ..... g (Normal até 30 g)')], '"Peso: ....." e MEDIDA');
+  const o = rev2MoldeDoTexto(MODELOS.obst23.corpo);
+  ok(!!o.medidas[rev2Assinatura('..... bpm.')], '"..... bpm." e MEDIDA');
+  ok(!!o.titulos[rev2Assinatura('BIOMETRIA FETAL')], '"BIOMETRIA FETAL" e TITULO');
+}
+
+console.log('=== VARREDURA: 26 modelos x 2 versoes, os dois lados ===');
+{
+  let vf = 0, af = 0;
+  Object.keys(MODELOS).filter(k => k !== 'outro').forEach(k => {
+    const molde = rev2MoldeDoTexto(MODELOS[k].corpo);
+    [MODELOS[k].corpo, MODELOS[k].corpo.replace(/\.{5}/g, '8')].forEach(c => {
+      const e = { tipo: k, laudo: { corpo: c, _molde: molde } };
+      if (rev2Blocos(e.laudo, molde).some(b => rev2Estado(e, b) === 'alterado')) vf++;
+      if (alertasAchadoSemNegrito(e.laudo, molde).length) af++;
+    });
+  });
+  ok(vf === 0, 'nenhum verde falso em 52 varreduras — deu ' + vf);
+  ok(af === 0, 'nenhum aviso falso em 52 varreduras — deu ' + af);
+}
+
+console.log('=== residuais que a 2a avaliacao apontou ===');
+{
+  const e = comMolde('transvaginal', '**Útero:** normal.\nEndométrio com **Espessura de 18 mm, acima do esperado**');
+  ok(rev2Blocos(e.laudo, e.laudo._molde).some(b => rev2Estado(e, b) === 'alterado'),
+    'espessamento endometrial ("Espessura de 18 mm") ACENDE — ficava mudo');
+}
+[['não há sinais de tendinopatia'], ['ausência de sinais de tendinopatia'],
+ ['sem evidências de tendinopatia'], ['não se observam sinais de tendinopatia'],
+ ['sem qualquer sinal de tendinopatia'], ['tendinopatia ausente']
+].forEach(([f]) => {
+  ok(alertasAchadoSemNegrito({ corpo: '**Tendão A:** com **tendinopatia**.\n\n**Tendão B:** ' + f + '.' },
+     rev2MoldeDoTexto(MODELOS.ombro.corpo)).length === 0, 'negacao calada: ' + f);
+});
+
+console.log('=== VOZ/IMG nao pode pegar o LADO ERRADO ===');
+[[['Ovário', 'Ovário direito'], 'Ovário esquerdo', null],
+ [['Mama esquerda', 'Mama'], 'MAMA DIREITA', null],
+ [['Tendão supra-espinhal'], 'Tendão supraespinhal', 'Tendão supra-espinhal'],
+ [['Supraespinhal'], 'Tendão supraespinhal', 'Supraespinhal']
+].forEach(([secoes, tit, esperado]) => {
+  const r = rev2Proc({ laudo: { procedencia: secoes.map(s => ({ secao: s, citacao: 'x' })) } }, tit);
+  ok((r ? r.secao : null) === esperado,
+    JSON.stringify(secoes) + ' x "' + tit + '" -> ' + (esperado === null ? 'nenhuma' : esperado));
+});
+
+console.log('=== foto: nem perder nem duplicar ===');
+ok(/ex\._instIds=instOk/.test(HTML), 'a recuperacao guarda de qual instancia veio cada foto');
+ok(/instOk\.push\(est\.instancias\[q\]\)/.test(HTML), 'e so guarda as que REALMENTE baixaram');
+ok(/if\(Array\.isArray\(ex\._instIds\) && i<ex\._instIds\.length\) ex\._instIds\.splice\(i,1\)/.test(HTML),
+  'apagar uma foto tambem tira o id do mapa (senao desalinha)');
+ok(/var manuais=\(ex\.imagens\|\|\[\]\)\.slice\(\(ex\._instIds\|\|\[\]\)\.length\)/.test(HTML),
+  'completar com o aparelho PRESERVA as fotos anexadas a mao (sumiam caladas)');
 
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

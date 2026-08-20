@@ -2899,7 +2899,12 @@ function novaFotoExame(id){ abrirCamera('exame', id); }
 function removerFotoExame(id, i){
   const ex = exames.find(function(x){return x.id===id;}); if(!ex) return;
   if(!confirm('Apagar esta foto do exame?')) return;
-  ex.imagens.splice(i,1); renderExames();
+  /* O mapa das instâncias tem de acompanhar (19/08/2026): sem isto ele ficava desalinhado
+     com as fotos — a apagada nunca mais voltava pelo botão de buscar ("nenhuma foto nova")
+     e o completamento seguinte casava id com a foto ERRADA. */
+  ex.imagens.splice(i,1);
+  if(Array.isArray(ex._instIds) && i<ex._instIds.length) ex._instIds.splice(i,1);
+  renderExames();
   const d=document.getElementById('det'+id); if(d) d.style.display='block';
 }
 function removerAudioExame(aIdx){
@@ -3419,6 +3424,13 @@ async function gerarLaudo(exId, opts){
          descritor que faltava (rev2RecalcularClassif), sem pedir nada à IA: o
          ditado continua sem aquele descritor, então regenerar traria a mesma
          pendência de volta — era esse o buraco em que a escolha dele caía. */
+      /* MOLDE CONGELADO (19/08/2026, 3ª rodada). O que era estrutura no modelo NA HORA em
+         que este laudo nasceu. Sem congelar, a cor dos retângulos era recalculada contra o
+         MODELOS de agora — e duas coisas corriqueiras repintavam laudo já assinado: trocar
+         o tipo do exame no cartão, e o médico editar o próprio modelo. Uma avaliação
+         independente mediu: 25 combinações davam VERDE FALSO numa próstata normal, e
+         mexer numa frase do modelo virava um dia inteiro de laudos em alarme falso. */
+      _molde:rev2MoldeDoTexto(mod.corpo),
       _classifBruto:{tirads:(resp.tirads||[]), birads:(resp.birads||[]), orads:(resp.orads||[])},
       _conclusaoBase:(resp.conclusao||mod.conclusao||''),
       _descritores:_escAntes||undefined,
@@ -5983,8 +5995,14 @@ async function capOrtCompletar(est){
     catch(e){ log('Falha ao baixar imagem atrasada: '+((e&&e.message)||e), true); }
   }
   if(!novas) return;
+  /* ⚠️ FOTO ANEXADA À MÃO NÃO PODE SUMIR (19/08/2026). Esta linha refazia ex.imagens SÓ com
+     o que veio do aparelho, e apagava calado o que o médico tinha anexado pela revisão
+     (rev2AnexarFotos). Medido numa avaliação: exame com [i1, i2, MANUAL-A, MANUAL-B] saía
+     com [i1, i2, i3] — duas fotos dele perdidas, e o aviso ainda dizia "total 3".
+     Agora as manuais (as que estão além do mapa) são preservadas no fim. */
+  var manuais=(ex.imagens||[]).slice((ex._instIds||[]).length);
   var ids=(est.instancias||[]).filter(function(id){ return mapa[id]!=null; });
-  ex._instIds=ids; ex.imagens=ids.map(function(id){ return mapa[id]; });
+  ex._instIds=ids; ex.imagens=ids.map(function(id){ return mapa[id]; }).concat(manuais);
   renderExames(); capRenderNovos();
   log('⚠️ '+ex.paciente+': chegaram +'+novas+' imagem(ns) DEPOIS da captura (total '+ex.imagens.length+').'
       +(ex.laudo?' O laudo já tinha saído SEM elas — gere de novo antes de liberar.':''), true);
@@ -6106,9 +6124,17 @@ async function capRecuperar(){
   for(var i=0;i<alvo.length;i++){
     var est=alvo[i], dit=ditados[est.id];
     capOrtStatusTxt('🔄 Recuperando '+(i+1)+' de '+alvo.length+': '+(est.paciente||'?')+'…');
-    var imagens=[];
+    /* ⚠️ GUARDAR DE QUAL INSTÂNCIA VEIO CADA FOTO (19/08/2026, 3ª rodada).
+       Antes o `catch` vazio engolia a falha e o exame nascia SEM o mapa (_instIds). Depois,
+       "buscar fotos no aparelho" não tinha como saber quais já estavam aqui: uma avaliação
+       independente mediu o estrago — exame com [i1, i3] (i2 falhou) baixava i3 DE NOVO e
+       marcava i2 como presente, perdendo-a para sempre. Guardando o mapa na hora, a conta
+       fecha sempre, e a que falhou continua sendo procurada. */
+    var imagens=[], instOk=[];
     for(var q=0;q<(est.instancias||[]).length;q++){
-      try{ imagens.push(await capOrtBaixar(est.instancias[q])); }catch(err){}
+      try{ imagens.push(await capOrtBaixar(est.instancias[q])); instOk.push(est.instancias[q]); }
+      catch(err){ log('Recuperação: imagem '+(q+1)+' de '+(est.paciente||'?')+' não veio ('
+                     +((err&&err.message)||err)+') — ela continua sendo procurada.', true); }
     }
     if(!imagens.length){ log('Recuperação: exame de '+(est.paciente||'?')+' sem imagens legíveis — pulado.', true); continue; }
     // Este exame já pode estar na tela SEM ditado — é o caso que a recuperação passou a
@@ -6117,14 +6143,14 @@ async function capRecuperar(){
     // o problema que se veio resolver.
     var ex=exames.filter(function(e){ return e._estudoId===est.id; })[0];
     if(ex){
-      if(!ex.imagens || !ex.imagens.length) ex.imagens=imagens;
+      if(!ex.imagens || !ex.imagens.length){ ex.imagens=imagens; ex._instIds=instOk; }
       log('Recuperação: trazendo o ditado para o exame de '+(ex.paciente||'?')+' que já estava na lista.');
     }else{
       // 15/08/2026: nascimento e sexo também aqui — ver o comentário no outro caminho da
       // captura. Recuperar um exame não pode devolvê-lo com menos cadastro do que ele tinha.
       ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
           tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
-          idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
+          idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _instIds:instOk, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
       ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
       ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
     // 17/08: antes de re-gerar, pergunta ao BANCO — o laudo pode já existir lá.
@@ -8868,13 +8894,36 @@ function rev2NegritoDeMedida(t){
 function rev2Assinatura(s){
   return String(s||'').replace(/[\d.,]+/g,'#').replace(/\s+/g,' ').trim().toLowerCase();
 }
+/* ⚠️ O MODELO SEPARA TÍTULO DE MEDIDA SOZINHO (3ª rodada, 19/08/2026).
+   No modelo, um espaço de medida SEMPRE tem pontilhado ("**Peso: ..... g**"); um título
+   NUNCA tem ("**Próstata:**"). Não é palpite sobre a palavra: é o próprio jeito como o
+   médico escreve os modelos. Daí saem os dois conjuntos, e cada um resolve um defeito:
+     • titulos — só ELES podem abrir retângulo. Sem isso, um achado que abre a linha
+       ("**Área de infarto**") virava título: ficava cinza E fatiava o órgão, que era o
+       defeito do útero voltando por outra porta;
+     • medidas — apagadas antes de procurar achado, de qualquer tamanho. */
 function rev2MoldeDoModelo(tipo){
   var mod=tipo&&MODELOS[tipo]; if(!mod) return null;
-  var set={};
-  String(mod.corpo||'').replace(/\*\*([^*]+?)\*\*/g, function(m,t){
-    set[rev2Assinatura(String(t).replace(/[:\s]+$/,''))]=1; return m;
+  return rev2MoldeDoTexto(mod.corpo);
+}
+function rev2MoldeDoTexto(corpo){
+  var titulos={}, medidas={};
+  String(corpo||'').replace(/\*\*([^*]+?)\*\*/g, function(m,t){
+    var bruto=String(t), lim=bruto.replace(/[:\s]+$/,'');
+    (/\.{3,}/.test(bruto) ? medidas : titulos)[rev2Assinatura(lim)]=1;
+    return m;
   });
-  return set;
+  return {titulos:titulos, medidas:medidas};
+}
+/* O molde que vale para ESTE laudo. Prioridade absoluta para o que foi CONGELADO nele na
+   geração (L._molde): sem isso o molde vinha do MODELOS de agora, e duas coisas corriqueiras
+   repintavam laudos velhos — trocar o tipo do exame no cartão, e o médico editar o próprio
+   modelo. Um dia inteiro de laudos podia virar alarme falso depois de uma edição de modelo.
+   Laudo antigo (sem o congelado) cai no modelo atual, que é melhor que nada. */
+function rev2MoldeDoLaudo(ex){
+  var L=(ex&&ex.laudo)||{};
+  if(L._molde && L._molde.titulos) return L._molde;
+  return rev2MoldeDoModelo(ex&&ex.tipo);
 }
 /* O título de um RETÂNGULO é mais exigente que faltaTitulo (que serve a outra coisa e
    continua como estava, com três suítes em cima dela):
@@ -8882,19 +8931,25 @@ function rev2MoldeDoModelo(tipo){
         desenho do retângulo (que corta o título do início do texto) duplicaria a medida;
      2. não pode ser medida;
      3. não pode ser moldura ("DESCRIÇÃO:", "TÉCNICA:"). */
-function rev2TituloDeBloco(linha){
+function rev2TituloDeBloco(linha, molde){
   var m=String(linha||'').match(/^\s*\*\*([^*]{1,70})\*\*/);
   if(!m) return null;
   var t=m[1].replace(/[:\s]+$/,'').trim();
   if(!t || FALTA.pont.test(m[1])) return null;
-  if(rev2NegritoDeMedida(t) || rev2TituloDeMoldura(t)) return null;
-  return t;
+  if(rev2TituloDeMoldura(t)) return null;
+  /* Com o molde do laudo, quem manda é ele: só abre retângulo o negrito que era TÍTULO no
+     modelo do médico. Um achado que abre a linha ("**Área de infarto**") não está lá, então
+     continua DENTRO do órgão — e é assim que ele acende verde em vez de virar uma caixa
+     cinza própria, fatiando o laudo. Sem molde (laudo antigo), vale a heurística. */
+  if(molde && molde.titulos) return molde.titulos[rev2Assinatura(t)] ? t : null;
+  return rev2NegritoDeMedida(t) ? null : t;
 }
 
-function rev2Blocos(L){
+function rev2Blocos(L, molde){
   var linhas=String((L&&L.corpo)||'').split('\n'), blocos=[], at=null;
+  if(molde===undefined && L && L._molde) molde=L._molde;   // laudo carrega o próprio molde
   linhas.forEach(function(li){
-    var t=rev2TituloDeBloco(li);
+    var t=rev2TituloDeBloco(li, molde);
     if(t){ at={titulo:t, linhas:[li]}; blocos.push(at); return; }
     if(!at){ at={titulo:'', linhas:[]}; blocos.push(at); }
     at.linhas.push(li);
@@ -8937,10 +8992,16 @@ function rev2CorpoVisivel(b){
    Sem isto o aviso convidava o médico a pôr negrito numa coisa que ele acabou de DESCARTAR
    — e negrito numa negação pintaria de VERDE uma estrutura normal. O aviso viraria a
    fábrica do defeito que ele veio caçar. */
-const REV2_NEGACAO = /(sem|ausência|ausencia|não|nao|nega|descartad[ao]|livre)\s+(de\s+|sinais?\s+de\s+|h[áa]\s+)?$/i;
-function rev2TermosAchado(L, tipo){
-  var termos={}, molde=rev2MoldeDoModelo(tipo);
-  var titulos={}; rev2Blocos(L).forEach(function(b){ if(b.titulo) titulos[norm(b.titulo)]=1; });
+/* ⚠️ A 1ª versão aceitava UM conectivo só, e pegava 2 de 12 redações reais de negação —
+   inclusive deixava passar "não há sinais de", que é como o próprio médico escreve nos
+   modelos. Agora: a palavra de negação, seguida de QUALQUER sequência de conectivos
+   ("há", "sinais de", "evidências de", "qualquer", "se observa"...) até o termo. */
+const REV2_NEGACAO = /(sem|ausência|ausencia|ausente|não|nao|nega|nenhum[ao]?|descartad[ao]|livre|excluíd[ao]|excluid[ao])\b[\s\S]{0,40}$/i;
+/* Negação DEPOIS do termo ("tendinopatia ausente", "cisto não caracterizado"). */
+const REV2_NEGACAO_POS = /^\s*(ausente|não|nao|nega)\b/i;
+function rev2TermosAchado(L, molde){
+  var termos={};
+  var titulos={}; rev2Blocos(L, molde).forEach(function(b){ if(b.titulo) titulos[norm(b.titulo)]=1; });
   String((L&&L.corpo)||'').replace(/\*\*([^*]+?)\*\*/g, function(m, t){
     var s=String(t).replace(/[:.\s]+$/,'').trim();
     if(s.length<5 || s.split(/\s+/).length>4 || !/^[A-Za-zÀ-ÿ\s-]+$/.test(s)) return m;
@@ -8948,30 +9009,29 @@ function rev2TermosAchado(L, tipo){
     // ⚠️ o que JÁ VINHA DO MODELO não é achado: "Grandes vasos" e "Artéria femoral comum"
     // aparecem em negrito e depois em texto simples nos próprios modelos normais do médico,
     // e o aviso acendia em TODO abdominal e TODO Doppler. Aviso que grita todo dia não é lido.
-    if(molde && molde[rev2Assinatura(s)]) return m;
+    if(molde && (molde.titulos[rev2Assinatura(s)] || molde.medidas[rev2Assinatura(s)])) return m;
     if(titulos[norm(s)]) return m;                 // título de órgão não é achado
     termos[s.toLowerCase()]=s;
     return m;
   });
   return termos;
 }
-function alertasAchadoSemNegrito(L, tipo){
+function alertasAchadoSemNegrito(L, molde){
   try{
-    var termos=rev2TermosAchado(L, tipo); var chaves=Object.keys(termos);
+    var termos=rev2TermosAchado(L, molde); var chaves=Object.keys(termos);
     if(!chaves.length) return [];
     var achados=[];
-    rev2Blocos(L).forEach(function(b){
-      // texto do bloco SEM o que já está em negrito: o que sobrar é texto simples.
-      // Só interessa bloco onde o termo NÃO está em negrito — se já está, nada a avisar.
-      if(/\*\*/.test(b.texto) && chaves.some(function(k){
-           return norm(b.texto.match(/\*\*[^*]+?\*\*/g)?b.texto.match(/\*\*[^*]+?\*\*/g).join(' '):'').indexOf(norm(k))>=0;
-         })) { /* segue: pode haver outro termo sem negrito neste mesmo bloco */ }
+    rev2Blocos(L, molde).forEach(function(b){
       var simples=b.texto.replace(/\*\*[^*]+?\*\*/g, ' ');
       chaves.forEach(function(k){
         var alvo=norm(k), texto=norm(simples), i=texto.indexOf(alvo);
         if(i<0) return;
-        // negação imediatamente antes? então não é achado ali — é o contrário dele
-        if(REV2_NEGACAO.test(texto.slice(Math.max(0,i-28), i))) return;
+        /* Negação antes OU depois? Então ali não é achado — é o contrário dele. Sem isto o
+           aviso convidava o médico a pôr negrito numa coisa que ele acabou de DESCARTAR, e
+           negrito numa negação pinta de VERDE uma estrutura normal: o aviso viraria a
+           fábrica do defeito que veio caçar. Na dúvida, ficar calado é o lado seguro. */
+        if(REV2_NEGACAO.test(texto.slice(Math.max(0,i-45), i))) return;
+        if(REV2_NEGACAO_POS.test(texto.slice(i+alvo.length, i+alvo.length+22))) return;
         achados.push('“'+termos[k]+'” aparece em NEGRITO em outra parte do laudo, mas em '
           +'“'+(b.titulo||'um trecho sem título')+'” está sem negrito — ali o retângulo fica '
           +'CINZA, como se não houvesse alteração. Confira se é achado nos dois.');
@@ -9010,12 +9070,15 @@ function rev2Estado(ex, b){
      normal. E o verde só aparecia DEPOIS de o médico preencher as medidas, porque até lá
      o vermelho de "falta medida" mascarava. Agora cai fora todo negrito que seja o
      título, moldura ou MEDIDA — de qualquer tamanho. O que sobrar é achado de verdade. */
-  var _molde=rev2MoldeDoModelo(ex&&ex.tipo);
+  var _molde=rev2MoldeDoLaudo(ex);
   var resto=b.texto.replace(/\*\*([^*]+?)\*\*/g, function(m, t){
-    var lim=String(t).replace(/[:\s]+$/,'').trim();
+    var lim=String(t).replace(/[:\s]+$/,'').trim(), as=rev2Assinatura(lim);
     if(lim===b.titulo || rev2TituloDeMoldura(lim)) return '';
-    if(_molde && _molde[rev2Assinatura(lim)]) return '';   // já vinha do modelo: é estrutura
-    return rev2NegritoDeMedida(lim) ? '' : m;              // reserva, p/ modelo desconhecido
+    // estrutura do modelo (título OU rótulo de medida) — de qualquer tamanho
+    if(_molde && (_molde.titulos[as] || _molde.medidas[as])) return '';
+    // sem molde (laudo antigo): a heurística é a reserva, e é conservadora de propósito
+    if(!_molde && rev2NegritoDeMedida(lim)) return '';
+    return m;
   });
   if(/\*\*/.test(resto)) return 'alterado';   // negrito além da moldura = achado patológico
   // informação que veio do ditado (indicação clínica, história) não é "órgão sem
@@ -9031,17 +9094,37 @@ function rev2Estado(ex, b){
    sumiam sem dizer por quê. Agora, se a igualdade falhar, aceita conter/estar contido
    (mesma regra que rev2Casa já usa para os conflitos), com hífen tratado como espaço.
    Exigir 4 letras evita casar por pedaço curto demais ("mão" dentro de "mama"). */
+/* Lados: se o título diz um lado e a seção diz o OUTRO, não é a mesma coisa — nunca. */
+const REV2_LADOS = [/\bdireit[ao]\b/i, /\besquerd[ao]\b/i];
+function rev2LadoDe(s){
+  var t=norm(s);
+  for(var i=0;i<REV2_LADOS.length;i++) if(REV2_LADOS[i].test(t)) return i;
+  return -1;
+}
 function rev2Proc(ex, titulo){
   var lista=((ex.laudo||{}).procedencia)||[], n=norm(titulo);
   if(!n) return null;
-  var achatar=function(s){ return norm(String(s||'').replace(/-/g,' ')); };
-  var nn=achatar(titulo);
+  // hífen REMOVIDO, não trocado por espaço: norm() já troca por espaço, então trocar de novo
+  // era um no-op e "supra-espinhal" continuava sem casar com "supraespinhal" (achado na
+  // 2ª avaliação — o exemplo do próprio comentário não funcionava).
+  var achatar=function(s){ return norm(s).replace(/[\s-]/g,''); };
+  var nn=achatar(titulo), ladoTit=rev2LadoDe(titulo);
   for(var i=0;i<lista.length;i++){ if(norm(lista[i].secao||'')===n) return lista[i]; }
+  /* Parcial: aceita conter/estar contido, MAS
+       (a) lado tem de bater — "Ovário" casava com "Ovário esquerdo" E com "Ovário direito",
+           e a ficha VOZ tocava o ditado do outro lado, a IMG mostrava a foto do outro lado;
+       (b) vence a seção MAIS PARECIDA (a mais longa), não a primeira da lista. */
+  var melhor=null, melhorLen=-1;
   for(var j=0;j<lista.length;j++){
-    var s=achatar(lista[j].secao||'');
-    if(s.length>=4 && nn.length>=4 && (s.indexOf(nn)>=0 || nn.indexOf(s)>=0)) return lista[j];
+    var bruto=lista[j].secao||'', s=achatar(bruto);
+    if(s.length<4 || nn.length<4) continue;
+    if(s.indexOf(nn)<0 && nn.indexOf(s)<0) continue;
+    var ladoSec=rev2LadoDe(bruto);
+    if(ladoTit>=0 && ladoSec>=0 && ladoTit!==ladoSec) continue;   // lados opostos: não é
+    if(ladoTit>=0 && ladoSec<0 && lista.length>1) continue;        // seção sem lado num laudo
+    if(s.length>melhorLen){ melhorLen=s.length; melhor=lista[j]; } //   com lados: ambígua
   }
-  return null;
+  return melhor;
 }
 /* acha o trecho do ditado pela citação que a IA copiou dele */
 function rev2Trecho(ex, citacao){
@@ -9106,7 +9189,7 @@ function rev2Render(){
   // ---- os alertas, que são a legenda das cores ----
   var lista=alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
                              .concat(alertasReferencia(L))
-                             .concat(alertasAchadoSemNegrito(L, ex&&ex.tipo));
+                             .concat(alertasAchadoSemNegrito(L, rev2MoldeDoLaudo(ex)));
   var porTipo={}, calmos={};
   lista.forEach(function(a){
     var txt=String((a&&a.texto)||'').trim(); if(!txt) return;

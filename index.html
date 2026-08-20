@@ -266,6 +266,15 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <label>Motor de transcrição local (opcional)</label>
   <input type="text" id="cfgAgenteLocal" placeholder="ex.: http://127.0.0.1:8977 (vazio = transcreve na OpenAI)">
   <span class="aviso">Serviço que roda no computador da clínica. Se preenchido e ativo, a <b>transcrição</b> é feita nele (melhor vocabulário médico, áudio não sai da máquina); se estiver fora do ar, cai automaticamente na OpenAI. A busca de exames por <b>DICOM</b> usa este endereço (ou <span class="mono">http://127.0.0.1:8977</span> quando vazio).</span>
+  <!-- 20/08/2026, pedido do médico: reiniciar o agente sem Gerenciador de Tarefas.
+       Fechar a janela NÃO derruba o agente (é de propósito — é ele quem continua
+       gravando com o navegador fechado), então até aqui não havia caminho nenhum
+       pelo programa. O agente recusa sozinho quando reiniciar custaria trabalho. -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+    <button class="btn sec" type="button" id="btnReiniciarAgente" onclick="reiniciarAgente()">🔄 Reiniciar o motor de transcrição</button>
+  </div>
+  <span class="aviso">Use quando o motor de voz tiver ficado estranho, ou depois de o sistema ser atualizado. O programa <b>continua aberto</b>: só o serviço de fundo é trocado, e ele volta sozinho em alguns segundos. <b>É recusado com exame gravando</b> — nada de ditado se perde.</span>
+  <div id="reiniciarEstado" class="aviso" style="margin-top:4px"></div>
   <label>💾 Pasta de backup (fora deste computador)</label>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <input type="text" id="cfgBackupPasta" style="flex:1;min-width:220px" placeholder="escolha pelo botão ao lado">
@@ -855,6 +864,66 @@ async function backupAgora(){
     log('Backup externo feito: '+(j.arquivos||0)+' arquivo(s), '+((j.bytes||0)/1048576).toFixed(1)+' MB.');
     atualizarEstadoBackup();
   }catch(e){ el.innerHTML='<b style="color:#b3261e">⚠️ Agente fora do ar ('+esc(e.message)+')</b>'; }
+}
+/* ============ REINICIAR O AGENTE (20/08/2026, pedido do médico) ============
+   Fechar a janela não derruba o agente — é de propósito, porque é ele quem continua
+   gravando com o navegador fechado. A consequência era que trocar o código do agente
+   (ou destravar um motor de voz emperrado) só dava pelo Gerenciador de Tarefas. */
+async function reiniciarAgente(){
+  var el=document.getElementById('reiniciarEstado'), bt=document.getElementById('btnReiniciarAgente');
+  if(!confirm('Reiniciar o motor de transcrição?\n\nO programa continua aberto — só o serviço de '
+             +'fundo sai e volta, em alguns segundos. Durante esse tempo não dá para transcrever '
+             +'nem buscar exames no aparelho.')) return;
+  bt.disabled=true; el.textContent='pedindo ao agente para reiniciar…';
+  var r=null, j=null;
+  try{
+    r=await fetch(agenteBase()+'/agente/reiniciar',{method:'POST'});
+    try{ j=await r.json(); }catch(e){ j=null; }
+  }catch(e){
+    bt.disabled=false;
+    el.innerHTML='<b style="color:#b3261e">⚠️ Agente fora do ar ('+esc(e.message)+') — não havia o que reiniciar.</b>';
+    return;
+  }
+  if(!r.ok || !j || !j.ok){
+    bt.disabled=false;
+    /* 409 não é erro: é a trava do agente funcionando (exame gravando, transcrição em
+       curso, microfone aberto). O texto dele já diz o que fazer, então não se enfeita
+       com "falhou" — dizer "falhou" para uma recusa correta ensina a ignorar o aviso. */
+    var recusa=(r.status===409);
+    el.innerHTML=(recusa?'⛔ ':'<b style="color:#b3261e">⚠️ ')
+      +esc((j&&j.erro)||('não deu para reiniciar (HTTP '+r.status+')'))+(recusa?'':'</b>');
+    return;
+  }
+  el.textContent='o agente está saindo; esperando o novo subir…';
+  _agenteLocalOk=null;                     // a resposta guardada é do agente que morreu
+  var voltou=await esperarAgenteVoltar(60000);
+  bt.disabled=false;
+  if(voltou){
+    el.innerHTML='<b style="color:#1f7a3d">✅ Motor de transcrição reiniciado e no ar.</b>';
+    log('Motor de transcrição reiniciado — o agente novo está no ar.');
+  }else{
+    el.innerHTML='<b style="color:#b3261e">⚠️ O agente saiu e não voltou em 60s. '
+                +'Feche e abra o programa; se insistir, veja o agente-diario.log.</b>';
+  }
+}
+/* Espera o agente NOVO. O detalhe que faz isto funcionar: só aceito "voltou" DEPOIS de
+   ter visto ele cair. O agente antigo responde por mais ~1,5s após aceitar o pedido (ele
+   sai depois de a resposta chegar), então um /health imediato pegaria o VELHO e o botão
+   diria "pronto" antes de o novo existir. */
+async function esperarAgenteVoltar(prazoMs){
+  var ate=Date.now()+(prazoMs||60000), viCair=false;
+  while(Date.now()<ate){
+    await new Promise(function(f){ setTimeout(f,1000); });
+    var ok=false;
+    try{
+      var c=new AbortController(), t=setTimeout(function(){ c.abort(); },1500);
+      var r=await fetch(agenteBase()+'/health',{signal:c.signal, cache:'no-store'});
+      clearTimeout(t); ok=r.ok;
+    }catch(e){ ok=false; }
+    if(!ok){ viCair=true; continue; }
+    if(viCair) return true;
+  }
+  return false;
 }
 document.getElementById('cfgAss').addEventListener('change', function(e){
   const f = e.target.files[0]; if(!f) return;

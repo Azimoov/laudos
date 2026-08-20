@@ -6907,7 +6907,7 @@ function processarBirads(lista, ditadoTexto){
     }
     if(d.caso_especial && BIRADS_ESPECIAIS[d.caso_especial]){
       var e=BIRADS_ESPECIAIS[d.caso_especial];
-      linhas.push((n>1?(rot+' — '):'')+'Categoria: BI-RADS '+e[0]+'.');
+      linhas.push(biradsLinhaCategoria(e[0], (n>1?(rot+' — '):'')));
       obs.push(rot+': BI-RADS '+e[0]+' por caso especial ditado ('+d.caso_especial+') — '+e[1]+' Confira antes de liberar.');
       return;
     }
@@ -6923,7 +6923,9 @@ function processarBirads(lista, ditadoTexto){
       return;
     }
     var r=biradsAvaliar(L.achou);
-    linhas.push((n>1?(rot+' — '):'')+'Categoria: BI-RADS '+r.cat+'.');
+    linhas.push(biradsLinhaCategoria(r.cat, (n>1?(rot+' — '):'')));
+    var _as=biradsCategoria(r.cat).assumido;
+    if(_as) obs.push(rot+': '+_as+'.');
     obs.push(rot+': BI-RADS calculado automaticamente dos descritores ditados — '+r.cat
              +(r.susp.length?(' (suspeitos: '+r.susp.join(', ')+')'):' (todos os descritores benignos)')
              +'; conduta: '+r.cond+(r.notas.length?(' Notas: '+r.notas.join('; ')+'.'):'')+' Confira antes de liberar.');
@@ -7820,10 +7822,66 @@ const BIRADS_ESPECIAIS = {
   cat0b:['0b','Avaliação incompleta — necessita exames prévios para comparação. Recuperar e comparar antes de atribuir categoria final.'],
   cistoSimples:['2','Cisto simples — achado benigno. Rotina.'],
   cistoComplicado:['3','Cisto complicado — provavelmente benigno. Seguimento em 6, 12 e 24 meses (ou aspiração se sintomático).'],
-  microcistos:['3','Microcistos agrupados — provavelmente benigno. Seguimento em 6, 12 e 24 meses.'],
+  /* 20/08/2026 — CORRIGIDO DE 3 PARA 2. A auditoria (AUDITORIA-CBR.md, 30/07) apontou que
+     microcistos agrupados estavam SOBRECLASSIFICADOS, e invertidos com o cisto complicado
+     logo acima: o programa seguia de perto o achado que não precisa e liberava para rotina
+     o que a norma manda seguir. Microcistos agrupados são caracteristicamente benignos.
+     Isto aqui é a CONTA; o texto dos dizeres já tinha sido corrigido no bloco 1 do pacote
+     de mama — os dois precisavam mudar juntos, e por um dia não mudaram. */
+  microcistos:['2','Microcistos agrupados — achado benigno. Controle de rotina conforme protocolo de rastreamento.'],
   linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.'],
   cat6:['6','Malignidade comprovada por biópsia. Seguimento clínico e terapia local definitiva, conforme a conduta oncológica adotada.']
 };
+/* ============ Categoria BI-RADS por extenso: rótulo + probabilidade + conduta ============
+   Especificação 06 do pacote de mama (20/08/2026). Valores da Table 2 do manual ACR
+   BI-RADS v2025 (Concordance Between Assessment Categories and Management Recommendations)
+   e a tabela de conduta da especificação 01.
+
+   POR QUE ISTO VIVE AQUI, NO CÓDIGO, E NÃO NO TEXTO DOS DIZERES — são três razões, e a
+   terceira foi pedido explícito do médico:
+     1. É consulta, não julgamento: categoria entra, faixa sai. Não há o que a IA decida.
+     2. Faixa de probabilidade parafraseada é faixa errada. Escrita aqui, ela é sempre a
+        mesma, e conferir as sete redações uma vez vale para sempre.
+     3. CUSTO. O que está no texto dos dizeres viaja no pedido à IA em TODO exame e é
+        cobrado por token. Estas linhas se repetiam em cada um dos 11 dizeres de mama; aqui
+        elas não custam nada e o arquivo de dizeres voltou a encolher.
+
+   Categoria 4 SEM letra assume 4A — decisão do médico (20/08). A ressalva foi apresentada
+   (4A é a MENOR suspeição, então assumir erra sempre para baixo, que é a direção que
+   atrasa biópsia) e ele manteve. Por isso o assumido nunca é calado: `assumido` volta
+   junto e a revisão acende o alerta pedindo confirmação. */
+const BIRADS_CAT = {
+  '0' : ['Incompleto',                        'N/A',                'Imagens adicionais e/ou comparação com exame(s) anterior(es).'],
+  '0a': ['Incompleto',                        'N/A',                'Imagens adicionais e/ou comparação com exame(s) anterior(es).'],
+  '0b': ['Incompleto',                        'N/A',                'Imagens adicionais e/ou comparação com exame(s) anterior(es).'],
+  '1' : ['Negativo',                          'essencialmente 0%',  'Rastreamento de rotina.'],
+  '2' : ['Benigno',                           'essencialmente 0%',  'Controle de rotina conforme protocolo de rastreamento.'],
+  '3' : ['Provavelmente benigno',             '> 0% e ≤ 2%',        'Seguimento de curto intervalo, com nova ultrassonografia em 6 meses.'],
+  '4A': ['Suspeição baixa',                   '> 2% e ≤ 10%',       'Diagnóstico tecidual (biópsia).'],
+  '4B': ['Suspeição moderada',                '> 10% e ≤ 50%',      'Diagnóstico tecidual (biópsia).'],
+  '4C': ['Suspeição alta',                    '> 50% e < 95%',      'Diagnóstico tecidual (biópsia).'],
+  '5' : ['Altamente sugestivo de malignidade','≥ 95%',              'Diagnóstico tecidual (biópsia).'],
+  '6' : ['Malignidade comprovada',            'N/A',                'Acompanhamento com cirurgião e/ou oncologista; terapia local definitiva quando clinicamente apropriado.']
+};
+/* Devolve {cat, rotulo, prob, conduta, assumido}. `assumido` só vem preenchido quando a
+   letra do 4 foi assumida — quem chama TEM de mostrar isso, nunca engolir. */
+function biradsCategoria(cat){
+  var c=String(cat==null?'':cat).trim().toUpperCase().replace(/^BI-?RADS\s*/,'').replace(/\.$/,'');
+  var assumido='';
+  if(c==='4'){ c='4A'; assumido='categoria 4 sem letra — assumida 4A; confirme A, B ou C'; }
+  var t=BIRADS_CAT[c];
+  if(!t) return {cat:c, rotulo:'', prob:'', conduta:'', assumido:assumido};
+  return {cat:c, rotulo:t[0], prob:t[1], conduta:t[2], assumido:assumido};
+}
+/* A linha que vai para o laudo. `prefixo` é o rótulo do achado quando há mais de um. */
+function biradsLinhaCategoria(cat, prefixo){
+  var d=biradsCategoria(cat);
+  if(!d.rotulo) return (prefixo||'')+'Categoria: BI-RADS '+d.cat+'.';
+  return (prefixo||'')+'Categoria: BI-RADS '+d.cat+' — '+d.rotulo+'.'
+       + (d.prob==='N/A' ? ' Probabilidade de malignidade: N/A.'
+                         : ' Probabilidade de malignidade: '+d.prob+'.')
+       + '\nRecomendação de conduta: '+d.conduta;
+}
 /* Casa o texto que a IA anotou com uma opção da tabela. Reconhece o código, o rótulo e os
    sinônimos; não reconheceu = trata como NÃO DITADO (nunca chuta a opção mais parecida). */
 function classifCasar(descritor, texto){

@@ -74,8 +74,8 @@ ok(/cisto complicado isolado[\s\S]{0,140}BI-RADS 3/.test(plano),
 ok(/microcistos agrupados[\s\S]{0,140}BI-RADS 2/.test(plano),
    'microcistos agrupados 3 -> 2 (estavam invertidos entre si)');
 ok(/linfonodo intramamário[\s\S]{0,160}BI-RADS 2/i.test(plano), 'linfonodo ganhou categoria');
-ok(plano.indexOf('BI-RADS 4.....') >= 0 && /4A/.test(plano) && /4B/.test(plano) && /4C/.test(plano),
-   'BI-RADS 4 pede a letra, com as três faixas escritas');
+ok(plano.indexOf('BI-RADS 4.....') >= 0 && /escolher a letra \(A, B ou C\)/.test(plano),
+   'BI-RADS 4 pede a letra (as faixas saem da tabela local, não do texto — ver bloco 2)');
 ok(/retroareolares até 3 mm/.test(plano) && /periféricos até/.test(plano),
    'ectasia ductal com a referência de calibre que sustenta a conclusão');
 ok(mama.indexOf('TECIDO MAMÁRIO') < 0 && /tecido mamário ectópico/.test(plano),
@@ -92,13 +92,18 @@ console.log('\n=== língua ===');
   ok(mama.indexOf(e) < 0, "sem '" + e + "'"));
 ok(/Notaram-se/.test(mama), 'plural corrigido onde há mais de um achado');
 
-console.log('\n=== toda categoria vem com probabilidade e conduta ===');
+console.log('\n=== categoria nos dizeres: enxuta, porque o resto sai da tabela local ===');
+// 20/08: probabilidade e conduta SAÍRAM do texto e passaram para BIRADS_CAT, no código.
+// Motivo de peso: o que está aqui viaja no pedido à IA em todo exame e é cobrado por
+// token; ali não custa nada e não corre risco de ser parafraseado. Ver teste-birads-cat.js.
 const cats = mama.match(/Categoria: BI-RADS [^\n]*/g) || [];
 ok(cats.length >= 11, cats.length + ' categorias no arquivo');
-const semProb = cats.filter(c => c.indexOf('Probabilidade') < 0 && c.indexOf('4.....') < 0);
-ok(semProb.length === 0, 'toda categoria traz a faixa de probabilidade (Table 2 do ACR)');
-ok((mama.match(/Recomendação de conduta/g) || []).length === cats.length,
-   'e toda categoria traz a conduta correspondente');
+ok(!/Probabilidade de malignidade/.test(mama),
+   'a faixa de probabilidade NÃO se repete no texto — sai da tabela local');
+ok(!/Recomendação de conduta/.test(mama),
+   'a conduta também não — mesma razão');
+ok(mama.length < 5300,
+   'e a seção ficou em ' + mama.length + ' caracteres, na faixa do tamanho original (5087)');
 ok(!/Categoria: BI-RADS/.test(mama.slice(mama.indexOf('Ginecomastia:'), mama.indexOf('Implante mamário íntegro:'))),
    'ginecomastia segue SEM categoria — não é lesão focal, não há o que classificar');
 

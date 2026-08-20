@@ -59,6 +59,8 @@ Object.defineProperty(RES, 'textContent', { set(v) { RES._v = v; }, get() { retu
 const src = [
   bloco(/const CLASSIF = \{[\s\S]*?\n\};/, 'CLASSIF'),
   bloco(/const BIRADS_ESPECIAIS = \{[\s\S]*?\n\};/, 'BIRADS_ESPECIAIS'),
+  bloco(/const BIRADS_CAT = \{[\s\S]*?\n\};/, 'BIRADS_CAT'),
+  grab('biradsCategoria'), grab('biradsLinhaCategoria'),
   grab('norm'), grab('classifCasar'), grab('classifLerDescritores'),
   grab('classifCategoriaDitada'), grab('classifConferir'),
   grab('calcRadio'), grab('calcOut'),

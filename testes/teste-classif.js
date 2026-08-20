@@ -33,6 +33,8 @@ const ok = (c, m) => { console.log((c ? '  ok   ' : '  FALHA ') + m); if (!c) fa
 const src = [
   bloco(/const CLASSIF = \{[\s\S]*?\n\};/, 'CLASSIF'),
   bloco(/const BIRADS_ESPECIAIS = \{[\s\S]*?\n\};/, 'BIRADS_ESPECIAIS'),
+  bloco(/const BIRADS_CAT = \{[\s\S]*?\n\};/, 'BIRADS_CAT'),
+  grab('biradsCategoria'), grab('biradsLinhaCategoria'),
   grab('norm'), grab('classifVale'), grab('classifOpcoes'), grab('classifRotulo'),
   grab('classifCasar'), grab('classifLerDescritores'), grab('classifExigir'),
   grab('biradsAvaliar'), grab('oradsAvaliar'),

@@ -39,6 +39,8 @@ const SUITE = [
   { arq: 'teste-referencia.js', o: 'medidas de referencia por idade (pediatrico)' },
   { arq: 'teste-rede.py', o: 'queda da placa para a CPU, exercitada de verdade', py: true },
   { arq: 'teste-placa.py', o: 'reserva da placa: dois agentes nao carregam juntos', py: true },
+  { arq: 'teste-reiniciar.js', o: 'botao de reiniciar o agente (lado do app)' },
+  { arq: 'teste-reiniciar.py', o: 'reiniciar o agente: recusa, espera e sucessor', py: true },
   { arq: 'teste-anterior.js', o: 'comparacao com o exame anterior (F2b)' },
   { arq: 'teste-alertas.js', o: 'painel de alertas por categoria' },
   { arq: 'teste-faltando.js', o: 'medidas em branco no laudo (F2e)' },

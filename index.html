@@ -8068,7 +8068,7 @@ function _mamaLateral(lesoes, lado){
   });
   s+='<text x="'+x0+'" y="172" font-size="8" fill="#5a6478" font-family="Arial,Helvetica,sans-serif">papila</text>'
     +'<text x="'+x1+'" y="172" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">periferia</text>';
-  var YP={anterior:46, media:95, posterior:126};
+  var YP={anterior:46, media:95, posterior:126}, profs=[];
   lesoes.forEach(function(L){
     var x=x0+Math.min(L.distCm/MAMA_RAIO_CM,1)*(x1-x0);
     /* Profundidade medida vence a qualitativa: se o laudo diz "a 1,5 cm da pele", a lesão
@@ -8089,15 +8089,17 @@ function _mamaLateral(lesoes, lado){
     s+='<line x1="'+x.toFixed(1)+'" y1="'+MAMA_Y_PELE+'" x2="'+x.toFixed(1)+'" y2="'+topo.toFixed(1)+'" '
       +'stroke="#8a5cf6" stroke-width="0.9" stroke-dasharray="2.5 2.5"/>'
       +'<circle cx="'+x.toFixed(1)+'" cy="'+MAMA_Y_PELE+'" r="1.8" fill="#8a5cf6"/>';
-    /* O que a linha diz. Número SÓ se o laudo trouxe o número; senão, a palavra. Escrever
+    /* 21/08, 2ª volta: o texto da profundidade SAIU de cima da linha. Escrito no meio dela,
+       com dois ou três nódulos na mesma mama os rótulos caíam em alturas parecidas, se
+       atropelavam entre si e ainda cruzavam as linhas vizinhas — o médico viu isso na
+       conferência. Agora vive numa faixa própria embaixo do desenho, prefixado pelo NÚMERO
+       do achado: não há como sobrepor nada, e a atribuição é pelo mesmo número que já está
+       no marcador. Empurrar rótulo para o lado até "caber" resolveria com dois e voltaria a
+       quebrar com quatro; faixa própria não quebra nunca.
+       O que a faixa diz: número SÓ se o laudo trouxe o número; senão, a palavra. Escrever
        "18 mm da pele" num laudo que só disse "profundidade média" seria inventar medida. */
-    var rot = (L.profMm!=null) ? (Math.round(L.profMm)+' mm da pele')
-            : ({anterior:'anterior', media:'profundidade média', posterior:'posterior'}[L.prof]||'profundidade média');
-    var meio=(MAMA_Y_PELE+topo)/2;
-    var ladoTxt = (x>x1-58) ? 'end' : 'start';
-    var xTxt = (ladoTxt==='end') ? (x-4) : (x+4);
-    s+='<text x="'+xTxt.toFixed(1)+'" y="'+(meio+3).toFixed(1)+'" font-size="7.5" fill="#6A4FB6" '
-      +'text-anchor="'+ladoTxt+'" font-family="Arial,Helvetica,sans-serif">'+rot+'</text>';
+    profs.push({n:L.n, txt:(L.profMm!=null) ? (Math.round(L.profMm)+' mm da pele')
+              : ({anterior:'anterior', media:'média', posterior:'posterior'}[L.prof]||'média')});
     s+=_mamaContorno(x, y, rx, ry, L.forma, L.n,
                      'data-lesao="'+L.id+'" fill="#6A4FB6" fill-opacity="0.85" stroke="#fff" stroke-width="1.3"');
     if(Math.min(rx,ry)>=7){
@@ -8106,8 +8108,35 @@ function _mamaLateral(lesoes, lado){
       s+='<text x="'+(x+rx+4).toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#6A4FB6" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
     }
   });
-  s+='<text x="152" y="203" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — '+(lado==='D'?'DIREITA':'ESQUERDA')+'</text>';
-  return '<svg viewBox="0 0 250 210" width="250" height="210" xmlns="http://www.w3.org/2000/svg" role="img" '
+  /* A faixa da profundidade. Quebra em mais de uma linha quando não couber na largura —
+     texto que sai da caixa é tão ilegível quanto texto sobreposto, e com quatro ou cinco
+     achados a linha única estouraria. A largura é estimada por caractere (fonte 8 no
+     Arial ≈ 4,4 px); estimar de menos só faz sobrar espaço, nunca faltar. */
+  var yFaixa=184;
+  if(profs.length){
+    var PREFIXO='Profundidade:   ';
+    var itens=profs.map(function(p){ return p.n+' — '+p.txt; });
+    var linhas=[], atual='';
+    // o prefixo entra na conta da PRIMEIRA linha: sem isso, ela era a única que podia
+    // estourar a caixa — justamente por ser a que carrega o rótulo
+    var cabe=function(t, primeira){ return (t.length+(primeira?PREFIXO.length:0))*4.4 <= (x1-x0); };
+    itens.forEach(function(it){
+      var cand = atual ? (atual+'   ·   '+it) : it;
+      if(atual && !cabe(cand, linhas.length===0)){ linhas.push(atual); atual=it; }
+      else atual=cand;
+    });
+    if(atual) linhas.push(atual);
+    linhas.forEach(function(ln,i){
+      s+='<text x="'+((x0+x1)/2).toFixed(1)+'" y="'+(yFaixa+i*10)+'" font-size="8" fill="#6A4FB6" '
+        +'text-anchor="middle" font-family="Arial,Helvetica,sans-serif">'
+        +(i===0?PREFIXO:'')+ln+'</text>';
+    });
+    yFaixa += linhas.length*10;
+  }
+  var yTit=Math.max(206, yFaixa+6);
+  s+='<text x="152" y="'+yTit+'" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — '+(lado==='D'?'DIREITA':'ESQUERDA')+'</text>';
+  var alt=yTit+8;
+  return '<svg viewBox="0 0 250 '+alt+'" width="250" height="'+alt+'" xmlns="http://www.w3.org/2000/svg" role="img" '
        + 'aria-label="Corte lateral da mama '+(lado==='D'?'direita':'esquerda')+' mostrando profundidade">'+s+'</svg>';
 }
 /* O bloco inteiro, pronto para entrar no laudo. Devolve '' quando não há o que desenhar —
@@ -8119,7 +8148,7 @@ function mamaEsquemaHTML(L){
   ['D','E'].forEach(function(lado){
     var doLado=r.plot.filter(function(x){ return x.lado===lado; });
     if(!doLado.length) return;                    // mama sem lesão não é desenhada
-    h+='<div style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">'
+    h+='<div style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start;margin-bottom:6px">'
       + _mamaFrontal(doLado, lado) + _mamaLateral(doLado, lado) + '</div>';
   });
   if(r.plot.length){

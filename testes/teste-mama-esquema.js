@@ -158,14 +158,53 @@ console.log('\n=== 21/08: linha pontilhada da pele até a lesão ===');
 const comProf = api.mamaEsquemaHTML(laudo(
   [{ localizacao: 'mama direita', forma: 'oval', orientacao: 'paralela' }],
   'Notou-se nódulo na mama direita, às 10 h, distando 3 cm da papila, a 1,5 cm da pele, medindo 14 x 10 mm.'));
-ok(/stroke-dasharray/.test(comProf), 'a linha existe, e é pontilhada');
-ok(/15 mm da pele/.test(comProf), 'com a distância ESCRITA, porque o laudo a informou');
+// Recorta SÓ o desenho do corte lateral, para as asserções não acharem o que procuram na
+// legenda de texto que vem depois. (A primeira versão desta asserção passava por acaso:
+// procurava "profundidade média" e encontrava na LEGENDA, não no desenho.)
+function lateralDe(html) {
+  const marca = html.indexOf('aria-label="Corte lateral');
+  if (marca < 0) return '';
+  const i = html.lastIndexOf('<svg', marca);   // da tag INTEIRA, senão o viewBox fica de fora
+  const f = html.indexOf('</svg>', marca);
+  return html.slice(i, f);
+}
+ok(/stroke-dasharray/.test(lateralDe(comProf)), 'a linha existe, e é pontilhada');
+ok(/15 mm da pele/.test(lateralDe(comProf)), 'com a distância ESCRITA, porque o laudo a informou');
 const semProf = api.mamaEsquemaHTML(laudo(
   [{ localizacao: 'mama direita', forma: 'oval', orientacao: 'paralela' }], f));
-ok(/stroke-dasharray/.test(semProf), 'a linha aparece mesmo sem a medida');
-ok(/profundidade média/.test(semProf) && !/mm da pele/.test(semProf),
-   'mas aí traz a PALAVRA, não um número inventado — laudo que não disse a distância não '
-   + 'pode virar desenho com distância');
+ok(/stroke-dasharray/.test(lateralDe(semProf)), 'a linha aparece mesmo sem a medida');
+ok(!/mm da pele/.test(lateralDe(semProf)),
+   'mas SEM número — laudo que não disse a distância não pode virar desenho com distância');
+ok(/>Profundidade:/.test(lateralDe(semProf)) && /média/.test(lateralDe(semProf)),
+   'traz a PALAVRA no lugar do número');
+
+console.log('\n=== 21/08 (2ª volta): o texto da profundidade não sobrepõe nada ===');
+// Com dois ou três nódulos na mesma mama, o rótulo escrito no MEIO da linha caía em
+// alturas parecidas, atropelava o vizinho e cruzava as linhas — o médico viu na
+// conferência. Saiu da linha e foi para faixa própria, numerada.
+const tres = api.mamaEsquemaHTML(laudo(
+  [{ localizacao: 'mama direita superior', forma: 'oval', orientacao: 'paralela' },
+   { localizacao: 'mama direita lateral', forma: 'oval', orientacao: 'paralela' },
+   { localizacao: 'mama direita inferior', forma: 'oval', orientacao: 'paralela' }],
+  'Notou-se na mama direita superior, às 12 h, distando 2 cm da papila, nódulo medindo 20 x 14 mm. '
+  + 'Notou-se na mama direita lateral, às 3 h, distando 5 cm da papila, nódulo medindo 8 x 6 mm, a 1,2 cm da pele. '
+  + 'Notou-se na mama direita inferior, às 6 h, distando 7 cm da papila, nódulo medindo 2 x 2 mm.'));
+const latTres = lateralDe(tres);
+const textos = latTres.match(/<text[^>]*>[^<]*<\/text>/g) || [];
+const daFaixa = textos.filter(t => /fill="#6A4FB6"[^>]*text-anchor="middle"/.test(t));
+ok(daFaixa.length >= 1, 'a faixa de profundidade existe (' + daFaixa.length + ' linha(s))');
+ok(daFaixa.join(' ').indexOf('Profundidade:') >= 0, 'rotulada, para saber o que ela é');
+[1, 2, 3].forEach(n =>
+  ok(daFaixa.join(' ').indexOf(n + ' — ') >= 0, 'o achado ' + n + ' aparece com o próprio número'));
+ok(/2 — 12 mm da pele/.test(daFaixa.join(' ')),
+   'e quem tem distância medida mostra a distância (o 2), enquanto os outros mostram a palavra');
+// Sem texto solto no meio das linhas: é isso que garante que nada se atropela.
+const ys = daFaixa.map(t => parseFloat(/y="([\d.]+)"/.exec(t)[1]));
+ok(ys.every((y, i) => i === 0 || y - ys[i - 1] >= 9),
+   'as linhas da faixa ficam separadas o bastante para não encostar uma na outra');
+ok(ys.every(y => y > 158), 'e todas ficam ABAIXO das camadas, fora do desenho');
+const alt = +/viewBox="0 0 250 (\d+)"/.exec(latTres)[1];
+ok(alt > 210, 'a caixa CRESCE para caber a faixa (' + alt + '), em vez de cortar o texto');
 ok(api.mamaLocalDoTexto('a 1,5 cm da pele').profMm === 15, 'lê "1,5 cm da pele" como 15 mm');
 ok(api.mamaLocalDoTexto('a 8 mm da superfície').profMm === 8, 'e "8 mm da superfície" como 8 mm');
 ok(api.mamaLocalDoTexto('nódulo profundo').profMm === null, 'sem número, sem número');

@@ -5302,13 +5302,16 @@ function abrirRevisao(exId, semTela){
      conclusão e da categoria. Não no rodapé, não no fim. Contenteditable="false" porque o
      desenho não se edita digitando: ele nasce do texto, e é editando o texto (ou, adiante,
      arrastando o marcador) que ele muda. */
-  +((ex.tipo==='mama') ? ('<div contenteditable="false">'+mamaEsquemaHTML(L)+'</div>') : '')
+  +((ex.tipo==='mama') ? ('<div id="mamaEsqBox" contenteditable="false">'+mamaEsquemaHTML(L)+'</div>') : '')
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')
   +'</div></div>'
   +'<div class="assin">'+(cfg.assinatura?'<img src="'+cfg.assinatura+'" style="height:62px;display:block;margin:0 auto -16px">':'')+'<span class="linha">'+cfg.medico+'<br>'+cfg.crm+'</span></div>'
   +'<div class="rodapeLaudo">Esclarecemos que a impressão diagnóstica em exames de imagem não é absoluta, devendo ser feita a correlação clínico laboratorial, além de outros exames de imagem. Somente o seu médico tem condições de interpretar corretamente o conjunto de todas essas informações.</div>'
   +'</div>';
+  // arraste do marcador do esquema (só mama). Ligado DEPOIS de o HTML existir, e uma vez
+  // só por caixa — a própria função se protege de ligar duas vezes.
+  if(ex.tipo==='mama'){ try{ mamaArrasteLigar(document.getElementById('mamaEsqBox'), ex); }catch(e){} }
   // F2e e conferente: avisos CALCULADOS AGORA, não guardados — assim nenhum deles
   // sobrevive apontando um trecho que o médico já corrigiu.
   montarAlertas(alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
@@ -7910,6 +7913,50 @@ function mamaLocalDoTexto(txt){
   else out.prof='media';
   return out;
 }
+/* A frase do corpo que descreve UM achado. Existe como função própria porque DUAS coisas
+   dependem dela e precisam concordar: o desenho, que lê a posição daqui, e o arraste, que
+   reescreve a posição aqui. Se as duas buscas divergissem, arrastar um nódulo reescreveria
+   a frase de outro — o pior defeito possível nesta funcionalidade, e silencioso.
+   Devolve {texto, ini, fim}; ini<0 quando a frase não foi localizada no corpo. */
+function _mamaFraseDo(corpo, rotulo, quantosAchados){
+  var texto=String(corpo||'');
+  if(rotulo){
+    var chave=String(rotulo).split(/[,;]/)[0].trim();
+    if(chave){
+      var re=new RegExp('[^.]*'+chave.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'[^.]*\\.', 'i');
+      var m=re.exec(texto);
+      if(m) return {texto:m[0], ini:m.index, fim:m.index+m[0].length};
+    }
+  }
+  /* Não achou pelo rótulo e só existe UM achado: vale o corpo inteiro. Com um achado só
+     não há a quem confundir. Com dois ou mais, fica sem frase DE PROPÓSITO — pegar o corpo
+     todo casaria a hora de um com a distância do outro, que é pior que não desenhar. */
+  if(quantosAchados===1) return {texto:texto, ini:0, fim:texto.length};
+  return {texto:'', ini:-1, fim:-1};
+}
+/* Reescreve a localização de um achado DENTRO do corpo do laudo, sem tocar no resto da
+   descrição. É o que fecha o ciclo do arraste: mexeu no desenho, o texto acompanha.
+   Devolve {corpo, ok, frase}. ok=false quando não houve onde escrever — e aí quem chama
+   TEM de avisar, nunca fingir que salvou. */
+function mamaReescreverLocal(corpo, rotulo, quantosAchados, hora, distCm){
+  var f=_mamaFraseDo(corpo, rotulo, quantosAchados);
+  if(f.ini<0) return {corpo:corpo, ok:false, frase:''};
+  var antes=f.texto, depois=antes, mudou=false;
+  if(hora!=null){
+    var d1=depois.replace(/(às?\s*)\d{1,2}(\s*(?:h\b|horas?\b))/i, '$1'+hora+'$2');
+    if(d1!==depois){ depois=d1; mudou=true; }
+  }
+  if(distCm!=null){
+    var d2=depois.replace(/(dist(?:ando|a)\s*(?:de\s*)?)[\d.,]+(\s*)(mm|cm)\b/i, '$1'+distCm+'$2cm');
+    if(d2!==depois){ depois=d2; mudou=true; }
+  }
+  /* Não achou os pedaços para trocar (o médico reescreveu a frase à mão, por exemplo).
+     Não se inventa uma frase nova nem se acrescenta texto no fim: devolve que não deu, e
+     quem chama mostra o aviso. Melhor o desenho voltar ao lugar antigo do que o laudo
+     ganhar uma segunda localização contradizendo a primeira. */
+  if(!mudou) return {corpo:corpo, ok:false, frase:''};
+  return {corpo: corpo.slice(0,f.ini)+depois+corpo.slice(f.fim), ok:true, frase:depois};
+}
 /* Junta o que a IA JÁ devolve (birads[]: forma/orientação/margem; achados[]: medidas em
    mm) com o que se lê do texto (lado, hora, distância). Devolve só as lesões PLOTÁVEIS,
    mais a lista das que ficaram sem posição — que a legenda declara, em vez de sumir com
@@ -7924,19 +7971,10 @@ function mamaLesoes(L){
   bir.forEach(function(d,i){
     d=d||{};
     var rotulo=String(d.localizacao||'').trim();
-    // o trecho do corpo que descreve este achado: a frase que contém a localização dita
-    var frase='';
-    if(rotulo){
-      var chave=rotulo.split(/[,;]/)[0].trim();
-      var re=new RegExp('[^.]*'+chave.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'[^.]*\\.', 'i');
-      var mm=re.exec(corpo); if(mm) frase=mm[0];
-    }
-    /* Não achou a frase pelo rótulo e só existe UM achado: vale o corpo inteiro. Com um
-       achado só não há a quem confundir. Com dois ou mais, fica sem frase de propósito —
-       pegar o corpo todo casaria a hora de um com a distância do outro, que é pior que não
-       desenhar. (Sem esta saída, um rótulo que não aparece no texto fazia o motivo sair
-       errado: dizia "lado não identificado" num laudo onde o lado estava escrito.) */
-    if(!frase && bir.length===1) frase=corpo;
+    // o trecho do corpo que descreve este achado (ver _mamaFraseDo — é a MESMA busca que o
+    // arraste usa para reescrever, e é de propósito que seja a mesma função)
+    var _f=_mamaFraseDo(corpo, rotulo, bir.length);
+    var frase=_f.texto;
     var loc=mamaLocalDoTexto(frase||rotulo);
     if(!loc.lado && rotulo) loc.lado = /esquerd/i.test(rotulo)?'E':(/direit/i.test(rotulo)?'D':null);
     // medidas: primeiro as estruturadas (a IA já as devolve em mm), depois as do texto
@@ -8030,7 +8068,7 @@ function _mamaFrontal(lesoes, lado){
     var m=(L.mm&&L.mm.length)?Math.max.apply(null,L.mm):null;
     var r=_mamaRaioPx(m);
     s+=_mamaContorno(p[0], p[1], r, r*(L.forma==='oval'?0.72:1), L.forma, L.n,
-                     'data-lesao="'+L.id+'" fill="#6A4FB6" stroke="#fff" stroke-width="1.5"');
+                     'data-lesao="'+L.id+'" style="cursor:grab" fill="#6A4FB6" stroke="#fff" stroke-width="1.5"');
     /* O número vai DENTRO só quando cabe. Numa lesão de 2 mm o marcador é minúsculo e o
        número por cima o esconderia — aí ele vai ao lado, com um traço curto ligando. */
     if(r>=8){
@@ -8101,7 +8139,7 @@ function _mamaLateral(lesoes, lado){
     profs.push({n:L.n, txt:(L.profMm!=null) ? (Math.round(L.profMm)+' mm da pele')
               : ({anterior:'anterior', media:'média', posterior:'posterior'}[L.prof]||'média')});
     s+=_mamaContorno(x, y, rx, ry, L.forma, L.n,
-                     'data-lesao="'+L.id+'" fill="#6A4FB6" fill-opacity="0.85" stroke="#fff" stroke-width="1.3"');
+                     'data-lesao="'+L.id+'" style="cursor:grab" fill="#6A4FB6" fill-opacity="0.85" stroke="#fff" stroke-width="1.3"');
     if(Math.min(rx,ry)>=7){
       s+='<text x="'+x.toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
     }else{
@@ -8141,8 +8179,21 @@ function _mamaLateral(lesoes, lado){
 }
 /* O bloco inteiro, pronto para entrar no laudo. Devolve '' quando não há o que desenhar —
    exame normal não ganha esquema, e isso é regra, não economia. */
-function mamaEsquemaHTML(L){
+function mamaEsquemaHTML(L, arraste){
   var r=mamaLesoes(L);
+  /* Durante o arraste o desenho é redesenhado com a posição PROVISÓRIA, sem ainda tocar no
+     laudo. É isto que faz a distância da papila andar nas DUAS vistas ao mesmo tempo (§8.1
+     da especificação): as duas leem a mesma lesão, então mover numa move na outra de
+     graça. O texto só muda quando o dedo solta. */
+  if(arraste && arraste.id){
+    r.plot.forEach(function(x){
+      if(x.id!==arraste.id) return;
+      if(arraste.hora!=null) x.hora=arraste.hora;
+      if(arraste.distCm!=null) x.distCm=arraste.distCm;
+      if(arraste.profMm!==undefined) x.profMm=arraste.profMm;
+      if(arraste.prof) x.prof=arraste.prof;
+    });
+  }
   if(!r.plot.length && !r.semPos.length) return '';
   var h='<div class="mamaEsq" style="margin:14px 0;padding:10px 8px;border:1px solid #d6dbe4;border-radius:8px;background:#fcfcfe">';
   ['D','E'].forEach(function(lado){
@@ -8172,6 +8223,96 @@ function mamaEsquemaHTML(L){
   h+='<div style="font-size:10px;color:#6b7385;margin-top:6px;font-style:italic">Representação '
    + 'esquemática, sem escala anatômica real. A localização das lesões segue a descrição do exame.</div>';
   return h+'</div>';
+}
+
+/* ---- arraste do marcador (§8 da especificação) ----
+   Mover o marcador reescreve a FRASE do laudo. Não é enfeite: é o que permite corrigir a
+   posição sem redigitar, e é também o que mantém desenho e texto amarrados — quem manda
+   continua sendo o texto, o desenho só é uma forma de editá-lo.
+
+   Encaixe (§8.2, corrigido pela fonte primária): hora SEMPRE inteira e distância SEMPRE em
+   centímetro inteiro. O manual ACR não prevê meia-hora nem fração de centímetro, então
+   deixar o arraste livre produziria um laudo mais "preciso" que o padrão permite — precisão
+   inventada é pior que precisão ausente. */
+var _mamaArraste=null;
+function _mamaSvgXY(svg, ev){
+  var cx=(ev.touches&&ev.touches[0])?ev.touches[0].clientX:ev.clientX;
+  var cy=(ev.touches&&ev.touches[0])?ev.touches[0].clientY:ev.clientY;
+  var cx0=svg.getBoundingClientRect(), vb=(svg.getAttribute('viewBox')||'0 0 210 210').split(/\s+/);
+  var lv=parseFloat(vb[2])||210, av=parseFloat(vb[3])||210;
+  return [ (cx-cx0.left)/cx0.width*lv, (cy-cx0.top)/cx0.height*av ];
+}
+function mamaArrasteLigar(caixa, ex){
+  if(!caixa || caixa.__lig) return; caixa.__lig=true;
+  var mover=function(ev){
+    if(!_mamaArraste) return;
+    var p=_mamaSvgXY(_mamaArraste.svg, ev);
+    if(_mamaArraste.vista==='frontal'){
+      var dx=p[0]-105, dy=p[1]-105;
+      var ang=Math.atan2(dy,dx)*180/Math.PI+90;      // 12h no topo
+      var h=Math.round(((ang%360)+360)%360/30); if(h===0) h=12;
+      var d=Math.round(Math.min(Math.sqrt(dx*dx+dy*dy)/78,1)*MAMA_RAIO_CM);
+      _mamaArraste.hora=h; _mamaArraste.distCm=Math.max(0,d);
+    }else{
+      var d2=Math.round(Math.min(Math.max((p[0]-66)/(238-66),0),1)*MAMA_RAIO_CM);
+      _mamaArraste.distCm=d2;
+      // no corte, a altura vira profundidade em mm a partir da pele
+      var mm=Math.max(0,Math.round((p[1]-MAMA_Y_PELE)/MAMA_PX_MM));
+      _mamaArraste.profMm=mm;
+      _mamaArraste.prof = mm<20?'anterior':(mm>45?'posterior':'media');
+    }
+    var alvo=document.getElementById('mamaEsqBox');
+    if(alvo) alvo.innerHTML=mamaEsquemaHTML(ex.laudo, _mamaArraste);
+    ev.preventDefault();
+  };
+  var soltar=function(){
+    if(!_mamaArraste) return;
+    var a=_mamaArraste; _mamaArraste=null;
+    document.removeEventListener('mousemove',mover); document.removeEventListener('touchmove',mover);
+    var r=mamaReescreverLocal(ex.laudo.corpo, a.rotulo, a.quantos, a.hora, a.distCm);
+    if(!r.ok){
+      /* Não houve onde escrever — a frase foi reescrita à mão e não tem mais os pedaços de
+         localização. O desenho volta ao lugar antigo e o médico é avisado. Nunca se
+         acrescenta uma segunda localização no fim do texto: o laudo passaria a dizer duas
+         coisas diferentes sobre o mesmo achado. */
+      log('⚠️ Não consegui reescrever a localização deste achado no texto — a frase não '
+         +'tem mais o trecho "às ..h, distando ..cm". Ajuste pelo texto; o desenho voltou '
+         +'ao lugar anterior.', true);
+      var alvo2=document.getElementById('mamaEsqBox');
+      if(alvo2) alvo2.innerHTML=mamaEsquemaHTML(ex.laudo);
+      return;
+    }
+    ex.laudo.corpo=r.corpo;
+    if(typeof revMarcarEditado==='function') revMarcarEditado();
+    abrirRevisao(ex.id, true);                    // redesenha texto E esquema, juntos
+    // destaca por ~2 s o trecho que mudou, para o médico VER o que o arraste escreveu
+    var box=document.getElementById('mamaEsqBox');
+    if(box && box.previousSibling){
+      var cx=box.parentNode;
+      if(cx){ cx.style.transition='background .25s'; cx.style.background='#fff6d6';
+              setTimeout(function(){ cx.style.background=''; }, 2000); }
+    }
+    log('Localização do achado atualizada pelo desenho: '+r.frase.trim().slice(0,90));
+  };
+  caixa.addEventListener('mousedown', function(ev){ _mamaIniciar(ev, caixa, ex, mover, soltar); });
+  caixa.addEventListener('touchstart', function(ev){ _mamaIniciar(ev, caixa, ex, mover, soltar); }, {passive:false});
+  document.addEventListener('mouseup', soltar);
+  document.addEventListener('touchend', soltar);
+}
+function _mamaIniciar(ev, caixa, ex, mover, soltar){
+  var el=ev.target && ev.target.closest ? ev.target.closest('[data-lesao]') : null;
+  if(!el) return;
+  var svg=el.closest('svg'); if(!svg) return;
+  var id=el.getAttribute('data-lesao');
+  var r=mamaLesoes(ex.laudo), L=r.plot.filter(function(x){ return x.id===id; })[0];
+  if(!L) return;
+  _mamaArraste={ id:id, svg:svg, rotulo:L.rotulo,
+                 quantos:(Array.isArray(ex.laudo.birads)?ex.laudo.birads.length:1),
+                 vista:(/Corte lateral/.test(svg.getAttribute('aria-label')||'')?'lateral':'frontal'),
+                 hora:L.hora, distCm:L.distCm, profMm:L.profMm, prof:L.prof };
+  document.addEventListener('mousemove', mover);
+  document.addEventListener('touchmove', mover, {passive:false});
+  ev.preventDefault();
 }
 
 /* ============ Categoria BI-RADS por extenso: rótulo + probabilidade + conduta ============

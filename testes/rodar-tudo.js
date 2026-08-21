@@ -36,6 +36,7 @@ const SUITE = [
   { arq: 'teste-conferente.js', o: 'conferente: segunda leitura do laudo antes de entregar' },
   { arq: 'teste-birads-cat.js', o: 'categoria BI-RADS: rotulo, probabilidade e conduta (tabela local)' },
   { arq: 'teste-mama-esquema.js', o: 'esquema anatomico da mama (bloco 2)' },
+  { arq: 'teste-mama-arraste.js', o: 'arraste do marcador do esquema (bloco 2)' },
   { arq: 'teste-mama-bloco1.js', o: 'pacote de mama bloco 1: modelo e dizeres padrao' },
   { arq: 'teste-bizus-guarda.js', o: 'dizeres padrao (BIZUS): guarda contra valor salvo ilegivel' },
   { arq: 'teste-rede.js', o: 'rede debaixo da transcricao (placa->CPU->nuvem)' },

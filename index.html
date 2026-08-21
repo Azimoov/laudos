@@ -3469,6 +3469,24 @@ async function gerarLaudo(exId, opts){
       if(_anosRef!=null)
         _corpoFinal = refEscreverNoCorpo({corpo:_corpoFinal}, _anosRef, ex.sexoPac||'');
     }catch(e){ log('Falha ao escrever a referência no corpo de '+ex.paciente+': '+e.message, true); }
+    /* BLOCO 3 do pacote de mama (21/08/2026): APRESENTAÇÃO dos achados. A ordem destes três
+       passos importa — ordenar primeiro (§9A) e só depois agrupar em lista (§05), senão a
+       lista congelaria uma ordem que a ordenação ainda ia mexer. A correlação (§9B) vem por
+       último porque ela se prende ao ÚLTIMO achado, e antes disso não se sabe qual é.
+       Cada passo devolve o texto INTACTO quando não dá, e cada um que acontece é DITO ao
+       médico — texto de laudo remexido em silêncio é o que ninguém quer descobrir depois. */
+    if(ex.tipo==='mama'){
+      try{
+        var _ord=mamaOrdenarAchados(_corpoFinal, (resp.birads||[]));
+        if(_ord.mudou){ _corpoFinal=_ord.corpo; log('Achados reordenados por gravidade dentro de cada mama.'); }
+        var _lst=mamaListaMultiplos(_corpoFinal, (resp.birads||[]));
+        if(_lst.mudou){ _corpoFinal=_lst.corpo;
+          log(_lst.n+' achados semelhantes viraram lista, em vez de prosa repetida (ACR, achados múltiplos).'); }
+        var _cor=mamaCorrelacao(_corpoFinal);
+        if(_cor.mudou){ _corpoFinal=_cor.corpo;
+          log('Correlação com outro método registrada'+(_cor.metodo?(' ('+_cor.metodo+')'):' — ausência declarada')+'.'); }
+      }catch(e){ log('Apresentação dos achados de mama não foi aplicada: '+e.message, true); }
+    }
     /* Doppler arterial: as travas rodam sobre o laudo PRONTO (título + corpo + conclusão
        já montados), porque o membro errado pode aparecer em qualquer um dos três. */
     if(EX_DOPPLER_ART[ex.tipo]){
@@ -7913,6 +7931,15 @@ function mamaLocalDoTexto(txt){
     out.mm=[a,b,c].filter(function(x){ return x!=null; });
     if(!out.mm.length) out.mm=null;
   }
+  /* UMA dimensão só ("medindo 4 mm"). Faltava, e a falta não era inofensiva: cisto pequeno
+     costuma ser descrito com um número só, e sem ler esse número a lista de achados
+     múltiplos saía dizendo "medida não informada" — e, pior, a detecção de achado
+     DOMINANTE nunca rodava, porque ela precisa comparar tamanhos. Um cisto de 30 mm entrava
+     na lista junto com os de 3 mm, como se fossem equivalentes. */
+  else if((m=/medindo\s*(?:cerca de\s*)?([\d.,]+)\s*(mm|cm)\b/i.exec(t))){
+    var un=mamaMm(m[1], m[2]);
+    if(un!=null) out.mm=[un];
+  }
   /* Profundidade em MILÍMETRO, quando o laudo a diz ("a 1,5 cm da pele"). É o único jeito
      honesto de escrever um número na linha que vai da pele até o nódulo: se o número não
      está no laudo, ele não é escrito — a linha sai com a palavra ("profundidade média").
@@ -8525,6 +8552,189 @@ function _mamaData(s){
   if(m) return Date.UTC(+m[3], +m[2]-1, +m[1]);
   var d=Date.parse(String(s||''));
   return isFinite(d)?d:null;
+}
+
+/* ============ BLOCO 3 — apresentação dos achados de mama ============
+   Especificações 05 (lista de achados múltiplos) e 09 (ordenação e correlação), 21/08/2026.
+
+   TUDO AQUI MEXE NO TEXTO DO LAUDO, e por isso vale dizer o que NÃO se faz: nenhuma destas
+   funções acrescenta, apaga ou reescreve conteúdo clínico. Elas só REORDENAM linhas e
+   trocam prosa repetida por lista. Cada uma carrega a mesma trava: se o resultado não
+   contiver exatamente as mesmas linhas de achado que entraram, a transformação é
+   DESCARTADA e o texto original volta. Embaralhar laudo é pior que laudo feio.
+
+   POR QUE EM TEXTO, E NÃO EM TABELA HTML (a especificação 05 sugeria tabela zebrada):
+   o corpo do laudo é um campo editável que vai e volta do médico. Uma tabela em HTML
+   viveria FORA desse texto — ele editaria a descrição e a tabela não acompanharia. É
+   exatamente a divergência que o esquema anatômico foi desenhado para nunca ter. Em texto,
+   a lista é editável, imprime igual e continua sendo a fonte única. */
+
+/* As linhas de achado, por bloco de mama. Achado é linha que traz localização — é o que
+   distingue "Notou-se nódulo às 10h..." de "Pele sem alterações". */
+function _mamaBlocosCorpo(corpo){
+  var linhas=String(corpo||'').split('\n'), blocos=[], atual=null;
+  linhas.forEach(function(ln,i){
+    var m=/^\*\*MAMA (DIREITA|ESQUERDA)\*\*/i.exec(ln.trim());
+    if(m){ atual={lado:(/D/i.test(m[1][0])?'D':'E'), ini:i, fim:i, achados:[]}; blocos.push(atual); return; }
+    if(!atual) return;
+    atual.fim=i;
+    if(/às?\s*\d{1,2}\s*(?:h\b|horas?\b)/i.test(ln) && /dist/i.test(ln)) atual.achados.push(i);
+  });
+  return {linhas:linhas, blocos:blocos};
+}
+/* Categoria de um item do birads[] da IA, pela MESMA conta que o laudo usa. */
+function _mamaCatDoAchado(d){
+  d=d||{};
+  if(d.caso_especial && BIRADS_ESPECIAIS[d.caso_especial]) return BIRADS_ESPECIAIS[d.caso_especial][0];
+  try{
+    var L=classifLerDescritores('birads', d);
+    if(L.falta.length) return '';
+    return biradsAvaliar(L.achou).cat;
+  }catch(e){ return ''; }
+}
+/* Gravidade para ordenar. Categoria vazia (faltou descritor) vai para o FIM, não para o
+   começo: achado que o programa não conseguiu classificar não pode passar por urgente. */
+const MAMA_RANK={'5':90,'4C':80,'4B':70,'4A':60,'4':55,'0':50,'0a':50,'0b':50,'6':95,'3':30,'2':20,'1':10};
+function _mamaRank(cat){ var v=MAMA_RANK[String(cat||'').toUpperCase()]; return v==null?-1:v; }
+
+/* §9A — ORDENAR POR GRAVIDADE dentro de cada mama. O médico que recebe o laudo escaneia
+   mais rápido quando o achado mais preocupante vem primeiro. É reordenação de
+   APRESENTAÇÃO: durante o exame ele continua ditando na ordem que quiser.
+   Empate de categoria mantém a ordem de ditado — não se inventa critério de desempate. */
+function mamaOrdenarAchados(corpo, birads){
+  var B=_mamaBlocosCorpo(corpo);
+  if(!B.blocos.length) return {corpo:corpo, mudou:false};
+  var bir=Array.isArray(birads)?birads:[];
+  var catDaLinha=function(txt){
+    for(var i=0;i<bir.length;i++){
+      var rot=String((bir[i]||{}).localizacao||'').split(/[,;]/)[0].trim();
+      if(rot && norm(txt).indexOf(norm(rot))>=0) return _mamaCatDoAchado(bir[i]);
+    }
+    return '';
+  };
+  var linhas=B.linhas.slice(), mudou=false;
+  B.blocos.forEach(function(bl){
+    if(bl.achados.length<2) return;
+    var itens=bl.achados.map(function(i,ordem){
+      return {i:i, txt:B.linhas[i], rank:_mamaRank(catDaLinha(B.linhas[i])), ordem:ordem};
+    });
+    var ordenado=itens.slice().sort(function(a,b){
+      return (b.rank-a.rank) || (a.ordem-b.ordem);       // empate: ordem de ditado
+    });
+    if(ordenado.every(function(x,k){ return x.i===itens[k].i; })) return;   // já estava certo
+    bl.achados.forEach(function(pos,k){ linhas[pos]=ordenado[k].txt; });
+    mudou=true;
+  });
+  if(!mudou) return {corpo:corpo, mudou:false};
+  var novo=linhas.join('\n');
+  /* A TRAVA: mesmas linhas, só que em outra ordem. Qualquer linha perdida, duplicada ou
+     alterada e a reordenação inteira é jogada fora. Laudo embaralhado é dano; laudo na
+     ordem de ditado é só menos cômodo. */
+  var antes=String(corpo||'').split('\n').slice().sort().join('');
+  var depois=linhas.slice().sort().join('');
+  if(antes!==depois) return {corpo:corpo, mudou:false};
+  return {corpo:novo, mudou:true};
+}
+
+/* §05 — LISTA DE ACHADOS MÚLTIPLOS.
+   Base normativa (ACR v2025, Report Organization, item d): achados múltiplos bilaterais
+   circunscritos são avaliados como benignos pela multiplicidade e devem ser relatados
+   "in list format by breast, by location within the breast, and by size" — porque quem
+   fizer o exame seguinte agradece uma lista concisa em vez de prosa longa.
+   Dispara só com os TRÊS critérios: 3 ou mais do mesmo tipo, mesma categoria, e nenhum
+   achado dominante. */
+const MAMA_LISTA_MIN=3;
+/* Dominância: um achado do grupo com o maior diâmetro >= 2x o menor do grupo sai da lista
+   e volta para a prosa, com marcador próprio no desenho.
+   ⚠️ ESTE 2x É NOSSO, não do manual — o ACR fala em "achado dominante" sem dar número.
+   Está aqui declarado para poder ser discutido e trocado, em vez de virar regra invisível. */
+const MAMA_LISTA_DOMINANTE=2;
+function mamaListaMultiplos(corpo, birads){
+  var B=_mamaBlocosCorpo(corpo);
+  var todos=[];
+  B.blocos.forEach(function(bl){ bl.achados.forEach(function(i){
+    var loc=mamaLocalDoTexto(B.linhas[i]);
+    todos.push({i:i, lado:bl.lado, linha:B.linhas[i], tipo:_mamaTipoDe(B.linhas[i]),
+                hora:loc.hora, distCm:loc.distCm,
+                mm:(loc.mm&&loc.mm.length)?Math.max.apply(null,loc.mm):null});
+  }); });
+  if(todos.length<MAMA_LISTA_MIN) return {corpo:corpo, mudou:false, n:0};
+  var bir=Array.isArray(birads)?birads:[];
+  var cat=function(txt){
+    for(var i=0;i<bir.length;i++){
+      var rot=String((bir[i]||{}).localizacao||'').split(/[,;]/)[0].trim();
+      if(rot && norm(txt).indexOf(norm(rot))>=0) return _mamaCatDoAchado(bir[i]);
+    }
+    return '';
+  };
+  // agrupa por tipo + categoria; só grupos benignos entram (categoria 2 ou 3)
+  var grupos={};
+  todos.forEach(function(a){
+    a.cat=cat(a.linha);
+    if(a.cat!=='2' && a.cat!=='3') return;
+    (grupos[a.tipo+'|'+a.cat]=grupos[a.tipo+'|'+a.cat]||[]).push(a);
+  });
+  var chave=Object.keys(grupos).filter(function(k){ return grupos[k].length>=MAMA_LISTA_MIN; })[0];
+  if(!chave) return {corpo:corpo, mudou:false, n:0};
+  var g=grupos[chave];
+  // achado dominante sai do grupo e continua em prosa
+  var comMedida=g.filter(function(a){ return a.mm!=null; });
+  if(comMedida.length>=2){
+    var menor=Math.min.apply(null, comMedida.map(function(a){ return a.mm; }));
+    g=g.filter(function(a){ return !(a.mm!=null && menor>0 && a.mm/menor>=MAMA_LISTA_DOMINANTE); });
+  }
+  if(g.length<MAMA_LISTA_MIN) return {corpo:corpo, mudou:false, n:0};
+  // ordena: por mama, e por hora crescente dentro da mama
+  g.sort(function(a,b){ return (a.lado===b.lado ? (a.hora-b.hora) : (a.lado==='D'?-1:1)); });
+  var nome={cisto:'formações císticas simples', microcistos:'agrupamentos de microcistos',
+            nodulo:'imagens nodulares', linfonodo:'linfonodos intramamários'}[g[0].tipo]
+          || 'achados de aspecto semelhante';
+  var lista=['Notaram-se '+g.length+' '+nome+', de aspecto habitual, distribuídos conforme a lista abaixo:'];
+  g.forEach(function(a){
+    lista.push('  • Mama '+(a.lado==='D'?'direita':'esquerda')+', '+a.hora+'h, '
+      +a.distCm+' cm da papila — '+(a.mm!=null?(Math.round(a.mm)+' mm'):'medida não informada'));
+  });
+  lista.push(biradsLinhaCategoria(g[0].cat, '').replace('Categoria: BI-RADS '+g[0].cat,
+             'Categoria: BI-RADS '+g[0].cat+' (achados múltiplos)'));
+  // troca: a PRIMEIRA linha do grupo vira a lista; as demais somem
+  var linhas=B.linhas.slice(), primeiro=Math.min.apply(null, g.map(function(a){ return a.i; }));
+  var fora={}; g.forEach(function(a){ fora[a.i]=true; });
+  var saida=[];
+  linhas.forEach(function(ln,i){
+    if(i===primeiro){ saida.push(lista.join('\n')); return; }
+    if(fora[i]) return;
+    saida.push(ln);
+  });
+  return {corpo:saida.join('\n'), mudou:true, n:g.length};
+}
+
+/* §9B — CORRELAÇÃO COM OUTRO MÉTODO.
+   Base (ACR v2025, item e): se um achado de US corresponde a achado de outro método ou a
+   achado clínico, a correlação DEVE ser relatada. E o manual pede que a AUSÊNCIA de
+   correlação também seja dita — não é omissão, é afirmação.
+   Só se aplica em investigação diagnóstica: em rastreamento de rotina não há outro método
+   a correlacionar. Lido do próprio texto, sem custar token à IA. */
+function mamaCorrelacao(corpo){
+  var texto=String(corpo||'');
+  var ind=/INDICAÇÃO:([^\n]*)/i.exec(texto);
+  var indicacao=ind?norm(ind[1]):'';
+  if(!indicacao || /rastreamento/.test(indicacao)) return {corpo:texto, mudou:false, metodo:null};
+  if(!/investiga|diagnost|seguimento/.test(indicacao)) return {corpo:texto, mudou:false, metodo:null};
+  if(/correlac/i.test(texto)) return {corpo:texto, mudou:false, metodo:null};   // já dito
+  var t=norm(texto);
+  var metodo = /mamografi|birads mamograf/.test(t) ? 'mamografia'
+             : (/resson|\brm\b/.test(t) ? 'ressonância magnética'
+             : (/palpav|palpáv|nodulo palp/.test(t) ? 'exame clínico' : null));
+  var B=_mamaBlocosCorpo(texto);
+  var ultimo=null;
+  B.blocos.forEach(function(bl){ bl.achados.forEach(function(i){ ultimo=i; }); });
+  if(ultimo==null) return {corpo:texto, mudou:false, metodo:null};
+  var frase = metodo
+    ? 'Achado correlacionável com o descrito à '+metodo+'.'
+    : 'Achado sem correlação identificada em outros métodos de imagem ou exame clínico até o momento.';
+  var linhas=texto.split('\n');
+  linhas[ultimo]=linhas[ultimo]+'\n'+frase;
+  return {corpo:linhas.join('\n'), mudou:true, metodo:metodo};
 }
 
 /* ============ Categoria BI-RADS por extenso: rótulo + probabilidade + conduta ============

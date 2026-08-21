@@ -66,6 +66,13 @@ ok(api.mamaLocalDoTexto('às 2h').hora === 2, 'aceita "2h" colado');
 ok(api.mamaLocalDoTexto('às 2 horas').hora === 2, 'e "2 horas" por extenso');
 ok(api.mamaLocalDoTexto('medindo 1,4 x 0,7 cm').mm[0] === 14,
    'medida em CENTÍMETRO no texto é convertida (1,4 cm -> 14 mm)');
+// 21/08: faltava ler UMA dimensão só, e a falta não era inofensiva — cisto pequeno costuma
+// ser descrito com um número só, e sem lê-lo a lista de achados múltiplos dizia "medida não
+// informada" e a detecção de achado DOMINANTE nunca rodava (ela compara tamanhos).
+ok(String(api.mamaLocalDoTexto('medindo 4 mm').mm) === '4', 'uma dimensão só também é lida');
+ok(String(api.mamaLocalDoTexto('medindo 0,9 cm').mm) === '9', 'e convertida quando vem em cm');
+ok(String(api.mamaLocalDoTexto('medindo 12 x 8 mm').mm) === '12,8',
+   'e a de duas dimensões continua vencendo a de uma');
 ok(api.mamaLocalDoTexto('lesão retroareolar').distCm === 0, 'retroareolar é distância zero');
 ok(api.mamaLocalDoTexto('às 25 h').hora === null, 'hora fora de 1–12 é recusada');
 ok(api.mamaLocalDoTexto('texto sem nada disso').hora === null, 'frase sem hora não inventa hora');

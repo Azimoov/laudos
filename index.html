@@ -3504,6 +3504,18 @@ async function gerarLaudo(exId, opts){
       _classifBruto:{tirads:(resp.tirads||[]), birads:(resp.birads||[]), orads:(resp.orads||[])},
       _conclusaoBase:(resp.conclusao||mod.conclusao||''),
       _descritores:_escAntes||undefined,
+      /* EXAMES ANTERIORES, já lidos em achados (21/08/2026, especificação 04). O texto do
+         anterior é buscado AQUI, na geração, de forma assíncrona — e a tela de revisão é
+         síncrona. Guardar os achados extraídos agora é o que permite ao gráfico de evolução
+         existir na revisão sem uma segunda ida ao banco, e é também o que faz o par
+         continuar resolvido quando o laudo for reaberto do histórico meses depois.
+         Só para mama, e só o que dá para ler: achado sem posição não entra. */
+      anteriores: (ex.tipo==='mama' && anteriorTxt)
+        ? usados.map(function(A,i){
+            var pedaco=anteriorTxt.split(/--- EXAME ANTERIOR /)[i+1]||'';
+            return {id:A.id, data:A.data||'', lesoes:mamaLesoesDeTexto(pedaco)};
+          }).filter(function(x){ return x.lesoes.length; })
+        : [],
       // de qual imagem a IA tirou cada seção — ela já estava olhando, agora anota enquanto lê
       procedencia:(Array.isArray(resp.procedencia)?resp.procedencia:[]),
       trechos:trechosEx,
@@ -5302,7 +5314,8 @@ function abrirRevisao(exId, semTela){
      conclusão e da categoria. Não no rodapé, não no fim. Contenteditable="false" porque o
      desenho não se edita digitando: ele nasce do texto, e é editando o texto (ou, adiante,
      arrastando o marcador) que ele muda. */
-  +((ex.tipo==='mama') ? ('<div id="mamaEsqBox" contenteditable="false">'+mamaEsquemaHTML(L)+'</div>') : '')
+  +((ex.tipo==='mama') ? ('<div id="mamaEsqBox" contenteditable="false">'+mamaEsquemaHTML(L)+'</div>'
+                        + '<div contenteditable="false">'+mamaEvolucaoHTML(ex)+'</div>') : '')
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')
   +'</div></div>'
@@ -8313,6 +8326,205 @@ function _mamaIniciar(ev, caixa, ex, mover, soltar){
   document.addEventListener('mousemove', mover);
   document.addEventListener('touchmove', mover, {passive:false});
   ev.preventDefault();
+}
+
+/* ============ GRÁFICO DE EVOLUÇÃO DO ACHADO ============
+   Especificação 04 do pacote de mama (21/08/2026).
+
+   DESENHAR É A PARTE FÁCIL. A difícil é AFIRMAR QUE O NÓDULO DE HOJE É O MESMO DE DOIS
+   ANOS ATRÁS — e isso é afirmação clínica, não conta. Errar o pareamento produz gráfico
+   mostrando crescimento onde não houve, ou estabilidade onde há lesão nova, e nos dois
+   casos com aparência de dado conferido. Por isso, aqui:
+     - o sistema só SUGERE candidatos, nunca decide;
+     - sem confirmação do médico não existe gráfico — silêncio é melhor que gráfico errado;
+     - "não sei" é resposta de primeira classe, não um "não" disfarçado;
+     - vários candidatos são todos listados; nunca se escolhe "o mais próximo". */
+
+/* Lê as lesões de um laudo ANTIGO, que chega como texto corrido. Funciona melhor do que a
+   especificação temia, por um motivo que o bloco 1 criou: a frase de localização passou a
+   ter molde fixo nos dizeres, então o texto do próprio médico segue esse molde. */
+function mamaLesoesDeTexto(texto){
+  var frases=String(texto||'').split(/\.\s+/), out=[];
+  frases.forEach(function(fr){
+    if(!/às?\s*\d{1,2}\s*(?:h\b|horas?\b)/i.test(fr)) return;   // sem hora não é achado localizado
+    var loc=mamaLocalDoTexto(fr);
+    if(!loc.lado || loc.hora==null || loc.distCm==null) return;
+    out.push({ lado:loc.lado, hora:loc.hora, distCm:loc.distCm,
+               mm:(loc.mm||[]), tipo:_mamaTipoDe(fr), frase:fr.trim() });
+  });
+  return out;
+}
+/* O "tipo de achado" do critério de pareamento. Grosso de propósito: cisto com cisto,
+   nódulo com nódulo. Fino demais viraria motivo de recusar par legítimo. */
+function _mamaTipoDe(txt){
+  var t=norm(txt);
+  if(/microcisto/.test(t)) return 'microcistos';
+  if(/cisto/.test(t)) return 'cisto';
+  if(/linfonodo/.test(t)) return 'linfonodo';
+  if(/nodul|massa/.test(t)) return 'nodulo';
+  return 'outro';
+}
+/* §2.1 — CANDIDATURA. Falhou UM critério, não é candidato. Nada de "por aproximação":
+   pareamento frouxo é exatamente como o gráfico mentiria com cara de dado conferido. */
+const MAMA_PAR_HORA_TOL=1;      // ± 1 hora
+const MAMA_PAR_DIST_TOL=1;      // ± 1 cm
+function mamaCandidatos(atual, anteriores){
+  if(!atual || !atual.lado || atual.hora==null || atual.distCm==null) return [];
+  var tipoA=atual.tipo||_mamaTipoDe(atual.rotulo||'');
+  return (anteriores||[]).filter(function(v){
+    if(!v || v.lado!==atual.lado) return false;                      // lado: sem tolerância
+    if((v.tipo||'outro')!==tipoA) return false;                      // tipo: idêntico
+    /* Achado já biopsiado NUNCA é candidato (especificação 07 §3): o original foi retirado
+       ou tratado, então o que existe ali hoje é, por definição, evento novo. Comparar como
+       se ainda estivesse em vigilância é erro de ESTADO, não dado faltando. */
+    if(v.status && v.status!=='ativo') return false;
+    var dh=Math.abs(v.hora-atual.hora); dh=Math.min(dh, 12-dh);      // 12h e 1h distam 1
+    if(dh>MAMA_PAR_HORA_TOL) return false;
+    if(Math.abs(v.distCm-atual.distCm)>MAMA_PAR_DIST_TOL) return false;
+    return true;
+  });
+}
+/* §6 — a frase que acompanha. FATO BRUTO, sem rótulo. A leitura da fonte primária foi
+   explícita: o manual NÃO dá percentual de crescimento que mude conduta; a decisão é do
+   radiologista. Então o sistema não escreve "cresceu" nem "manteve" — escreve os dois
+   números e a data, e a leitura fica com o médico, olhando o gráfico. Inventar um corte
+   percentual repetiria o defeito que a própria auditoria apontou nos dizeres: número sem
+   fonte declarada, indefensável se questionado. */
+function mamaFraseComparacao(mmAtual, mmAnterior, dataAnterior){
+  if(mmAtual==null || mmAnterior==null) return '';
+  return 'Em comparação ao exame de '+(dataAnterior||'data não registrada')
+       + ', o achado mede '+Math.round(mmAtual)+' mm (havia '+Math.round(mmAnterior)+' mm).';
+}
+/* §5 — o desenho. As regras aqui NÃO são estéticas:
+     - eixo Y COMEÇA EM ZERO. Eixo cortado transforma 1 mm de variação em subida dramática,
+       e é o jeito mais fácil de mentir com gráfico. Aqui a mentira mudaria conduta.
+     - eixo X em escala REAL de tempo. Pontos igualmente espaçados escondem que um
+       intervalo foi de 6 meses e o outro de 3 anos — e no BI-RADS 3 o intervalo É o dado.
+     - cor NEUTRA, sem verde/vermelho e sem seta de tendência: seria um segundo
+       diagnóstico, visual, correndo em paralelo ao texto.
+     - nota de variabilidade fixa no rodapé: medida de ultrassom varia entre examinadores,
+       e sem essa nota dois pontos com 1 mm de diferença viram "cresceu". */
+function mamaGraficoSVG(pontos){
+  var p=(pontos||[]).filter(function(x){ return x && x.mm!=null && x.t!=null; })
+                    .sort(function(a,b){ return a.t-b.t; });
+  if(p.length<2) return '';        // §4: gráfico de um ponto só não é gráfico, é enfeite
+  var L=44, R=248, T=16, B=104;
+  var t0=p[0].t, t1=p[p.length-1].t, dt=(t1-t0)||1;
+  var maxV=Math.max.apply(null,p.map(function(x){ return x.mm; }));
+  var topo=Math.max(5, Math.ceil(maxV*1.2/5)*5);            // sempre a partir do ZERO
+  var X=function(t){ return L+((t-t0)/dt)*(R-L); };
+  var Y=function(v){ return B-(v/topo)*(B-T); };
+  var s='';
+  [0, topo/2, topo].forEach(function(v){
+    s+='<line x1="'+L+'" y1="'+Y(v).toFixed(1)+'" x2="'+R+'" y2="'+Y(v).toFixed(1)+'" stroke="#e2e6ee" stroke-width="0.8"/>'
+      +'<text x="'+(L-5)+'" y="'+(Y(v)+3).toFixed(1)+'" font-size="7.5" fill="#6b7385" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+Math.round(v)+'</text>';
+  });
+  s+='<text x="'+(L-5)+'" y="'+(T-5)+'" font-size="7.5" fill="#6b7385" text-anchor="end" font-family="Arial,Helvetica,sans-serif">mm</text>';
+  s+='<polyline fill="none" stroke="#6A4FB6" stroke-width="1.6" points="'
+    + p.map(function(x){ return X(x.t).toFixed(1)+','+Y(x.mm).toFixed(1); }).join(' ')+'"/>';
+  p.forEach(function(x,i){
+    var cx=X(x.t), cy=Y(x.mm), atual=!!x.atual;
+    s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+(atual?4.6:3.4)+'" '
+      +'fill="'+(atual?'#6A4FB6':'#fff')+'" stroke="#6A4FB6" stroke-width="1.6"/>'
+      +'<text x="'+cx.toFixed(1)+'" y="'+(cy-8).toFixed(1)+'" font-size="8" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+Math.round(x.mm)+'</text>'
+      +'<text x="'+cx.toFixed(1)+'" y="'+(B+12)+'" font-size="7" fill="#6b7385" text-anchor="'+(i===0?'start':(i===p.length-1?'end':'middle'))+'" font-family="Arial,Helvetica,sans-serif">'+esc(x.rot||'')+'</text>';
+    if(atual) s+='<text x="'+cx.toFixed(1)+'" y="'+(B+22)+'" font-size="7" fill="#6A4FB6" text-anchor="end" font-weight="bold" font-family="Arial,Helvetica,sans-serif">este exame</text>';
+  });
+  s+='<text x="'+L+'" y="136" font-size="6.8" fill="#6b7385" font-family="Arial,Helvetica,sans-serif">'
+   + 'Medida de ultrassom varia entre examinadores e aparelhos; diferenças pequenas podem não ser reais.</text>';
+  return '<svg viewBox="0 0 260 142" width="260" height="142" xmlns="http://www.w3.org/2000/svg" role="img" '
+       + 'aria-label="Evolução do tamanho do achado ao longo do tempo">'+s+'</svg>';
+}
+
+/* §2.2 — O MÉDICO CONFIRMA, SEMPRE. Candidato não vira par sozinho.
+   A resposta fica gravada no laudo (L.evolucao), então o par já vem resolvido quando o
+   laudo for reaberto — e no exame seguinte, porque o laudo de hoje vira o anterior de
+   amanhã. "não sei" é resposta de PRIMEIRA CLASSE: não é um "não" disfarçado, é o médico
+   dizendo que não dá para afirmar, e nesse caso não há gráfico nem frase de comparação. */
+function mamaEvolucaoDecidir(exId, lesaoId, decisao, idxAnt, idxLes){
+  var ex=exames.find(function(e){ return e.id===exId; }); if(!ex||!ex.laudo) return;
+  var L=ex.laudo; L.evolucao=L.evolucao||{};
+  if(decisao==='outro' || decisao==='naosei'){
+    L.evolucao[lesaoId]={decisao:decisao};
+  }else{
+    var A=(L.anteriores||[])[idxAnt]; if(!A) return;
+    var v=(A.lesoes||[])[idxLes]; if(!v) return;
+    L.evolucao[lesaoId]={decisao:'mesmo', anteriorId:A.id, anteriorData:A.data,
+                         anteriorMm:(v.mm&&v.mm.length?Math.max.apply(null,v.mm):null)};
+  }
+  if(typeof revMarcarEditado==='function') revMarcarEditado();
+  abrirRevisao(exId, true);
+}
+/* O bloco inteiro da evolução, por achado plotado. Devolve '' quando não há exame anterior
+   com achados legíveis — e aí a tela simplesmente não fala do assunto, em vez de mostrar
+   uma pergunta sem resposta possível. */
+function mamaEvolucaoHTML(ex){
+  var L=(ex&&ex.laudo)||{}, ants=L.anteriores||[];
+  if(!ants.length) return '';
+  var r=mamaLesoes(L); if(!r.plot.length) return '';
+  var dec=L.evolucao||{}, h='';
+  r.plot.forEach(function(les){
+    var mmAtual=(les.mm&&les.mm.length)?Math.max.apply(null,les.mm):null;
+    var d=dec[les.id];
+    if(d && d.decisao==='outro') return;                    // é outro achado: nada a comparar
+    if(d && d.decisao==='naosei'){
+      h+='<div style="font-size:11px;color:#6b7385;margin-top:6px">Achado <b>'+les.n+'</b> — '
+       + 'comparação com o exame anterior não feita, a seu pedido.</div>';
+      return;
+    }
+    if(d && d.decisao==='mesmo'){
+      var pontos=[];
+      if(d.anteriorMm!=null) pontos.push({t:_mamaData(d.anteriorData), mm:d.anteriorMm, rot:d.anteriorData||''});
+      if(mmAtual!=null) pontos.push({t:Date.now(), mm:mmAtual, rot:'hoje', atual:true});
+      var g=mamaGraficoSVG(pontos);
+      h+='<div style="margin-top:8px"><div style="font-size:11.5px;color:#3F3357;font-weight:600">'
+       + 'Achado '+les.n+' — evolução</div>'
+       + (g || '<div style="font-size:11px;color:#8a5a00">Sem medida no exame anterior: a '
+             + 'comparação não foi possível para este achado.</div>')
+       + (mamaFraseComparacao(mmAtual, d.anteriorMm, d.anteriorData)
+          ? '<div style="font-size:11px;color:#3F3357;margin-top:2px">'
+            + esc(mamaFraseComparacao(mmAtual, d.anteriorMm, d.anteriorData))+'</div>' : '')
+       + '</div>';
+      return;
+    }
+    // ainda sem resposta: a PERGUNTA. Todos os candidatos, nenhum pré-escolhido.
+    var perguntas=[];
+    ants.forEach(function(A,ia){
+      mamaCandidatos(les, A.lesoes||[]).forEach(function(v){
+        var iv=(A.lesoes||[]).indexOf(v);
+        perguntas.push({ia:ia, iv:iv, data:A.data,
+          txt:'mama '+(v.lado==='D'?'direita':'esquerda')+', '+v.hora+'h, '+v.distCm+' cm da papila'
+             +(v.mm&&v.mm.length?(', '+Math.round(Math.max.apply(null,v.mm))+' mm'):'')});
+      });
+    });
+    if(!perguntas.length) return;                            // achado novo: §2.3, sem gráfico
+    h+='<div style="margin-top:8px;padding:8px;border:1px dashed #c8b3f0;border-radius:8px;background:#fbf9ff">'
+     + '<div style="font-size:11.5px;color:#3F3357">O achado <b>'+les.n+'</b> (mama '
+     + (les.lado==='D'?'direita':'esquerda')+', '+les.hora+'h, '+les.distCm+' cm da papila'
+     + (mmAtual!=null?(', '+Math.round(mmAtual)+' mm'):'')+') parece corresponder a:</div>';
+    perguntas.forEach(function(q){
+      h+='<div style="margin-top:4px;font-size:11.5px;color:#3F3357">• '+esc(q.txt)
+       + ' <span style="color:#6b7385">— exame de '+esc(q.data||'data não registrada')+'</span> '
+       + '<button class="bt" style="padding:2px 8px;font-size:11px" onclick="mamaEvolucaoDecidir('
+       + ex.id+',\''+les.id+'\',\'mesmo\','+q.ia+','+q.iv+')">é o mesmo</button></div>';
+    });
+    h+='<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'
+     + '<button class="bt cinza" style="padding:2px 8px;font-size:11px" onclick="mamaEvolucaoDecidir('
+     + ex.id+',\''+les.id+'\',\'outro\')">é outro achado</button>'
+     + '<button class="bt cinza" style="padding:2px 8px;font-size:11px" onclick="mamaEvolucaoDecidir('
+     + ex.id+',\''+les.id+'\',\'naosei\')">não sei — não comparar</button></div>'
+     + '<div style="font-size:10px;color:#6b7385;margin-top:4px">Sem a sua confirmação não há '
+     + 'gráfico: comparar o achado errado mostraria crescimento onde não houve.</div></div>';
+  });
+  return h;
+}
+/* Data em texto (dd/mm/aaaa) para milissegundos. Sem data legível devolve nulo, e ponto
+   sem data não entra no gráfico — eixo X em tempo real precisa de tempo de verdade. */
+function _mamaData(s){
+  var m=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s||''));
+  if(m) return Date.UTC(+m[3], +m[2]-1, +m[1]);
+  var d=Date.parse(String(s||''));
+  return isFinite(d)?d:null;
 }
 
 /* ============ Categoria BI-RADS por extenso: rótulo + probabilidade + conduta ============

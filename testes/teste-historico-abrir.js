@@ -32,6 +32,20 @@ ok(/areaImpressaoHist.*innerHTML=html/s.test(abrir), 'o HTML guardado é escrito
 ok(/telaVerLaudo.*style\.display='block'/s.test(abrir), 'e a tela é mostrada');
 ok(/classList\.add\('verHist'\)/.test(abrir), 'marcando no body que é laudo do histórico');
 
+console.log('\n=== e abre POR CIMA, não por trás ===');
+// A primeira versão saiu com z-index 60 enquanto TODAS as telas cheias deste app usam
+// 9000. Ela abria atrás do histórico, que é opaco — de fora parecia que o botão não fazia
+// nada, exatamente como antes do conserto. Bug corrigido reaparecendo com outra cara.
+const zTelas = (HTML.match(/#tela[A-Za-z]+\{position:fixed;inset:0;z-index:(\d+)/g) || [])
+  .map(s => +/z-index:(\d+)/.exec(s)[1]);
+ok(zTelas.length >= 4, 'as telas cheias do app têm z-index declarado (' + zTelas.length + ')');
+const zVer = +/id="telaVerLaudo"[^>]*z-index:(\d+)/.exec(HTML)[1];
+ok(zVer >= Math.max.apply(null, zTelas),
+   'e a tela de leitura fica em cima de todas (' + zVer + ' contra ' + Math.max.apply(null, zTelas) + ')');
+const abrir2 = CODIGO.slice(CODIGO.indexOf('abrindo o laudo guardado'), CODIGO.indexOf('function hisFecharLaudo'));
+ok(/telaHistorico.*display='none'/s.test(abrir2),
+   'e o histórico sai da frente — duas telas cheias empilhadas deixam a rolagem do fundo viva');
+
 console.log('\n=== dá para sair, e sair limpa ===');
 const fechar = CODIGO.slice(CODIGO.indexOf('function hisFecharLaudo'), CODIGO.indexOf('function hisFecharLaudo') + 500);
 ok(/display='none'/.test(fechar), 'fechar esconde a tela');

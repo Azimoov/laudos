@@ -28,6 +28,26 @@ ok(/id="dicomInfo"/.test(HTML), 'e o lugar do aviso também');
 });
 ok(/onclick="dicomImportar\(\)"/.test(HTML), 'o botão de importar também tem quem o chame');
 
+console.log('\n=== a lista diz QUAL exame é cada linha ===');
+// Pedido do médico (21/08): a lista mostrava nome, idade, data e nº de imagens — tudo
+// menos o que decide a escolha. Com 277 estudos e o mesmo paciente três vezes no mesmo
+// dia, não havia como saber qual linha era a mama.
+const api = new Function(
+  HTML.slice(HTML.indexOf('const DICOM_REGIAO'), HTML.indexOf('function dicomRender')) +
+  '\nreturn {dicomRegiao, DICOM_REGIAO};')();
+// as descrições REAIS do Orthanc dele, conferidas na listagem de 21/08
+[['BREAST', 'Mama'], ['GYN', 'Ginecológico'], ['URO', 'Urológico'], ['SMP', 'Partes moles'],
+ ['OB', 'Obstétrico'], ['ABD', 'Abdome'], ['Nerve Blocks', 'Bloqueio de nervo']].forEach(([cod, nome]) =>
+  ok(api.dicomRegiao(cod) === nome, cod + ' -> ' + nome));
+ok(api.dicomRegiao('breast') === 'Mama', 'não depende de maiúscula');
+ok(api.dicomRegiao('XPTO') === 'XPTO',
+   'código desconhecido sai CRU — melhor "XPTO" do que nada, e melhor que eu adivinhar');
+ok(api.dicomRegiao('') === '' && api.dicomRegiao(null) === '', 'sem descrição, sem etiqueta');
+const render = HTML.slice(HTML.indexOf('function dicomRender'), HTML.indexOf('function dicomMarcarTodos'));
+ok(/dicomRegiao\(e\.descricao\)/.test(render), 'a lista usa a região de cada estudo');
+ok(render.indexOf('dicomRegiao(e.descricao)') < render.indexOf('anos · '),
+   'e ela vem logo depois do nome, antes de idade e data — é por ela que se escolhe');
+
 console.log('\n=== ele está na tela CERTA ===');
 // Foi removido da aba "Arquivos acumulados" a pedido do médico. Voltou na tela de exames
 // antigos, que nasceu depois e é onde puxar exame do aparelho pertence.

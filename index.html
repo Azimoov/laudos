@@ -876,7 +876,11 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
      quem só queria reler um laudo.
      Agora abre aqui, e a impressão sai de graça: o CSS de impressão já esconde tudo menos
      a área do laudo — bastou esta ganhar o mesmo tratamento. -->
-<div id="telaVerLaudo" style="display:none;position:fixed;inset:0;z-index:60;background:#f4f5f8;overflow:auto">
+<!-- z-index 9100, e não um número qualquer: TODAS as telas cheias deste app são
+     position:fixed com z-index 9000. A primeira versão desta aqui saiu com 60, e o
+     resultado foi ela abrir ATRÁS do histórico — que é opaco. Do lado de fora parecia que
+     o botão não fazia nada, exatamente como antes do conserto. -->
+<div id="telaVerLaudo" style="display:none;position:fixed;inset:0;z-index:9100;background:#f4f5f8;overflow:auto">
   <div style="position:sticky;top:0;display:flex;gap:8px;align-items:center;padding:10px 14px;background:#1f5f5b;color:#fff;z-index:2">
     <button class="bt cinza" onclick="hisFecharLaudo()" style="padding:4px 12px">‹ Voltar ao histórico</button>
     <span id="verLaudoQuem" style="flex:1;font-weight:600"></span>
@@ -2732,6 +2736,22 @@ var dicomEstudos=[], dicomProntos=[];   // listados · importados (viram exames 
    e se não vier nenhum o app cai no nome + confirmação do médico. */
 function codDoEstudo(e){ return String((e&&(e.codigo||e.codPaciente||e.patientId||e.PatientID||e.pid))||'').trim(); }
 function dicomInfoTxt(t){ var s=document.getElementById('dicomInfo'); if(s) s.textContent=t; }
+/* QUAL exame é cada um (21/08/2026, pedido do médico). A lista mostrava nome, idade, data e
+   número de imagens — tudo menos o que importa para escolher. Com 277 estudos e o mesmo
+   paciente aparecendo três vezes no mesmo dia, não havia como saber qual linha era a mama.
+   O aparelho carimba a região no DICOM (StudyDescription), e o agente já a entrega em
+   `descricao`; ela só estava sendo jogada fora aqui.
+   Código que não conheço é mostrado CRU, não escondido: melhor "SMP" do que nada, e melhor
+   ainda do que eu adivinhar o que significa. */
+const DICOM_REGIAO = {
+  'BREAST':'Mama', 'GYN':'Ginecológico', 'URO':'Urológico', 'OB':'Obstétrico',
+  'ABD':'Abdome', 'SMP':'Partes moles', 'NERVE BLOCKS':'Bloqueio de nervo',
+  'THYROID':'Tireoide', 'VASCULAR':'Vascular'
+};
+function dicomRegiao(d){
+  var s=String(d||'').trim(); if(!s) return '';
+  return DICOM_REGIAO[s.toUpperCase()] || s;
+}
 async function dicomBuscar(){
   dicomInfoTxt('Procurando exames…');
   try{
@@ -2761,6 +2781,11 @@ function dicomRender(){
         return '<label style="display:flex;gap:8px;align-items:center;font-weight:400;border:1px solid #c8d0da;border-radius:8px;padding:7px 10px;margin-top:4px'+(jaImportado?';opacity:.6':'')+'">'
           +'<input type="checkbox" class="dicomChk" data-i="'+i+'"'+(jaImportado?' disabled':'')+'>'
           +'<span style="flex:1;min-width:140px;font-size:13px"><b>'+String(e.paciente||'(sem nome)').replace(/</g,'&lt;')+'</b>'
+          /* a REGIÃO vem primeiro depois do nome, em etiqueta: é por ela que se escolhe a
+             linha, e com o mesmo paciente três vezes no dia ela é o único jeito de
+             distinguir. Mesmo estilo da etiqueta do Histórico, para ler igual. */
+          +(dicomRegiao(e.descricao)?' <span class="tag" style="background:#e6efee;color:#1f5f5b;border-radius:10px;padding:1px 8px;font-size:11.5px;font-weight:600">'
+              +String(dicomRegiao(e.descricao)).replace(/</g,'&lt;')+'</span>':'')
           +'<span class="aviso"> · '+(e.idade!==''&&e.idade!=null?e.idade+' anos · ':'')+(e.data||'')+(e.hora?' '+e.hora:'')+' · '+e.nImagens+' imagem(ns)'+(jaImportado?' · <b>já importado</b>':'')+'</span></span></label>';
       }).join('');
 }
@@ -11901,6 +11926,10 @@ async function hisRevisar(id){
     document.getElementById('verLaudoNota').textContent=
       'Laudo de outro dia. As imagens do exame não ficam guardadas no histórico, por isso ele '
       +'abre só para leitura e impressão, e não na tela de revisão editável.';
+    /* O histórico sai da frente enquanto o laudo está aberto — é o mesmo gesto que o
+       caminho editável já fazia logo acima. Só o z-index resolveria, mas deixar duas telas
+       cheias empilhadas faz a rolagem do fundo continuar viva por baixo. */
+    var _th=document.getElementById('telaHistorico'); if(_th) _th.style.display='none';
     document.getElementById('telaVerLaudo').style.display='block';
     document.body.classList.add('verHist');
     window.scrollTo(0,0);
@@ -11911,6 +11940,7 @@ function hisFecharLaudo(){
   var t=document.getElementById('telaVerLaudo'); if(t) t.style.display='none';
   document.body.classList.remove('verHist');
   var a=document.getElementById('areaImpressaoHist'); if(a) a.innerHTML='';   // não fica ocupando memória
+  var h=document.getElementById('telaHistorico'); if(h) h.style.display='block';  // volta para onde ele estava
 }
 
 window.addEventListener('DOMContentLoaded', function(){

@@ -3616,6 +3616,22 @@ async function gerarLaudo(exId, opts){
       if(_anosRef!=null)
         _corpoFinal = refEscreverNoCorpo({corpo:_corpoFinal}, _anosRef, ex.sexoPac||'');
     }catch(e){ log('Falha ao escrever a referência no corpo de '+ex.paciente+': '+e.message, true); }
+    /* ASTERISCO + FONTE nos julgamentos de tamanho (21/08/2026, pedido do médico). Vale
+       para QUALQUER exame, não só mama: hepatomegalia, útero aumentado, ovário aumentado,
+       próstata aumentada. A nota vai para o fim do texto, junto das outras ressalvas, que é
+       onde o leitor procura rodapé. Falhar aqui não pode custar o laudo. */
+    var _extraFinal = mod.extra||'';
+    try{
+      var _rv=refVolumeMarcar(_corpoFinal, conclusaoFinal);
+      if(_rv.usados.length){
+        _corpoFinal=_rv.corpo; conclusaoFinal=_rv.conclusao;
+        _extraFinal = (_extraFinal? (_extraFinal+'\n\n') : '') + _rv.nota;
+        var _semFonte=_rv.usados.filter(function(k){ return !REF_VOLUME[k].fonte; });
+        log('Julgamento de tamanho assinalado com * e fonte no rodapé: '+_rv.usados.join(', ')+'.'
+           +(_semFonte.length?(' ⚠️ SEM fonte estabelecida: '+_semFonte.join(', ')+' — o rodapé declara isso.'):''),
+            _semFonte.length>0);
+      }
+    }catch(e){ log('Não consegui assinalar as referências de tamanho: '+e.message, true); }
     /* BLOCO 3 do pacote de mama (21/08/2026): APRESENTAÇÃO dos achados. A ordem destes três
        passos importa — ordenar primeiro (§9A) e só depois agrupar em lista (§05), senão a
        lista congelaria uma ordem que a ordenação ainda ia mexer. A correlação (§9B) vem por
@@ -3659,7 +3675,10 @@ async function gerarLaudo(exId, opts){
         }
       }catch(e){ log('Falha ao conferir o Doppler de '+ex.paciente+': '+e.message, true); }
     }
-    ex.laudo = {cab:resp.cabecalho||{}, corpo:_corpoFinal, conclusao:conclusaoFinal, extra:mod.extra||'', titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas,
+    /* `_extraFinal` e não `mod.extra`: é nele que a nota das referências de tamanho foi
+       acrescentada. Usar mod.extra aqui jogaria o rodapé fora silenciosamente — o asterisco
+       ficaria no texto apontando para uma nota que não existe, que é pior que não marcar. */
+    ex.laudo = {cab:resp.cabecalho||{}, corpo:_corpoFinal, conclusao:conclusaoFinal, extra:(_extraFinal||mod.extra||''), titulo:resp.titulo||mod.titulo, tecnica:mod.tecnica, obs:obsFinal, alertas:alertas,
       // dado ESTRUTURADO para a tela de revisão desenhar os botões de descritor faltando
       // e a caixa âmbar de conflito, sem ter de reinterpretar o texto do aviso
       classifPendencias:_cls.pendencias, classifConflitos:_cls.conflitos,
@@ -5470,6 +5489,17 @@ async function revChatEnviar(){
     if(resp.titulo) L.titulo=resp.titulo;
     if(resp.corpo) L.corpo=resp.corpo;
     if(resp.conclusao) L.conclusao=resp.conclusao;
+    /* REFAZER O LAUDO troca o texto inteiro — e trocaria junto a marcacao de tamanho, que
+       so era feita na geracao. O asterisco sumiria e o rodape ficaria apontando para nada,
+       ou o contrario. Remarca aqui, sobre o texto novo. Achado na revisao de 21/08. */
+    try{
+      var _rv2=refVolumeMarcar(L.corpo, L.conclusao);
+      if(_rv2.usados.length){
+        L.corpo=_rv2.corpo; L.conclusao=_rv2.conclusao;
+        var _b=String(L.extra||'').split('Referências dos julgamentos de tamanho')[0].replace(/\s+$/,'');
+        L.extra=(_b?(_b+'\n\n'):'')+_rv2.nota;   // substitui a nota antiga, nao empilha
+      }
+    }catch(e){}
     if(resp.observacoes_para_o_medico) L.obs=resp.observacoes_para_o_medico;
     ex.laudoBaseTexto=textoBaseLaudo(L);   // atualiza a base p/ o loop de aprendizado não confundir mudança da IA com correção do médico
     abrirRevisao(exId);
@@ -8989,6 +9019,133 @@ function pacienteHTML(ex){
   return h;
 }
 
+/* ============ ASTERISCO E FONTE NO JULGAMENTO DE TAMANHO ============
+   Pedido do Dr. Daniel, 21/08/2026: toda vez que o laudo AFIRMA que algo está aumentado ou
+   reduzido — hepatomegalia, útero aumentado, ovário aumentado, o que for —, tem de haver um
+   asterisco ali e, no fim do texto, a fonte daquele julgamento.
+
+   A auditoria que abriu esta tarefa: 23 frases dos dizeres julgam tamanho, e 22 NÃO
+   declaravam referência nenhuma. Dizer "aumentado" sem dizer aumentado em relação a QUÊ é o
+   mesmo defeito que a auditoria do CBR apontou nos valores sem fonte — só que em forma de
+   adjetivo, que é mais fácil de não notar.
+
+   REGRA DE OURO, a mesma do resto do programa: onde NÃO existe fonte, o rodapé DIZ que não
+   existe, em vez de inventar um número para tapar o buraco. "Referência não estabelecida"
+   escrito é honesto e aciona o médico; número inventado é indefensável se questionado — e
+   num laudo assinado, a assinatura é dele. */
+const REF_VOLUME = {
+  figado: {
+    termos:[/hepatomegalia/i, /f[íi]gado[^.]{0,80}?dimens[õo]es aumentad\w*/i],
+    ref:'fígado, adulto: até 16 cm no lobo direito (longitudinal, linha hemiclavicular)',
+    fonte:'Sienz M, Ignee A, Dietrich CF. Z Gastroenterol 2010;48(9):1141–52 — limite adotado pelo Dr. Daniel em 15/08/2026',
+    ressalva:'a própria revisão propõe o valor com a ressalva de não estar suficientemente avaliado; num estudo com 2.080 adultos, 11,5% dos saudáveis passavam de 16 cm'
+  },
+  baco: {
+    termos:[/esplenomegalia/i, /ba[çc]o[^.]{0,80}?dimens[õo]es aumentad\w*/i],
+    ref:'baço, adulto: até 13 cm no maior eixo longitudinal',
+    fonte:'valor dos modelos do próprio Dr. Daniel — NÃO localizado em fonte primária',
+    ressalva:'contestado por Chow 2016 (Radiology, n=1.230): 26% dos homens adultos saudáveis passam de 12 cm'
+  },
+  ovario: {
+    termos:[/ov[áa]rio\w*[^.]{0,80}?(aumentad\w*|volumos\w*)/i, /aumento do volume ovarian\w*/i],
+    ref:'ovário: até 20 cm³ na pré-menopausa e 10 cm³ na pós-menopausa',
+    fonte:'Pavlik EJ et al. Ovarian volume related to age. Gynecol Oncol 2000;77(3):410–2 (doi 10.1006/gyno.2000.5783) — 13.963 mulheres, 58.673 medidas',
+    ressalva:''
+  },
+  prostata: {
+    termos:[/pr[óo]stata[^.]{0,80}?aumentad\w*/i, /aumento do volume prost[áa]tic\w*/i],
+    ref:'próstata: limite superior 35 mL (inferior 15 mL)',
+    fonte:'Lotti F et al., European Academy of Andrology. Andrology 2022;10(6):1150–71 (doi 10.1111/andr.13217)',
+    ressalva:'a casuística é de homens FÉRTEIS, média de 35 anos — não a faixa em que a hiperplasia costuma ser avaliada; leia o limite com essa distância'
+  },
+  utero: {
+    termos:[/[úu]tero[^.]{0,80}?(aumentad\w*|volumos\w*)/i, /aumento do volume uterin\w*/i],
+    /* O ÚTERO GRÁVIDO é aumentado por natureza — não é achado, é a gestação. Marcá-lo com
+       asterisco e apontar a tabela pediátrica de 2 a 7 anos seria pior que não marcar: um
+       rodapé fora de contexto ensina o médico a ignorar o rodapé. Achado pela revisão desta
+       própria tarefa, no modelo obstétrico ("Útero aumentado de volume ... contendo feto"). */
+    excecoes:[/\bfeto\b/i, /gesta[çc]/i, /gravíd/i, /concepto/i, /bcf\b/i],
+    ref:'útero: o programa só tem referência por idade, dos 2 aos 7 anos (por volume)',
+    fonte:'ver "Medidas por idade" nas referências do programa',
+    ressalva:'para a mulher ADULTA não há corte único estabelecido — os estudos trazem médias por paridade e menopausa, não limite superior. O aumento aqui é julgamento clínico, não conferência contra tabela'
+  },
+  rim: {
+    termos:[/atrofia renal/i, /ri[nm]s?[^.]{0,80}?dimens[õo]es (aumentad\w*|reduzid\w*)/i],
+    ref:'rim: maior eixo longitudinal, faixa por idade',
+    fonte:'ver "Medidas por idade" nas referências do programa',
+    ressalva:''
+  },
+  vesicula: {
+    termos:[/ves[íi]cula[^.]{0,80}?dimens[õo]es aumentad\w*/i, /hidr[óo]psia vesicular/i],
+    ref:'vesícula biliar: SEM referência estabelecida neste programa',
+    fonte:'',
+    ressalva:'não foi localizado corte de tamanho em fonte primária; o julgamento é clínico'
+  },
+  ducto_mamario: {
+    termos:[/ectasia ductal/i, /dilata[çc][ãa]o ductal/i],
+    ref:'ductos mamários: retroareolares até 3 mm, periféricos até 2 mm',
+    fonte:'léxico BI-RADS (via AUDITORIA-CBR, 30/07/2026)',
+    ressalva:''
+  },
+  nervo_mediano: {
+    termos:[/nervo mediano[^.]{0,80}?(aumentad\w*|espessad\w*)/i],
+    ref:'nervo mediano: o valor de 0,12 cm² usado no dizer NÃO tem fonte declarada',
+    fonte:'',
+    ressalva:'a literatura do túnel do carpo usa cortes entre 0,09 e 0,12 cm² conforme o estudo; enquanto a fonte não for fixada, o número vale como referência de serviço'
+  },
+  tendao: {
+    termos:[/tend[ãa]o[^.]{0,80}?aumentad\w* de calibre/i, /espessamento tendine\w*/i],
+    ref:'tendão: SEM referência estabelecida neste programa',
+    fonte:'',
+    ressalva:'o calibre normal varia por tendão e por porte do paciente; não há corte único, e o julgamento é comparativo com o lado contralateral'
+  }
+};
+/* Marca com asterisco e devolve o rodapé. Não reescreve NADA além de inserir o asterisco —
+   e se o texto, tirados os asteriscos, não for idêntico ao que entrou, a marcação inteira é
+   descartada. Mexer no texto de um laudo exige essa trava. */
+function refVolumeMarcar(corpo, conclusao){
+  var texto=String(corpo||''), concl=String(conclusao||''), usados=[];
+  var marcadoC=texto, marcadoK=concl;
+  Object.keys(REF_VOLUME).forEach(function(k){
+    var R=REF_VOLUME[k], achou=false;
+    R.termos.forEach(function(re){
+      var rg=new RegExp(re.source, re.flags.indexOf('g')<0 ? re.flags+'g' : re.flags);
+      var poe=function(s){
+        return s.replace(rg, function(){
+          var args=Array.prototype.slice.call(arguments);
+          var m=args[0], todo=args[args.length-1], pos=args[args.length-2];
+          /* ASTERISCO SÓ UMA VEZ. A guarda antiga olhava o TRECHO CASADO — e o asterisco
+             vem DEPOIS dele, então nunca estava ali. Refazer o laudo três vezes produzia
+             "Hepatomegalia***". Agora olha o caractere seguinte, no texto. */
+          if(String(todo).charAt(pos+m.length)==='*') return m;
+          /* Exceção de contexto: a mesma frase pode conter algo que invalida a marca (útero
+             grávido é aumentado por natureza — ver REF_VOLUME.utero). Olha a FRASE, não o
+             texto inteiro, senão um feto citado noutro parágrafo calaria o achado daqui. */
+          if(R.excecoes && R.excecoes.length){
+            var ini=String(todo).lastIndexOf('.', pos)+1;
+            var fim=String(todo).indexOf('.', pos+m.length); if(fim<0) fim=String(todo).length;
+            var frase=String(todo).slice(ini, fim);
+            for(var i=0;i<R.excecoes.length;i++) if(R.excecoes[i].test(frase)) return m;
+          }
+          achou=true; return m+'*';
+        });
+      };
+      marcadoC=poe(marcadoC); marcadoK=poe(marcadoK);
+    });
+    if(achou) usados.push(k);
+  });
+  if(!usados.length) return {corpo:texto, conclusao:concl, nota:'', usados:[]};
+  if(marcadoC.replace(/\*/g,'')!==texto.replace(/\*/g,'') ||
+     marcadoK.replace(/\*/g,'')!==concl.replace(/\*/g,''))
+    return {corpo:texto, conclusao:concl, nota:'', usados:[]};
+  var linhas=usados.map(function(k){
+    var R=REF_VOLUME[k];
+    return '* '+R.ref+(R.fonte?(' — '+R.fonte):'')+(R.ressalva?(' ['+R.ressalva+']'):'')+'.';
+  });
+  return {corpo:marcadoC, conclusao:marcadoK, usados:usados,
+          nota:'Referências dos julgamentos de tamanho assinalados com *:\n'+linhas.join('\n')};
+}
+
 /* ============ BLOCO 4 — registro pós-biópsia ============
    Especificação 07 (21/08/2026). Fecha o laço que o sistema não tinha: um achado categoria
    4 ou 5 recebia recomendação de biópsia e o resultado nunca voltava para dentro do WBOT.
@@ -11341,6 +11498,17 @@ async function rev2PedidoEnviar(){
     if(resp.titulo) L.titulo=resp.titulo;
     if(resp.corpo) L.corpo=resp.corpo;
     if(resp.conclusao) L.conclusao=resp.conclusao;
+    /* REFAZER O LAUDO troca o texto inteiro — e trocaria junto a marcacao de tamanho, que
+       so era feita na geracao. O asterisco sumiria e o rodape ficaria apontando para nada,
+       ou o contrario. Remarca aqui, sobre o texto novo. Achado na revisao de 21/08. */
+    try{
+      var _rv2=refVolumeMarcar(L.corpo, L.conclusao);
+      if(_rv2.usados.length){
+        L.corpo=_rv2.corpo; L.conclusao=_rv2.conclusao;
+        var _b=String(L.extra||'').split('Referências dos julgamentos de tamanho')[0].replace(/\s+$/,'');
+        L.extra=(_b?(_b+'\n\n'):'')+_rv2.nota;   // substitui a nota antiga, nao empilha
+      }
+    }catch(e){}
     if(resp.observacoes_para_o_medico) L.obs=resp.observacoes_para_o_medico;
     // a base do loop de aprendizado tem de acompanhar, senão mudança da IA vira "correção do médico"
     try{ ex.laudoBaseTexto=textoBaseLaudo(L); }catch(e){}

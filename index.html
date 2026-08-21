@@ -5297,6 +5297,12 @@ function abrirRevisao(exId, semTela){
   +'<div class="laudoCab"><div contenteditable="true" oninput="revMarcarEditado()"><b>Nome do Paciente:</b>'+esc(c.nome||'')+'<br><b>Idade:</b> '+esc(c.idade||'')+'<br><b>Realizado em:</b> '+esc(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+esc(c.dados_clinicos||'')+'</div></div>'
   +'<div class="laudoCorpoBox"><div class="laudoTitulo" contenteditable="true" oninput="revMarcarEditado()">'+esc(L.titulo)+'</div>'
   +'<div class="laudoTexto" contenteditable="true" oninput="revMarcarEditado()">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n'))
+  /* O esquema entra AQUI, e o lugar não é livre: BI-RADS §16.4 fixa a ordem do laudo de
+     mama, e o desenho pertence ao bloco ACHADOS — depois da descrição textual e ANTES da
+     conclusão e da categoria. Não no rodapé, não no fim. Contenteditable="false" porque o
+     desenho não se edita digitando: ele nasce do texto, e é editando o texto (ou, adiante,
+     arrastando o marcador) que ele muda. */
+  +((ex.tipo==='mama') ? ('<div contenteditable="false">'+mamaEsquemaHTML(L)+'</div>') : '')
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')
   +'</div></div>'
@@ -7832,6 +7838,224 @@ const BIRADS_ESPECIAIS = {
   linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.'],
   cat6:['6','Malignidade comprovada por biópsia. Seguimento clínico e terapia local definitiva, conforme a conduta oncológica adotada.']
 };
+/* ============ ESQUEMA ANATÔMICO DA MAMA ============
+   Especificação 03 do pacote de mama (20/08/2026).
+
+   PRINCÍPIO INEGOCIÁVEL da especificação: o desenho e o texto nunca podem divergir. Aqui
+   isso é garantido pela via mais simples que existe — o desenho NÃO É GUARDADO. Ele é
+   redesenhado a partir do texto do laudo toda vez que a tela monta. Não há cópia para
+   ficar velha, nem imagem para sobreviver a uma correção. (Este projeto já foi mordido
+   duas vezes esta semana por dado guardado que sobreviveu ao código; aqui não há dado.)
+
+   CUSTO DE TOKEN: ZERO, por decisão do médico (21/08). A especificação recomendava pedir
+   à IA os campos estruturados de posição. Não foi feito, e vale dizer o porquê em voz
+   alta: forma, orientação, margem e as medidas em milímetros a IA JÁ devolve hoje (nos
+   campos `birads` e `dados_estruturados.achados`); o que falta é só hora e distância da
+   papila, e essas duas moram numa frase de molde fixo que o próprio bloco 1 padronizou em
+   todos os dizeres. Ler localmente sai de graça. A rede de segurança é a regra da própria
+   especificação: NÃO CONSEGUIU LER, NÃO DESENHA. Marcador em posição inventada é risco
+   médico-legal direto — ausência de marcador não é. */
+
+/* Milímetros a partir de número + UNIDADE. Pedido explícito do médico (20/08): o aparelho
+   dele mede em centímetro e o laudo de mama passou a falar milímetro, então o programa tem
+   de ler os dois e saber a diferença. Sem unidade devolve nulo DE PROPÓSITO: "12" pode ser
+   12 mm ou 12 cm, e chutar pelo tamanho do número é como o desenho erraria feio e calado
+   (um nódulo de 1,2 cm viraria um de 1,2 mm, ou o contrário). */
+function mamaMm(valor, unidade){
+  var n=parseFloat(String(valor==null?'':valor).replace(',','.'));
+  if(!isFinite(n) || n<0) return null;
+  var u=String(unidade||'').toLowerCase().trim();
+  if(u==='mm') return n;
+  if(u==='cm') return n*10;
+  return null;
+}
+/* Centímetros inteiros, que é como o ACR manda a distância da papila (v2025, Location of
+   Finding: "2 cm do mamilo", nunca "2,3 cm" — fração passa uma precisão que não se alcança
+   de forma consistente entre examinadores). */
+function mamaCmInteiro(valor, unidade){
+  var mm=mamaMm(valor, unidade);
+  return mm==null ? null : Math.round(mm/10);
+}
+/* Lê a localização da FRASE do laudo. Devolve só o que achou; campo não achado é nulo, e
+   nulo depois vira "não desenha". Nunca completa lacuna com suposição. */
+function mamaLocalDoTexto(txt){
+  var t=String(txt||'').replace(/\s+/g,' ');
+  var out={lado:null, hora:null, distCm:null, prof:null, mm:null};
+  var m;
+  if((m=/mama\s+(direita|esquerda)/i.exec(t))) out.lado = /d/i.test(m[1][0])?'D':'E';
+  else if((m=/\b(à|na)\s+(direita|esquerda)\b/i.exec(t))) out.lado = /d/i.test(m[2][0])?'D':'E';
+  // hora INTEIRA: o padrão ACR não tem meia-hora. "10h", "10 h", "10 horas".
+  if((m=/às?\s*(\d{1,2})\s*(?:h\b|horas?\b)/i.exec(t))){
+    var h=parseInt(m[1],10);
+    if(h>=1 && h<=12) out.hora=h;
+  }
+  if((m=/dist(?:ando|a)\s*(?:de\s*)?([\d.,]+)\s*(mm|cm)\b/i.exec(t))) out.distCm=mamaCmInteiro(m[1], m[2]);
+  if(/retroareolar/i.test(t) && out.distCm==null) out.distCm=0;
+  // as três medidas, com a unidade lida junto (nunca adivinhada)
+  if((m=/medindo\s*([\d.,]+)\s*[x×]\s*([\d.,]+)(?:\s*[x×]\s*([\d.,]+))?\s*(mm|cm)\b/i.exec(t))){
+    var u=m[4], a=mamaMm(m[1],u), b=mamaMm(m[2],u), c=m[3]?mamaMm(m[3],u):null;
+    out.mm=[a,b,c].filter(function(x){ return x!=null; });
+    if(!out.mm.length) out.mm=null;
+  }
+  if(/\bposterior\b|\bprofund/i.test(t)) out.prof='posterior';
+  else if(/\banterior\b|\bsuperficial/i.test(t)) out.prof='anterior';
+  else out.prof='media';
+  return out;
+}
+/* Junta o que a IA JÁ devolve (birads[]: forma/orientação/margem; achados[]: medidas em
+   mm) com o que se lê do texto (lado, hora, distância). Devolve só as lesões PLOTÁVEIS,
+   mais a lista das que ficaram sem posição — que a legenda declara, em vez de sumir com
+   elas. Numeração contínua entre as mamas, como a especificação pede. */
+function mamaLesoes(L){
+  L=L||{};
+  var bir=Array.isArray(L.birads)?L.birads:[];
+  var estr=(((L.dados_estruturados||{}).achados)||[]);
+  var corpo=String(L.corpo||'');
+  // cada achado do BI-RADS casa com o trecho do corpo que fala dele, pela localização
+  var plot=[], semPos=[], n=0;
+  bir.forEach(function(d,i){
+    d=d||{};
+    var rotulo=String(d.localizacao||'').trim();
+    // o trecho do corpo que descreve este achado: a frase que contém a localização dita
+    var frase='';
+    if(rotulo){
+      var chave=rotulo.split(/[,;]/)[0].trim();
+      var re=new RegExp('[^.]*'+chave.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'[^.]*\\.', 'i');
+      var mm=re.exec(corpo); if(mm) frase=mm[0];
+    }
+    /* Não achou a frase pelo rótulo e só existe UM achado: vale o corpo inteiro. Com um
+       achado só não há a quem confundir. Com dois ou mais, fica sem frase de propósito —
+       pegar o corpo todo casaria a hora de um com a distância do outro, que é pior que não
+       desenhar. (Sem esta saída, um rótulo que não aparece no texto fazia o motivo sair
+       errado: dizia "lado não identificado" num laudo onde o lado estava escrito.) */
+    if(!frase && bir.length===1) frase=corpo;
+    var loc=mamaLocalDoTexto(frase||rotulo);
+    if(!loc.lado && rotulo) loc.lado = /esquerd/i.test(rotulo)?'E':(/direit/i.test(rotulo)?'D':null);
+    // medidas: primeiro as estruturadas (a IA já as devolve em mm), depois as do texto
+    var e=estr[i]||{};
+    var mmEstr=[e.medida_1_mm,e.medida_2_mm,e.medida_3_mm]
+                 .map(function(v){ return (v==null||v==='')?null:parseFloat(v); })
+                 .filter(function(v){ return isFinite(v) && v>0; });
+    var medidas = mmEstr.length?mmEstr : (loc.mm||[]);
+    if(!medidas.length && d.tamanho_cm){ var t=mamaMm(d.tamanho_cm,'cm'); if(t!=null) medidas=[t]; }
+    var forma=String(d.forma||'').toLowerCase();
+    var orient=String(d.orientacao||'').toLowerCase();
+    var item={ id:'L'+(i+1), lado:loc.lado, hora:loc.hora, distCm:loc.distCm,
+               prof:loc.prof||'media', forma:forma, orientacao:orient,
+               mm:medidas, birads:String(d.caso_especial?'':(d.categoria||''))||'',
+               rotulo:rotulo, incoerencia:'' };
+    /* §3.1 da especificação: por definição do BI-RADS, massa REDONDA tem orientação NÃO
+       paralela. A combinação redonda+paralela é contraditória por dentro e não pode virar
+       desenho — desenhar dá ao erro a aparência de dado conferido. Não plota, e acende. */
+    if(forma==='redonda' && /paralel/.test(orient) && !/nao|não/.test(orient))
+      item.incoerencia='forma redonda com orientação paralela — o BI-RADS define massa redonda como NÃO paralela';
+    var temPos = item.lado && item.hora!=null && item.distCm!=null;
+    if(temPos && !item.incoerencia){ item.n=++n; plot.push(item); }
+    else semPos.push({rotulo:rotulo||('achado '+(i+1)), porque: item.incoerencia ||
+        (!item.lado?'lado não identificado':(item.hora==null?'hora do relógio não informada':'distância da papila não informada'))});
+  });
+  return {plot:plot, semPos:semPos};
+}
+/* ---- o desenho ---- */
+const MAMA_RAIO_CM = 8;          // raio representado na vista frontal; configurável
+function _mamaXY(hora, distCm, cx, cy, rPx){
+  var ang=((hora*30)-90)*Math.PI/180;                 // 12h no topo, horário na tela
+  var r=Math.min(distCm/MAMA_RAIO_CM,1)*rPx;
+  return [cx+r*Math.cos(ang), cy+r*Math.sin(ang)];
+}
+/* Vista frontal de uma mama: relógio, anéis de 2 em 2 cm, papila no centro. */
+function _mamaFrontal(lesoes, lado){
+  var cx=105, cy=105, R=78, s='';
+  s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="#fff" stroke="#33415a" stroke-width="1.4"/>';
+  for(var cm=2; cm<MAMA_RAIO_CM; cm+=2){
+    s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+((cm/MAMA_RAIO_CM)*R).toFixed(1)+'" fill="none" '
+      +'stroke="#c8d0da" stroke-width="0.7" stroke-dasharray="3 3"/>';
+  }
+  for(var h=1; h<=12; h++){
+    var a=((h*30)-90)*Math.PI/180, x1=cx+(R-5)*Math.cos(a), y1=cy+(R-5)*Math.sin(a);
+    var x2=cx+R*Math.cos(a), y2=cy+R*Math.sin(a);
+    s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#8894a8" stroke-width="0.9"/>';
+    if(h%3===0){
+      var xr=cx+(R+11)*Math.cos(a), yr=cy+(R+11)*Math.sin(a);
+      s+='<text x="'+xr.toFixed(1)+'" y="'+(yr+3.5).toFixed(1)+'" font-size="10" fill="#5a6478" text-anchor="middle" font-family="Arial,Helvetica,sans-serif">'+h+'</text>';
+    }
+  }
+  s+='<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#8894a8"/>';   // papila
+  lesoes.forEach(function(L){
+    var p=_mamaXY(L.hora, L.distCm, cx, cy, R);
+    s+='<circle data-lesao="'+L.id+'" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="8.5" fill="#6A4FB6" stroke="#fff" stroke-width="1.6"/>'
+      +'<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+3.6).toFixed(1)+'" font-size="10.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+  });
+  s+='<text x="'+cx+'" y="203" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">MAMA '+(lado==='D'?'DIREITA':'ESQUERDA')+'</text>';
+  return '<svg viewBox="0 0 210 210" width="210" height="210" xmlns="http://www.w3.org/2000/svg" role="img" '
+       + 'aria-label="Vista frontal da mama '+(lado==='D'?'direita':'esquerda')+' em relógio">'+s+'</svg>';
+}
+/* Corte lateral: camadas, distância da papila no eixo horizontal, profundidade no
+   vertical. §6.4: a lesão é ELIPSE com a proporção das medidas, e o eixo maior mostra a
+   orientação — assim o médico VÊ a contradição descritor↔desenho em vez de conferir
+   palavra por palavra. */
+function _mamaLateral(lesoes, lado){
+  var x0=26, x1=196, s='', faixas=[['Pele',26,34,'#eef1f6'],['TCSC',34,58,'#f7f4ec'],
+                                   ['Glândula',58,132,'#fdf7fb'],['Peitoral',132,158,'#eef3ee']];
+  faixas.forEach(function(f){
+    s+='<rect x="'+x0+'" y="'+f[1]+'" width="'+(x1-x0)+'" height="'+(f[2]-f[1])+'" fill="'+f[3]+'" stroke="#c8d0da" stroke-width="0.7"/>'
+      +'<text x="'+(x0-3)+'" y="'+((f[1]+f[2])/2+3).toFixed(1)+'" font-size="7.5" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+f[0]+'</text>';
+  });
+  s+='<text x="'+x0+'" y="172" font-size="8" fill="#5a6478" font-family="Arial,Helvetica,sans-serif">papila</text>'
+    +'<text x="'+x1+'" y="172" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">periferia</text>';
+  var YP={anterior:46, media:95, posterior:126};
+  lesoes.forEach(function(L){
+    var x=x0+Math.min(L.distCm/MAMA_RAIO_CM,1)*(x1-x0), y=YP[L.prof]||95;
+    var m=(L.mm&&L.mm.length)?L.mm.slice().sort(function(a,b){return b-a;}):[10,7];
+    var maior=m[0]||10, menor=(m[1]!=null?m[1]:maior*0.7);
+    var esc=Math.max(0.35, Math.min(1.1, 14/Math.max(maior,1)));
+    var rg=Math.max(4,(maior*esc)/2), rp=Math.max(3,(menor*esc)/2);
+    var redonda=(L.forma==='redonda');
+    var naoParalela=/nao|não/.test(L.orientacao);
+    var rx = redonda?rg : (naoParalela?rp:rg);
+    var ry = redonda?rg : (naoParalela?rg:rp);
+    s+='<ellipse data-lesao="'+L.id+'" cx="'+x.toFixed(1)+'" cy="'+y+'" rx="'+rx.toFixed(1)+'" ry="'+ry.toFixed(1)+'" fill="#6A4FB6" fill-opacity="0.82" stroke="#fff" stroke-width="1.3"/>'
+      +'<text x="'+x.toFixed(1)+'" y="'+(y+3.4)+'" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+  });
+  s+='<text x="111" y="203" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — '+(lado==='D'?'DIREITA':'ESQUERDA')+'</text>';
+  return '<svg viewBox="0 0 210 210" width="210" height="210" xmlns="http://www.w3.org/2000/svg" role="img" '
+       + 'aria-label="Corte lateral da mama '+(lado==='D'?'direita':'esquerda')+' mostrando profundidade">'+s+'</svg>';
+}
+/* O bloco inteiro, pronto para entrar no laudo. Devolve '' quando não há o que desenhar —
+   exame normal não ganha esquema, e isso é regra, não economia. */
+function mamaEsquemaHTML(L){
+  var r=mamaLesoes(L);
+  if(!r.plot.length && !r.semPos.length) return '';
+  var h='<div class="mamaEsq" style="margin:14px 0;padding:10px 8px;border:1px solid #d6dbe4;border-radius:8px;background:#fcfcfe">';
+  ['D','E'].forEach(function(lado){
+    var doLado=r.plot.filter(function(x){ return x.lado===lado; });
+    if(!doLado.length) return;                    // mama sem lesão não é desenhada
+    h+='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">'
+      + _mamaFrontal(doLado, lado) + _mamaLateral(doLado, lado) + '</div>';
+  });
+  if(r.plot.length){
+    h+='<div style="font-size:11.5px;color:#3F3357;line-height:1.5;margin-top:4px">';
+    r.plot.forEach(function(L2){
+      var med=(L2.mm&&L2.mm.length)?(' — '+L2.mm.map(function(v){ return String(Math.round(v)); }).join(' × ')+' mm'):'';
+      h+='<div><b>'+L2.n+'</b> — Mama '+(L2.lado==='D'?'direita':'esquerda')+', '+L2.hora+'h, a '
+        + L2.distCm+' cm da papila, profundidade '+({anterior:'anterior',media:'média',posterior:'posterior'}[L2.prof]||'média')
+        + (L2.rotulo?(' — '+esc(L2.rotulo)):'') + med + '</div>';
+    });
+    h+='</div>';
+  }
+  /* Achado sem posição NÃO some: some do desenho e aparece aqui dito. A especificação é
+     explícita — nunca inventar posição, e nunca deixar o leitor achar que o desenho
+     mostra tudo. */
+  if(r.semPos.length){
+    h+='<div style="font-size:11px;color:#8a5a00;margin-top:6px">';
+    r.semPos.forEach(function(s){ h+='<div>• <b>'+esc(s.rotulo)+'</b> — sem localização pontual no desenho ('+esc(s.porque)+').</div>'; });
+    h+='</div>';
+  }
+  h+='<div style="font-size:10px;color:#6b7385;margin-top:6px;font-style:italic">Representação '
+   + 'esquemática, sem escala anatômica real. A localização das lesões segue a descrição do exame.</div>';
+  return h+'</div>';
+}
+
 /* ============ Categoria BI-RADS por extenso: rótulo + probabilidade + conduta ============
    Especificação 06 do pacote de mama (20/08/2026). Valores da Table 2 do manual ACR
    BI-RADS v2025 (Concordance Between Assessment Categories and Management Recommendations)

@@ -70,7 +70,9 @@ ok(/hisExameDaSessao\(r\)/.test(REV), 'procura o exame correspondente nesta sess
 ok(/_rev2Origem='historico'/.test(REV), 'marca de onde veio');
 ok(/rev2Abrir\(ex\.id\)/.test(REV), 'laudo desta sessao reabre na revisao INTEIRA, editavel');
 ok(/historico\/laudo\?id=/.test(REV), 'laudo de outro dia busca o desenho guardado no agente');
-ok(/as imagens do exame não ficam guardadas no histórico/.test(REV),
+// sem distinguir maiuscula: o que importa e a EXPLICACAO existir, nao onde ela cai na
+// frase. Em 21/08 ela virou inicio de periodo e a assercao quebrou sem nada ter piorado.
+ok(/as imagens do exame não ficam guardadas no histórico/i.test(REV),
    'e a tela EXPLICA por que esse nao abre editavel, em vez de so nao abrir');
 const DA_SESSAO = corpoDe('hisExameDaSessao');
 ok(/x\.histKey===r\.id && x\.laudo/.test(DA_SESSAO), 'casa pelo histKey, que e a chave do historico');

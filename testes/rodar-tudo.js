@@ -36,6 +36,7 @@ const SUITE = [
   { arq: 'teste-conferente.js', o: 'conferente: segunda leitura do laudo antes de entregar' },
   { arq: 'teste-birads-cat.js', o: 'categoria BI-RADS: rotulo, probabilidade e conduta (tabela local)' },
   { arq: 'teste-mama-esquema.js', o: 'esquema anatomico da mama (bloco 2)' },
+  { arq: 'teste-historico-abrir.js', o: 'abrir laudo antigo do historico (sem window.open)' },
   { arq: 'teste-dicom-importar.js', o: 'buscar exame no aparelho (caminho religado)' },
   { arq: 'teste-mama-paciente.js', o: 'secao para a paciente (frases fixas, desligada por padrao)' },
   { arq: 'teste-mama-bloco4.js', o: 'bloco 4: registro pos-biopsia e validador de lexico' },

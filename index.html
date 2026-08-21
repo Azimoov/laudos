@@ -219,6 +219,14 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   #barraFormato{display:none;}
   #areaImpressao,#areaImpressao *{visibility:visible;}
   #areaImpressao{position:absolute;left:0;top:0;width:100%;}
+  /* Laudo antigo aberto do histórico: mesma regra, container próprio. E quando ELE está
+     aberto, a área da revisão é escondida à força — senão sairiam dois laudos na mesma
+     impressão, o que se lê primeiro e depois se pergunta de quem era o segundo. */
+  #telaVerLaudo > div:first-child{display:none;}
+  #verLaudoNota{display:none;}
+  #areaImpressaoHist,#areaImpressaoHist *{visibility:visible;}
+  #areaImpressaoHist{position:absolute;left:0;top:0;width:100%;}
+  body.verHist #areaImpressao,body.verHist #areaImpressao *{visibility:hidden;}
   .laudoFolha{border:0;max-width:none;padding:6mm 10mm;}
   .laudoCorpoBox{min-height:0;}
   .laudoTexto:focus{background:none;}
@@ -858,6 +866,24 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <div id="hisLista"></div>
     </div>
   </div>
+</div>
+
+<!-- 21/08/2026 — VER LAUDO ANTIGO, DENTRO DA PRÓPRIA JANELA.
+     Antes isto era window.open('', '_blank'): abrir aba nova. Mas a janela do programa NÃO
+     é um navegador — o pywebview não tem abas. O window.open devolvia nulo (e o médico via
+     "o navegador bloqueou a janela") ou empurrava um about:blank para o Windows, que abria
+     a caixa "Obter um aplicativo para abrir este link". Duas mensagens sem sentido para
+     quem só queria reler um laudo.
+     Agora abre aqui, e a impressão sai de graça: o CSS de impressão já esconde tudo menos
+     a área do laudo — bastou esta ganhar o mesmo tratamento. -->
+<div id="telaVerLaudo" style="display:none;position:fixed;inset:0;z-index:60;background:#f4f5f8;overflow:auto">
+  <div style="position:sticky;top:0;display:flex;gap:8px;align-items:center;padding:10px 14px;background:#1f5f5b;color:#fff;z-index:2">
+    <button class="bt cinza" onclick="hisFecharLaudo()" style="padding:4px 12px">‹ Voltar ao histórico</button>
+    <span id="verLaudoQuem" style="flex:1;font-weight:600"></span>
+    <button class="bt" onclick="window.print()" style="padding:4px 12px">🖨 Imprimir / Salvar PDF</button>
+  </div>
+  <div id="verLaudoNota" class="aviso" style="padding:8px 14px;color:#5a6478"></div>
+  <div id="areaImpressaoHist" style="padding:0 14px 24px"></div>
 </div>
 
 <div id="telaAntigos">
@@ -11868,16 +11894,23 @@ async function hisRevisar(id){
       html=(j&&j.ok&&typeof j.html==='string')?j.html:'';
     }
     if(!html) throw new Error('o desenho deste laudo não está guardado');
-    var w=window.open('', '_blank');
-    if(!w) throw new Error('o navegador bloqueou a janela — permita janelas para este endereço');
-    w.document.write('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
-      +'<title>Laudo - '+esc(r.paciente||'')+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff}'
-      +laudoCssText()+'@media print{@page{size:A4;margin:8mm}}</style></head><body>'+html+'</body></html>');
-    w.document.close();
-    hisAvisar('Laudo de '+(r.paciente||'')+' aberto em outra janela — dá para ler, imprimir e salvar. '
-      +'Este é de outro dia: as imagens do exame não ficam guardadas no histórico, por isso ele não '
-      +'abre na tela de revisão editável.');
+    /* Sem window.open: a janela do programa não tem abas, e tentar abrir uma devolvia nulo
+       ou empurrava um about:blank para o Windows resolver. Abre AQUI. */
+    document.getElementById('areaImpressaoHist').innerHTML=html;
+    document.getElementById('verLaudoQuem').textContent='Laudo de '+(r.paciente||'')+(r.data?(' — '+r.data):'');
+    document.getElementById('verLaudoNota').textContent=
+      'Laudo de outro dia. As imagens do exame não ficam guardadas no histórico, por isso ele '
+      +'abre só para leitura e impressão, e não na tela de revisão editável.';
+    document.getElementById('telaVerLaudo').style.display='block';
+    document.body.classList.add('verHist');
+    window.scrollTo(0,0);
+    hisAvisar('');
   }catch(e){ hisAvisar('Não consegui abrir: '+((e&&e.message)||e), true); }
+}
+function hisFecharLaudo(){
+  var t=document.getElementById('telaVerLaudo'); if(t) t.style.display='none';
+  document.body.classList.remove('verHist');
+  var a=document.getElementById('areaImpressaoHist'); if(a) a.innerHTML='';   // não fica ocupando memória
 }
 
 window.addEventListener('DOMContentLoaded', function(){

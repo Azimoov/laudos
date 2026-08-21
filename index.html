@@ -895,6 +895,20 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
           </div>
           <div class="minis" id="antMinis"></div>
           <input type="file" id="antImgs" accept="application/pdf,image/*,.dcm" multiple style="display:none">
+          <!-- 21/08/2026 — BUSCAR NO APARELHO, de volta e no lugar certo.
+               As funções dicom* existem desde 89f935e, mas o botão que as chamava saiu em
+               07/08 (a57725c), quando o médico pediu para enxugar a aba "Arquivos
+               acumulados". Ficaram órfãs: função escrita, container removido, nenhum
+               caminho até elas. Ele tentou hoje puxar um exame antigo do Orthanc e não
+               achou por onde — porque não havia.
+               Voltam AQUI, que é a tela de exames antigos: ela nasceu DEPOIS daquela
+               limpeza, e é exatamente onde puxar exame do aparelho pertence. Religar não
+               desfaz a decisão dele; põe a função na tela que passou a ter lugar para ela. -->
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn peq sec" type="button" onclick="dicomBuscar()">🔍 Buscar no aparelho</button>
+            <span id="dicomInfo" class="aviso"></span>
+          </div>
+          <div id="dicomLista" style="margin-top:6px;max-height:340px;overflow:auto"></div>
         </div>
 
         <div class="cx">
@@ -2754,7 +2768,10 @@ async function dicomImportar(){
     dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens, codigo:codDoEstudo(e), nascimento:e.nascimento||'', sexo:e.sexo||''});
   }
   progVincHide();
-  dicomInfoTxt(dicomProntos.length+' exame(s) do aparelho prontos — toque em Processar.');
+  /* A frase dizia "toque em Processar", botão da aba antiga, que já não existe. Quem lê
+     isto hoje está na tela de exames antigos, e o botão dela é outro. Mensagem que aponta
+     para um botão inexistente é a mesma armadilha do caminho que não existia. */
+  dicomInfoTxt(dicomProntos.length+' exame(s) do aparelho prontos — grave o ditado e toque em "Gerar laudo".');
   dicomRender();
   log(dicomProntos.length+' exame(s) importado(s) do aparelho (nome/idade/data vieram do DICOM — sem custo de leitura de legenda).');
 }
@@ -2864,6 +2881,13 @@ async function processar(){
     for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s)'+(dicomProntos.length?' + '+dicomProntos.length+' exame(s) do aparelho':'')+' em '+exames.length+' exame(s).');
+    /* 21/08/2026 — a lista de importados é ESVAZIADA aqui, depois de virar exame. Ela
+       nunca era: importar um segundo exame do aparelho reprocessaria o primeiro junto, e
+       o médico veria um laudo repetido sem entender de onde veio. Só apareceu quando o
+       botão de buscar no aparelho voltou a existir e o caminho pôde ser percorrido duas
+       vezes seguidas. */
+    dicomProntos=[];
+    if(typeof dicomRender==='function') dicomRender();
     // 2. transcrever áudios
     for(let i=0;i<fAu.length;i++){
       progVincStep();
@@ -11597,7 +11621,11 @@ function antParaInput(id, arquivos){
   inp.files=dt.files;
 }
 async function antGerar(){
-  if(!_antImgs.length && !_antAuds.length){
+  /* `dicomProntos` conta como material: quem puxou o exame do aparelho JÁ escolheu as
+     imagens — elas só não passaram pelo seletor de arquivos. Sem isto, importar do
+     aparelho e tocar em Gerar respondia "escolha ao menos as imagens", que é confuso
+     justamente para quem acabou de escolhê-las. */
+  if(!_antImgs.length && !_antAuds.length && !dicomProntos.length){
     antAvisar('Escolha ao menos as imagens ou um áudio antes de gerar.', true); return; }
   var b=document.getElementById('antGerar');
   if(b){ b.disabled=true; b.textContent='Gerando…'; }

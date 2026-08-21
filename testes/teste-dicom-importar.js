@@ -48,6 +48,37 @@ ok(/dicomRegiao\(e\.descricao\)/.test(render), 'a lista usa a região de cada es
 ok(render.indexOf('dicomRegiao(e.descricao)') < render.indexOf('anos · '),
    'e ela vem logo depois do nome, antes de idade e data — é por ela que se escolhe');
 
+console.log('\n=== o que foi importado FICA À VISTA ===');
+// O médico importou um exame e a tela não mudou em lugar nenhum: nem o exame, nem as
+// fotos, nem confirmação. Importar às cegas e ter de acreditar que deu certo é o oposto do
+// que este programa faz no resto.
+ok(/id="dicomProntosLista"/.test(HTML), 'existe o painel do que já foi importado');
+ok(/function dicomProntosRender/.test(HTML), 'e a função que o desenha');
+const pr = HTML.slice(HTML.indexOf('function dicomProntosRender'), HTML.indexOf('function dicomVerFotos'));
+ok(/Nenhum exame importado ainda/.test(pr),
+   'vazio, ele DIZ que está vazio e aponta o caminho — em vez de não existir');
+ok(/d\.regiao/.test(pr), 'cada importado mostra a região do exame');
+ok(/imagens\|\|\[\]\)\.length/.test(pr), 'e quantas fotos vieram');
+ok(/dicomVerFotos\(/.test(pr) && /function dicomVerFotos/.test(HTML), 'com botão para ver as fotos');
+ok(/Gerar laudo/.test(pr), 'e o painel diz qual é o próximo passo');
+
+console.log('\n=== ver as fotos, e desfazer o engano ===');
+const vf = HTML.slice(HTML.indexOf('function dicomVerFotos'), HTML.indexOf('function dicomTirar'));
+ok(/ampliarImg\(this\)/.test(vf), 'as miniaturas ampliam — reaproveita o que já existia');
+ok(/box\.style\.display!=='none'.*return;/s.test(vf), 'e o 2º toque fecha, sem empilhar galeria');
+const tirar = HTML.slice(HTML.indexOf('function dicomTirar'), HTML.indexOf('function dicomTirar') + 700);
+ok(/splice\(i,1\)/.test(tirar), 'dá para tirar o que foi importado por engano');
+ok(/dicomRender\(\)/.test(tirar),
+   'e a linha volta a ficar marcável na lista — sem isto, errar o exame obrigaria a '
+   + 'recarregar a janela e perder o ditado já gravado junto');
+
+console.log('\n=== o painel acompanha o ciclo de vida ===');
+ok(/dicomProntosRender\(\);/.test(HTML.slice(HTML.indexOf('function dicomImportar'), HTML.indexOf('function dicomImportar') + 2800)),
+   'depois de importar, ele é redesenhado');
+const procAqui = HTML.slice(HTML.indexOf('async function processar()'), HTML.indexOf('// 2. transcrever áudios'));
+ok(/dicomProntosRender\(\)/.test(procAqui), 'depois de virar exame, ele é esvaziado junto com a lista');
+ok(/dicomProntosRender\(\);\s*\/\/ o painel nasce/.test(HTML), 'e desenhado ao entrar na tela');
+
 console.log('\n=== ele está na tela CERTA ===');
 // Foi removido da aba "Arquivos acumulados" a pedido do médico. Voltou na tela de exames
 // antigos, que nasceu depois e é onde puxar exame do aparelho pertence.

@@ -7897,6 +7897,14 @@ function mamaLocalDoTexto(txt){
     out.mm=[a,b,c].filter(function(x){ return x!=null; });
     if(!out.mm.length) out.mm=null;
   }
+  /* Profundidade em MILÍMETRO, quando o laudo a diz ("a 1,5 cm da pele"). É o único jeito
+     honesto de escrever um número na linha que vai da pele até o nódulo: se o número não
+     está no laudo, ele não é escrito — a linha sai com a palavra ("profundidade média").
+     Inventar distância da pele seria o mesmo erro das medidas fixas, só que em forma de
+     desenho, que é pior porque parece conferido. */
+  if((m=/(?:a|distando|distante|dist[âa]ncia\s+de)\s*(?:de\s*)?([\d.,]+)\s*(mm|cm)\s*(?:d[ao]|de)?\s*(?:pele|superf[íi]cie|plano\s+cut[âa]neo)/i.exec(t)))
+    out.profMm=mamaMm(m[1], m[2]);
+  else out.profMm=null;
   if(/\bposterior\b|\bprofund/i.test(t)) out.prof='posterior';
   else if(/\banterior\b|\bsuperficial/i.test(t)) out.prof='anterior';
   else out.prof='media';
@@ -7941,7 +7949,8 @@ function mamaLesoes(L){
     var forma=String(d.forma||'').toLowerCase();
     var orient=String(d.orientacao||'').toLowerCase();
     var item={ id:'L'+(i+1), lado:loc.lado, hora:loc.hora, distCm:loc.distCm,
-               prof:loc.prof||'media', forma:forma, orientacao:orient,
+               prof:loc.prof||'media', profMm:(loc.profMm==null?null:loc.profMm),
+               forma:forma, orientacao:orient,
                mm:medidas, birads:String(d.caso_especial?'':(d.categoria||''))||'',
                rotulo:rotulo, incoerencia:'' };
     /* §3.1 da especificação: por definição do BI-RADS, massa REDONDA tem orientação NÃO
@@ -7958,10 +7967,45 @@ function mamaLesoes(L){
 }
 /* ---- o desenho ---- */
 const MAMA_RAIO_CM = 8;          // raio representado na vista frontal; configurável
+/* Pixels por milímetro de lesão. Existe para o TAMANHO DESENHADO ser proporcional ao
+   tamanho medido: um nódulo de 12 mm tem de aparecer maior que um de 2 mm (pedido do
+   médico, 21/08). A primeira versão errava isto de um jeito bobo e invisível — a escala
+   era INVERSA (14/maior), o que normalizava tudo para o mesmo tamanho na tela: 2 mm e
+   12 mm saíam do mesmo tamanho, e o desenho perdia a única informação de calibre que ele
+   podia dar de graça. */
+const MAMA_PX_MM = 1.7;
+const MAMA_R_MIN = 2.6;          // lesão minúscula ainda precisa ser visível
+const MAMA_R_MAX = 32;           // e lesão enorme não pode estourar a caixa
+function _mamaRaioPx(mm){
+  var v=(isFinite(mm) && mm>0) ? (mm/2)*MAMA_PX_MM : 5;
+  return Math.max(MAMA_R_MIN, Math.min(MAMA_R_MAX, v));
+}
 function _mamaXY(hora, distCm, cx, cy, rPx){
   var ang=((hora*30)-90)*Math.PI/180;                 // 12h no topo, horário na tela
   var r=Math.min(distCm/MAMA_RAIO_CM,1)*rPx;
   return [cx+r*Math.cos(ang), cy+r*Math.sin(ang)];
+}
+/* O contorno da lesão DESENHA a forma descrita, em vez de ser sempre uma elipse lisa
+   (pedido do médico, 21/08): assim "irregular" se reconhece de relance, e o médico vê a
+   incoerência entre descritor e desenho sem reler o texto.
+   A deformação é DETERMINÍSTICA — tabela fixa, deslocada pelo número do achado. Nada de
+   sorteio: um contorno que muda de forma a cada vez que a tela redesenha assustaria, e com
+   razão, quem está conferindo um laudo. */
+const _MAMA_JIT=[1.00,0.82,1.14,0.88,1.06,0.78,1.12,0.92,1.04,0.84,1.10,0.86];
+function _mamaContorno(cx, cy, rx, ry, forma, n, attrs){
+  var f=String(forma||'').toLowerCase();
+  if(f!=='irregular' && f!=='lobulada')
+    return '<ellipse '+attrs+' cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" rx="'+rx.toFixed(1)+'" ry="'+ry.toFixed(1)+'"/>';
+  var lados = (f==='irregular') ? 12 : 8;
+  var forca = (f==='irregular') ? 1 : 0.45;      // lobulada ondula de leve; irregular crava
+  var pts=[];
+  for(var i=0;i<lados;i++){
+    var a=(i/lados)*2*Math.PI;
+    var j=_MAMA_JIT[(i+(n||0)*5)%_MAMA_JIT.length];
+    var k=1+(j-1)*forca;
+    pts.push([(cx+rx*k*Math.cos(a)).toFixed(1), (cy+ry*k*Math.sin(a)).toFixed(1)].join(','));
+  }
+  return '<polygon '+attrs+' points="'+pts.join(' ')+'"/>';
 }
 /* Vista frontal de uma mama: relógio, anéis de 2 em 2 cm, papila no centro. */
 function _mamaFrontal(lesoes, lado){
@@ -7983,8 +8027,19 @@ function _mamaFrontal(lesoes, lado){
   s+='<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#8894a8"/>';   // papila
   lesoes.forEach(function(L){
     var p=_mamaXY(L.hora, L.distCm, cx, cy, R);
-    s+='<circle data-lesao="'+L.id+'" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="8.5" fill="#6A4FB6" stroke="#fff" stroke-width="1.6"/>'
-      +'<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+3.6).toFixed(1)+'" font-size="10.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+    var m=(L.mm&&L.mm.length)?Math.max.apply(null,L.mm):null;
+    var r=_mamaRaioPx(m);
+    s+=_mamaContorno(p[0], p[1], r, r*(L.forma==='oval'?0.72:1), L.forma, L.n,
+                     'data-lesao="'+L.id+'" fill="#6A4FB6" stroke="#fff" stroke-width="1.5"');
+    /* O número vai DENTRO só quando cabe. Numa lesão de 2 mm o marcador é minúsculo e o
+       número por cima o esconderia — aí ele vai ao lado, com um traço curto ligando. */
+    if(r>=8){
+      s+='<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+3.6).toFixed(1)+'" font-size="10.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+    }else{
+      var lx=p[0]+r+7, ly=p[1]-r-2;
+      s+='<line x1="'+(p[0]+r*0.7).toFixed(1)+'" y1="'+(p[1]-r*0.7).toFixed(1)+'" x2="'+(lx-2).toFixed(1)+'" y2="'+(ly+2).toFixed(1)+'" stroke="#6A4FB6" stroke-width="0.8"/>'
+        +'<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" font-size="10" fill="#6A4FB6" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+    }
   });
   s+='<text x="'+cx+'" y="203" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">MAMA '+(lado==='D'?'DIREITA':'ESQUERDA')+'</text>';
   return '<svg viewBox="0 0 210 210" width="210" height="210" xmlns="http://www.w3.org/2000/svg" role="img" '
@@ -7994,31 +8049,65 @@ function _mamaFrontal(lesoes, lado){
    vertical. §6.4: a lesão é ELIPSE com a proporção das medidas, e o eixo maior mostra a
    orientação — assim o médico VÊ a contradição descritor↔desenho em vez de conferir
    palavra por palavra. */
+/* Corte lateral: camadas, distância da papila no eixo horizontal, profundidade no
+   vertical. §6.4: a lesão mostra a ORIENTAÇÃO pelo eixo maior — assim o médico VÊ a
+   contradição descritor↔desenho em vez de conferir palavra por palavra.
+
+   21/08, três pedidos do médico atendidos aqui:
+   - os rótulos das camadas estavam cortando na borda esquerda: o desenho começa mais à
+     direita (x0=66) e a caixa ficou mais larga (250), dando aos rótulos espaço próprio;
+   - o tamanho desenhado passou a ser PROPORCIONAL ao medido (ver MAMA_PX_MM);
+   - linha pontilhada da pele até a lesão, com a distância escrita. */
+const MAMA_Y_PELE=26;            // a superfície da pele, de onde a linha de profundidade parte
 function _mamaLateral(lesoes, lado){
-  var x0=26, x1=196, s='', faixas=[['Pele',26,34,'#eef1f6'],['TCSC',34,58,'#f7f4ec'],
+  var x0=66, x1=238, s='', faixas=[['Pele',26,34,'#eef1f6'],['TCSC',34,58,'#f7f4ec'],
                                    ['Glândula',58,132,'#fdf7fb'],['Peitoral',132,158,'#eef3ee']];
   faixas.forEach(function(f){
     s+='<rect x="'+x0+'" y="'+f[1]+'" width="'+(x1-x0)+'" height="'+(f[2]-f[1])+'" fill="'+f[3]+'" stroke="#c8d0da" stroke-width="0.7"/>'
-      +'<text x="'+(x0-3)+'" y="'+((f[1]+f[2])/2+3).toFixed(1)+'" font-size="7.5" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+f[0]+'</text>';
+      +'<text x="'+(x0-5)+'" y="'+((f[1]+f[2])/2+3).toFixed(1)+'" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+f[0]+'</text>';
   });
   s+='<text x="'+x0+'" y="172" font-size="8" fill="#5a6478" font-family="Arial,Helvetica,sans-serif">papila</text>'
     +'<text x="'+x1+'" y="172" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">periferia</text>';
   var YP={anterior:46, media:95, posterior:126};
   lesoes.forEach(function(L){
-    var x=x0+Math.min(L.distCm/MAMA_RAIO_CM,1)*(x1-x0), y=YP[L.prof]||95;
-    var m=(L.mm&&L.mm.length)?L.mm.slice().sort(function(a,b){return b-a;}):[10,7];
-    var maior=m[0]||10, menor=(m[1]!=null?m[1]:maior*0.7);
-    var esc=Math.max(0.35, Math.min(1.1, 14/Math.max(maior,1)));
-    var rg=Math.max(4,(maior*esc)/2), rp=Math.max(3,(menor*esc)/2);
+    var x=x0+Math.min(L.distCm/MAMA_RAIO_CM,1)*(x1-x0);
+    /* Profundidade medida vence a qualitativa: se o laudo diz "a 1,5 cm da pele", a lesão
+       fica onde ela está, não no meio do parênquima por convenção. */
+    var y = (L.profMm!=null)
+          ? Math.max(40, Math.min(150, MAMA_Y_PELE + L.profMm*MAMA_PX_MM))
+          : (YP[L.prof]||95);
+    var m=(L.mm&&L.mm.length)?L.mm.slice().sort(function(a,b){return b-a;}):[];
+    var maior=m[0]!=null?m[0]:10, menor=(m[1]!=null?m[1]:maior*0.7);
+    var rg=_mamaRaioPx(maior), rp=_mamaRaioPx(menor);
+    if(rp>rg) rp=rg;
     var redonda=(L.forma==='redonda');
     var naoParalela=/nao|não/.test(L.orientacao);
     var rx = redonda?rg : (naoParalela?rp:rg);
     var ry = redonda?rg : (naoParalela?rg:rp);
-    s+='<ellipse data-lesao="'+L.id+'" cx="'+x.toFixed(1)+'" cy="'+y+'" rx="'+rx.toFixed(1)+'" ry="'+ry.toFixed(1)+'" fill="#6A4FB6" fill-opacity="0.82" stroke="#fff" stroke-width="1.3"/>'
-      +'<text x="'+x.toFixed(1)+'" y="'+(y+3.4)+'" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+    // a linha pontilhada, da pele até a borda de cima da lesão
+    var topo=y-ry;
+    s+='<line x1="'+x.toFixed(1)+'" y1="'+MAMA_Y_PELE+'" x2="'+x.toFixed(1)+'" y2="'+topo.toFixed(1)+'" '
+      +'stroke="#8a5cf6" stroke-width="0.9" stroke-dasharray="2.5 2.5"/>'
+      +'<circle cx="'+x.toFixed(1)+'" cy="'+MAMA_Y_PELE+'" r="1.8" fill="#8a5cf6"/>';
+    /* O que a linha diz. Número SÓ se o laudo trouxe o número; senão, a palavra. Escrever
+       "18 mm da pele" num laudo que só disse "profundidade média" seria inventar medida. */
+    var rot = (L.profMm!=null) ? (Math.round(L.profMm)+' mm da pele')
+            : ({anterior:'anterior', media:'profundidade média', posterior:'posterior'}[L.prof]||'profundidade média');
+    var meio=(MAMA_Y_PELE+topo)/2;
+    var ladoTxt = (x>x1-58) ? 'end' : 'start';
+    var xTxt = (ladoTxt==='end') ? (x-4) : (x+4);
+    s+='<text x="'+xTxt.toFixed(1)+'" y="'+(meio+3).toFixed(1)+'" font-size="7.5" fill="#6A4FB6" '
+      +'text-anchor="'+ladoTxt+'" font-family="Arial,Helvetica,sans-serif">'+rot+'</text>';
+    s+=_mamaContorno(x, y, rx, ry, L.forma, L.n,
+                     'data-lesao="'+L.id+'" fill="#6A4FB6" fill-opacity="0.85" stroke="#fff" stroke-width="1.3"');
+    if(Math.min(rx,ry)>=7){
+      s+='<text x="'+x.toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+    }else{
+      s+='<text x="'+(x+rx+4).toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#6A4FB6" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
+    }
   });
-  s+='<text x="111" y="203" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — '+(lado==='D'?'DIREITA':'ESQUERDA')+'</text>';
-  return '<svg viewBox="0 0 210 210" width="210" height="210" xmlns="http://www.w3.org/2000/svg" role="img" '
+  s+='<text x="152" y="203" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — '+(lado==='D'?'DIREITA':'ESQUERDA')+'</text>';
+  return '<svg viewBox="0 0 250 210" width="250" height="210" xmlns="http://www.w3.org/2000/svg" role="img" '
        + 'aria-label="Corte lateral da mama '+(lado==='D'?'direita':'esquerda')+' mostrando profundidade">'+s+'</svg>';
 }
 /* O bloco inteiro, pronto para entrar no laudo. Devolve '' quando não há o que desenhar —
@@ -8030,7 +8119,7 @@ function mamaEsquemaHTML(L){
   ['D','E'].forEach(function(lado){
     var doLado=r.plot.filter(function(x){ return x.lado===lado; });
     if(!doLado.length) return;                    // mama sem lesão não é desenhada
-    h+='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">'
+    h+='<div style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">'
       + _mamaFrontal(doLado, lado) + _mamaLateral(doLado, lado) + '</div>';
   });
   if(r.plot.length){

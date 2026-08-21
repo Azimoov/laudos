@@ -24,11 +24,18 @@ function grab(nome) {
   }
   throw new Error('nao fechou ' + nome);
 }
-const api = new Function('esc',
-  HTML.match(/const MAMA_RAIO_CM = [^\n]*/)[0] + '\n' +
-  grab('mamaMm') + grab('mamaCmInteiro') + grab('mamaLocalDoTexto') + grab('mamaLesoes') +
-  grab('_mamaXY') + grab('_mamaFrontal') + grab('_mamaLateral') + grab('mamaEsquemaHTML') +
-  '\nreturn {mamaMm, mamaCmInteiro, mamaLocalDoTexto, mamaLesoes, mamaEsquemaHTML, _mamaXY};'
+// O MÓDULO INTEIRO de uma vez, em vez de constante por constante. Listar cada uma à mão
+// quebrava a suíte toda vez que o módulo ganhava um ajudante novo — e quebrava com um
+// "não está definido" que não diz nada sobre o que se queria testar.
+const MODULO = (function () {
+  const i = HTML.indexOf('/* ============ ESQUEMA ANATÔMICO DA MAMA ============');
+  const f = HTML.indexOf('/* ============ Categoria BI-RADS por extenso', i);
+  if (i < 0 || f < 0) throw new Error('não achei o módulo do esquema no index.html');
+  return HTML.slice(i, f);
+})();
+const api = new Function('esc', MODULO +
+  '\nreturn {mamaMm, mamaCmInteiro, mamaLocalDoTexto, mamaLesoes, mamaEsquemaHTML,'
+  + ' _mamaXY, _mamaRaioPx, _mamaContorno};'
 )(s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])));
 
 console.log('=== unidade: lê o número E a unidade, nunca adivinha ===');
@@ -118,6 +125,61 @@ ok(/12 × 8 × 9 mm/.test(svgHtml), 'com as medidas em mm');
 ok(svgHtml.indexOf('style="') >= 0 && svgHtml.indexOf('class="mamaEsq"') >= 0,
    'estilos inline, sem depender de CSS externo (some na impressão)');
 ok(api.mamaEsquemaHTML(laudo([], '')) === '', 'exame NORMAL não ganha esquema nenhum');
+
+console.log('\n=== 21/08: o TAMANHO desenhado é proporcional ao medido ===');
+// Pedido do médico. A primeira versão errava de um jeito bobo e invisível: a escala era
+// INVERSA (14/maior), o que normalizava tudo para o mesmo tamanho na tela — 2 mm e 12 mm
+// saíam iguais, e o desenho perdia a única informação de calibre que dava de graça.
+const r2 = api._mamaRaioPx(2), r8 = api._mamaRaioPx(8), r20 = api._mamaRaioPx(20);
+ok(r2 < r8 && r8 < r20, 'raio cresce com a medida: 2 mm (' + r2.toFixed(1) + ') < 8 mm ('
+   + r8.toFixed(1) + ') < 20 mm (' + r20.toFixed(1) + ')');
+ok(r20 / r2 > 2.5, 'e a diferença é VISÍVEL, não decorativa (' + (r20 / r2).toFixed(1) + '×)');
+ok(api._mamaRaioPx(0.2) >= 2.6, 'lesão minúscula ainda aparece — tem piso');
+ok(api._mamaRaioPx(400) <= 32, 'e lesão enorme não estoura a caixa — tem teto');
+ok(api._mamaRaioPx(null) > 0 && api._mamaRaioPx('x') > 0, 'sem medida não quebra o desenho');
+
+console.log('\n=== 21/08: forma irregular é DESENHADA irregular ===');
+const oval = api._mamaContorno(50, 50, 20, 14, 'oval', 1, '');
+const irreg = api._mamaContorno(50, 50, 20, 14, 'irregular', 1, '');
+const lob = api._mamaContorno(50, 50, 20, 14, 'lobulada', 1, '');
+ok(/^<ellipse/.test(oval), 'oval continua elipse lisa');
+ok(/^<polygon/.test(irreg), 'irregular vira polígono de contorno quebrado');
+ok(/^<polygon/.test(lob), 'lobulada também, mas com ondulação mais suave');
+ok((irreg.match(/,/g) || []).length > (lob.match(/,/g) || []).length,
+   'e a irregular tem mais vértices que a lobulada (' + (irreg.match(/,/g) || []).length
+   + ' contra ' + (lob.match(/,/g) || []).length + ')');
+// Determinístico: contorno que muda a cada redesenho assustaria quem confere um laudo.
+ok(api._mamaContorno(50, 50, 20, 14, 'irregular', 1, '') === irreg,
+   'o contorno é DETERMINÍSTICO — redesenhar dá exatamente o mesmo desenho');
+ok(api._mamaContorno(50, 50, 20, 14, 'irregular', 2, '') !== irreg,
+   'mas dois achados diferentes não saem com o contorno idêntico');
+
+console.log('\n=== 21/08: linha pontilhada da pele até a lesão ===');
+const comProf = api.mamaEsquemaHTML(laudo(
+  [{ localizacao: 'mama direita', forma: 'oval', orientacao: 'paralela' }],
+  'Notou-se nódulo na mama direita, às 10 h, distando 3 cm da papila, a 1,5 cm da pele, medindo 14 x 10 mm.'));
+ok(/stroke-dasharray/.test(comProf), 'a linha existe, e é pontilhada');
+ok(/15 mm da pele/.test(comProf), 'com a distância ESCRITA, porque o laudo a informou');
+const semProf = api.mamaEsquemaHTML(laudo(
+  [{ localizacao: 'mama direita', forma: 'oval', orientacao: 'paralela' }], f));
+ok(/stroke-dasharray/.test(semProf), 'a linha aparece mesmo sem a medida');
+ok(/profundidade média/.test(semProf) && !/mm da pele/.test(semProf),
+   'mas aí traz a PALAVRA, não um número inventado — laudo que não disse a distância não '
+   + 'pode virar desenho com distância');
+ok(api.mamaLocalDoTexto('a 1,5 cm da pele').profMm === 15, 'lê "1,5 cm da pele" como 15 mm');
+ok(api.mamaLocalDoTexto('a 8 mm da superfície').profMm === 8, 'e "8 mm da superfície" como 8 mm');
+ok(api.mamaLocalDoTexto('nódulo profundo').profMm === null, 'sem número, sem número');
+
+console.log('\n=== 21/08: os rótulos das camadas cabem no desenho ===');
+// Estavam sendo cortados na borda esquerda. O desenho começa mais à direita e a caixa
+// ficou mais larga; o rótulo mais longo é "Glândula".
+const lat = semProf.slice(semProf.indexOf('CORTE LATERAL') - 3000, semProf.indexOf('CORTE LATERAL'));
+const vb = /viewBox="0 0 (\d+) (\d+)"[^>]*aria-label="Corte lateral/.exec(semProf);
+ok(!!vb && +vb[1] >= 240, 'a caixa do corte lateral tem largura ' + (vb ? vb[1] : '?') + ' (era 210)');
+const xRot = /<text x="(\d+)" y="[\d.]+" font-size="8" fill="#5a6478" text-anchor="end"/.exec(semProf);
+ok(!!xRot && +xRot[1] >= 55,
+   'e os rótulos terminam em x=' + (xRot ? xRot[1] : '?') + ', com espaço à esquerda para caberem');
+ok(/gap:22px/.test(HTML), 'e as duas vistas ficaram mais afastadas uma da outra');
 
 console.log('\n=== as duas mamas, com numeração contínua ===');
 const duas = api.mamaEsquemaHTML(laudo(

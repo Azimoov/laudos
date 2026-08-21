@@ -1190,6 +1190,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
     <input type="checkbox" id="cfgConferente" onchange="conferenteAlternar(this)"> Conferir o laudo com uma segunda leitura antes de entregar
   </label>
   <span class="aviso">Um segundo leitor, que não escreveu o laudo e <b>não vê as imagens</b>: confere coerência, medidas, conclusão, lateralidade e português. Como não manda imagem, gasta pouco — <b>mas usa o modelo auxiliar acima; se aquele campo estiver vazio, ele roda no modelo principal e aí custa bem mais</b>. Acrescenta alguns segundos por laudo.</span>
+  <label style="margin-top:10px;font-weight:400;display:block">
+    <input type="checkbox" id="cfgPaciente" onchange="pacienteAlternar(this)"> Incluir no laudo de mama uma explicação para a paciente, em linguagem simples
+  </label>
+  <span class="aviso">Uma seção curta no fim do laudo, montada de <b>frases fixas por categoria</b> — a IA não escreve nada ali, para o resumo nunca contradizer o texto técnico. Nas categorias <b>4, 5 e 6 ela não explica a suspeita</b>: diz que o achado precisa de investigação e orienta procurar o médico solicitante o quanto antes. Nasce <b>desligada</b>. Uma vez impressa, a explicação passa a fazer parte do documento assinado — leia antes de liberar.</span>
   <div id="cfgDadosStatus" style="margin:8px 0"></div>
   <div id="bancoStatus" class="aviso" style="margin:4px 0 8px"></div>
   <label>Motor de transcrição local (opcional)</label>
@@ -1747,6 +1751,7 @@ function alternarConfig(){
   document.getElementById('cfgModeloAux').value = cfg.modeloAux;
   var _ck=document.getElementById('cfgConferente'); if(_ck) _ck.checked=conferenteLigado();
   document.getElementById('cfgAgenteLocal').value = cfg.agenteLocal;
+  var _cp=document.getElementById('cfgPaciente'); if(_cp) _cp.checked=pacienteLigada();
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
   renderRegras();
@@ -2144,7 +2149,7 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
 // 'glocais' (2.0): locais de atendimento cadastrados pelo médico, com o papel
 // timbrado de cada um. Entra aqui para viver no computador e não só no
 // navegador — trocar de navegador não pode custar o timbrado da clínica.
-const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais'];
+const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais','gpaciente'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -5361,6 +5366,10 @@ function abrirRevisao(exId, semTela){
                         + '<div contenteditable="false">'+mamaEvolucaoHTML(ex)+'</div>') : '')
   +'<br><br><b>CONCLUSÃO: '+negrito(L.conclusao)+'</b>'
   +(L.extra?'<br><br><span style="font-size:11px">'+negrito(L.extra).replace(/\n/g,'<br>')+'</span>':'')
+  /* A seção da paciente entra por ÚLTIMO, depois do texto técnico e das ressalvas.
+     contenteditable="false": ela é montada de frases fixas, e editá-la à mão aqui faria
+     justamente o que o desenho dela evita — divergir do texto técnico logo acima. */
+  +'<div contenteditable="false">'+pacienteHTML(ex)+'</div>'
   +'</div></div>'
   +'<div class="assin">'+(cfg.assinatura?'<img src="'+cfg.assinatura+'" style="height:62px;display:block;margin:0 auto -16px">':'')+'<span class="linha">'+cfg.medico+'<br>'+cfg.crm+'</span></div>'
   +'<div class="rodapeLaudo">Esclarecemos que a impressão diagnóstica em exames de imagem não é absoluta, devendo ser feita a correlação clínico laboratorial, além de outros exames de imagem. Somente o seu médico tem condições de interpretar corretamente o conjunto de todas essas informações.</div>'
@@ -8767,6 +8776,84 @@ function mamaCorrelacao(corpo){
   return {corpo:linhas.join('\n'), mudou:true, metodo:metodo};
 }
 
+/* ============ SEÇÃO "PARA A PACIENTE" ============
+   Especificação 01 §4 (21/08/2026). Uma explicação em linguagem simples no fim do laudo.
+
+   ZERO GERAÇÃO LIVRE, e esta é a decisão que sustenta tudo o mais. Se a IA escrevesse esta
+   seção, mais cedo ou mais tarde ela suavizaria ou endureceria algo em relação ao texto
+   técnico — e aí o documento se contradiz a si mesmo, no papel, assinado. Aqui a seção é
+   MONTADA a partir dos campos que já existem (categoria, lado, tamanho, conduta) com
+   frases fixas. A vantagem prática: dá para revisar estas redações UMA vez e confiar nelas
+   para sempre, em vez de conferir parágrafo novo a cada laudo.
+
+   DESLIGADA POR PADRÃO — decisão do médico (20/08). Muitos solicitantes preferem dar a
+   notícia na consulta, não pelo papel, e um laudo que já explica BI-RADS 4 à paciente na
+   sala de espera pode gerar reclamação legítima.
+
+   E NAS CATEGORIAS 4, 5 E 6 ELA NÃO EXPLICA A SUSPEITA. Diz que o exame encontrou algo que
+   precisa de investigação adicional e que a paciente deve procurar o médico solicitante o
+   quanto antes. Escrever "provavelmente é câncer" num laudo entregue no balcão não é
+   defensável — e a decisão de não fazer isso é mais importante que a seção inteira. */
+function pacienteLigada(){
+  try{ return localStorage.getItem('gpaciente')==='1'; }catch(e){ return false; }
+}
+function pacienteAlternar(el){
+  try{ dadoSalvar('gpaciente', el.checked?'1':'0'); }catch(e){}
+  log(el.checked ? 'Seção para a paciente LIGADA — ela passa a sair nos laudos de mama.'
+                 : 'Seção para a paciente desligada.');
+}
+/* As redações, por categoria. Sete textos para revisar uma vez. */
+const PACIENTE_TXT = {
+  '1': {oque:'Não foi encontrada nenhuma alteração.',
+        diz:'O exame não mostrou nada fora do normal.',
+        passo:'Manter os exames de rotina, na periodicidade que o seu médico indicar.'},
+  '2': {oque:'Foi encontrado um achado de características benignas.',
+        diz:'Achado benigno quer dizer: não é câncer. É um tipo de alteração comum e sem gravidade.',
+        passo:'Manter os exames de rotina, na periodicidade que o seu médico indicar.'},
+  '3': {oque:'Foi encontrado um achado com características de benignidade.',
+        diz:'As características desse achado ao ultrassom são as de um achado benigno — ou seja, não canceroso. A chance de ser algo maligno é de até 2 em cada 100.',
+        passo:'Repetir o ultrassom em 6 meses para confirmar que não houve mudança. Isso é acompanhamento de rotina, não é urgência.'},
+  /* 4, 5 e 6 compartilham a MESMA redação, e ela não descreve a suspeita. */
+  'ALTA': {oque:'Foi encontrado um achado que precisa de investigação adicional.',
+        diz:'O ultrassom sozinho não permite concluir sobre este achado. O seu médico vai avaliar o laudo completo e indicar o próximo passo.',
+        passo:'Procure o médico que pediu este exame o quanto antes, levando este laudo.'},
+  '0': {oque:'O exame ficou incompleto.',
+        diz:'Faltam imagens complementares ou exames anteriores para comparação antes de se chegar a uma conclusão.',
+        passo:'Procure o médico que pediu este exame, levando este laudo.'}
+};
+function _pacienteChave(cat){
+  var c=String(cat||'').toUpperCase().replace(/^BI-?RADS\s*/,'').replace(/\.$/,'');
+  if(/^[456]/.test(c)) return 'ALTA';
+  if(/^0/.test(c)) return '0';
+  return PACIENTE_TXT[c] ? c : null;
+}
+/* Monta a seção. Devolve '' quando desligada, quando não é mama, ou quando a categoria não
+   é reconhecida — na dúvida, não fala com a paciente. */
+function pacienteHTML(ex){
+  if(!pacienteLigada()) return '';
+  if(!ex || ex.tipo!=='mama' || !ex.laudo) return '';
+  var L=ex.laudo;
+  // a categoria do EXAME é a mais alta encontrada (regra do §6 do modelo)
+  var cats=(String(L.conclusao||'').match(/BI-RADS\s*([0-9][ABC]?)/gi)||[])
+             .map(function(s){ return s.replace(/BI-RADS\s*/i,''); });
+  var alta=cats.sort(function(a,b){ return _mamaRank(b)-_mamaRank(a); })[0];
+  var chave=_pacienteChave(alta);
+  if(!chave) return '';
+  var t=PACIENTE_TXT[chave];
+  var h='<div class="pacBox" style="margin-top:14px;border:1px solid #c8d0da;border-radius:8px;'
+   + 'padding:10px 12px;background:#fbfcfe;font-size:12px;color:#2b3242">'
+   + '<div style="font-weight:700;color:#3F3357;margin-bottom:6px">PARA A PACIENTE — explicação em linguagem simples</div>'
+   + '<p style="margin:4px 0"><b>O que foi examinado.</b> Foi feito um ultrassom das mamas. '
+   + 'O aparelho usa ondas de som, não usa radiação.</p>'
+   + '<p style="margin:4px 0"><b>O que foi encontrado.</b> '+esc(t.oque)+'</p>'
+   + '<p style="margin:4px 0"><b>O que isso quer dizer.</b> '+esc(t.diz)+'</p>'
+   + '<p style="margin:4px 0"><b>Qual o próximo passo.</b> '+esc(t.passo)+'</p>'
+   + '<p style="margin:6px 0 0;font-size:10.5px;color:#5a6478">Esta explicação é um resumo e '
+   + '<b>não substitui</b> o texto técnico acima nem a consulta com o seu médico. Leve este '
+   + 'laudo à sua próxima consulta.</p></div>';
+  return h;
+}
+
 /* ============ BLOCO 4 — registro pós-biópsia ============
    Especificação 07 (21/08/2026). Fecha o laço que o sistema não tinha: um achado categoria
    4 ou 5 recebia recomendação de biópsia e o resultado nunca voltava para dentro do WBOT.
@@ -8910,14 +8997,26 @@ function _lexGenero(texto, pos){
    A primeira versão desta tabela trocava "formação anecoica" por "formação anecoico":
    consertava a grafia e quebrava a frase. Corrigir ortografia estragando concordância é
    piorar com cara de melhorar, e num laudo assinado. */
-const LEX_EQUIV = [
+/* ORTOGRAFIA — vale para QUALQUER exame. Isto não é léxico de sociedade nenhuma: é a
+   grafia correta da palavra em português, e "anecóico" está errado num laudo de tireoide
+   exatamente como está num de mama. */
+const LEX_ORTOGRAFIA = [
   // grafia errada com o gênero PRESERVADO: só cai o acento, ou troca o radical
   [/\banec[oó]ic([oa]s?)\b/gi,          function(m,g){ return 'anecoic'+g; }],
   [/\banec[oó]g[eê]nic([oa]s?)\b/gi,    function(m,g){ return 'anecoic'+g; }],
   // "anecoide" não carrega gênero na própria forma: ele vem do substantivo antes dela
   [/\banec[oó]ide(s?)\b/gi,             function(m,plural,pos,todo){
       return 'anecoic'+_lexGenero(todo,pos)+(plural?'s':''); }],
-  [/\bpolip[oó]ide\b/gi,                'polipoide'],
+  [/\bpolip[oó]ide\b/gi,                'polipoide']
+];
+/* LÉXICO BI-RADS — SÓ MAMA, e esta separação é correção de um erro meu (21/08/2026).
+   A primeira versão tinha uma tabela só, e a substituição rodava sobre o laudo de mama.
+   Mas a auditoria estática mostrou "bem delimitado" espalhado por tireoide, obstétrico e
+   pélvica — e se um dia a substituição fosse ligada para todos os exames, ela escreveria
+   "de margens circunscritas" num laudo de tireoide. BI-RADS é o léxico DA MAMA; a tireoide
+   tem o TI-RADS, o ovário tem o O-RADS. Trocar o termo pelo de outra norma não é
+   padronizar, é aplicar a norma errada — e com aparência de rigor. */
+const LEX_BIRADS = [
   [/\bbem delimitad[oa]s?\b/gi,         'de margens circunscritas'],
   [/\bbem definid[oa]s?\b/gi,           'de margens circunscritas'],
   [/\bcom limites n[ií]tidos\b/gi,      'de margens circunscritas'],
@@ -8930,6 +9029,7 @@ const LEX_EQUIV = [
   [/\bmal delimitad[oa]s?\b/gi,         'de margens indistintas'],
   [/\bcom bordas irregulares\b/gi,      'de margens indistintas']
 ];
+const LEX_EQUIV = LEX_ORTOGRAFIA.concat(LEX_BIRADS);   // mama usa as duas
 /* Onde a substituição NÃO entra: indicação clínica e qualquer fala do paciente. Ali o
    léxico técnico não se aplica — "nódulo palpável" na indicação é queixa, não descritor. */
 function _lexTrechoProtegido(corpo){
@@ -8937,11 +9037,14 @@ function _lexTrechoProtegido(corpo){
   return m ? {ini:m.index, fim:m.index+m[0].length} : null;
 }
 /* Mecanismo 2 — substitui e REGISTRA. Devolve {texto, trocas:[{de,para}]}. */
-function lexSubstituir(corpo){
+/* `tabela` diz QUAL norma aplicar. O padrão é a de mama (ortografia + BI-RADS), porque é
+   de onde esta funcionalidade nasceu; exame de outra topografia deve passar só
+   LEX_ORTOGRAFIA, que é a parte que não pertence a norma nenhuma. */
+function lexSubstituir(corpo, tabela){
   var texto=String(corpo||''), prot=_lexTrechoProtegido(texto), trocas=[];
   var cabeca = prot ? texto.slice(0, prot.fim) : '';
   var resto  = prot ? texto.slice(prot.fim)     : texto;
-  LEX_EQUIV.forEach(function(par){
+  (tabela||LEX_EQUIV).forEach(function(par){
     var re=par[0], para=par[1];
     resto=resto.replace(re, function(){
       var args=Array.prototype.slice.call(arguments), achado=args[0];

@@ -42,6 +42,7 @@ const api = new Function('esc', 'norm', 'document', 'log', 'exames',
       'function _mamaCatDoAchado(d){ if(d&&d.__cat) return d.__cat;') + '\n' + BIO + '\n' + LEX +
   '\nreturn {lexSubstituir, lexDefinicoes, lexAlertas, LEX_EQUIV, LEX_TERMOS,'
   + ' biopsiaPendentes, biopsiaRegistrar, biopsiaFraseComparacao, BIOPSIA_ROTULO, mamaLesoes,'
+  + ' LEX_ORTOGRAFIA, LEX_BIRADS,'
   + ' mamaCandidatos};'
 )(s => String(s == null ? '' : s), norm,
   { getElementById: () => null, addEventListener: () => {} }, () => {}, []);
@@ -87,6 +88,28 @@ ok(/nódulo anecoico\b/.test(api.lexSubstituir('Notou-se nódulo anecóide.').te
    'e "nódulo anecóide" -> "anecoico"');
 ok(/imagens anecoicas\b/.test(api.lexSubstituir('Notaram-se imagens anecóides.').texto),
    'plural também acompanha');
+
+console.log('\n=== ORTOGRAFIA e LÉXICO BI-RADS são tabelas SEPARADAS ===');
+// Correção de um erro meu, achado pela auditoria estática (21/08): havia uma tabela só.
+// Mas "anecóico" está errado em qualquer laudo (é ortografia), enquanto "de margens
+// circunscritas" é BI-RADS — norma DA MAMA. A tireoide tem TI-RADS, o ovário tem O-RADS.
+// Trocar o termo pelo de outra norma não é padronizar: é aplicar a norma errada, com
+// aparência de rigor.
+ok(Array.isArray(api.LEX_ORTOGRAFIA) && Array.isArray(api.LEX_BIRADS),
+   'as duas tabelas existem separadas');
+ok(api.LEX_EQUIV.length === api.LEX_ORTOGRAFIA.length + api.LEX_BIRADS.length,
+   'e a de mama é a soma das duas');
+const soOrto = api.lexSubstituir(
+  'Notou-se cisto anecóico bem delimitado no rim direito.', api.LEX_ORTOGRAFIA);
+ok(/anecoico/.test(soOrto.texto), 'com só a ortografia, "anecóico" é corrigido');
+ok(/bem delimitado/.test(soOrto.texto),
+   'e "bem delimitado" é DEIXADO EM PAZ — num laudo de rim, BI-RADS não se aplica');
+const comBirads = api.lexSubstituir(
+  'Notou-se cisto anecóico bem delimitado na mama direita.', api.LEX_EQUIV);
+ok(/de margens circunscritas/.test(comBirads.texto),
+   'e na mama, com a tabela completa, o termo do léxico entra');
+ok(/tabela\|\|LEX_EQUIV/.test(LEX.replace(/\s/g, '')) || /\(tabela\|\|LEX_EQUIV\)/.test(LEX),
+   'o padrão continua sendo a de mama, que é de onde a funcionalidade nasceu');
 
 console.log('\n=== §08 mecanismo 1 — definição embutida SINALIZA, não apaga ===');
 const comDef = 'Notou-se nódulo de margens circunscritas (ou seja, bem delimitadas e '

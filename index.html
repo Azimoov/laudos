@@ -1204,6 +1204,13 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   </div>
   <span class="aviso">Use quando o motor de voz tiver ficado estranho, ou depois de o sistema ser atualizado. O programa <b>continua aberto</b>: só o serviço de fundo é trocado, e ele volta sozinho em alguns segundos. <b>É recusado com exame gravando</b> — nada de ditado se perde.</span>
   <div id="reiniciarEstado" class="aviso" style="margin-top:4px"></div>
+  <!-- 21/08/2026, especificação 07: fechar o laço pós-biópsia. Fica AQUI, e não no fluxo
+       de realizar exame, porque o resultado chega semanas depois — obrigar a reabrir o
+       exame antigo é o atrito que faria o registro simplesmente não acontecer. -->
+  <label style="margin-top:12px">🔬 Achados aguardando resultado de biópsia</label>
+  <span class="aviso">Achados de mama <b>categoria 4 ou 5</b> dos seus laudos, que ainda não têm resultado registrado. Lançar o resultado aqui tira o achado do pareamento com exames futuros: o que aparecer no mesmo lugar depois passa a ser tratado como <b>achado novo</b>, e não como o mesmo em crescimento. O sistema não descobre resultado sozinho — o registro é seu.</span>
+  <div style="margin-top:6px"><button class="btn sec" type="button" onclick="biopsiaRender()">🔄 Atualizar a lista</button></div>
+  <div id="biopsiaLista" style="margin-top:6px"></div>
   <label>💾 Pasta de backup (fora deste computador)</label>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <input type="text" id="cfgBackupPasta" style="flex:1;min-width:220px" placeholder="escolha pelo botão ao lado">
@@ -3485,6 +3492,15 @@ async function gerarLaudo(exId, opts){
         var _cor=mamaCorrelacao(_corpoFinal);
         if(_cor.mudou){ _corpoFinal=_cor.corpo;
           log('Correlação com outro método registrada'+(_cor.metodo?(' ('+_cor.metodo+')'):' — ausência declarada')+'.'); }
+        /* Especificação 08, mecanismo 2: termo fora do léxico vira o termo do léxico. A
+           troca é registrada AQUI, na revisão, e nunca no laudo entregue — mesma regra de
+           sempre: nenhuma menção a correção automática no documento final. */
+        var _lex=lexSubstituir(_corpoFinal);
+        if(_lex.trocas.length){
+          _corpoFinal=_lex.texto;
+          var _uni={}; _lex.trocas.forEach(function(t){ _uni[t.de+'→'+t.para]=1; });
+          log('Termos ajustados ao léxico BI-RADS: '+Object.keys(_uni).join('; ')+'.');
+        }
       }catch(e){ log('Apresentação dos achados de mama não foi aplicada: '+e.message, true); }
     }
     /* Doppler arterial: as travas rodam sobre o laudo PRONTO (título + corpo + conclusão
@@ -3531,7 +3547,12 @@ async function gerarLaudo(exId, opts){
       anteriores: (ex.tipo==='mama' && anteriorTxt)
         ? usados.map(function(A,i){
             var pedaco=anteriorTxt.split(/--- EXAME ANTERIOR /)[i+1]||'';
-            return {id:A.id, data:A.data||'', lesoes:mamaLesoesDeTexto(pedaco)};
+            var _bio=((usados[i]&&usados[i].laudo)||{}).biopsias||{};
+            var _les=mamaLesoesDeTexto(pedaco);
+            /* o status pos-biopsia do exame anterior viaja junto: e o que faz a
+               regra de exclusao do pareamento (mamaCandidatos) ter o que checar */
+            _les.forEach(function(v,k){ var b=_bio['L'+(k+1)]; if(b&&b.status) v.status=b.status; });
+            return {id:A.id, data:A.data||'', lesoes:_les};
           }).filter(function(x){ return x.lesoes.length; })
         : [],
       // de qual imagem a IA tirou cada seção — ela já estava olhando, agora anota enquanto lê
@@ -4345,6 +4366,10 @@ const ALERTAS = [
   {k:'conferente',    nome:'Revisão do conferente',         cor:'#6A4FB6', vazio:'Sem informação de conferência neste laudo'},
   // medida comparada com a tabela da IDADE do paciente (ver REF_MEDIDAS)
   {k:'referencia',    nome:'Medida fora da referência',     cor:'#0E7C8A', vazio:'Nenhuma medida fora da referência para a idade'},
+  /* 21/08/2026 — especificação 08. Cor da família das advertências de ESTILO, e de propósito
+     NÃO o vermelho de "Dados faltando": aquele está reservado para segurança de dado do
+     paciente, e diluí-lo em questão de redação faria o médico aprender a ignorar os dois. */
+  {k:'lexico',        nome:'Definição de termo no laudo',   cor:'#8A6D3B', vazio:'Nenhuma definição de termo embutida no texto'},
   {k:'outros',        nome:'Outros avisos',                 cor:'#6B7480', vazio:'Nenhum outro aviso'}
 ];
 /* Categoria desconhecida NUNCA some: cai em "outros". Aviso perdido é aviso não lido. */
@@ -5346,7 +5371,7 @@ function abrirRevisao(exId, semTela){
   // F2e e conferente: avisos CALCULADOS AGORA, não guardados — assim nenhum deles
   // sobrevive apontando um trecho que o médico já corrigiu.
   montarAlertas(alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
-                                 .concat(alertasReferencia(L)));
+                                 .concat(alertasReferencia(L)).concat(lexAlertas(L)));
   document.title = 'Laudo - '+((c.nome||ex.paciente||'paciente').trim());
   if(!semTela){ document.querySelector('main').style.display='none';
   document.getElementById('telaRevisao').style.display='block';
@@ -8029,7 +8054,12 @@ function mamaLesoes(L){
     var item={ id:'L'+(i+1), lado:loc.lado, hora:loc.hora, distCm:loc.distCm,
                prof:loc.prof||'media', profMm:(loc.profMm==null?null:loc.profMm),
                forma:forma, orientacao:orient,
-               mm:medidas, birads:String(d.caso_especial?'':(d.categoria||''))||'',
+               /* A categoria vem da MESMA conta que o laudo usa (_mamaCatDoAchado). Antes
+                  este campo lia `d.categoria`, que a IA nunca devolve — ela anota os
+                  descritores e o app é que calcula. Ficava sempre vazio, e vazio calado:
+                  o desenho não usava, então ninguém notava. Notou-se quando o registro de
+                  biópsia passou a filtrar por "categoria 4 ou 5" e não achava nada. */
+               mm:medidas, birads:_mamaCatDoAchado(d),
                rotulo:rotulo, incoerencia:'' };
     /* §3.1 da especificação: por definição do BI-RADS, massa REDONDA tem orientação NÃO
        paralela. A combinação redonda+paralela é contraditória por dentro e não pode virar
@@ -8735,6 +8765,226 @@ function mamaCorrelacao(corpo){
   var linhas=texto.split('\n');
   linhas[ultimo]=linhas[ultimo]+'\n'+frase;
   return {corpo:linhas.join('\n'), mudou:true, metodo:metodo};
+}
+
+/* ============ BLOCO 4 — registro pós-biópsia ============
+   Especificação 07 (21/08/2026). Fecha o laço que o sistema não tinha: um achado categoria
+   4 ou 5 recebia recomendação de biópsia e o resultado nunca voltava para dentro do WBOT.
+
+   Dois problemas, e o segundo é o mais urgente:
+     1. clínico — nenhum registro do desfecho no histórico do paciente;
+     2. TÉCNICO — o gráfico de evolução seguia tratando o achado como "em vigilância" e o
+        ofereceria para pareamento com exames futuros, quando ele já foi biopsiado e o caso
+        está resolvido ou seguiu para tratamento. Comparar um achado pós-biópsia como se
+        ainda estivesse em seguimento é erro de ESTADO, não dado faltando.
+   A regra de exclusão do pareamento já entrou no bloco 2 (ver mamaCandidatos); aqui entram
+   o campo, o lugar de lançar o resultado e a frase do exame seguinte.
+
+   NÃO HÁ IMPORTAÇÃO AUTOMÁTICA de laboratório: o registro é manual. Este sistema não
+   descobre resultado de biópsia sozinho, e fingir que descobre seria pior que não ter. */
+const BIOPSIA_ROTULO = {
+  ativo:'em acompanhamento',
+  biopsiado_benigno:'biópsia — benigno',
+  biopsiado_maligno:'biópsia — maligno',
+  biopsiado_inconclusivo:'biópsia — inconclusivo'
+};
+/* Os achados que PODEM estar esperando resultado: categoria 4 ou 5, e ainda "ativo".
+   Varre os laudos já feitos, porque o resultado chega semanas depois — o fluxo de
+   "realizar exame" não é o lugar disso. */
+function biopsiaPendentes(lista){
+  var out=[];
+  (lista||[]).forEach(function(ex){
+    var L=ex&&ex.laudo; if(!L || ex.tipo!=='mama') return;
+    var bio=L.biopsias||{};
+    var r;
+    try{ r=mamaLesoes(L); }catch(e){ return; }
+    r.plot.forEach(function(les){
+      var cat=String(les.birads||'');
+      if(!/^(4|5)/.test(cat)) return;                       // só 4 e 5 pedem tecido
+      if(((bio[les.id]||{}).status||'ativo')!=='ativo') return;
+      out.push({exId:ex.id, paciente:ex.paciente||'(sem nome)', lesaoId:les.id, n:les.n,
+                cat:cat, quando:ex._quando||0,
+                onde:'mama '+(les.lado==='D'?'direita':'esquerda')+', '+les.hora+'h, '
+                    +les.distCm+' cm da papila'});
+    });
+  });
+  return out.sort(function(a,b){ return b.quando-a.quando; });
+}
+/* Grava o resultado. `data` e `resultado` são opcionais — o essencial é o STATUS, que é o
+   que muda o comportamento do pareamento. */
+function biopsiaRegistrar(exId, lesaoId, status, data, resultado){
+  var ex=exames.find(function(e){ return e.id===exId; }); if(!ex||!ex.laudo) return false;
+  if(!BIOPSIA_ROTULO[status]) return false;
+  ex.laudo.biopsias=ex.laudo.biopsias||{};
+  ex.laudo.biopsias[lesaoId]={status:status, data:data||'', resultado:resultado||''};
+  if(typeof revMarcarEditado==='function') revMarcarEditado();
+  return true;
+}
+/* §4 — a frase do exame SEGUINTE. Achado resolvido por biópsia NÃO some da comparação: ele
+   é declarado. Sumir faria o laudo novo parecer que o achado nunca existiu. */
+function biopsiaFraseComparacao(n, dataAnterior, status, dataBiopsia){
+  var rot={biopsiado_benigno:'benigno', biopsiado_maligno:'maligno',
+           biopsiado_inconclusivo:'inconclusivo'}[status];
+  if(!rot) return '';
+  return 'O achado '+n+' descrito no exame de '+(dataAnterior||'data não registrada')
+       + ' foi submetido a biópsia'+(dataBiopsia?(' em '+dataBiopsia):'')
+       + ', com resultado '+rot+', não sendo objeto de comparação neste exame.';
+}
+
+/* A tela de lançamento. Fica FORA do fluxo de realizar exame de propósito: o resultado da
+   biópsia chega semanas depois, e obrigar a abrir o exame antigo para lançá-lo é o tipo de
+   atrito que faz o registro simplesmente não acontecer. */
+function biopsiaRender(){
+  var el=document.getElementById('biopsiaLista'); if(!el) return;
+  var pend=biopsiaPendentes(typeof exames!=='undefined'?exames:[]);
+  if(!pend.length){
+    el.innerHTML='<p class="aviso">Nenhum achado de mama categoria 4 ou 5 aguardando '
+      +'resultado. (Achados já registrados saem desta lista.)</p>';
+    return;
+  }
+  el.innerHTML=pend.map(function(p){
+    var sel='bioSt_'+p.exId+'_'+p.lesaoId, dt='bioDt_'+p.exId+'_'+p.lesaoId, tx='bioTx_'+p.exId+'_'+p.lesaoId;
+    return '<div style="border:1px solid #d6dbe4;border-radius:8px;padding:8px;margin-top:6px;background:#fff">'
+      +'<div style="font-size:12.5px;color:#3F3357"><b>'+esc(p.paciente)+'</b> — achado '+p.n
+      +' (BI-RADS '+esc(p.cat)+'), '+esc(p.onde)+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center">'
+      +'<select id="'+sel+'" style="font-size:12px">'
+      +'<option value="">resultado…</option>'
+      +'<option value="biopsiado_benigno">benigno</option>'
+      +'<option value="biopsiado_maligno">maligno</option>'
+      +'<option value="biopsiado_inconclusivo">inconclusivo</option></select>'
+      +'<input id="'+dt+'" type="text" placeholder="data (dd/mm/aaaa)" style="font-size:12px;width:140px">'
+      +'<input id="'+tx+'" type="text" placeholder="laudo histopatológico (opcional)" style="font-size:12px;flex:1;min-width:180px">'
+      +'<button class="btn peq" type="button" onclick="biopsiaSalvar('+p.exId+',\''+p.lesaoId+'\',\''+sel+'\',\''+dt+'\',\''+tx+'\')">Registrar</button>'
+      +'</div></div>';
+  }).join('');
+}
+function biopsiaSalvar(exId, lesaoId, idSel, idDt, idTx){
+  var st=(document.getElementById(idSel)||{}).value||'';
+  if(!st){ log('Escolha o resultado da biópsia antes de registrar.', true); return; }
+  var ok=biopsiaRegistrar(exId, lesaoId, st,
+    ((document.getElementById(idDt)||{}).value||'').trim(),
+    ((document.getElementById(idTx)||{}).value||'').trim());
+  if(!ok){ log('Não consegui registrar este resultado.', true); return; }
+  log('Resultado de biópsia registrado: '+BIOPSIA_ROTULO[st]+'. Este achado sai do '
+     +'pareamento com exames futuros — o que aparecer no mesmo lugar será tratado como achado novo.');
+  biopsiaRender();
+}
+
+/* ============ BLOCO 4 — validador de léxico ============
+   Especificação 08 (21/08/2026). Base normativa, ACR v2025, Report Organization, seção C:
+   o laudo deve ser sucinto, usando a terminologia do léxico aprovado SEM ENFEITE, e
+   definições de termos do léxico NÃO devem ser incluídas no laudo.
+
+   São dois mecanismos com AÇÕES DIFERENTES de propósito, e a diferença é a parte que
+   importa:
+     1. definição embutida  -> SINALIZA, não altera. Apagar texto clínico sem certeza é
+        arriscado; o médico decide se mantém, edita ou tira.
+     2. termo fora do léxico -> SUBSTITUI sozinho. Trocar por sinônimo exato não muda o
+        significado clínico, e a troca aparece na revisão — nunca no laudo entregue.
+   Termo ambíguo não é substituído: cai no mecanismo 1 e vira aviso, em vez de arriscar
+   trocar errado. */
+
+/* Substantivos femininos do vocabulário do exame. Existe por causa de "anecoide", que é
+   palavra de dois gêneros: virá-la para "anecoico" exige saber a quem ela se refere. */
+const LEX_FEM = ['formacao','imagem','area','lesao','colecao','estrutura','massa','regiao'];
+/* Singulariza o suficiente para reconhecer o substantivo: "imagens"->"imagem",
+   "formações"->"formacao", "lesões"->"lesao". Sem isto, o plural feminino não era
+   reconhecido e "imagens anecóides" virava "imagens anecoicos". */
+function _lexSingular(p){
+  p=String(p||'');
+  if(/oes$/.test(p)) return p.replace(/oes$/,'ao');
+  if(/ens$/.test(p)) return p.replace(/ens$/,'em');
+  if(/s$/.test(p))   return p.replace(/s$/,'');
+  return p;
+}
+function _lexGenero(texto, pos){
+  var antes=norm(String(texto).slice(Math.max(0,pos-45), pos)).trim().split(/\s+/);
+  for(var i=antes.length-1;i>=0 && i>=antes.length-4;i--)
+    if(LEX_FEM.indexOf(_lexSingular(antes[i]))>=0) return 'a';
+  return 'o';
+}
+/* Tabela de equivalências. É CONFIGURAÇÃO, não regra fixa: nasce do que a auditoria já
+   levantou e cresce com o uso real.
+   O substituto pode ser FUNÇÃO, e PRECISA poder ser — em português o adjetivo concorda.
+   A primeira versão desta tabela trocava "formação anecoica" por "formação anecoico":
+   consertava a grafia e quebrava a frase. Corrigir ortografia estragando concordância é
+   piorar com cara de melhorar, e num laudo assinado. */
+const LEX_EQUIV = [
+  // grafia errada com o gênero PRESERVADO: só cai o acento, ou troca o radical
+  [/\banec[oó]ic([oa]s?)\b/gi,          function(m,g){ return 'anecoic'+g; }],
+  [/\banec[oó]g[eê]nic([oa]s?)\b/gi,    function(m,g){ return 'anecoic'+g; }],
+  // "anecoide" não carrega gênero na própria forma: ele vem do substantivo antes dela
+  [/\banec[oó]ide(s?)\b/gi,             function(m,plural,pos,todo){
+      return 'anecoic'+_lexGenero(todo,pos)+(plural?'s':''); }],
+  [/\bpolip[oó]ide\b/gi,                'polipoide'],
+  [/\bbem delimitad[oa]s?\b/gi,         'de margens circunscritas'],
+  [/\bbem definid[oa]s?\b/gi,           'de margens circunscritas'],
+  [/\bcom limites n[ií]tidos\b/gi,      'de margens circunscritas'],
+  [/\bformato ovalad[oa]\b/gi,          'forma oval'],
+  [/\bformato oval\b/gi,                'forma oval'],
+  [/\balinhad[oa] com a pele\b/gi,      'de orientação paralela'],
+  [/\bna horizontal\b/gi,               'de orientação paralela'],
+  [/\bperpendicular à pele\b/gi,        'de orientação não paralela'],
+  [/\bna vertical\b/gi,                 'de orientação não paralela'],
+  [/\bmal delimitad[oa]s?\b/gi,         'de margens indistintas'],
+  [/\bcom bordas irregulares\b/gi,      'de margens indistintas']
+];
+/* Onde a substituição NÃO entra: indicação clínica e qualquer fala do paciente. Ali o
+   léxico técnico não se aplica — "nódulo palpável" na indicação é queixa, não descritor. */
+function _lexTrechoProtegido(corpo){
+  var m=/INDICAÇÃO:[^\n]*/i.exec(String(corpo||''));
+  return m ? {ini:m.index, fim:m.index+m[0].length} : null;
+}
+/* Mecanismo 2 — substitui e REGISTRA. Devolve {texto, trocas:[{de,para}]}. */
+function lexSubstituir(corpo){
+  var texto=String(corpo||''), prot=_lexTrechoProtegido(texto), trocas=[];
+  var cabeca = prot ? texto.slice(0, prot.fim) : '';
+  var resto  = prot ? texto.slice(prot.fim)     : texto;
+  LEX_EQUIV.forEach(function(par){
+    var re=par[0], para=par[1];
+    resto=resto.replace(re, function(){
+      var args=Array.prototype.slice.call(arguments), achado=args[0];
+      var novo = (typeof para==='function') ? para.apply(null, args) : para;
+      if(novo==null) return achado;                     // a regra decidiu não substituir
+      if(achado===novo) return achado;                  // já estava exatamente certo
+      trocas.push({de:achado, para:novo});
+      return novo;
+    });
+  });
+  return {texto:cabeca+resto, trocas:trocas};
+}
+/* Mecanismo 1 — só APONTA. Um termo do léxico seguido de explicação embutida. */
+const LEX_TERMOS = ['margens circunscritas','margens indistintas','orientação paralela',
+  'orientação não paralela','forma oval','anecoico','reforço acústico posterior',
+  'sombra acústica','hilo gorduroso','microlobulada','espiculada'];
+function lexDefinicoes(corpo){
+  var texto=String(corpo||''), achados=[];
+  LEX_TERMOS.forEach(function(t){
+    /* Dois padrões, e só estes dois: parêntese logo depois do termo, ou conectivo de
+       explicação. Padrão largo demais acusaria frase clínica normal, e alerta que erra é
+       alerta que passa a ser ignorado. */
+    var esc_=t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    /* Sem \b no fim da alternância: "isto é" termina em "é", que NÃO é caractere de
+       palavra para o regex, então a fronteira nunca casava e o conectivo mais comum
+       passava batido. O teste pegou. */
+    [ new RegExp(esc_+'\\s*\\(([^)]{12,})\\)', 'i'),
+      new RegExp(esc_+'\\s*[,;—-]?\\s*(ou seja|isto [ée]|em outras palavras|que significa|que quer dizer)', 'i')
+    ].forEach(function(re){
+      var m=re.exec(texto);
+      if(m) achados.push({termo:t, trecho:m[0].slice(0,90)});
+    });
+  });
+  return achados;
+}
+/* O aviso que vai para o painel da revisão. Categoria própria (ver ALERTAS). */
+function lexAlertas(L){
+  var achados=lexDefinicoes(((L||{}).corpo||'')+'\n'+((L||{}).conclusao||''));
+  if(!achados.length) return [];
+  return achados.map(function(a){
+    return {tipo:'lexico', texto:'"'+a.termo+'" aparece com a definição embutida no laudo '
+      +'("'+a.trecho+'"). O manual pede o termo sem explicação — decida se mantém, edita ou tira.'};
+  });
 }
 
 /* ============ Categoria BI-RADS por extenso: rótulo + probabilidade + conduta ============
@@ -10269,7 +10519,7 @@ function rev2Render(){
 
   // ---- os alertas, que são a legenda das cores ----
   var lista=alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
-                             .concat(alertasReferencia(L))
+                             .concat(alertasReferencia(L)).concat(lexAlertas(L))
                              .concat(alertasAchadoSemNegrito(L, rev2MoldeDoLaudo(ex)));
   var porTipo={}, calmos={};
   lista.forEach(function(a){

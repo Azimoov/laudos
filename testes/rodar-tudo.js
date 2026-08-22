@@ -37,6 +37,7 @@ const SUITE = [
   { arq: 'teste-birads-cat.js', o: 'categoria BI-RADS: rotulo, probabilidade e conduta (tabela local)' },
   { arq: 'teste-ref-volume.js', o: 'asterisco e fonte no julgamento de tamanho' },
   { arq: 'teste-mama-esquema.js', o: 'esquema anatomico da mama (bloco 2)' },
+  { arq: 'teste-historico-reabrir.js', o: 'reabrir laudo antigo na tela de liberacao' },
   { arq: 'teste-historico-abrir.js', o: 'abrir laudo antigo do historico (sem window.open)' },
   { arq: 'teste-dicom-importar.js', o: 'buscar exame no aparelho (caminho religado)' },
   { arq: 'teste-mama-paciente.js', o: 'secao para a paciente (frases fixas, desligada por padrao)' },

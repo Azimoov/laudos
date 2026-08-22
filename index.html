@@ -884,6 +884,8 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <div style="position:sticky;top:0;display:flex;gap:8px;align-items:center;padding:10px 14px;background:#1f5f5b;color:#fff;z-index:2">
     <button class="bt cinza" onclick="hisFecharLaudo()" style="padding:4px 12px">‹ Voltar ao histórico</button>
     <span id="verLaudoQuem" style="flex:1;font-weight:600"></span>
+    <!-- 21/08/2026, pedido do médico: daqui dá para ir à tela de liberação e editar. -->
+    <button class="bt" id="verLaudoReabrir" style="padding:4px 12px">📄 Reabrir para editar</button>
     <button class="bt" onclick="window.print()" style="padding:4px 12px">🖨 Imprimir / Salvar PDF</button>
   </div>
   <div id="verLaudoNota" class="aviso" style="padding:8px 14px;color:#5a6478"></div>
@@ -10535,7 +10537,11 @@ function rev2Abrir(exId){
     return;
   }
   _rev2Id=exId;
-  ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos'].forEach(function(id){
+  /* telaVerLaudo entrou nesta lista em 21/08: ela é a tela de leitura do histórico e vive
+     em z-index 9100, ACIMA das outras. Sem estar aqui, reabrir um laudo pelo histórico
+     mostrava a revisão por baixo dela — o botão pareceria não funcionar, que é exatamente
+     o defeito que essa mesma tela custou a tarde de ontem. */
+  ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo'].forEach(function(id){
     var e=document.getElementById(id); if(e) e.style.display='none';
   });
   var t=document.getElementById('telaRev2'); if(t) t.style.display='block';
@@ -10875,10 +10881,17 @@ function rev2Render(){
      o título não pode falar em pendências — ele não está na fila. Dizer "já assinado" no
      alto é o que evita o médico achar que está revisando algo que ainda falta entregar. */
   var nIgn=Object.keys(_rev2Ignorado).length;
-  document.getElementById('rv2Tit').textContent = ex._liberado
+  /* Laudo REABERTO DO HISTÓRICO tem de se anunciar: ele já foi assinado e entregue uma vez,
+     e volta SEM as imagens (elas nunca são guardadas no histórico). Sem esse aviso no alto,
+     ele se parece com um laudo novo do dia — e o médico só descobriria a diferença quando
+     procurasse as fotos e não achasse. */
+  document.getElementById('rv2Tit').textContent = ex._doHistorico
+    ? ('Laudo REABERTO do histórico — '+(ex.paciente||'')+(ex.dataExame?(' · '+ex.dataExame):'')
+       +'  ·  sem as imagens do exame')
+    : (ex._liberado
     ? ('Relendo laudo JÁ ASSINADO — '+(ex.paciente||'')+(fila.length?('  ·  '+fila.length+' pendente'+(fila.length===1?'':'s')+' na fila'):''))
     : ('Revisão de laudos — '+fila.length+' pendente'+(fila.length===1?'':'s')
-       +(nIgn?('  ·  '+nIgn+' ignorado'+(nIgn===1?'':'s')):''));
+       +(nIgn?('  ·  '+nIgn+' ignorado'+(nIgn===1?'':'s')):'')));
   /* Laudo ignorado não pode virar laudo esquecido: o rodapé diz quantos são e traz de volta. */
   var elIgn=document.getElementById('rv2Ignorados');
   if(elIgn){
@@ -12159,11 +12172,106 @@ async function hisRevisar(id){
        caminho editável já fazia logo acima. Só o z-index resolveria, mas deixar duas telas
        cheias empilhadas faz a rolagem do fundo continuar viva por baixo. */
     var _th=document.getElementById('telaHistorico'); if(_th) _th.style.display='none';
+    /* O botão de reabrir precisa saber QUAL laudo está na tela. Ligado aqui, com o id
+       fechado por closure, em vez de montado dentro do HTML: id de histórico pode conter
+       aspas e barras, e concatená-lo num onclick é como se abre buraco de injeção numa
+       tela que só mostra dado do próprio médico — mas o hábito é o que protege quando o
+       dado deixar de ser só dele. */
+    var _bt=document.getElementById('verLaudoReabrir');
+    if(_bt) _bt.onclick=function(){ hisReabrir(r.id); };
     document.getElementById('telaVerLaudo').style.display='block';
     document.body.classList.add('verHist');
     window.scrollTo(0,0);
     hisAvisar('');
   }catch(e){ hisAvisar('Não consegui abrir: '+((e&&e.message)||e), true); }
+}
+/* ---- REABRIR UM LAUDO ANTIGO NA TELA DE LIBERAÇÃO (21/08/2026, pedido do médico) ----
+   O histórico guarda o laudo como HTML JÁ DESENHADO, não como campos. Para reabri-lo
+   editável é preciso desmontar esse desenho de volta em título / técnica / corpo /
+   conclusão / ressalvas.
+
+   A leitura é feita pelo DOM, não por expressão regular: o HTML é o nosso próprio desenho,
+   com classes conhecidas, e o navegador o interpreta melhor do que qualquer regex minha
+   — inclusive quando o médico editou o texto e mudou o espaçamento.
+
+   O QUE NÃO VOLTA, e é dito na cara: as IMAGENS do exame. Elas nunca foram guardadas no
+   histórico (é o que impede o localStorage de estourar). Então o laudo reaberto é
+   editável, assinável e imprimível, mas sem fotos — e portanto sem esquema anatômico e sem
+   conferência contra imagem. */
+function hisLaudoDoHtml(html){
+  var d=document.createElement('div'); d.innerHTML=String(html||'');
+  var txt=d.querySelector('.laudoTexto'); if(!txt) return null;
+  var tit=d.querySelector('.laudoTitulo');
+  var cabEl=d.querySelector('.laudoCab');
+  /* as ressalvas do fim vivem num <span> de corpo menor — tira antes, senão viriam
+     coladas no fim da conclusão */
+  var extra='';
+  var spanExtra=txt.querySelector('span[style*="font-size:11px"]');
+  if(spanExtra){ extra=_hisTexto(spanExtra); spanExtra.parentNode.removeChild(spanExtra); }
+  var inteiro=_hisTexto(txt);
+  /* o desenho tem sempre a mesma espinha: TÉCNICA, "DESCRIÇÃO:", corpo, "CONCLUSÃO:". */
+  var tecnica='', corpo='', conclusao='';
+  var iDesc=inteiro.indexOf('DESCRIÇÃO:');
+  if(iDesc>=0){ tecnica=inteiro.slice(0,iDesc).trim(); inteiro=inteiro.slice(iDesc+'DESCRIÇÃO:'.length); }
+  var iConc=inteiro.indexOf('CONCLUSÃO:');
+  if(iConc>=0){ corpo=inteiro.slice(0,iConc).trim(); conclusao=inteiro.slice(iConc+'CONCLUSÃO:'.length).trim(); }
+  else corpo=inteiro.trim();
+  if(!corpo && !conclusao) return null;          // não reconheci o desenho: não invento laudo
+  var cab={};
+  if(cabEl){
+    var t=_hisTexto(cabEl);
+    var g=function(r){ var m=r.exec(t); return m?m[1].trim():''; };
+    cab={nome:g(/Nome do Paciente:\s*([^\n]*)/i), idade:g(/Idade:\s*([^\n]*)/i),
+         realizado_em:g(/Realizado em:\s*([^\n]*)/i), dados_clinicos:g(/Dados Clínicos:\s*([^\n]*)/i)};
+  }
+  return {titulo:(tit?_hisTexto(tit).trim():''), tecnica:tecnica, corpo:corpo,
+          conclusao:conclusao, extra:extra, cab:cab};
+}
+/* Texto de um nó preservando as quebras que o desenho fazia com <br> e blocos. */
+function _hisTexto(el){
+  var c=el.cloneNode(true);
+  Array.prototype.forEach.call(c.querySelectorAll('br'), function(b){
+    b.parentNode.replaceChild(document.createTextNode('\n'), b); });
+  Array.prototype.forEach.call(c.querySelectorAll('div,p'), function(b){
+    b.appendChild(document.createTextNode('\n')); });
+  return (c.textContent||'').replace(/ /g,' ').replace(/\n{3,}/g,'\n\n');
+}
+async function hisReabrir(id){
+  var r=_hisIndice.filter(function(x){ return String(x.id)===String(id); })[0];
+  if(!r){ hisAvisar('Não achei esse laudo no histórico.', true); return; }
+  /* Se o exame ainda está NESTA sessão, não se reconstrói nada: reabre o de verdade, com
+     imagens, ditado e tudo. Reconstruir seria entregar uma versão pior do que existe. */
+  var ex=hisExameDaSessao(r);
+  if(ex){ hisFecharLaudo(); _rev2Origem='historico'; rev2Abrir(ex.id); return; }
+  try{
+    var html=r.html;
+    if(!html){
+      var resp=await fetch(agenteBase()+'/historico/laudo?id='+encodeURIComponent(r.id));
+      var j=await resp.json();
+      html=(j&&j.ok&&typeof j.html==='string')?j.html:'';
+    }
+    var L=hisLaudoDoHtml(html);
+    if(!L) throw new Error('não reconheci o formato deste laudo guardado');
+    /* já está aberto para reabrir? então usa aquele, em vez de criar um segundo */
+    var jaAberto=exames.filter(function(x){ return x._doHistorico===r.id; })[0];
+    if(jaAberto){ hisFecharLaudo(); _rev2Origem='historico'; rev2Abrir(jaAberto.id); return; }
+    var novo={ id:(exames.reduce(function(m,x){ return Math.max(m,x.id); },-1)+1),
+      nomeArquivo:'', paciente:r.paciente||'', subExame:'', imagens:[], tipo:r.tipo||'',
+      lateralidade:'', audios:[], metaConf:1, dataExame:r.data||'', idadeExame:(L.cab.idade||''),
+      codPac:r.cod||'', nascPac:'', sexoPac:'', histKey:r.id, _doHistorico:r.id,
+      _quando:(r.ts||Date.now()), _semImagens:true,
+      laudo:{ cab:L.cab, titulo:L.titulo, tecnica:L.tecnica, corpo:L.corpo,
+              conclusao:L.conclusao, extra:L.extra, obs:(r.obs||''),
+              alertas:(r.alertas||[]), trechos:[], procedencia:[],
+              _molde:(MODELOS[r.tipo]?rev2MoldeDoTexto(MODELOS[r.tipo].corpo):null) } };
+    exames.push(novo);
+    hisFecharLaudo();
+    _rev2Origem='historico';
+    rev2Abrir(novo.id);
+    log('Laudo de '+(r.paciente||'')+' ('+(r.data||'sem data')+') reaberto para edição. '
+       +'⚠️ As imagens do exame NÃO ficam guardadas no histórico: este laudo volta sem fotos, '
+       +'e portanto sem esquema anatômico e sem conferência contra imagem.', true);
+  }catch(e){ hisAvisar('Não consegui reabrir: '+((e&&e.message)||e), true); }
 }
 function hisFecharLaudo(){
   var t=document.getElementById('telaVerLaudo'); if(t) t.style.display='none';

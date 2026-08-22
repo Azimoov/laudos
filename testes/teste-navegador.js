@@ -395,6 +395,42 @@ const VERIFICACOES = `(async () => {
     txtArquivo.toLowerCase().indexOf('lote') < 0, txtArquivo.replace(/\\s+/g, ' ').trim());
   diz('mas diz para onde ir depois', txtArquivo.indexOf('Liberar laudos') >= 0);
 
+  // ---- REABRIR LAUDO ANTIGO: a reconstrução do desenho guardado (21/08/2026) ----
+  // Aqui, e não numa suíte de bancada, porque hisLaudoDoHtml PRECISA de DOM de verdade: ela
+  // desmonta o HTML já desenhado do histórico de volta em campos. Desmontar errado entrega
+  // ao médico um laudo com pedaços trocados, para ele assinar.
+  const desenhoGuardado =
+    '<div class="laudoCab"><div>Nome do Paciente:MARIA DE SOUZA<br><b>Idade:</b> 49 anos<br>' +
+    '<b>Realizado em:</b> 19/08/2026<br><b>Dados Clínicos:</b> rastreamento</div></div>' +
+    '<div class="laudoCorpoBox"><div class="laudoTitulo">RELATÓRIO ULTRASSONOGRÁFICO DE MAMAS</div>' +
+    '<div class="laudoTexto">Exame realizado com transdutor linear.<br><br><b><u>DESCRIÇÃO:</u></b><br><br>' +
+    '<b>MAMA DIREITA</b><br>Pele sem alterações.<br>Notou-se nódulo às 10 h.<br><br>' +
+    '<b>CONCLUSÃO: Nódulo sólido na mama direita.<br>Categoria: BI-RADS 3.</b>' +
+    '<br><br><span style="font-size:11px">A ultrassonografia não substitui a mamografia.</span>' +
+    '</div></div>';
+  diz('hisLaudoDoHtml existe na pagina', typeof hisLaudoDoHtml === 'function');
+  const LR = (typeof hisLaudoDoHtml === 'function') ? hisLaudoDoHtml(desenhoGuardado) : null;
+  diz('o desenho guardado e reconhecido', !!LR);
+  if (LR) {
+    diz('titulo volta inteiro', /RELAT.RIO ULTRASSONOGR.FICO DE MAMAS/.test(LR.titulo), LR.titulo);
+    diz('tecnica sai limpa, sem o rotulo DESCRICAO',
+      /transdutor linear/.test(LR.tecnica) && LR.tecnica.indexOf('DESCRI') < 0, LR.tecnica.slice(0, 46));
+    diz('corpo traz os achados', /MAMA DIREITA/.test(LR.corpo) && /n.dulo .s 10 h/.test(LR.corpo));
+    diz('e o corpo NAO engole a conclusao', LR.corpo.indexOf('CONCLUS') < 0);
+    diz('conclusao sai separada', /N.dulo s.lido na mama direita/.test(LR.conclusao), LR.conclusao.slice(0, 46));
+    diz('com a categoria dentro dela', /BI-RADS 3/.test(LR.conclusao));
+    diz('as ressalvas do fim viram extra', /n.o substitui a mamografia/.test(LR.extra));
+    diz('e NAO ficam grudadas no fim da conclusao', !/substitui a mamografia/.test(LR.conclusao));
+    diz('cabecalho: idade', LR.cab.idade === '49 anos', LR.cab.idade);
+    diz('cabecalho: data do exame', /19.08.2026/.test(LR.cab.realizado_em), LR.cab.realizado_em);
+    diz('as quebras do desenho viram quebras de verdade', LR.corpo.indexOf(String.fromCharCode(10)) >= 0);
+  }
+  // E RECUSA o que nao reconhece: devolver meio laudo para assinar e pior que nao reabrir.
+  diz('HTML que nao e laudo: recusa', hisLaudoDoHtml('<div>qualquer coisa</div>') === null);
+  diz('vazio: recusa', hisLaudoDoHtml('') === null);
+  diz('caixa presente mas vazia: recusa, em vez de devolver laudo em branco',
+    hisLaudoDoHtml('<div class="laudoTexto"></div>') === null);
+
   return R;
 })()`;
 

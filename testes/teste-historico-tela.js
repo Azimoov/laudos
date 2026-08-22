@@ -47,9 +47,19 @@ ok(/#telaHistorico\{position:fixed;inset:0/.test(HTML), 'tem o CSS de tela cheia
 // nao seria reconhecida. Aconteceu ao criar esta tela, e o teste ponta a ponta pegou.
 ok(!/#tela\w+,#tela\w+\{position:fixed/.test(HTML),
    'nenhuma regra de tela cheia junta duas telas no mesmo seletor');
-ok(/const TELAS = \[[^\]]*'telaHistorico'\]/.test(
-     require('fs').readFileSync(require('path').join(__dirname, 'teste-navegador.js'), 'utf8')),
-   'a lista do teste ponta a ponta tambem foi atualizada (ela e copia manual, de proposito)');
+/* 22/08/2026 — esta assercao MUDOU DE PREMISSA, e vale dizer por que.
+   Antes ela exigia que a lista COPIADA dentro do teste ponta a ponta fosse atualizada
+   junto. A copia era proposital, mas era o defeito: copia nao vigia nada — envelhece junto
+   e as duas divergem em silencio. Aconteceu com telaModelos, que entrou na lista do app e
+   o teste continuou reclamando, porque olhava a propria.
+   Agora o app EXPOE a lista (window.__TELAS_CHEIAS) e o teste le dela. Entao o que se
+   cobra aqui e o contrario: que NAO exista mais copia. */
+const PONTA = require('fs').readFileSync(require('path').join(__dirname, 'teste-navegador.js'), 'utf8');
+ok(/const TELAS = window\.__TELAS_CHEIAS/.test(PONTA),
+   'o teste ponta a ponta LE a lista do app, em vez de guardar uma copia dela');
+ok(!/const TELAS = \['tela/.test(PONTA),
+   'e nao sobrou copia manual nenhuma para envelhecer em silencio');
+ok(/window\.__TELAS_CHEIAS = TELAS_CHEIAS/.test(HTML), 'e o app expoe a lista de verdade');
 
 console.log('=== pastas do dia ===');
 const PINTAR = corpoDe('hisPintar');

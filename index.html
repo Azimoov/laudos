@@ -213,6 +213,83 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 .assin{text-align:center;margin-top:14px;font-size:12.5px;}
 .assin .linha{display:inline-block;border-top:1px solid #000;padding-top:3px;min-width:330px;}
 .rodapeLaudo{border:1px solid #000;margin-top:10px;padding:5px 8px;font-size:10px;text-align:justify;}
+/* ============ TELA DE MODELOS DE LAUDO (22/08/2026) ============
+   Tokens copiados do mockup do médico (wbot-configuracoes.html), NÃO redefinidos.
+   Tudo escopado em #telaModelos para não vazar no resto do app, que tem outra paleta.
+
+   AS FONTES DO MOCKUP VÊM DO GOOGLE, e não as linkei: a janela do programa roda em
+   127.0.0.1 e pode estar sem internet — a tela ficaria com fonte trocada justamente na
+   clínica. E pedir fonte para fora contraria o local-first do projeto inteiro. Uso a pilha
+   do sistema; no Windows dá Segoe UI, que é próxima o bastante da Archivo em peso e
+   largura. A monoespaçada é a mesma que o app já usa nos outros lugares.
+
+   REGRA DE COR, que é do médico e vale nas três telas: cor SÓ onde há interação. O azul
+   (--doppler) aparece em foco, hover e seleção. Âmbar só para pendência real. O estado de
+   auditoria é comunicado por PREENCHIMENTO EM CINZA, nunca por cor — cor de gravidade numa
+   tela clínica cria um segundo julgamento correndo em paralelo ao texto. */
+#telaModelos{
+  --surface:#EEF1F4; --panel:#FFFFFF; --ink:#15202B; --ink-2:#3C4C5A;
+  --muted:#77899A; --line:#DCE3E9; --line-2:#C6D1DA;
+  --doppler:#14618F; --doppler-soft:#E6F0F7;
+  --flag:#9A6410; --flag-soft:#FBF2E2; --r:3px;
+  --sans:system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+  position:fixed;inset:0;z-index:9000;background:var(--surface);overflow:auto;
+  display:none;color:var(--ink);font-family:var(--sans);
+}
+#telaModelos .mdTopo{
+  background:var(--panel);border-bottom:1px solid var(--line);
+  padding:14px 26px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:3;
+}
+#telaModelos .mdVoltar{
+  background:none;border:1px solid var(--line-2);border-radius:var(--r);color:var(--ink-2);
+  font:inherit;font-size:13px;padding:5px 12px;cursor:pointer;
+}
+#telaModelos .mdVoltar:hover{border-color:var(--doppler);color:var(--doppler)}
+#telaModelos h2{font-size:20px;font-weight:600;letter-spacing:-.01em;margin:0;flex:1}
+#telaModelos .mdConta{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.05em}
+#telaModelos .mdCorpo{padding:22px 26px 60px;max-width:1280px;margin:0 auto}
+#telaModelos .mdLegenda{font-size:12.5px;color:var(--ink-2);margin-bottom:16px;line-height:1.5;max-width:74ch}
+#telaModelos .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:1080px){#telaModelos .grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:820px){#telaModelos .grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){#telaModelos .grid{grid-template-columns:1fr}#telaModelos .mdCorpo{padding:22px 18px 50px}}
+#telaModelos .card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  display:flex;flex-direction:column;gap:10px;min-height:132px;
+  transition:border-color .12s,box-shadow .12s,transform .12s;
+}
+#telaModelos .card:hover{border-color:var(--doppler);box-shadow:0 2px 10px rgba(20,97,143,.11);transform:translateY(-1px)}
+#telaModelos .card:focus-visible{outline:2px solid var(--doppler);outline-offset:2px}
+#telaModelos .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+#telaModelos .card-name{font-weight:600;font-size:14.5px;line-height:1.25;letter-spacing:-.005em}
+#telaModelos .card-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted);
+  letter-spacing:.04em;margin-top:auto;display:flex;flex-direction:column;gap:2px}
+#telaModelos .tag{display:inline-block;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.09em;text-transform:uppercase;padding:2px 6px;border-radius:2px;
+  background:var(--surface);color:var(--ink-2);border:1px solid var(--line-2);width:fit-content}
+#telaModelos .tag.sys{background:var(--doppler-soft);color:var(--doppler);border-color:#BFD9E9}
+#telaModelos .tag.flag{background:var(--flag-soft);color:var(--flag);border-color:#E8D5AE}
+/* o setor: assinatura do estado de auditoria, em cinza */
+#telaModelos .sector{flex-shrink:0}
+#telaModelos .sector .band{fill:none;stroke:var(--line-2);stroke-width:3.4}
+#telaModelos .sector .band.on{stroke:var(--ink-2)}
+#telaModelos .sector .edge{fill:none;stroke:var(--line-2);stroke-width:1}
+#telaModelos .card.new{border:1px dashed var(--line-2);background:transparent;
+  align-items:center;justify-content:center;text-align:center;gap:7px}
+#telaModelos .card.new:hover{border-color:var(--doppler);background:var(--doppler-soft);box-shadow:none}
+#telaModelos .plus{width:30px;height:30px;border:1px solid var(--line-2);border-radius:50%;
+  display:grid;place-items:center;color:var(--muted);font-size:17px;line-height:1}
+#telaModelos .card.new:hover .plus{border-color:var(--doppler);color:var(--doppler)}
+#telaModelos .card.new .card-name{color:var(--ink-2)}
+#telaModelos .card.new:hover .card-name{color:var(--doppler)}
+#telaModelos .new-hint{font-size:11.5px;color:var(--muted);max-width:20ch;line-height:1.35}
+@media (prefers-reduced-motion:reduce){
+  #telaModelos .card{transition:none}
+  #telaModelos .card:hover{transform:none}
+}
+
 /* Miniaturas do exame importado do aparelho: ampliam ao passar o mouse (21/08/2026).
    `position:relative` + z-index alto para a ampliada passar POR CIMA das vizinhas, e
    transform-origin no canto de baixo à esquerda para ela crescer para dentro da caixa em
@@ -878,6 +955,24 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   </div>
 </div>
 
+<!-- TELA 1 — GRADE DE MODELOS DE LAUDO (22/08/2026, desenho do médico).
+     Substitui o editor de textarea que vivia dentro de Configurações. A grade lê os
+     modelos REAIS do dados.js; nada aqui é ilustrativo. -->
+<div id="telaModelos">
+  <div class="mdTopo">
+    <button class="mdVoltar" type="button" onclick="modCfgFechar()">‹ Configurações</button>
+    <h2>Modelos de laudo</h2>
+    <span class="mdConta" id="mdConta"></span>
+  </div>
+  <div class="mdCorpo">
+    <p class="mdLegenda">Cada modelo é a estrutura de um tipo de exame: o texto do exame
+      normal, o sistema de classificação quando houver, e os textos de achado vinculados.
+      O <b>estado de auditoria</b> diz se o conteúdo já foi conferido contra a fonte
+      primária daquele exame.</p>
+    <div class="grid" id="mdGrade"></div>
+  </div>
+</div>
+
 <!-- 21/08/2026 — VER LAUDO ANTIGO, DENTRO DA PRÓPRIA JANELA.
      Antes isto era window.open('', '_blank'): abrir aba nova. Mas a janela do programa NÃO
      é um navegador — o pywebview não tem abas. O window.open devolvia nulo (e o médico via
@@ -1311,8 +1406,8 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   </div>
   <div style="margin-top:12px;border-top:1px dashed #c8d0da;padding-top:10px">
     <label>📋 Modelos de laudo</label>
-    <span class="aviso">Edite os modelos (Nome, Título, Técnica, Corpo, Conclusão) ou adicione novos. Ficam salvos só neste navegador e valem na lista de tipos e na geração.</span>
-    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn sec" type="button" onclick="abrirEditorModelos()">✏️ Abrir/fechar editor de modelos</button><span id="modelosStatus" class="aviso"></span></div>
+    <span class="aviso">A grade mostra todos os exames, com o sistema de classificação de cada um, quantos textos de achado tem e se já foi <b>auditado contra a fonte primária</b>. O editor antigo continua aqui embaixo enquanto as telas novas não cobrem tudo.</span>
+    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn" type="button" onclick="modCfgAbrir()">🗂 Abrir a grade de modelos</button><button class="btn sec" type="button" onclick="abrirEditorModelos()">✏️ Editor antigo (texto)</button><span id="modelosStatus" class="aviso"></span></div>
     <div id="modelosEditor" style="margin-top:8px"></div>
   </div>
   <div style="margin-top:12px"><button class="btn" onclick="salvarConfig()">Salvar</button></div>
@@ -9039,6 +9134,108 @@ function pacienteHTML(ex){
   return h;
 }
 
+/* ============ TELA 1 — GRADE DE MODELOS DE LAUDO (22/08/2026) ============
+   Desenho do médico (wbot-configuracoes.html). A grade lê os modelos REAIS do dados.js —
+   nome, sistema e contagem de textos de achado saem todos de lá, nenhum é digitado aqui.
+
+   O ESTADO DE AUDITORIA é a única coisa que não dá para derivar: ele é conhecimento do
+   projeto ("este exame já foi conferido contra a fonte primária?"), não dado do dados.js
+   nem escolha do usuário. Mora aqui, com a data e o documento que sustentam cada nota —
+   senão viraria número na tela sem ninguém saber de onde veio, que é exatamente o defeito
+   que a auditoria do CBR apontou nos valores. */
+const MOD_AUDITORIA = {
+  mama:        {n:3, nota:'ago/2026', fonte:'ACR BI-RADS v2025 + AUDITORIA-CBR'},
+  transvaginal:{n:2, nota:'em curso', fonte:'O-RADS US v2022 — parcial'},
+  pelvica:     {n:0, flag:'herda transvaginal'},
+  tireoide:    {n:0, fonte:'ACR TI-RADS 2017 no código, modelo não auditado'},
+  rins:        {n:0, fonte:'Bosniak v2019 no código, modelo não auditado'}
+};
+const MOD_ESTADO = ['Não auditado','Em auditoria','Em auditoria','Auditado'];
+/* O setor de ultrassom: três faixas de profundidade, preenchidas conforme o progresso.
+   Cinza, sempre — ver a regra de cor no CSS. */
+function _modSetor(n){
+  var b=['M9.5 13.5 A9 9 0 0 0 24.5 13.5',
+         'M6.5 18.5 A13.5 13.5 0 0 0 27.5 18.5',
+         'M3.5 23.5 A18 18 0 0 0 30.5 23.5'];
+  return '<svg class="sector" width="26" height="21" viewBox="0 0 34 27" aria-hidden="true">'
+    +'<path class="edge" d="M17 2 L3 25 M17 2 L31 25"/>'
+    + b.map(function(d,i){ return '<path class="band'+(i<n?' on':'')+'" d="'+d+'"/>'; }).join('')
+    +'</svg>';
+}
+/* Quantos textos de achado cada exame tem. Derivado do BIZUS de verdade, pela MESMA função
+   que o editor usa para fatiar — se um dia a fatia mudar, a contagem acompanha sozinha. */
+function modCfgQuantosBizus(chave){
+  try{
+    var regiao=bizusParaTipo(chave);
+    if(!regiao) return 0;
+    return bizusSplitRegiao(regiao).length;
+  }catch(e){
+    /* NULO, não zero. "0 textos de achado" é uma AFIRMAÇÃO — e seria mentira se o que
+       aconteceu foi a contagem quebrar. Devolvendo nulo, o cartão mostra "—" e o médico vê
+       que o programa não sabe, em vez de acreditar que aquele exame não tem dizer nenhum.
+       (Isto apareceu ao montar a tela: um sandbox meu sem uma constante em escopo fez os 25
+       cartões saírem com "0 textos", e por um instante pareceu dado, não falha.) */
+    return null;
+  }
+}
+/* O sistema de classificação, lido do CLASSIF — não digitado. */
+function modCfgSistema(chave){
+  var nomes={birads:'BI-RADS', orads:'O-RADS', tirads:'TI-RADS'};
+  for(var k in nomes) if(classifVale(k, chave)) return nomes[k];
+  return null;
+}
+function modCfgDados(){
+  return Object.keys(MODELOS||{}).filter(function(k){ return k!=='outro'; }).map(function(k){
+    var A=MOD_AUDITORIA[k]||{};
+    return {chave:k, nome:(MODELOS[k].nome||k), bizus:modCfgQuantosBizus(k),
+            sistema:modCfgSistema(k), auditoria:(A.n||0), nota:(A.nota||''), flag:(A.flag||'')};
+  }).sort(function(a,b){
+    /* auditados primeiro, depois por nome: o que já foi conferido é o que ele mais visita,
+       e deixar tudo em ordem alfabética empurraria mama para o meio de 26 cartões. */
+    return (b.auditoria-a.auditoria) || a.nome.localeCompare(b.nome,'pt-BR');
+  });
+}
+function modCfgRender(){
+  var g=document.getElementById('mdGrade'); if(!g) return;
+  var lista=modCfgDados();
+  g.innerHTML=lista.map(function(m){
+    return '<button class="card" type="button" onclick="modCfgAbrirModelo(\''+esc(m.chave)+'\')">'
+      +'<div class="card-top"><div class="card-name">'+esc(m.nome)+'</div>'+_modSetor(m.auditoria)+'</div>'
+      +(m.sistema?'<span class="tag sys">'+esc(m.sistema)+'</span>':'')
+      +(m.flag?'<span class="tag flag">'+esc(m.flag)+'</span>':'')
+      +'<div class="card-meta"><span>'+(m.bizus==null ? '— textos de achado'
+          : (m.bizus+' texto'+(m.bizus===1?'':'s')+' de achado'))+'</span>'
+      +'<span>'+esc(MOD_ESTADO[m.auditoria])+(m.nota?(' · '+esc(m.nota)):'')+'</span></div>'
+      +'</button>';
+  }).join('')
+   +'<button class="card new" type="button" onclick="modCfgNovo()">'
+   +'<div class="plus">+</div><div class="card-name">Novo modelo</div>'
+   +'<div class="new-hint">Cria a estrutura completa de um exame</div></button>';
+  var c=document.getElementById('mdConta');
+  if(c) c.textContent=lista.length+' modelos';
+}
+function modCfgAbrir(){
+  ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo','telaRev2']
+    .forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  modCfgRender();
+  var t=document.getElementById('telaModelos'); if(t) t.style.display='block';
+  window.scrollTo(0,0);
+}
+function modCfgFechar(){
+  var t=document.getElementById('telaModelos'); if(t) t.style.display='none';
+  var c=document.getElementById('painelConfig');
+  if(c && c.style.display==='none') alternarConfig();
+}
+function modCfgAbrirModelo(chave){
+  /* Tela 2 (laudo estruturado) ainda não construída — dizer isso é melhor que um clique
+     que não faz nada, que é indistinguível de programa quebrado. */
+  log('A tela do modelo "'+((MODELOS[chave]||{}).nome||chave)+'" ainda está sendo construída. '
+     +'Por enquanto, os textos continuam editáveis pelos editores de Configurações.', true);
+}
+function modCfgNovo(){
+  log('A criação de modelo em 5 passos ainda está sendo construída.', true);
+}
+
 /* ============ ASTERISCO E FONTE NO JULGAMENTO DE TAMANHO ============
    Pedido do Dr. Daniel, 21/08/2026: toda vez que o laudo AFIRMA que algo está aumentado ou
    reduzido — hepatomegalia, útero aumentado, ovário aumentado, o que for —, tem de haver um
@@ -12323,7 +12520,17 @@ window.addEventListener('DOMContentLoaded', function(){
    essas telas, e uma tela nova amanhã repetiria o defeito sem ninguém notar. Aqui basta
    acrescentar o id à lista. */
 (function(){
-  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2','telaAntigos','telaHistorico'];
+  /* telaVerLaudo e telaModelos entraram em 21 e 22/08. A segunda foi apanhada pelo teste
+     que confere se TODA tela de tela cheia do CSS está nesta lista — a primeira escapava
+     dele só porque tem o position:fixed inline, e não no CSS. Estar aqui é o que impede a
+     segunda barra de rolagem de voltar. */
+  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2','telaAntigos',
+                      'telaHistorico','telaVerLaudo','telaModelos'];
+  /* Exposta de propósito: o teste que confere se toda tela cheia está aqui guardava uma
+     CÓPIA desta lista, e cópia não vigia nada — ela envelhece junto e as duas divergem em
+     silêncio. Foi o que aconteceu com telaModelos em 22/08: acrescentei aqui e o teste
+     continuou reclamando, porque olhava a lista dele. Agora ele lê ESTA. */
+  window.__TELAS_CHEIAS = TELAS_CHEIAS;
   function travarFundo(){
     var algumaAberta = TELAS_CHEIAS.some(function(id){
       var el=document.getElementById(id);

@@ -277,7 +277,11 @@ const VERIFICACOES = `(async () => {
   // continua POR BAIXO ocupando ~4.000 px — a janela mantinha a barra dela, rolando um
   // conteudo invisivel, ao lado da barra da propria tela.
   // So se pega num navegador de verdade: nenhuma funcao isolada mostra isso.
-  const TELAS = ['telaAbertura', 'telaExames', 'telaDia', 'telaRev2', 'telaAntigos', 'telaHistorico'];
+  // A lista VEM DO APP (window.__TELAS_CHEIAS). Antes era uma copia escrita aqui — e copia
+  // nao vigia nada: ela envelhece junto e as duas divergem em silencio. Em 22/08 uma tela
+  // nova entrou na lista do app e este teste continuou reclamando, porque olhava a propria.
+  // Se a lista sumir do app, o fallback vazio derruba o teste — que e o certo.
+  const TELAS = window.__TELAS_CHEIAS || [];
   const contarBarras = () => {
     const de = document.documentElement;
     let n = (window.innerWidth - de.clientWidth) > 2 ? 1 : 0;
@@ -430,6 +434,45 @@ const VERIFICACOES = `(async () => {
   diz('vazio: recusa', hisLaudoDoHtml('') === null);
   diz('caixa presente mas vazia: recusa, em vez de devolver laudo em branco',
     hisLaudoDoHtml('<div class="laudoTexto"></div>') === null);
+
+  // ---- TELA 1: grade de modelos de laudo (22/08/2026) ----
+  // Aqui, na pagina inteira, porque a contagem de textos de achado depende de VARIAS
+  // constantes e funcoes conversando (BIZUS_SECOES, BIZUS_POR_TIPO, bizusParse,
+  // bizusSplitRegiao). Um sandbox de bancada sem uma delas fez os 25 cartoes sairem com
+  // "0 textos" e por um instante aquilo pareceu dado, nao falha.
+  diz('a grade existe', typeof modCfgDados === 'function' && !!document.getElementById('mdGrade'));
+  const GM = (typeof modCfgDados === 'function') ? modCfgDados() : [];
+  diz('lista os modelos reais do dados.js', GM.length >= 20, GM.length + ' modelos');
+  diz('e NAO inclui o pseudo-tipo "outro"', !GM.some(m => m.chave === 'outro'));
+  const gMama = GM.filter(m => m.chave === 'mama')[0];
+  const gTv = GM.filter(m => m.chave === 'transvaginal')[0];
+  diz('mama tem sistema BI-RADS lido do CLASSIF', !!gMama && gMama.sistema === 'BI-RADS', gMama && gMama.sistema);
+  diz('transvaginal tem O-RADS', !!gTv && gTv.sistema === 'O-RADS', gTv && gTv.sistema);
+  diz('exame sem sistema fica sem etiqueta', GM.some(m => m.sistema === null));
+  // A CONTAGEM: o defeito que este teste existe para pegar.
+  diz('a contagem de textos de achado FUNCIONA (nao é 0 em todos)',
+    GM.some(m => m.bizus > 0), 'mama=' + (gMama && gMama.bizus) + ' tv=' + (gTv && gTv.bizus));
+  diz('e nenhuma contagem voltou nula (nula = a conta quebrou)',
+    !GM.some(m => m.bizus === null));
+  diz('mama tem mais de um texto de achado', !!gMama && gMama.bizus > 1, gMama && gMama.bizus);
+  // Estado de auditoria: o unico dado que nao vem do dados.js
+  diz('mama esta auditada (3)', !!gMama && gMama.auditoria === 3);
+  diz('transvaditoria em curso (2)', !!gTv && gTv.auditoria === 2);
+  diz('o resto nasce nao auditado', GM.filter(m => m.auditoria === 0).length >= 20);
+  diz('auditados vem primeiro na grade', GM[0].auditoria >= GM[GM.length - 1].auditoria);
+  // Desenho
+  modCfgRender();
+  const cards = document.querySelectorAll('#telaModelos .card');
+  diz('a grade desenha um cartao por modelo, mais o "Novo modelo"',
+    cards.length === GM.length + 1, cards.length + ' cartoes');
+  diz('o ultimo cartao e o de criar', document.querySelector('#telaModelos .card.new') !== null);
+  diz('cada cartao traz o setor de auditoria', document.querySelectorAll('#telaModelos .sector').length >= GM.length);
+  const faixasMama = document.querySelectorAll('#telaModelos .card .sector .band.on');
+  diz('e ha faixas preenchidas (o estado e visivel)', faixasMama.length > 0, faixasMama.length + ' faixas');
+  diz('a contagem do topo bate', document.getElementById('mdConta').textContent.indexOf(String(GM.length)) === 0);
+  // Regra de cor: status em cinza, nunca colorido
+  const corBanda = getComputedStyle(document.querySelector('#telaModelos .sector .band.on')).stroke;
+  diz('o estado de auditoria e CINZA, nao colorido', /60, ?76, ?90|#3C4C5A/i.test(corBanda), corBanda);
 
   return R;
 })()`;

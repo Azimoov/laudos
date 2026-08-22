@@ -213,6 +213,16 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 .assin{text-align:center;margin-top:14px;font-size:12.5px;}
 .assin .linha{display:inline-block;border-top:1px solid #000;padding-top:3px;min-width:330px;}
 .rodapeLaudo{border:1px solid #000;margin-top:10px;padding:5px 8px;font-size:10px;text-align:justify;}
+/* Miniaturas do exame importado do aparelho: ampliam ao passar o mouse (21/08/2026).
+   `position:relative` + z-index alto para a ampliada passar POR CIMA das vizinhas, e
+   transform-origin no canto de baixo à esquerda para ela crescer para dentro da caixa em
+   vez de sair pela direita da janela. */
+.dicomMinis{display:flex;gap:6px;flex-wrap:wrap;}
+.dicomMini{height:78px;border-radius:6px;border:1px solid #c8d0da;cursor:zoom-in;
+  position:relative;z-index:1;transition:transform .12s ease, box-shadow .12s ease;
+  transform-origin:left bottom;}
+.dicomMini:hover{transform:scale(3.4);z-index:30;box-shadow:0 8px 28px rgba(0,0,0,.35);
+  border-color:#6A4FB6;}
 @media print{
   body{background:#fff;}
   body *{visibility:hidden;}
@@ -2784,7 +2794,12 @@ async function dicomBuscar(){
 function dicomRender(){
   var div=document.getElementById('dicomLista'); if(!div) return;
   if(!dicomEstudos.length){ div.innerHTML=''; return; }
-  div.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
+  /* Os botões GRUDAM no alto (21/08, pedido do médico). São 277 estudos: rolando a lista
+     para achar o exame, a barra saía da tela e ele tinha de rolar tudo de volta para
+     importar. `sticky` mantém a barra visível enquanto só a lista corre por baixo — o
+     fundo opaco é o que impede as linhas de aparecerem através dela. */
+  div.innerHTML='<div style="position:sticky;top:0;z-index:2;background:#fff;padding:4px 0 6px;'
+      +'display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:1px solid #e2e6ee">'
       +'<button class="btn peq sec" type="button" onclick="dicomMarcarTodos(true)">marcar todos</button>'
       +'<button class="btn peq sec" type="button" onclick="dicomMarcarTodos(false)">desmarcar</button>'
       +'<button class="btn peq" type="button" onclick="dicomImportar()">⬇ Importar selecionados</button></div>'
@@ -2830,12 +2845,15 @@ function dicomVerFotos(i){
   var d=dicomProntos[i]; if(!d) return;
   var box=document.getElementById('dicomFotos'+i); if(!box) return;
   if(box.style.display!=='none'){ box.style.display='none'; return; }
+  /* AMPLIA AO PASSAR O MOUSE (21/08, pedido do médico): conferir 13 fotos clicando uma a
+     uma, e fechando uma a uma, é trabalho demais para uma conferência rápida. O clique
+     continua valendo, para ver em tamanho cheio. */
   var fotos=(d.imagens||[]).map(function(im){
-    return '<img src="'+im+'" style="height:78px;border-radius:6px;border:1px solid #c8d0da;cursor:zoom-in" onclick="ampliarImg(this)">';
+    return '<img class="dicomMini" src="'+im+'" onclick="ampliarImg(this)">';
   }).join('');
-  box.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap">'
+  box.innerHTML='<div class="dicomMinis">'
     +(fotos||'<span class="aviso">(sem fotos legíveis)</span>')+'</div>'
-    +'<span class="aviso">toque numa foto para ampliar</span>';
+    +'<span class="aviso">passe o mouse para ampliar · toque para ver em tamanho cheio</span>';
   box.style.display='block';
 }
 /* Tirar o que foi importado por engano. Sem isto, errar o exame significava recarregar a
@@ -11931,7 +11949,17 @@ async function antGerar(){
     var pac=((document.getElementById('antPaciente')||{}).value||'').trim();
     window.__antForcar={tipo:mod, paciente:pac};   // aplicado depois, em antAplicarEscolhas
     await processar();
+    /* As escolhas do médico (tipo do exame, nome) MANDAM, e têm de valer ANTES de gerar —
+       gerarLaudo lê ex.tipo para escolher o modelo. Aplicar depois seria escolher o modelo
+       errado e corrigir o rótulo em cima do laudo já escrito. */
     antAplicarEscolhas();
+    /* E AQUI ESTAVA O BURACO (achado em 21/08): faltava esta linha. `processar()` agrupa,
+       transcreve e associa — ele termina dizendo "confira as associações e GERE os laudos".
+       Quem gera é `gerarTodos()`, e ninguém o chamava. A tela então processava tudo direito
+       e logo depois perguntava quantos laudos tinham saído; a resposta era sempre zero, e
+       o médico via "nenhum laudo saiu pronto" sem nada de errado no material.
+       A tela está assim desde que nasceu, em 18/08 — nunca gerou um laudo sequer. */
+    await gerarTodos();
     var prontos=exames.filter(function(x){ return x.laudo; }).length;
     if(prontos){
       antAvisar('✅ '+prontos+' laudo(s) pronto(s). Abrindo a fila de revisão…');

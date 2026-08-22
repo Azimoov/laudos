@@ -79,6 +79,42 @@ const procAqui = HTML.slice(HTML.indexOf('async function processar()'), HTML.ind
 ok(/dicomProntosRender\(\)/.test(procAqui), 'depois de virar exame, ele é esvaziado junto com a lista');
 ok(/dicomProntosRender\(\);\s*\/\/ o painel nasce/.test(HTML), 'e desenhado ao entrar na tela');
 
+console.log('\n=== 21/08: os botões GRUDAM no alto da lista ===');
+// São 277 estudos. Rolando para achar o exame, a barra saía da tela e o médico tinha de
+// rolar tudo de volta só para importar.
+const barra = HTML.slice(HTML.indexOf("div.innerHTML='<div style=\"position:sticky"), HTML.indexOf('Importar selecionados') + 40);
+ok(/position:sticky;top:0/.test(barra), 'a barra de botões é sticky no topo');
+ok(/background:#fff/.test(barra),
+   'com fundo opaco — sem ele as linhas da lista apareceriam através da barra');
+ok(/z-index:2/.test(barra), 'e por cima das linhas que passam por baixo');
+ok(/max-height:340px;overflow:auto/.test(HTML), 'e a lista é que rola, não a tela toda');
+
+console.log('\n=== 21/08: as fotos ampliam ao PASSAR O MOUSE ===');
+// Conferir 13 fotos clicando e fechando uma a uma é trabalho demais para uma olhada rápida.
+ok(/\.dicomMini:hover\{transform:scale\(/.test(HTML), 'há regra de :hover que amplia');
+const esc_ = /\.dicomMini:hover\{[^}]*\}/.exec(HTML)[0];
+ok(/z-index:30/.test(esc_), 'a ampliada passa POR CIMA das vizinhas');
+ok(/transform-origin:left bottom/.test(HTML),
+   'e cresce para dentro da caixa, não para fora da janela');
+ok(/cursor:zoom-in/.test(HTML), 'o cursor continua dizendo que dá para clicar');
+ok(/onclick="ampliarImg\(this\)"/.test(HTML), 'e o clique continua abrindo em tamanho cheio');
+ok(/passe o mouse para ampliar/.test(HTML), 'a legenda ensina as duas formas');
+ok(!/toque numa foto para ampliar<\/span>/.test(HTML), 'e a legenda antiga, que só falava em tocar, saiu');
+
+console.log('\n=== 21/08: a tela de exames antigos GERA o laudo ===');
+// Ela nunca gerou. processar() agrupa, transcreve e associa — termina dizendo "confira as
+// associações e GERE os laudos". Quem gera é gerarTodos(), e ninguém o chamava. A tela
+// processava tudo direito e perguntava quantos laudos tinham saído: sempre zero. Está
+// assim desde que nasceu, em 18/08.
+const antG = HTML.slice(HTML.indexOf('async function antGerar()'), HTML.indexOf('function antAplicarEscolhas'));
+ok(/await processar\(\)/.test(antG), 'processa o material');
+ok(/await gerarTodos\(\)/.test(antG), 'E GERA OS LAUDOS — era esta linha que faltava');
+ok(antG.indexOf('antAplicarEscolhas()') < antG.indexOf('await gerarTodos()'),
+   'as escolhas do médico (tipo do exame) valem ANTES de gerar — gerarLaudo lê ex.tipo para '
+   + 'escolher o modelo, e aplicar depois seria gerar com o modelo errado');
+ok(antG.indexOf('await gerarTodos()') < antG.indexOf('var prontos='),
+   'e só depois se pergunta quantos saíram — perguntar antes é o que dava sempre zero');
+
 console.log('\n=== ele está na tela CERTA ===');
 // Foi removido da aba "Arquivos acumulados" a pedido do médico. Voltou na tela de exames
 // antigos, que nasceu depois e é onde puxar exame do aparelho pertence.

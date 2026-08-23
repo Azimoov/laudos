@@ -474,6 +474,44 @@ const VERIFICACOES = `(async () => {
   const corBanda = getComputedStyle(document.querySelector('#telaModelos .sector .band.on')).stroke;
   diz('o estado de auditoria e CINZA, nao colorido', /60, ?76, ?90|#3C4C5A/i.test(corBanda), corBanda);
 
+  // ---- A TELA E A DE CONFIGURACOES INTEIRA, nao um pedaco pendurado no painel antigo ----
+  // O medico clicou em Configuracoes e caiu na tela velha: a grade estava atras de um botao
+  // no meio do painel antigo. No desenho dele, Configuracoes E esta tela.
+  diz('o botao Configuracoes abre a tela nova',
+    /onclick="modCfgAbrir\(\)"/.test(document.body.innerHTML)
+    || document.querySelectorAll('[onclick*="modCfgAbrir"]').length > 0);
+  diz('nenhum botao de Configuracoes abre direto o painel antigo',
+    document.querySelectorAll('[onclick="alternarConfig()"]').length === 0);
+  diz('a tela tem barra lateral de navegacao', !!document.querySelector('#telaModelos .nav'));
+  const navItens = document.querySelectorAll('#telaModelos .nav-item');
+  diz('com os itens do desenho', navItens.length >= 9, navItens.length + ' itens');
+  diz('e "Modelos de laudo" comeca selecionado',
+    document.querySelector('#telaModelos .nav-item[data-pane="modelos"]').getAttribute('aria-current') === 'true');
+  // O que ainda nao migrou DIZ que nao migrou, antes do clique
+  const antigas = document.querySelectorAll('#telaModelos .nav-item .antiga');
+  diz('os itens que ainda vao para o painel antigo avisam no proprio rotulo',
+    antigas.length >= 5, antigas.length + ' marcados');
+  // E os ajustes de verdade continuam alcancaveis: cada ancora existe
+  diz('cada item da navegacao aponta para algo que EXISTE',
+    Object.keys(MOD_PANE_ANCORA).every(k => !!document.getElementById(MOD_PANE_ANCORA[k])),
+    Object.keys(MOD_PANE_ANCORA).join(','));
+  diz('o painel antigo continua no DOM (os ajustes de verdade vivem la)',
+    !!document.getElementById('cardConfig'));
+  // A legenda do setor
+  diz('a legenda do setor existe', !!document.getElementById('mdLeg0'));
+  modCfgRender();
+  diz('e e desenhada com o MESMO setor dos cartoes',
+    document.querySelectorAll('#telaModelos .legend .sector').length === 3);
+  diz('com os tres estados nomeados',
+    /Nao auditado|Não auditado/.test(document.getElementById('mdLeg0').textContent)
+    && /fonte prim/.test(document.getElementById('mdLeg2').textContent));
+  // Voltar nao pode abrir o painel antigo por baixo
+  const fecharSrc = String(modCfgFechar);
+  diz('"Voltar ao programa" so fecha, nao abre o painel antigo',
+    fecharSrc.indexOf('alternarConfig') < 0);
+  diz('e existe funcao separada para quando a navegacao PRECISA do painel antigo',
+    typeof modCfgAbrirAntigo === 'function' && String(modCfgAbrirAntigo).indexOf('cardConfig') > 0);
+
   return R;
 })()`;
 

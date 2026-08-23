@@ -512,6 +512,36 @@ const VERIFICACOES = `(async () => {
   diz('e existe funcao separada para quando a navegacao PRECISA do painel antigo',
     typeof modCfgAbrirAntigo === 'function' && String(modCfgAbrirAntigo).indexOf('cardConfig') > 0);
 
+  // ---- EXAME DE OUTRO DIA NAO E EXAME DE AGORA (23/08/2026) ----
+  // A espera capturava qualquer estudo que chegasse, sem olhar a data. Um exame da semana
+  // passada, empurrado do aparelho agora, virava exame de hoje: laudo com a data errada e
+  // ditado casado pelo relogio da sala.
+  const hoje = new Date();
+  const aaaammdd = d => String(d.getFullYear()) + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
+  const ontem = new Date(hoje.getTime() - 86400000);
+  const amanha = new Date(hoje.getTime() + 86400000);
+  diz('exame de HOJE nao e desviado', estudoDeOutroDia({ imgData: aaaammdd(hoje) }) === false, aaaammdd(hoje));
+  diz('exame de ONTEM e reconhecido como de outro dia', estudoDeOutroDia({ imgData: aaaammdd(ontem) }) === true);
+  diz('exame com data no FUTURO nao e desviado (relogio do aparelho adiantado)',
+    estudoDeOutroDia({ imgData: aaaammdd(amanha) }) === false);
+  diz('sem data legivel, NAO se decide nada — segue o caminho de sempre',
+    estudoDeOutroDia({}) === false && estudoDeOutroDia({ imgData: 'xx' }) === false);
+  // reserva: quando o campo cru do DICOM nao veio, le a data em texto
+  const d1 = new Date(hoje.getTime() - 7 * 86400000);
+  const txtBr = ('0' + d1.getDate()).slice(-2) + '/' + ('0' + (d1.getMonth() + 1)).slice(-2) + '/' + d1.getFullYear();
+  diz('e a data em texto serve de reserva', estudoDeOutroDia({ data: txtBr }) === true, txtBr);
+  // O desvio acontece ANTES de virar exame ao vivo
+  const varrer = String(capOrtVarrer);
+  diz('o desvio roda ANTES do capOrtProcessar (senao ja teria virado exame de hoje)',
+    varrer.indexOf('estudoDeOutroDia') < varrer.indexOf('await capOrtProcessar'));
+  diz('e o exame desviado NAO e descartado em silencio: e anunciado',
+    varrer.indexOf('capAntigoOferecer') > 0 && typeof capAntigoOferecer === 'function');
+  const levar = String(capAntigoLevar);
+  diz('o atalho baixa as imagens DO APARELHO', levar.indexOf('dicomBaixarImagem') > 0);
+  diz('e as poe na tela de exames antigos ja importadas',
+    levar.indexOf('dicomProntos.push') > 0 && levar.indexOf('antAbrir()') > 0);
+  diz('sem imagem nenhuma, avisa em vez de abrir a tela vazia', levar.indexOf('!imagens.length') > 0);
+
   return R;
 })()`;
 

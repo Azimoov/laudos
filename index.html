@@ -1087,7 +1087,11 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
               <rect x="3" y="3" width="18" height="18" rx="2"></rect>
               <circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
             <div class="t">arraste as imagens de ultrassom aqui</div>
-            <div class="t2">ou toque para escolher — JPG · PNG · DICOM</div>
+            <!-- 23/08/2026: a caixa só falava em arrastar arquivo, e o médico concluiu que
+                 era o único caminho. Puxar do aparelho é o caminho PRINCIPAL desta tela —
+                 é dali que vêm os exames de outro dia que ele quer laudar. -->
+            <div class="t2">ou toque para escolher — JPG · PNG · DICOM<br>
+              <b>ou busque direto no aparelho, no botão abaixo</b></div>
           </div>
           <div class="minis" id="antMinis"></div>
           <input type="file" id="antImgs" accept="application/pdf,image/*,.dcm" multiple style="display:none">
@@ -6186,6 +6190,15 @@ async function capOrtVarrer(){
       // fechava exame pela metade: o envio do aparelho tem pausas reais (mediana
       // 18-25 s para chegar inteiro, máximo medido 523 s) — mordeu em 17/08, dia
       // de atendimento, com exames capturados com 1 imagem quando havia 6.
+      /* EXAME DE OUTRO DIA sai do caminho ao vivo aqui, antes de virar exame de hoje.
+         Não é descartado: é ANUNCIADO, com o botão que o leva à tela de exames antigos já
+         importado. Descartar em silêncio seria pior que capturar errado — ele empurrou o
+         exame do aparelho de propósito e ficaria sem saber o que houve. */
+      if(e.nImagens>0 && st.ciclos>=2 && estudoDeOutroDia(e)){
+        capOrtFeitos.add(e.id); delete capOrtStable[e.id];
+        capAntigoOferecer(e);
+        continue;
+      }
       if(e.nImagens>0 && st.ciclos>=2){ capOrtFeitos.add(e.id); delete capOrtStable[e.id]; await capOrtProcessar(e); }
       else if(e.nImagens>0){ capOrtStatusTxt('Recebendo exame de '+(e.paciente||'?')+'… ('+e.nImagens+' imagem(ns))'); }
     }
@@ -6491,6 +6504,75 @@ async function esperaVigiar(){
     });
     esperaBanner(faltando.map(function(e){ return e.id; }));
   }catch(e){ /* agente fora do ar já é sinalizado em outro lugar da tela */ }
+}
+
+/* ---- EXAME DE OUTRO DIA NÃO É EXAME DE AGORA (23/08/2026, pedido do médico) ----
+   A espera marca como "antigo" tudo que já existia quando ligou, e captura o que chegar
+   depois — SEM olhar a data do exame. Então um estudo da semana passada, empurrado do
+   aparelho agora, entrava como se fosse de hoje: virava exame ao vivo, com o ditado da
+   sala e a data de hoje no laudo.
+
+   A diferença não é cosmética. No caminho ao vivo o laudo nasce com a data de HOJE e o
+   ditado é casado pelo RELÓGIO da sala — e nenhum dos dois vale para um exame de outro
+   dia. Exame com data anterior a hoje pertence à tela de exames antigos, onde ele importa,
+   dita na hora e escreve o laudo daquele exame. */
+/* O anúncio, e o atalho. Guarda o estudo para o botão poder levá-lo inteiro — sem isso o
+   médico teria de procurar a linha certa entre 277 na tela de exames antigos. */
+var _capAntigos={};
+function capAntigoOferecer(e){
+  _capAntigos[e.id]=e;
+  var quando=(e.data||'')+(e.hora?(' '+e.hora):'');
+  log('📅 Chegou do aparelho um exame de OUTRO DIA — '+(e.paciente||'?')+', '+quando
+     +'. Ele NÃO entrou como exame de agora: o laudo sairia com a data de hoje e o ditado '
+     +'seria casado pelo relógio da sala. Use o botão no aviso para abri-lo em "exames antigos".', true);
+  var el=document.getElementById('capOrtStatus');
+  if(el){
+    var d=document.createElement('div');
+    d.style.cssText='margin-top:6px;padding:8px 10px;border:1px solid #d99a26;background:#fdf6e9;'
+      +'border-radius:8px;color:#7a5310;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    d.innerHTML='<span style="flex:1">📅 <b>'+esc(e.paciente||'?')+'</b> — exame de '+esc(quando)
+      +' (outro dia). Não entra como exame de agora.</span>';
+    var b=document.createElement('button');
+    b.className='btn peq'; b.type='button'; b.textContent='Abrir em exames antigos';
+    b.onclick=function(){ capAntigoLevar(e.id); d.remove(); };
+    d.appendChild(b);
+    el.parentNode.insertBefore(d, el.nextSibling);
+  }
+}
+/* Leva o estudo para a tela de exames antigos JÁ IMPORTADO — as imagens vêm do aparelho,
+   que é exatamente o que ele pediu: não precisar arrastar arquivo do computador. */
+async function capAntigoLevar(id){
+  var e=_capAntigos[id]; if(!e){ log('Não achei mais esse exame.', true); return; }
+  try{
+    log('Baixando as imagens de '+(e.paciente||'?')+' do aparelho…');
+    var imagens=[];
+    for(var q=0;q<(e.instancias||[]).length;q++){
+      try{ imagens.push(await dicomBaixarImagem(e.instancias[q])); }catch(err){}
+    }
+    if(!imagens.length){ log('Não consegui baixar imagem nenhuma desse exame.', true); return; }
+    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''),
+      idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens,
+      codigo:codDoEstudo(e), nascimento:e.nascimento||'', sexo:e.sexo||'',
+      regiao:dicomRegiao(e.descricao), hora:e.hora||''});
+    antAbrir();                       // a tela de exames antigos
+    antFonte('novo');
+    dicomProntosRender();
+    log('Exame de '+(e.paciente||'?')+' ('+(e.data||'')+') pronto em exames antigos, com '
+       +imagens.length+' foto(s). Grave o ditado e toque em "Gerar laudo".');
+  }catch(err){ log('Falha ao levar o exame para exames antigos: '+((err&&err.message)||err), true); }
+}
+function estudoDeOutroDia(e){
+  var d=String((e&&e.imgData)||'').trim();
+  if(d.length!==8) d=_estudoDataDoTexto((e&&e.data)||'');
+  if(d.length!==8) return false;          // sem data legível não se decide nada
+  var h=new Date();
+  var hoje=String(h.getFullYear())+('0'+(h.getMonth()+1)).slice(-2)+('0'+h.getDate()).slice(-2);
+  return d < hoje;                        // AAAAMMDD compara direto como texto
+}
+/* "19/08/2026" -> "20260819". Reserva para quando o campo cru do DICOM não veio. */
+function _estudoDataDoTexto(s){
+  var m=/(\d{2})\/(\d{2})\/(\d{4})/.exec(String(s||''));
+  return m ? (m[3]+m[2]+m[1]) : '';
 }
 
 /* AAAAMMDD + HHMMSS (relógio do aparelho) -> milissegundos */

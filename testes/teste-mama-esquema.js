@@ -88,14 +88,25 @@ ok(completo.plot[0].n === 1, 'e recebe o número 1');
 // passou dizendo "lado não identificado" para um laudo onde o lado estava escrito — o
 // achado não casava com nenhuma frase do corpo e a leitura acontecia sobre o rótulo
 // sozinho. Passar pelo motivo errado é passar por acaso.
+// 24/08/2026: "sem distância" SAIU desta lista. Ele exigia que o achado sem distância da
+// papila não fosse desenhado — e era isso, em atendimento, que deixava o esquema vazio em
+// quase todo cisto simples (onde se dita só a hora). Agora lado + hora bastam: desenha no
+// raio médio, VAZADO, e a legenda diz que a distância não foi informada. Ver
+// teste-mama-esquema-sem-dist.js. Sem lado ou sem hora continua fora — ali não há o que
+// desenhar, e o motivo tem de ser o motivo CERTO, não um qualquer.
 [['sem hora', 'Notou-se nódulo localizado na mama direita, distando 3 cm da papila.', /hora/],
- ['sem distância', 'Notou-se nódulo localizado na mama direita, às 10 h.', /dist/i],
  ['sem lado', 'Notou-se nódulo às 10 h, distando 3 cm da papila.', /lado/]].forEach(([oque, txt, esperado]) => {
   const r = api.mamaLesoes(laudo([{ localizacao: 'nódulo', forma: 'oval', orientacao: 'paralela' }], txt));
   ok(r.plot.length === 0, oque + ': não é desenhado');
   ok(esperado.test(r.semPos[0].porque),
      '   e a legenda diz o motivo CERTO: "' + r.semPos[0].porque + '"');
 });
+// e o caso que MUDOU: sem distância, agora desenha
+const semDist = api.mamaLesoes(laudo([{ localizacao: 'nódulo', forma: 'oval', orientacao: 'paralela' }],
+  'Notou-se nódulo localizado na mama direita, às 10 h.'));
+ok(semDist.plot.length === 1, 'sem distância da papila: AGORA é desenhado (mudou em 24/08)');
+ok(semDist.plot[0].distIgnorada === true && semDist.plot[0].distCm === null,
+   '   marcado como "distância não informada", e o dado continua NULO — nada foi inventado');
 
 console.log('\n=== com DOIS achados e frase não identificada, não se chuta ===');
 // Aqui a saída do "corpo inteiro" é desligada de propósito: com dois achados, ler o corpo
@@ -128,7 +139,7 @@ ok(/MAMA DIREITA/.test(svgHtml), 'com o lado escrito por extenso — nunca só a
 ok(!/MAMA ESQUERDA/.test(svgHtml), 'e a mama sem lesão NÃO é desenhada');
 ok(/Representação esquemática, sem escala anatômica real/.test(svgHtml), 'com o aviso obrigatório');
 ok(/10h, a 3 cm da papila/.test(svgHtml), 'e a legenda repete a localização em texto');
-ok(/12 × 8 × 9 mm/.test(svgHtml), 'com as medidas em mm');
+ok(/1,2 × 0,8 × 0,9 cm/.test(svgHtml), 'com as medidas em cm (padrao de 26/08; era mm)');
 ok(svgHtml.indexOf('style="') >= 0 && svgHtml.indexOf('class="mamaEsq"') >= 0,
    'estilos inline, sem depender de CSS externo (some na impressão)');
 ok(api.mamaEsquemaHTML(laudo([], '')) === '', 'exame NORMAL não ganha esquema nenhum');
@@ -176,11 +187,11 @@ function lateralDe(html) {
   return html.slice(i, f);
 }
 ok(/stroke-dasharray/.test(lateralDe(comProf)), 'a linha existe, e é pontilhada');
-ok(/15 mm da pele/.test(lateralDe(comProf)), 'com a distância ESCRITA, porque o laudo a informou');
+ok(/1,5 cm da pele/.test(lateralDe(comProf)), 'com a distância ESCRITA, porque o laudo a informou (em cm)');
 const semProf = api.mamaEsquemaHTML(laudo(
   [{ localizacao: 'mama direita', forma: 'oval', orientacao: 'paralela' }], f));
 ok(/stroke-dasharray/.test(lateralDe(semProf)), 'a linha aparece mesmo sem a medida');
-ok(!/mm da pele/.test(lateralDe(semProf)),
+ok(!/cm da pele/.test(lateralDe(semProf)),
    'mas SEM número — laudo que não disse a distância não pode virar desenho com distância');
 ok(/>Profundidade:/.test(lateralDe(semProf)) && /média/.test(lateralDe(semProf)),
    'traz a PALAVRA no lugar do número');
@@ -203,7 +214,7 @@ ok(daFaixa.length >= 1, 'a faixa de profundidade existe (' + daFaixa.length + ' 
 ok(daFaixa.join(' ').indexOf('Profundidade:') >= 0, 'rotulada, para saber o que ela é');
 [1, 2, 3].forEach(n =>
   ok(daFaixa.join(' ').indexOf(n + ' — ') >= 0, 'o achado ' + n + ' aparece com o próprio número'));
-ok(/2 — 12 mm da pele/.test(daFaixa.join(' ')),
+ok(/2 — 1,2 cm da pele/.test(daFaixa.join(' ')),
    'e quem tem distância medida mostra a distância (o 2), enquanto os outros mostram a palavra');
 // Sem texto solto no meio das linhas: é isso que garante que nada se atropela.
 const ys = daFaixa.map(t => parseFloat(/y="([\d.]+)"/.exec(t)[1]));

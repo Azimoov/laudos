@@ -58,6 +58,11 @@ mod.__dict__.update({
     "MARCA_INICIO": None,
     "_transcr_lock": threading.Lock(),
     "BUF": types.SimpleNamespace(stream=None),
+    # 30/08/2026: agente_ocupado passou a consultar ha quanto tempo nada acontece, para a
+    # recusa poder DIZER "o microfone pode ter ficado aberto de uma sessao anterior" em
+    # vez de AFIRMAR "o app esta em modo exame" — que era falso no caso de 30/08: o
+    # microfone estava aberto ha tres dias e o medico nem tinha entrado em modo exame.
+    "ULTIMA_ATIVIDADE": {"quando": 0.0, "o_que": "microfone aberto"},
 })
 for _n in ("agente_ocupado", "esperar_porta_livre", "relancar_agente"):
     exec(compile(recortar(_n), _n, "exec"), mod.__dict__)

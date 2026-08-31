@@ -43,7 +43,12 @@ ok(obstParseIG('99w2d') === null, 'numero absurdo e recusado em vez de virar lau
 ok(obstParseIG('2w1d') === null, 'semanas abaixo do possivel sao recusadas');
 ok(obstIgTexto({ sem: 34, dias: 2 }) === '34 semanas e 2 dias', 'texto em portugues');
 ok(obstIgTexto({ sem: 34, dias: 1 }) === '34 semanas e 1 dia', 'um dia no singular');
-ok(obstIgTexto({ sem: 34, dias: 0 }) === '34 semanas', 'zero dia nao vira "e 0 dias"');
+// 31/08/2026 — A DECISAO DELE (item 5) INVERTEU ESTA REGRA. Antes, semana redonda saia
+// como "34 semanas" e este teste congelava isso. Ele pediu o contrario: "em situacoes onde
+// um numero e redondo, e preciso que seja dito por exemplo: 25 semanas e 0 dias" — porque
+// ler "34 semanas" deixa no ar se o dado e exato ou arredondado. NAO consertar de volta.
+// Os demais casos estao em teste-obst-numeros.js.
+ok(obstIgTexto({ sem: 34, dias: 0 }) === '34 semanas e 0 dias', 'semana redonda diz "e 0 dias"');
 
 console.log('=== margem de erro da IG — ACOG CO 700, Tabela 1 (fonte primaria, 19/08/2026) ===');
 ok(margemErroIG(5.9) === null, 'abaixo de 6 semanas: fora da tabela');

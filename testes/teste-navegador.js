@@ -434,6 +434,20 @@ const VERIFICACOES = `(async () => {
   diz('vazio: recusa', hisLaudoDoHtml('') === null);
   diz('caixa presente mas vazia: recusa, em vez de devolver laudo em branco',
     hisLaudoDoHtml('<div class="laudoTexto"></div>') === null);
+  // o desenho NOVO (26/08, noite): conclusao + texto final embrulhados num bloco so
+  // (.laudoFecho) e o texto final com classe (.laudoExtra) em vez de style cravado
+  const desenhoNovo = desenhoGuardado
+    .replace('<b>CONCLUSÃO:', '<div class="laudoFecho"><b>CONCLUSÃO:')
+    .replace('<span style="font-size:11px">', '<span class="laudoExtra">')
+    .replace('</span>', '</span></div>');
+  const LN = hisLaudoDoHtml(desenhoNovo);
+  diz('o desenho novo (bloco conclusao+texto final) tambem e reconhecido', !!LN);
+  if (LN) {
+    diz('conclusao sai separada tambem no desenho novo',
+      /N.dulo s.lido/.test(LN.conclusao) && !/substitui a mamografia/.test(LN.conclusao));
+    diz('e as ressalvas do fim viram extra tambem no desenho novo',
+      /n.o substitui a mamografia/.test(LN.extra));
+  }
 
   // ---- TELA 1: grade de modelos de laudo (22/08/2026) ----
   // Aqui, na pagina inteira, porque a contagem de textos de achado depende de VARIAS
@@ -487,16 +501,92 @@ const VERIFICACOES = `(async () => {
   diz('com os itens do desenho', navItens.length >= 9, navItens.length + ' itens');
   diz('e "Modelos de laudo" comeca selecionado',
     document.querySelector('#telaModelos .nav-item[data-pane="modelos"]').getAttribute('aria-current') === 'true');
-  // O que ainda nao migrou DIZ que nao migrou, antes do clique
-  const antigas = document.querySelectorAll('#telaModelos .nav-item .antiga');
-  diz('os itens que ainda vao para o painel antigo avisam no proprio rotulo',
-    antigas.length >= 5, antigas.length + ' marcados');
+  // O que ainda nao migrou DIZ que nao migrou, antes do clique.
+  // 29/08/2026: era "antigas.length >= 5" — numero magico que envelhecia a cada tela
+  // migrada (o Provedor de IA ganhou tela propria e derrubou o teste, sem nada quebrado).
+  // A regra que NAO envelhece: leva etiqueta exatamente quem ainda cai no painel antigo.
+  const comEtiqueta = Array.prototype.map.call(
+    document.querySelectorAll('#telaModelos .nav-item'),
+    b => b.querySelector('.antiga') ? b.getAttribute('data-pane') : null).filter(Boolean).sort();
+  // 29/08 (2a leva): TODOS os itens migraram, MOD_PANE_ANCORA esvaziou. Sobrou etiqueta
+  // so no item "Painel antigo", que e a saida de emergencia — e ele DIZ que e a antiga.
+  const vaoProAntigo = Object.keys(MOD_PANE_ANCORA).concat(['antigo']).sort();
+  diz('quem leva ao painel antigo avisa no proprio rotulo — e so quem leva',
+    JSON.stringify(comEtiqueta) === JSON.stringify(vaoProAntigo),
+    'etiqueta: [' + comEtiqueta + '] · painel antigo: [' + vaoProAntigo + ']');
+  // e quem JA tem tela propria nao pode mentir dizendo "tela antiga"
+  diz('os que tem tela propria nao levam etiqueta',
+    Object.keys(MOD_PANES).every(p => {
+      const b = document.querySelector('#telaModelos .nav-item[data-pane="' + p + '"]');
+      return !b || !b.querySelector('.antiga');
+    }), Object.keys(MOD_PANES).join(','));
   // E os ajustes de verdade continuam alcancaveis: cada ancora existe
   diz('cada item da navegacao aponta para algo que EXISTE',
     Object.keys(MOD_PANE_ANCORA).every(k => !!document.getElementById(MOD_PANE_ANCORA[k])),
-    Object.keys(MOD_PANE_ANCORA).join(','));
+    Object.keys(MOD_PANE_ANCORA).join(',') || '(nenhum: todos migraram)');
+
+  // ---- AS TELAS MIGRADAS (29/08, 2a leva): o controle de VERDADE chega no painel ----
+  // O risco de mover no e o no nao chegar — e ai o ajuste some da tela sem avisar.
+  [['ditado', ['cfgAgenteLocal', 'btnReiniciarAgente']],
+   ['impressao', ['cfgImpAuto', 'cfgImpSeparadas', 'cfgImpLaudo']],
+   ['revisao', ['cfgPaciente', 'listaRegras', 'biopsiaLista']],
+   ['assinatura', ['cfgMedico', 'cfgCrm', 'assPrev']],
+   ['backup', ['cfgBackupPasta', 'backupEstado']]].forEach(([pane, ids]) => {
+    modCfgIr(pane);
+    const p = document.getElementById(MOD_PANES[pane]);
+    const visivel = getComputedStyle(p).display !== 'none';
+    const dentro = ids.filter(id => { const e = document.getElementById(id); return e && p.contains(e); });
+    diz('"' + pane + '" abre em painel proprio com os controles de verdade dentro',
+      visivel && dentro.length === ids.length, dentro.length + ' de ' + ids.length);
+  });
+  // e salvar pela tela nova chega no cfg (assinatura e o unico com campos do salvarConfig)
+  modCfgIr('assinatura');
+  const _med = cfg.medico, _crm = cfg.crm;
+  const gravouAss = []; const _ds2 = window.dadoSalvar;
+  window.dadoSalvar = (ch, v) => { gravouAss.push(ch + '=' + v); return true; };
+  document.getElementById('cfgMedico').value = 'Dr. Teste Config';
+  cfgSalvarSimples('assinatura');
+  window.dadoSalvar = _ds2;
+  diz('salvar na tela de assinatura chega no cfg e no disco',
+    cfg.medico === 'Dr. Teste Config' && gravouAss.indexOf('gmedico=Dr. Teste Config') >= 0,
+    gravouAss.filter(g => /gmedico/.test(g)).join(' '));
+  cfg.medico = _med; cfg.crm = _crm;
+  document.getElementById('cfgMedico').value = _med || '';
+  modCfgIr('modelos');
   diz('o painel antigo continua no DOM (os ajustes de verdade vivem la)',
     !!document.getElementById('cardConfig'));
+
+  // ---- PROVEDOR DE IA: TELA PROPRIA, MESMO SALVAR (29/08, pedido dele) ----
+  // O risco desta tela e ter DOIS caminhos de gravacao: o novo e o antigo divergirem
+  // e a chave/modelo cobrado virarem loteria. Aqui a prova de que e um caminho so.
+  modCfgIr('ia');
+  diz('o Provedor de IA abre painel proprio, sem cair no painel antigo',
+    getComputedStyle(document.getElementById('paneIa')).display !== 'none'
+    && getComputedStyle(document.getElementById('paneModelos')).display === 'none');
+  document.getElementById('cfgModelo').value = 'gpt-5.5';
+  document.getElementById('cfgModeloAux').value = 'gpt-5.5';
+  modCfgIr('ia');   // re-render: a tela le dos campos antigos
+  diz('a tela nasce com o que ja estava configurado',
+    document.getElementById('iaNvModelo').value === 'gpt-5.5'
+    && document.getElementById('iaNvAux').value === 'gpt-5.5');
+  diz('e acende o aviso quando as tarefas simples usam o modelo caro',
+    getComputedStyle(document.getElementById('iaAvisoCusto')).display !== 'none');
+  // salvar pela tela nova tem de chegar no campo ANTIGO e no cfg
+  const gravou = [];
+  const _ds = window.dadoSalvar;
+  window.dadoSalvar = (ch, v) => { gravou.push(ch + '=' + v); return true; };
+  document.getElementById('iaNvAux').value = 'modelo-barato-teste';
+  iaCfgSalvar();
+  window.dadoSalvar = _ds;
+  diz('salvar pela tela nova escreve no campo antigo',
+    document.getElementById('cfgModeloAux').value === 'modelo-barato-teste');
+  diz('e chega no cfg e no disco pelo caminho de sempre',
+    cfg.modeloAux === 'modelo-barato-teste' && gravou.indexOf('gmodaux=modelo-barato-teste') >= 0,
+    gravou.filter(g => /gmodaux/.test(g)).join(' '));
+  diz('e o aviso apaga sozinho quando o auxiliar difere',
+    getComputedStyle(document.getElementById('iaAvisoCusto')).display === 'none');
+  diz('a chave nunca e reexibida na tela', document.getElementById('iaNvChave').value === '');
+  modCfgIr('modelos');
   // A legenda do setor
   diz('a legenda do setor existe', !!document.getElementById('mdLeg0'));
   modCfgRender();
@@ -511,6 +601,93 @@ const VERIFICACOES = `(async () => {
     fecharSrc.indexOf('alternarConfig') < 0);
   diz('e existe funcao separada para quando a navegacao PRECISA do painel antigo',
     typeof modCfgAbrirAntigo === 'function' && String(modCfgAbrirAntigo).indexOf('cardConfig') > 0);
+
+  // ---- O CARTAO ABRE O MODELO (25/08/2026) ----
+  // O medico clicou num modelo de laudo e nao aconteceu nada util: so um aviso de "tela em
+  // construcao". Um clique que nao faz nada e indistinguivel de programa quebrado.
+  // Este bloco CLICA no cartao de verdade, em vez de chamar a funcao por dentro: era
+  // justamente a LIGACAO entre o cartao e o editor que estava faltando.
+  const mdSalvo = localStorage.getItem('gmodelos');
+  const mdConfirmOrig = window.confirm;
+  window.confirm = () => true;
+  try {
+    modCfgRender();
+    const cartaoMama = Array.prototype.filter.call(
+      document.querySelectorAll('#mdGrade .card'),
+      c => (c.getAttribute('onclick') || '').indexOf("modCfgAbrirModelo('mama')") >= 0)[0];
+    diz('o cartao do modelo chama o editor', !!cartaoMama);
+    diz('e o cartao nao responde mais com "tela em construcao"',
+      String(modCfgAbrirModelo).indexOf('sendo constru') < 0);
+    if (cartaoMama) cartaoMama.click();
+    const mdHost = document.getElementById('mdHost');
+    diz('existe a caixa que hospeda o editor, embaixo da grade', !!mdHost);
+    const caixa = mdHost && mdHost.querySelector('.modeloBox');
+    diz('clicar no cartao ABRE o modelo', !!caixa);
+    diz('e abre o modelo certo', !!caixa && caixa.getAttribute('data-key') === 'mama',
+      caixa && caixa.getAttribute('data-key'));
+    // Os campos trazem o texto REAL do dados.js, nao um exemplo de tela
+    const corpoEl = caixa && caixa.querySelector('.mdCorpo');
+    diz('o corpo vem do modelo de verdade, nao de exemplo',
+      !!corpoEl && corpoEl.value === MODELOS.mama.corpo);
+    diz('e os cinco campos do modelo estao na tela',
+      !!caixa && ['mdNome','mdTitulo','mdTecnica','mdCorpo','mdConclusao'].every(c => !!caixa.querySelector('.' + c)));
+    // A OPCAO DE EDITAR — foi exatamente isto que ele pediu.
+    diz('abre TRAVADO (um toque no cartao nao pode virar letra perdida no laudo)',
+      !!caixa && caixa.getAttribute('data-locked') === '1' && corpoEl.readOnly === true);
+    const btEditar = caixa && Array.prototype.filter.call(caixa.querySelectorAll('button'),
+      b => (b.getAttribute('onclick') || '').indexOf('editarModeloBox') >= 0)[0];
+    diz('mas com a OPCAO DE EDITAR a vista', !!btEditar && /Editar/.test(btEditar.textContent));
+    if (btEditar) btEditar.click();
+    diz('e o botao destrava de verdade',
+      !!corpoEl && corpoEl.readOnly === false && caixa.getAttribute('data-locked') === '0');
+    // O X do editor antigo apaga o modelo da lista. Numa caixa so, seria armadilha.
+    diz('o X de remover NAO vem junto (aqui ele apagaria o modelo)',
+      !!caixa && caixa.querySelectorAll('[onclick^="removerModeloBox"]').length === 0);
+    diz('e os tres botoes de acao estao la',
+      !!mdHost && ['modCfgSalvarModelo','modCfgRestaurarModelo','modCfgFecharModelo']
+        .every(f => mdHost.querySelectorAll('[onclick^="' + f + '"]').length > 0));
+    // SALVAR: o teste que mais importa. Salvar UM modelo nao pode apagar os outros — a
+    // caixa aberta e uma so, e gravar "o que esta na tela" varreria os outros 24.
+    const quantosAntes = Object.keys(MODELOS).length;
+    const abdomAntes = MODELOS.abdominal && MODELOS.abdominal.corpo;
+    corpoEl.value = 'CORPO DE TESTE 25/08';
+    modCfgSalvarModelo();
+    diz('salvar guarda o texto novo', MODELOS.mama.corpo === 'CORPO DE TESTE 25/08');
+    diz('e NAO apaga os outros modelos', Object.keys(MODELOS).length === quantosAntes,
+      Object.keys(MODELOS).length + ' de ' + quantosAntes);
+    const guardado = JSON.parse(localStorage.getItem('gmodelos') || '{}');
+    diz('o que foi para o disco tem o conjunto INTEIRO, nao so o editado',
+      Object.keys(guardado).length === quantosAntes, Object.keys(guardado).length + ' modelos');
+    diz('com o texto editado dentro', !!guardado.mama && guardado.mama.corpo === 'CORPO DE TESTE 25/08');
+    diz('e com o modelo vizinho intacto', !!guardado.abdominal && guardado.abdominal.corpo === abdomAntes);
+    diz('a grade se redesenha depois de salvar (a contagem nao fica velha)',
+      document.querySelectorAll('#mdGrade .card').length === quantosAntes,
+      document.querySelectorAll('#mdGrade .card').length + ' cartoes');
+    diz('e o modelo continua aberto para conferir o que ficou salvo',
+      !!mdHost.querySelector('.modeloBox[data-key="mama"]'));
+    // RESTAURAR: so este modelo volta ao original, os vizinhos ficam como estao
+    modCfgRestaurarModelo();
+    diz('restaurar devolve o texto original do programa',
+      MODELOS.mama.corpo === MODELOS_PADRAO.mama.corpo);
+    diz('e continua sem mexer nos vizinhos',
+      Object.keys(MODELOS).length === quantosAntes && MODELOS.abdominal.corpo === abdomAntes);
+    // FECHAR
+    modCfgFecharModelo();
+    diz('fechar limpa a caixa', !mdHost.querySelector('.modeloBox'));
+    // E reabrir Configuracoes comeca na lista, nao dentro do ultimo modelo aberto
+    modCfgAbrirModelo('mama');
+    modCfgAbrir();
+    diz('reabrir Configuracoes comeca na grade, nao dentro do ultimo modelo',
+      !document.getElementById('mdHost').querySelector('.modeloBox'));
+  } finally {
+    // Devolve tudo como estava: este bloco escreve em MODELOS e no localStorage de verdade,
+    // e as suites seguintes rodam na MESMA pagina.
+    window.confirm = mdConfirmOrig;
+    try { if (mdSalvo === null) localStorage.removeItem('gmodelos'); else localStorage.setItem('gmodelos', mdSalvo); } catch (e) {}
+    Object.keys(MODELOS).forEach(k => { delete MODELOS[k]; });
+    Object.assign(MODELOS, JSON.parse(JSON.stringify(MODELOS_PADRAO)));
+    try { modCfgFecharModelo(); modCfgFechar(); } catch (e) {}
+  }
 
   // ---- EXAME DE OUTRO DIA NAO E EXAME DE AGORA (23/08/2026) ----
   // A espera capturava qualquer estudo que chegasse, sem olhar a data. Um exame da semana
@@ -541,6 +718,555 @@ const VERIFICACOES = `(async () => {
   diz('e as poe na tela de exames antigos ja importadas',
     levar.indexOf('dicomProntos.push') > 0 && levar.indexOf('antAbrir()') > 0);
   diz('sem imagem nenhuma, avisa em vez de abrir a tela vazia', levar.indexOf('!imagens.length') > 0);
+
+  // ---- PAGINACAO DA TELA (25/08/2026) ----
+  // O medico mostrou o laudo ATRAVESSANDO a mascara do timbrado na tela: a folha era uma
+  // so e crescia, a mascara esticava junto, e "pagina 2" nao existia. Este bloco monta um
+  // laudo LONGO com timbrado, pagina, e mede LINHA A LINHA que nada invade o rodape de
+  // uma folha nem o cabecalho da seguinte — tres vezes seguidas, porque a repaginacao
+  // ja quebrou uma vez (nos de texto divididos perdiam o ponto de paragrafo).
+  const pgFundoAntes = window.__fundo, pgPergAntes = window.__fundoPerguntado;
+  try {
+    window.__fundo = 'labita'; window.__fundoPerguntado = true;
+    const pgCorpo = (MODELOS.abdominal.corpo + '\\n\\n') + (MODELOS.abdominal.corpo + '\\n\\n') + MODELOS.abdominal.corpo;
+    exames.push({ id: 9901, tipo: 'abdominal', paciente: 'Teste Paginacao',
+      laudo: { cab: { nome: 'Teste Paginacao', idade: '48', realizado_em: '25/08/2026', dados_clinicos: '' },
+               titulo: MODELOS.abdominal.titulo, tecnica: MODELOS.abdominal.tecnica,
+               corpo: pgCorpo, conclusao: 'Exame ecográfico compatível com a normalidade.', obs: '' } });
+    abrirRevisao(9901);
+    document.querySelector('main').style.display = '';
+    document.getElementById('telaRevisao').style.display = 'block';
+    const pgFolha = document.querySelector('#areaImpressao .laudoFolha');
+    diz('a folha do laudo com timbrado existe', !!pgFolha && pgFolha.classList.contains('comFundo'));
+    const pgTx = pgFolha.querySelector('.laudoTexto');
+    const pgAntes = pgTx.textContent;
+    const medir = () => {
+      paginarLaudoTela();
+      const pxmm = pgFolha.clientWidth / 210, pageH = 297 * pxmm;
+      const cs = getComputedStyle(pgFolha);
+      const topPx = parseFloat(cs.paddingTop), botPx = parseFloat(cs.paddingBottom);
+      const fr = pgFolha.getBoundingClientRect();
+      let cruza = 0, linhas = 0;
+      const w = document.createTreeWalker(pgFolha, NodeFilter.SHOW_TEXT, null);
+      let nn;
+      while ((nn = w.nextNode())) {
+        if (!nn.textContent.trim()) continue;
+        const rr = document.createRange(); rr.selectNodeContents(nn);
+        const rects = rr.getClientRects();
+        for (let i = 0; i < rects.length; i++) {
+          if (rects[i].height < 2 || rects[i].width < 1) continue;
+          linhas++;
+          const t = rects[i].top - fr.top, b = rects[i].bottom - fr.top;
+          const pag = Math.floor((t + b) / 2 / pageH);
+          if (b > (pag + 1) * pageH - botPx + 2) cruza++;
+          if (pag > 0 && t < pag * pageH + topPx - 2) cruza++;
+        }
+      }
+      const paginas = Math.round(pgFolha.clientHeight / pageH);
+      return { paginas, cruza, linhas,
+               esp: pgFolha.querySelectorAll('.quebraFolha').length,
+               masc: pgFolha.querySelectorAll('.fundoFolhaTela').length,
+               mult: Math.abs(pgFolha.clientHeight - paginas * pageH) < 4 };
+    };
+    const m1 = medir(), m2 = medir(), m3 = medir();
+    diz('o laudo longo vira MAIS DE UMA folha', m1.paginas >= 2, m1.paginas + ' folhas');
+    diz('nenhuma linha de texto invade rodape ou cabecalho da mascara',
+      m1.cruza === 0 && m1.linhas > 50, m1.linhas + ' linhas, ' + m1.cruza + ' invasoes');
+    diz('ha vaos de quebra entre as folhas', m1.esp > 0, m1.esp + ' vaos');
+    diz('a mascara aparece uma vez POR folha', m1.masc === m1.paginas - 1,
+      m1.masc + ' extras para ' + m1.paginas + ' folhas');
+    diz('a folha fecha em multiplos exatos de pagina', m1.mult);
+    diz('REPAGINAR nao degrada (2a e 3a rodadas identicas)',
+      m2.paginas === m1.paginas && m3.paginas === m1.paginas
+      && m2.cruza === 0 && m3.cruza === 0 && m3.esp === m1.esp,
+      'r2=' + m2.paginas + 'p/' + m2.esp + 'v r3=' + m3.paginas + 'p/' + m3.esp + 'v');
+    const pgDepois = (() => { const c = pgTx.cloneNode(true);
+      c.querySelectorAll('.quebraFolha').forEach(x => x.remove()); return c.textContent; })();
+    diz('o CONTEUDO do laudo nao muda um caractere com a paginacao', pgAntes === pgDepois);
+    // 25/08 (2a leva): os VAOS viajam com o laudo — no papel eles SAO as quebras de
+    // pagina (a tela e o papel tem as mesmas medidas). So as mascaras repetidas ficam.
+    diz('o que se salva leva os vaos (as quebras do papel) e nenhuma mascara extra',
+      /quebraFolha/.test(folhaHtmlLimpo()) && !/fundoFolhaTela/.test(folhaHtmlLimpo()));
+    diz('a foto da impressora e a propria tela (vaos sim, mascaras nao)',
+      /quebraFolha/.test((impHtmlDoLaudo() || {}).html || '')
+      && !/fundoFolhaTela|fundoLaudo/.test((impHtmlDoLaudo() || {}).html || ''));
+    diz('e o pacote pede alinhamento pela borda fisica, com margens NA foto',
+      (impHtmlDoLaudo() || {}).alinhar === true && (impHtmlDoLaudo() || {}).topoMm === 0);
+    diz('o texto lido para o aprendizado nao ganha linhas fantasmas',
+      !/\\n{4,}/.test(textoEditadoLaudo(true)));
+    // ---- ASSINATURA NO PE DA ULTIMA FOLHA (pedido do medico, 25/08) ----
+    // "A assinatura precisa obrigatoriamente estar na parte inferior da ultima folha."
+    // E quando ela sobraria sozinha numa folha, o laudo inteiro aperta um degrau de
+    // entrelinha/letra — MESMO padrao do inicio ao fim — ate ela voltar para a folha
+    // do texto. Assinatura e rodape sao um bloco: separados, o rodape virava a orfa.
+    const pgMede = () => {
+      const f = document.querySelector('#areaImpressao .laudoFolha');
+      const mm = f.clientWidth / 210, ph = 297 * mm;
+      const c2 = getComputedStyle(f);
+      const bot = parseFloat(c2.paddingBottom);
+      const fr2 = f.getBoundingClientRect();
+      const asn = f.querySelector('.assin'), rd = f.querySelector('.rodapeLaudo'),
+            bx = f.querySelector('.laudoCorpoBox');
+      const fimC = bx.getBoundingClientRect().bottom - fr2.top;
+      const iniA = asn.getBoundingClientRect().top - fr2.top;
+      const basR = rd.getBoundingClientRect().bottom - fr2.top;
+      const pC = Math.floor((fimC - 2) / ph), pA = Math.floor((iniA + 2) / ph),
+            pR = Math.floor((basR - 2) / ph);
+      return { pags: Math.round(f.clientHeight / ph), nivel: f.getAttribute('data-nivel'),
+               juntos: pA === pR, orfa: pA > pC,
+               naBase: Math.abs(((pA + 1) * ph - bot) - basR) < 4 };
+    };
+    const mLongo = pgMede();
+    diz('assinatura e rodape na MESMA folha', mLongo.juntos);
+    diz('a assinatura NUNCA fica numa folha sem texto', !mLongo.orfa);
+    diz('e ancora exatamente no pe da ultima folha', mLongo.naBase);
+    // o cenario que forca a ESCADA: texto terminando rente ao fim da folha
+    let pgLinhas = '';
+    for (let li = 0; li < 8; li++) pgLinhas += 'Linha de ajuste fino do comprimento do laudo, numero ' + (li + 1) + ', escrita para empurrar o texto ate muito perto do fim da folha.\\n\\n';
+    exames.push({ id: 9903, tipo: 'abdominal', paciente: 'Teste Escada',
+      laudo: { cab: { nome: 'Teste Escada' }, titulo: MODELOS.abdominal.titulo,
+               tecnica: MODELOS.abdominal.tecnica,
+               corpo: (MODELOS.abdominal.corpo + '\\n\\n') + MODELOS.abdominal.corpo + '\\n\\n' + pgLinhas,
+               conclusao: 'Exame ecográfico compatível com a normalidade.', obs: '' } });
+    abrirRevisao(9903);
+    paginarLaudoTela();
+    const mRente = pgMede();
+    diz('texto rente ao fim da folha: a ESCADA aperta a entrelinha (nivel ' + mRente.nivel + ')',
+      +mRente.nivel > 0);
+    diz('e a assinatura volta para a folha do texto, no pe dela',
+      !mRente.orfa && mRente.naBase && mRente.juntos);
+    const pgFolhaR = document.querySelector('#areaImpressao .laudoFolha');
+    diz('a compactacao e UNIFORME: a entrelinha e da folha inteira (herdada)',
+      getComputedStyle(pgFolhaR.querySelector('.laudoTexto')).lineHeight ===
+      getComputedStyle(pgFolhaR).lineHeight);
+
+    // ---- O LAUDO DE MAMA SAI SEM DESENHO POR PADRAO (27/08, pedido dele) ----
+    // "vamos remover as imagens como padrao dos laudos de mama temporariamente ate a
+    // gente conseguir ajustar". O interruptor e MAMA_DESENHOS; o desenho em si continua
+    // inteiro, e as verificacoes dele (logo abaixo) ligam o interruptor de proposito.
+    diz('o interruptor dos desenhos da mama nasce DESLIGADO', MAMA_DESENHOS === false, MAMA_DESENHOS);
+
+    // ---- O DESENHO DA MAMA SE DIVIDE ENTRE AS FOLHAS (pedido do medico, 25/08) ----
+    // A partir daqui o interruptor fica LIGADO: estas verificacoes existem para o dia em
+    // que os desenhos voltarem, e ficariam verdes a toa se rodassem com eles desligados.
+    MAMA_DESENHOS = true;
+    // O laudo REAL dele gastava TRES folhas: o desenho das duas mamas era um bloco so,
+    // nao cabia no fim da folha 1 e pulava inteiro, deixando meia folha em branco; a
+    // terceira folha ficava quase vazia. Ele desenhou a solucao: uma mama fecha a folha 1,
+    // a outra abre a folha 2, com a conclusao e a assinatura embaixo. Dois motivos passam
+    // a apertar a entrelinha: assinatura orfa OU folha desperdicada.
+    const NL = String.fromCharCode(10);
+    const BUL = String.fromCharCode(8226);   // o bullet dos cistos, sem escape (ver a armadilha das crases)
+    const mamaCorpo = [
+      '**MAMA DIREITA**', '**DESCRICAO:**', '',
+      'Mama simetrica.',
+      'Pele e tecido celular subcutaneo sem alteracoes.',
+      'Mamilo e areola sem alteracoes.',
+      'Parenquima mamario com ecogenicidade habitual de padrao heterogeneo, apresentando formacao cistica simples, anecoica, de contornos regulares e reforco acustico posterior, localizada as 9 h, distando 3 cm da papila, medindo 6,1 x 3,6 mm.',
+      'Tecido retro-mamario sem dilatacao ductal.',
+      'Regiao axilar livre.', '',
+      '**MAMA ESQUERDA**', '**DESCRICAO:**', '',
+      'Mama simetrica.',
+      'Pele e tecido celular subcutaneo sem alteracoes.',
+      'Mamilo e areola sem alteracoes.',
+      'Parenquima mamario com ecogenicidade habitual de padrao heterogeneo, apresentando imagem nodular solida, de forma oval, orientacao paralela a pele e margens circunscritas, localizada as 3 h, distando 4 cm da papila, medindo 4,0 x 4,4 mm.',
+      'Tecido retro-mamario sem dilatacao ductal.',
+      'Regiao axilar livre.'
+    ].concat(Array.from({length: 6}, (_, i) =>
+      '' + NL + 'Observacao complementar numero ' + (i + 1) + ' do exame, escrita para o laudo alcancar o comprimento em que a folha extra aparecia.')).join(NL);
+    exames.push({ id: 9904, tipo: 'mama', paciente: 'Teste Esquema', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Teste Esquema', idade: '48', realizado_em: '25/08/2026' },
+               titulo: 'RELATORIO ULTRASSONOGRAFICO MAMA', tecnica: MODELOS.mama.tecnica,
+               corpo: mamaCorpo,
+               conclusao: 'Exame ecografico compativel com cisto simples na mama direita e nodulo mamario na esquerda.',
+               obs: '',
+               _classifBruto: { birads: [
+                 { localizacao: 'mama direita, as 9 h', caso_especial: 'cistoSimples' },
+                 { localizacao: 'mama esquerda, as 3 h', forma: 'oval', orientacao: 'paralela',
+                   margem: 'circ', eco: 'hipoecoico', posterior: 'nenhum' } ] } } });
+    abrirRevisao(9904);
+    paginarLaudoTela();
+    const fE = document.querySelector('#areaImpressao .laudoFolha');
+    const cards = fE.querySelectorAll('#mamaEsqBox .mamaEsq');
+    diz('o desenho vem em UM CARTAO POR MAMA, nao num bloco so',
+      cards.length === 2, cards.length + ' cartoes');
+    diz('e cada cartao leva a legenda da SUA mama',
+      cards.length === 2
+      && /direita/i.test(cards[0].textContent) && !/esquerda/i.test(cards[0].textContent)
+      && /esquerda/i.test(cards[1].textContent) && !/direita/i.test(cards[1].textContent));
+    diz('com a ressalva de escala em cada um (folha sem ressalva engana)',
+      cards.length === 2 && [].every.call(cards, c => /esquem[aá]tica/i.test(c.textContent)));
+    const medE = () => {
+      const mm = fE.clientWidth / 210, ph = 297 * mm, c2 = getComputedStyle(fE);
+      const tp = parseFloat(c2.paddingTop), bt = parseFloat(c2.paddingBottom), ut = ph - tp - bt;
+      const fr2 = fE.getBoundingClientRect();
+      const pg = el => Math.floor(((el.getBoundingClientRect().top - fr2.top) + 2) / ph);
+      const rd = fE.querySelector('.rodapeLaudo'), asn = fE.querySelector('.assin'),
+            tx2 = fE.querySelector('.laudoTexto');
+      const fim = rd.getBoundingClientRect().bottom - fr2.top;
+      const pu = Math.floor((fim - 2) / ph);
+      return { pags: Math.round(fE.clientHeight / ph),
+               pagD: pg(cards[0]), pagE: pg(cards[1]), pagAssin: pg(asn),
+               pagTxt: Math.floor(((tx2.getBoundingClientRect().bottom - fr2.top) - 2) / ph),
+               naBase: Math.abs(((pu + 1) * ph - bt) - fim) < 5,
+               usoUlt: (fim - (pu * ph + tp)) / ut };
+    };
+    const mE = medE();
+    diz('o laudo que gastava TRES folhas passa a caber em DUAS', mE.pags === 2, mE.pags + ' folhas');
+    // A quebra PODE cair entre as duas mamas — e isso que mata o vazio de meia folha.
+    // (Em que folha cada uma cai depende do comprimento do laudo; o que se garante aqui
+    // e que a paginacao enxerga os dois cartoes como pontos de quebra SEPARADOS.)
+    const ptsE = _paginarPontos(fE.querySelector('.laudoTexto'));
+    diz('a quebra pode cair ENTRE as duas mamas (um ponto por cartao)',
+      [].every.call(cards, c => ptsE.some(p => p.node === c)),
+      ptsE.length + ' pontos de quebra');
+    diz('os dois cartoes ficam na ordem direita-esquerda',
+      mE.pagD <= mE.pagE, 'D=f' + (mE.pagD + 1) + ' E=f' + (mE.pagE + 1));
+    diz('a assinatura fica na folha do texto, no pe dela',
+      mE.pagAssin <= mE.pagTxt && mE.naBase);
+    diz('e nenhuma folha sai desperdicada', mE.usoUlt >= 0.6,
+      Math.round(mE.usoUlt * 100) + '% de uso na ultima');
+    diz('a compactacao, quando entra, e UNIFORME (a entrelinha e da folha inteira)',
+      getComputedStyle(fE.querySelector('.laudoTexto')).lineHeight === getComputedStyle(fE).lineHeight);
+    // laudo comprido de verdade: aqui a escada TEM de entrar, para nao gastar folha a toa
+    exames.push({ id: 9906, tipo: 'abdominal', paciente: 'Teste Escada2', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Teste Escada2' }, titulo: MODELOS.abdominal.titulo,
+               tecnica: MODELOS.abdominal.tecnica,
+               corpo: [MODELOS.abdominal.corpo, MODELOS.abdominal.corpo, MODELOS.abdominal.corpo].join(NL + NL),
+               conclusao: 'Exame ecografico compativel com a normalidade.', obs: '' } });
+    abrirRevisao(9906);
+    paginarLaudoTela();
+    const fL = document.querySelector('#areaImpressao .laudoFolha');
+    const phL = 297 * fL.clientWidth / 210;
+    const csL = getComputedStyle(fL), frL = fL.getBoundingClientRect();
+    const rdL = fL.querySelector('.rodapeLaudo');
+    const fimL = rdL.getBoundingClientRect().bottom - frL.top;
+    const puL = Math.floor((fimL - 2) / phL);
+    const utL = phL - parseFloat(csL.paddingTop) - parseFloat(csL.paddingBottom);
+    diz('laudo comprido: a escada aperta um degrau para nao gastar folha a toa',
+      +fL.getAttribute('data-nivel') > 0, 'nivel ' + fL.getAttribute('data-nivel'));
+    diz('e a ultima folha dele tambem sai aproveitada',
+      (fimL - (puL * phL + parseFloat(csL.paddingTop))) / utL >= 0.6);
+    // e o laudo que JA cabia nao e apertado a toa
+    exames.push({ id: 9905, tipo: 'abdominal', paciente: 'Teste Curto', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Teste Curto' }, titulo: MODELOS.abdominal.titulo,
+               tecnica: MODELOS.abdominal.tecnica, corpo: MODELOS.abdominal.corpo,
+               conclusao: 'Exame ecografico compativel com a normalidade.', obs: '' } });
+    abrirRevisao(9905);
+    paginarLaudoTela();
+    const fC = document.querySelector('#areaImpressao .laudoFolha');
+    diz('laudo que cabe numa folha NAO e compactado (apertar sem ganhar folha e miudo a toa)',
+      Math.round(fC.clientHeight / (297 * fC.clientWidth / 210)) === 1
+      && (fC.getAttribute('data-nivel') === '0' || !fC.getAttribute('data-nivel')));
+
+    // ---- A MOLDURA DA MAMA BILATERAL (26/08/2026, desenho do medico) ----
+    // Duas mamas com desenho: folha 1 termina no cartao da DIREITA (cravado no pe),
+    // folha 2 abre no da ESQUERDA, conclusao e assinatura fecham a 2. O texto se adapta
+    // por dentro (so entrelinha; letra nunca menor que a padrao). Nao coube em 2 folhas:
+    // plano B ditado por ele — o cartao desce e vale o fluxo. Um desenho ou nenhum: fluxo.
+    const mCorpo = (fD, fE) => {
+      const enc = NL + 'Tecido retro-mamario sem dilatacao ductal.' + NL + 'Regiao axilar livre.' + NL;
+      return '**MAMA DIREITA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
+        + 'Parenquima mamario heterogeneo, notando-se formacao cistica simples, anecoica, com reforco acustico posterior, localizada as 9 h, distando 3 cm da papila, medindo 0,6 x 0,3 x 0,4 cm.' + NL
+        + (fD || '') + enc
+        + NL + '**MAMA ESQUERDA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
+        + 'Parenquima mamario heterogeneo, notando-se formacao cistica simples, anecoica, localizada as 3 h, distando 4 cm da papila, medindo 0,5 x 0,4 x 0,4 cm.' + NL
+        + (fE || '') + enc;
+    };
+    const mCaso = (id, corpo, itens) => {
+      exames.push({ id, tipo: 'mama', paciente: 'T' + id, imagens: [], audios: [],
+        laudo: { cab: { nome: 'T' + id, idade: '48', realizado_em: '26/08/2026' },
+                 titulo: 'RELATORIO ULTRASSONOGRAFICO MAMA', tecnica: MODELOS.mama.tecnica,
+                 corpo, conclusao: 'Exame ecografico compativel com cistos simples.', obs: '',
+                 _classifBruto: { birads: itens } } });
+      abrirRevisao(id);
+      paginarLaudoTela();
+      const f2 = document.querySelector('#areaImpressao .laudoFolha');
+      const ph2 = 297 * f2.clientWidth / 210, cs3 = getComputedStyle(f2);
+      const tp2 = parseFloat(cs3.paddingTop), bp2 = parseFloat(cs3.paddingBottom);
+      const fr3 = f2.getBoundingClientRect();
+      const cds = f2.querySelectorAll('#mamaEsqBox .mamaEsq');
+      const rd2 = f2.querySelector('.rodapeLaudo');
+      const B2 = el => el ? el.getBoundingClientRect().bottom - fr3.top : null;
+      const T2 = el => el ? el.getBoundingClientRect().top - fr3.top : null;
+      const pg2 = Math.round(f2.clientHeight / ph2);
+      // 26/08 (noite): a moldura fecha em cada folha e o texto guarda um respiro de 12px
+      // (FRISO) da linha do retangulo — o cartao crava 12px acima do pe, o da esquerda
+      // abre 12px abaixo do topo util
+      return { mold: f2.getAttribute('data-moldura'), fonte: cs3.fontSize, pags: pg2,
+               DnoPe: cds[0] ? Math.abs(B2(cds[0]) - (ph2 - bp2 - 12)) <= 3 : null,
+               EnoTopo: cds[1] ? (T2(cds[1]) - (ph2 + tp2)) : null,
+               assinPe: Math.abs(B2(rd2) - (pg2 * ph2 - bp2)) <= 3 };
+    };
+    const mIt2 = [{ localizacao: 'mama direita, as 9 h', caso_especial: 'cistoSimples' },
+                  { localizacao: 'mama esquerda, as 3 h', caso_especial: 'cistoSimples' }];
+    const mLin = 'Texto complementar do exame, escrito para alongar a descricao desta mama alem do habitual da clinica.' + NL;
+    const mo1 = mCaso(9910, mCorpo('', ''), mIt2);
+    diz('bilateral CURTO entra na moldura', mo1.mold === '1' && mo1.pags === 2, mo1.pags + ' folhas');
+    diz('o cartao da direita CRAVA no pe da folha 1 (12px acima da moldura)', mo1.DnoPe === true);
+    diz('o da esquerda abre a folha 2 (respiro da moldura + margem do cartao)',
+      mo1.EnoTopo != null && mo1.EnoTopo >= 10 && mo1.EnoTopo <= 42, Math.round(mo1.EnoTopo) + 'px do topo util');
+    diz('a letra segue a PADRAO (a 10 dele) — moldura nunca mia a letra', mo1.fonte === '13px');
+    diz('conclusao e assinatura fecham a folha 2 no pe', mo1.assinPe === true);
+    const mo3 = mCaso(9912, mCorpo(mLin.repeat(24), mLin.repeat(24)), mIt2);
+    diz('bilateral LONGO cai no plano B dele: fluxo, sem moldura',
+      mo3.mold == null && mo3.pags >= 3, mo3.pags + ' folhas');
+    diz('e mesmo no fluxo a assinatura fecha a ultima folha', mo3.assinPe === true);
+    const mo4 = mCaso(9913,
+      '**MAMA DIREITA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
+      + 'Notou-se formacao cistica simples, anecoica, localizada as 9 h, distando 3 cm da papila, medindo 0,6 x 0,3 x 0,4 cm.' + NL
+      + 'Regiao axilar livre.' + NL + NL + '**MAMA ESQUERDA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL + 'Sem alteracoes.' + NL,
+      [{ localizacao: 'mama direita, as 9 h', caso_especial: 'cistoSimples' }]);
+    diz('UM desenho so: sem moldura, laudo de UMA folha (decisao dele, item 1)',
+      mo4.mold == null && mo4.pags === 1, mo4.pags + ' folha(s)');
+    diz('com a assinatura no pe dela', mo4.assinPe === true);
+    exames = exames.filter(e => [9910, 9912, 9913].indexOf(e.id) < 0);
+    MAMA_DESENHOS = false;   // volta ao padrao de amanha: mama sem desenho
+
+    // ---- O LAUDO DE MAMA DE AMANHA, DE PONTA A PONTA, SEM DESENHO (27/08) ----
+    // Este e o teste que ele pediu como ultimo: o laudo bilateral com cistos nos dois
+    // lados, do jeito que vai sair na clinica, com os desenhos desligados.
+    const mo5 = mCaso(9917,
+      '**MAMA DIREITA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
+      + 'Parenquima mamario heterogeneo, **notando-se formacoes cisticas simples:**' + NL
+      + '**' + BUL + ' as 2 h, a 3 cm da papila, medindo 0,6 x 0,3 x 0,4 cm;**' + NL
+      + '**' + BUL + ' as 8 h, a 2 cm da papila, medindo 0,6 x 0,7 x 0,4 cm.**' + NL
+      + 'Regiao axilar livre.' + NL + NL
+      + '**MAMA ESQUERDA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
+      + 'Parenquima mamario heterogeneo, **notando-se formacoes cisticas simples:**' + NL
+      + '**' + BUL + ' as 12 h, a 1 cm da papila, medindo 0,6 x 0,3 x 0,4 cm;**' + NL
+      + '**' + BUL + ' as 3 h, a 2 cm da papila, medindo 1,0 x 1,1 x 0,4 cm.**' + NL
+      + 'Regiao axilar livre.',
+      [{ localizacao: 'mama direita, as 2 h', caso_especial: 'cistoSimples' },
+       { localizacao: 'mama esquerda, as 12 h', caso_especial: 'cistoSimples' }]);
+    const f5 = document.querySelector('#areaImpressao');
+    diz('MAMA: nenhum desenho na folha (nem esquema, nem grafico)',
+      !f5.querySelector('#mamaEsqBox') && !f5.querySelector('.mamaEvoBox'));
+    diz('e o laudo fecha em UMA folha, no fluxo', mo5.pags === 1, mo5.pags + ' folha(s)');
+    diz('com a assinatura no pe dela', mo5.assinPe === true);
+    const t5 = f5.querySelector('.laudoTexto').innerText;
+    // o cabecalho da montagem escreve DESCRICAO com acento e as do corpo do teste sao
+    // sem acento de proposito (o arquivo e ASCII): por isso as duas contagens separadas
+    diz('o texto clinico sai inteiro: os DOIS lados, com a moldura em cada um',
+      (t5.split('DESCRICAO').length - 1) === 2, (t5.split('DESCRICAO').length - 1) + ' dos lados');
+    diz('e o cabecalho DESCRICAO da montagem continua acima deles',
+      t5.indexOf('MAMA DIREITA') > 0 && t5.indexOf('MAMA ESQUERDA') > t5.indexOf('MAMA DIREITA'));
+    diz('e as quatro medidas continuam no laudo',
+      (t5.match(/medindo/g) || []).length === 4, (t5.match(/medindo/g) || []).length);
+    diz('a conclusao esta na folha', (f5.innerText || '').indexOf('CONCLUSAO') >= 0
+      || (f5.innerText || '').indexOf('CONCLUS') >= 0);
+    exames = exames.filter(e => e.id !== 9917);
+
+    // ---- CONCLUSAO + TEXTO FINAL NUM BLOCO SO, E A MOLDURA FECHA POR FOLHA (26/08, noite) ----
+    // Pedido dele, vindo do laudo real de Capanema: as observacoes finais nao podem se
+    // separar da conclusao na virada de folha; e o retangulo preto fecha em CADA folha,
+    // nunca segue de uma para a outra. A conclusao nunca desce de corpo; o texto final
+    // pode (11 -> 10/9/8, EXTRA_PX).
+    exames.push({ id: 9914, tipo: 'mama', paciente: 'T9914', imagens: [], audios: [],
+      laudo: { cab: { nome: 'T9914', idade: '48', realizado_em: '26/08/2026' },
+               titulo: 'RELATORIO ULTRASSONOGRAFICO MAMA', tecnica: MODELOS.mama.tecnica,
+               corpo: mCorpo(mLin.repeat(6), mLin.repeat(6)),
+               conclusao: 'Exame ecografico compativel com cistos simples bilateralmente.',
+               extra: MODELOS.mama.extra, obs: '',
+               _classifBruto: { birads: mIt2 } } });
+    abrirRevisao(9914);
+    paginarLaudoTela();
+    const fF = document.querySelector('#areaImpressao .laudoFolha');
+    const phF = 297 * fF.clientWidth / 210, frF = fF.getBoundingClientRect();
+    const fecho = fF.querySelector('.laudoFecho');
+    diz('conclusao e texto final moram num bloco so (.laudoFecho)', !!fecho);
+    if (fecho) {
+      const rF = fecho.getBoundingClientRect();
+      const pIniF = Math.floor((rF.top - frF.top + 2) / phF), pFimF = Math.floor((rF.bottom - frF.top - 2) / phF);
+      diz('e o bloco NUNCA se parte entre folhas', pIniF === pFimF, 'folhas ' + pIniF + '..' + pFimF);
+      const bC = fecho.querySelector('b');
+      diz('a conclusao nao desce de corpo (segue a letra do laudo)',
+        !!bC && getComputedStyle(bC).fontSize === getComputedStyle(fF).fontSize,
+        (bC ? getComputedStyle(bC).fontSize : '?') + ' vs ' + getComputedStyle(fF).fontSize);
+      const spF = fecho.querySelector('.laudoExtra');
+      const pxSp = spF ? parseFloat(getComputedStyle(spF).fontSize) : 0;
+      // 26/08 (noite, 2a leva) — pedido dele: NA MAMA os dizeres finais saem na letra 8
+      // e sem linha em branco entre eles ("o que esta abaixo da conclusao", nao ela)
+      diz('NA MAMA os dizeres finais saem na letra 8 (so eles — a conclusao nao)',
+        !!spF && pxSp === 8, pxSp + 'px');
+      diz('e SEM linha em branco entre os dizeres',
+        !!spF && spF.innerHTML.indexOf('<br><br>') < 0);
+    }
+    const cxF = fF.querySelector('.laudoCorpoBox');
+    const molds = fF.querySelectorAll('.laudoMoldura');
+    diz('a borda da caixa unica apaga (so a cor) e a moldura por folha assume',
+      getComputedStyle(cxF).borderTopColor === 'rgba(0, 0, 0, 0)' && molds.length >= 1,
+      molds.length + ' retangulo(s)');
+    let mOk = molds.length > 0;
+    Array.prototype.forEach.call(molds, m => {
+      const rM = m.getBoundingClientRect();
+      if (Math.floor((rM.top - frF.top + 2) / phF) !== Math.floor((rM.bottom - frF.top - 2) / phF)) mOk = false;
+    });
+    diz('cada retangulo mora INTEIRO numa folha (a moldura fecha a cada pagina)', mOk);
+    const cxR = cxF.getBoundingClientRect();
+    const pgCaixa = Math.floor((cxR.bottom - frF.top - 2) / phF) - Math.floor((cxR.top - frF.top + 2) / phF) + 1;
+    diz('e ha exatamente um retangulo por folha que a caixa atravessa',
+      molds.length === pgCaixa, molds.length + ' de ' + pgCaixa);
+    exames = exames.filter(e => e.id !== 9914);
+
+    // ---- CONTADOR E ORDEM DA LISTA DE EXAMES (31/08, itens 2 e 3) ----
+    // Item 2: ele atende ~100 exames/dia e contava os cartoes na mao.
+    // Item 3: o exame recem-chegado nascia no FIM da lista, fora da tela.
+    const _examesAntes = exames.slice();
+    exames.length = 0;
+    ['Primeiro', 'Segundo', 'Terceiro'].forEach((n, i) =>
+      exames.push({ id: 9700 + i, tipo: 'abdominal', paciente: n, imagens: [], audios: [] }));
+    renderExames();
+    const nomesTela = () => Array.prototype.map.call(
+      document.querySelectorAll('#listaExames .nome'), e => e.textContent.split(' ')[0]);
+    diz('o exame mais NOVO aparece no topo da lista',
+      JSON.stringify(nomesTela()) === JSON.stringify(['Terceiro', 'Segundo', 'Primeiro']),
+      nomesTela().join(' > '));
+    exames.push({ id: 9799, tipo: 'mama', paciente: 'RecemChegado', imagens: [], audios: [] });
+    renderExames();
+    diz('e o que acaba de chegar do aparelho entra em cima', nomesTela()[0] === 'RecemChegado');
+    // ⚠️ a ordem do ARRAY nao pode virar: fila de revisao, gerar todos e sessao do dia
+    // dependem da ordem de chegada. So a vitrine inverte.
+    diz('a ordem interna dos exames NAO foi invertida',
+      exames[0].paciente === 'Primeiro' && exames[exames.length - 1].paciente === 'RecemChegado');
+    diz('o contador conta os exames do dia',
+      document.getElementById('exContador').textContent.indexOf('4 exames') >= 0,
+      document.getElementById('exContador').textContent);
+    exames[0].laudo = { corpo: 'x' }; exames[1].laudo = { corpo: 'y' }; exames[1]._liberado = true;
+    renderExames();
+    const cont = document.getElementById('exContador').textContent;
+    diz('e separa o que falta gerar do que ja foi liberado',
+      cont.indexOf('2 sem laudo') >= 0 && cont.indexOf('1 liberado') >= 0, cont);
+    exames.length = 0; renderExames();
+    diz('lista vazia nao mostra contador nenhum',
+      document.getElementById('exContador').textContent === '');
+    _examesAntes.forEach(e => exames.push(e));
+
+    // ---- EDITAR O TITULO DO EXAME (31/08, pedido dele, item 1) ----
+    // O titulo ja era editavel NA FOLHA, mas nao na tela de revisao, que e onde ele
+    // trabalha. Entrou como retangulo para reusar o caminho de gravacao dos outros.
+    // O risco: o titulo vazar para DENTRO do corpo (o filtro que monta o corpo tem de
+    // exclui-lo, como ja exclui a conclusao e os dados clinicos).
+    exames.push({ id: 9918, tipo: 'abdominal', paciente: 'Titulo', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Titulo' }, titulo: 'RELATORIO ULTRASSONOGRAFICO ABDOMINAL',
+               tecnica: MODELOS.abdominal.tecnica,
+               corpo: '**Figado:**' + NL + 'Dimensoes normais.' + NL + NL + '**Baco:**' + NL + 'Sem alteracoes.',
+               conclusao: 'Exame ecografico compativel com a normalidade.', obs: '',
+               _molde: rev2MoldeDoTexto(MODELOS.abdominal.corpo) } });
+    _rev2Id = 9918; rev2Abrir(9918);
+    const exT = exames.find(e => e.id === 9918);
+    const corpoAntes = exT.laudo.corpo;
+    const blocosT = rev2BlocosDaTela(exT.laudo);
+    diz('o titulo e o PRIMEIRO retangulo da tela', !!blocosT[0] && blocosT[0]._titulo === true);
+    diz('e nao e tratado como achado (nao pinta alarme de medida faltando)',
+      rev2Estado(exT, blocosT[0]) === 'clinico', rev2Estado(exT, blocosT[0]));
+    const elT = Array.prototype.find.call(document.querySelectorAll('#telaRev2 [data-bloco]'),
+      e => (e.innerText || '').indexOf('ULTRASSONOGRAFICO') >= 0);
+    diz('o retangulo do titulo aparece na tela', !!elT);
+    if (elT) {
+      elT.innerHTML = 'ULTRASSONOGRAFIA DE ABDOME TOTAL';
+      rev2Editou(elT);
+      diz('editar o retangulo muda o titulo do laudo',
+        exT.laudo.titulo === 'ULTRASSONOGRAFIA DE ABDOME TOTAL', exT.laudo.titulo);
+      diz('e o corpo NAO e tocado (o titulo nao vaza para dentro do laudo)',
+        exT.laudo.corpo === corpoAntes);
+      rev2Preparar();
+      const fT = document.querySelector('#areaImpressao');
+      diz('a folha impressa sai com o titulo novo',
+        fT.querySelector('.laudoTitulo').innerText.trim() === 'ULTRASSONOGRAFIA DE ABDOME TOTAL');
+      diz('e o titulo nao aparece duplicado no corpo',
+        (fT.querySelector('.laudoTexto').innerText || '').indexOf('ABDOME TOTAL') < 0);
+    }
+    _rev2Id = null;
+    exames = exames.filter(e => e.id !== 9918);
+
+    // ---- A MOLDURA DO LAUDO SOBREVIVE A EDICAO (caso Jacilene, 26/08) ----
+    // No laudo liberado, "DESCRIÇÃO:" estava sob MAMA DIREITA e faltava sob MAMA ESQUERDA.
+    // A linha morava DENTRO da area editavel do retangulo e uma tecla a apagava calada.
+    // Aqui o pior acidente possivel: apagar o retangulo inteiro e digitar uma frase so.
+    const corpoMama = '**MAMA DIREITA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
+      + '**' + BUL + ' as 2 h, a ..... cm da papila, medindo 0,6 x 0,3 x 0,4 cm;**' + NL + 'Regiao axilar livre.' + NL + NL
+      + '**MAMA ESQUERDA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
+      + '**' + BUL + ' as 12 h, a ..... cm da papila, medindo 0,6 x 0,3 x 0,4 cm;**' + NL + 'Regiao axilar livre.';
+    exames.push({ id: 9916, tipo: 'mama', paciente: 'Moldura', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Moldura' }, titulo: MODELOS.mama.titulo, tecnica: MODELOS.mama.tecnica,
+               corpo: corpoMama, conclusao: 'Exame ecografico compativel com cistos simples bilateralmente.',
+               extra: '', obs: '',
+               _molde: { titulos: { 'mama direita': 1, 'mama esquerda': 1, 'descricao': 1 }, medidas: {} } } });
+    _rev2Id = 9916; rev2Abrir(9916); rev2Render();
+    const exM = exames.find(e => e.id === 9916);
+    const contD = () => (exM.laudo.corpo.split('DESCRICAO').length - 1);
+    diz('o laudo de mama nasce com "DESCRICAO:" nos DOIS lados', contD() === 2, contD());
+    const retEsq = Array.prototype.find.call(document.querySelectorAll('#telaRev2 [data-bloco]'),
+      e => (e.innerText || '').indexOf('as 12 h') >= 0);
+    diz('achou o retangulo da mama esquerda', !!retEsq);
+    if (retEsq) {
+      diz('e "DESCRICAO:" NAO esta mais na area que ele digita',
+        (retEsq.innerText || '').indexOf('DESCRICAO') < 0);
+      retEsq.innerHTML = 'Mama simetrica.';       // apaga tudo, o pior caso
+      rev2Editou(retEsq);
+      diz('mesmo apagando o retangulo inteiro, a moldura dos DOIS lados sobrevive',
+        contD() === 2, exM.laudo.corpo.slice(exM.laudo.corpo.indexOf('MAMA ESQUERDA') - 2,
+          exM.laudo.corpo.indexOf('MAMA ESQUERDA') + 40).split(NL).join('|'));
+      diz('e o titulo nao cola na moldura',
+        exM.laudo.corpo.indexOf('**MAMA ESQUERDA****') < 0);
+    }
+    _rev2Id = null;
+    exames = exames.filter(e => e.id !== 9916);
+
+    // ---- TELA "VER O LAUDO FINAL": A EDICAO SOBREVIVE, E COM FERRAMENTAS (26/08, noite) ----
+    // O defeito relatado por ele: "salvar e liberar nao esta salvando". A edicao vivia
+    // so na folha (DOM); o OBJETO do laudo ficava velho e reaparecia em toda remontagem.
+    // Agora o fechar da tela final ABSORVE a edicao de volta para o objeto.
+    exames.push({ id: 9915, tipo: 'abdominal', paciente: 'Teste Final', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Teste Final' }, titulo: MODELOS.abdominal.titulo,
+               tecnica: MODELOS.abdominal.tecnica, corpo: MODELOS.abdominal.corpo,
+               conclusao: 'Exame ecografico compativel com a normalidade.',
+               extra: 'Dizer final um.' + NL + NL + 'Dizer final dois.', obs: '' } });
+    _rev2Id = 9915;
+    rev2VerFinal();
+    diz('a tela final abre com a barra de formatacao da revisao (o mesmo no, emprestado)',
+      !!document.querySelector('#rv2Final #barraFormato'));
+    // a letra 8 sem linha em branco e regra SO da mama — fora dela, tudo como sempre
+    const spN = document.querySelector('#areaImpressao .laudoExtra');
+    diz('fora da mama o texto final segue em 11px', !!spN && getComputedStyle(spN).fontSize === '11px',
+      spN ? getComputedStyle(spN).fontSize : 'sem span');
+    diz('e com a linha em branco entre os dizeres', !!spN && spN.innerHTML.indexOf('<br><br>') >= 0);
+    const txF = document.querySelector('#areaImpressao .laudoTexto');
+    txF.appendChild(document.createTextNode(NL + NL + 'FRASE-EDITADA-NA-TELA-FINAL.'));
+    rev2FinalFechar();
+    const exF = exames.find(e => e.id === 9915);
+    diz('fechar a tela final leva a edicao para o OBJETO do laudo',
+      /FRASE-EDITADA-NA-TELA-FINAL/.test(exF.laudo.corpo || ''));
+    diz('sem estragar a conclusao no caminho de volta',
+      exF.laudo.conclusao === 'Exame ecografico compativel com a normalidade.', exF.laudo.conclusao);
+    diz('e a barra de formatacao volta para a tela de revisao',
+      !!document.querySelector('#telaRevisao #barraFormato'));
+    rev2VerFinal();   // reabrir REMONTA a folha a partir do objeto — era aqui que a edicao sumia
+    diz('reabrir a tela final NAO apaga mais a edicao',
+      /FRASE-EDITADA-NA-TELA-FINAL/.test(document.querySelector('#areaImpressao .laudoTexto').innerText));
+    rev2FinalFechar();
+    _rev2Id = null;
+    exames = exames.filter(e => e.id !== 9915);
+
+    // folha BRANCA: sem mascara, sem paginacao — o comportamento de sempre
+    window.__fundo = 'branco';
+    exames.push({ id: 9902, tipo: 'abdominal', paciente: 'Teste Branco',
+      laudo: { cab: { nome: 'Teste Branco' }, titulo: 't', tecnica: 't',
+               corpo: pgCorpo, conclusao: 'c', obs: '' } });
+    abrirRevisao(9902);
+    paginarLaudoTela();
+    const pgB = document.querySelector('#areaImpressao .laudoFolha');
+    diz('folha branca continua corrida (sem vaos, sem mascara extra, altura livre)',
+      pgB.querySelectorAll('.quebraFolha').length === 0
+      && pgB.querySelectorAll('.fundoFolhaTela').length === 0
+      && !pgB.style.height);
+  } finally {
+    window.__fundo = pgFundoAntes; window.__fundoPerguntado = pgPergAntes;
+    exames = exames.filter(e => [9901, 9902, 9903, 9904, 9905, 9906, 9910, 9912, 9913].indexOf(e.id) < 0);
+    document.getElementById('areaImpressao').innerHTML = '';
+    try { document.getElementById('telaRevisao').style.display = 'none'; } catch (e) {}
+  }
 
   return R;
 })()`;

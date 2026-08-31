@@ -70,12 +70,20 @@ ok(!api.biradsCategoria('3').assumido, 'e categoria sem letra nenhuma não inven
 console.log('\n=== a linha que vai para o laudo ===');
 const linha = api.biradsLinhaCategoria('3', '');
 ok(/^Categoria: BI-RADS 3 — Provavelmente benigno\./.test(linha), 'traz o rótulo por extenso');
-ok(/Probabilidade de malignidade: > 0% e ≤ 2%\./.test(linha), 'traz a faixa');
+// 24/08/2026 — a faixa de probabilidade SAIU do laudo, a pedido do medico. Antes estas
+// duas linhas exigiam o contrario ("traz a faixa" / "0 mostra N/A"): elas guardavam a
+// regra ANTIGA e acusaram na hora da mudanca, que e exatamente o que se espera delas.
+// A faixa continua viva em BIRADS_CAT — e apoio de TELA (calculadora e painel de alertas).
+ok(!/[Pp]robabilidade/.test(linha), 'NAO traz mais a probabilidade de malignidade');
+ok(!/\d\s*%/.test(linha), 'nem percentual nenhum');
 ok(/\nRecomendação de conduta: /.test(linha), 'e a conduta em linha própria');
 ok(api.biradsLinhaCategoria('3', 'Nódulo 1 — ').indexOf('Nódulo 1 — ') === 0,
    'com o rótulo do achado na frente quando há mais de um');
-ok(/N\/A/.test(api.biradsLinhaCategoria('0', '')),
-   'categoria 0 mostra N/A em vez de sumir com a linha (consistência visual entre achados)');
+ok(api.biradsLinhaCategoria('0', '').indexOf('Categoria: BI-RADS 0 — Incompleto.') === 0
+   && /Recomendação de conduta: Imagens adicionais/.test(api.biradsLinhaCategoria('0', '')),
+   'categoria 0 sai com rotulo e conduta (o "N/A" era da faixa, que nao existe mais no laudo)');
+ok(/> 0% e ≤ 2%/.test(tabela),
+   'mas a faixa CONTINUA na tabela — a calculadora de tela e os alertas se servem dela');
 
 console.log('\n=== aceita o que aparece na vida real ===');
 ['3', ' 3 ', 'BI-RADS 3', 'birads 3', '3.'].forEach(v =>
@@ -101,8 +109,13 @@ ok(/rotina/i.test(api.BIRADS_ESPECIAIS.microcistos[1]),
 console.log('\n=== e o laudo usa a linha nova, não a antiga ===');
 ok(!/'Categoria: BI-RADS '\+r\.cat\+'\.'/.test(HTML), 'a montagem antiga da categoria calculada sumiu');
 ok(!/'Categoria: BI-RADS '\+e\[0\]\+'\.'/.test(HTML), 'e a do caso especial também');
-ok((HTML.match(/linhas\.push\(biradsLinhaCategoria\(/g) || []).length === 2,
-   'os dois caminhos (descritores e caso especial) passam pela tabela');
+// 24/08/2026: eram DOIS pushes (um por caminho, cada um escrevendo a categoria da SUA
+// lesao). Agora cada lesao so CONTRIBUI com a categoria, e sai UMA linha para o exame —
+// regra do BI-RADS, pedida pelo medico. Ver teste-mama-cinco-correcoes.js.
+ok((HTML.match(/linhas\.push\(biradsLinhaCategoria\(/g) || []).length === 1,
+   'ha UMA montagem de linha de categoria — a do exame');
+ok(/linhas\.push\(biradsLinhaCategoria\(catExame, ''\)\)/.test(HTML),
+   'e ela usa a categoria do EXAME, sem prefixo de lesao');
 
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');

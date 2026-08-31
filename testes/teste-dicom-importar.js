@@ -91,11 +91,24 @@ ok(/max-height:340px;overflow:auto/.test(HTML), 'e a lista é que rola, não a t
 
 console.log('\n=== 21/08: as fotos ampliam ao PASSAR O MOUSE ===');
 // Conferir 13 fotos clicando e fechando uma a uma é trabalho demais para uma olhada rápida.
-ok(/\.dicomMini:hover\{transform:scale\(/.test(HTML), 'há regra de :hover que amplia');
-const esc_ = /\.dicomMini:hover\{[^}]*\}/.exec(HTML)[0];
-ok(/z-index:30/.test(esc_), 'a ampliada passa POR CIMA das vizinhas');
-ok(/transform-origin:left bottom/.test(HTML),
-   'e cresce para dentro da caixa, não para fora da janela');
+// 23/08: trocado de transform:scale() na própria miniatura (que cobria a vizinha e
+// prendia o mouse nela) para uma lupa flutuante — mesmo desenho do #rv2Lupa da revisão.
+const dicomLupaCss = (/#dicomLupa\{[^}]*\}/.exec(HTML) || [''])[0];
+ok(!/\.dicomMini:hover\{transform:scale\(/.test(HTML),
+   'a miniatura NÃO amplia mais sozinha (era isso que cobria a vizinha)');
+ok(/<img id="dicomLupa"/.test(HTML), 'existe o elemento da foto ampliada (a lupa)');
+ok(/#dicomLupa\{position:fixed/.test(dicomLupaCss), 'ela é posicionada na TELA (fixed), não dentro da grade');
+ok(/z-index:9999/.test(dicomLupaCss), 'e fica por cima de tudo');
+ok(/pointer-events:none/.test(dicomLupaCss), 'sem roubar o clique — nem da miniatura, nem da vizinha embaixo dela');
+ok(/object-fit:contain/.test(dicomLupaCss), 'mostra a imagem INTEIRA (a miniatura é cortada; aqui é a foto toda)');
+ok(/#dicomLupa\.aberta\{opacity:1;transform:scale\(1\)\}/.test(HTML), 'ela cresce ao aparecer e encolhe ao sumir');
+ok(/function dicomLupaLigar/.test(HTML) && (HTML.match(/_dicomLupaLigada/g) || []).length === 3,
+   'os ouvintes são ligados no container estável, UMA vez só');
+ok(/getElementById\('dicomProntosLista'\); if\(!caixa\) return;/.test(HTML),
+   'delegados no painel que não é recriado (só o innerHTML muda a cada exame importado)');
+ok(/e\.target\.closest\?e\.target\.closest\('\.dicomMini'\)/.test(HTML),
+   'o hover é sempre da miniatura de verdade sob o mouse — nunca da ampliada por cima');
+ok(/__dicomLupaFim=setTimeout/.test(HTML), 'e só some depois de encolher, por tempo fixo');
 ok(/cursor:zoom-in/.test(HTML), 'o cursor continua dizendo que dá para clicar');
 ok(/onclick="ampliarImg\(this\)"/.test(HTML), 'e o clique continua abrindo em tamanho cheio');
 ok(/passe o mouse para ampliar/.test(HTML), 'a legenda ensina as duas formas');

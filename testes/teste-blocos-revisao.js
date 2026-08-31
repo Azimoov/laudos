@@ -140,9 +140,14 @@ ok(rev2CorpoVisivel(moldura).txt.indexOf('DESCRIÇÃO') >= 0,
 console.log('=== item 3 e 4 — impressao e dados clinicos ===');
 const L = { corpo: '**Fígado:** normal.', conclusao: 'Exame normal.', cab: { dados_clinicos: 'Dor em hipocôndrio direito.' } };
 const tela = rev2BlocosDaTela(L);
-ok(tela[0]._dc === true && tela[0].titulo === 'DADOS CLÍNICOS', 'dados clinicos e o PRIMEIRO retangulo');
+// 31/08/2026: o TITULO DO EXAME passou a ser o 1o retangulo (pedido dele, item 1) — ele
+// e a primeira linha do documento. Dados clinicos desceu uma posicao. A ordem que importa
+// e a RELATIVA (titulo, dados clinicos, corpo..., impressao), nao o indice cravado.
+ok(tela[0]._titulo === true, 'o titulo do exame e o PRIMEIRO retangulo');
+const iDc = tela.findIndex(b => b._dc);
+ok(iDc === 1 && tela[iDc].titulo === 'DADOS CLÍNICOS', 'dados clinicos vem logo depois dele');
 ok(tela[tela.length - 1]._conc === true, 'a impressao e o ULTIMO');
-ok(rev2Estado(EX, tela[0]) === 'clinico', 'dados clinicos tem estado proprio');
+ok(rev2Estado(EX, tela[iDc]) === 'clinico', 'dados clinicos tem estado proprio');
 ok(rev2Estado(EX, tela[tela.length - 1]) === 'conclusao', 'a impressao tem estado proprio');
 // olha o CODIGO, nao o comentario: o comentario cita o rotulo antigo de proposito,
 // para quem for mexer saber o que foi tirado e por que
@@ -161,7 +166,9 @@ ok(/var blocos=rev2BlocosDaTela\(ex\.laudo\), novo=rev2ParaTexto\(el\)/.test(HTM
 ok(/var blocos=rev2BlocosDaTela\(L\);/.test(HTML), 'rev2Render usa rev2BlocosDaTela');
 ok(/if\(b\._dc\)\{ ex\.laudo\.cab=ex\.laudo\.cab\|\|\{\}; ex\.laudo\.cab\.dados_clinicos=novo/.test(HTML),
   'editar dados clinicos grava no CABECALHO, nao no corpo');
-ok(/blocos\.filter\(function\(x\)\{ return !x\._dc && !x\._conc; \}\)/.test(HTML),
+// 31/08: o filtro ganhou o _titulo. ⚠️ Esquecer UM destes faz o retangulo ser colado
+// DENTRO do laudo — o titulo apareceria duplicado como primeira linha do corpo.
+ok(/blocos\.filter\(function\(x\)\{ return !x\._dc && !x\._conc && !x\._titulo; \}\)/.test(HTML),
   'so os retangulos do CORPO voltam para o corpo do laudo');
 
 console.log('=== item 6 — achado em negrito num orgao e sem negrito noutro ===');

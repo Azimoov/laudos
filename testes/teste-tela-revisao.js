@@ -40,7 +40,9 @@ ok(!/await|openai|gerarLaudo/.test(recalc),
    'e NAO chama a IA: o ditado continua sem o descritor, pedir de novo traria a mesma falta');
 ok(/_classifBruto/.test(recalc) && /_classifBruto:\{tirads:/.test(HTML),
    'o que a IA anotou fica guardado, para poder recalcular sem ela');
-ok(/_conclusaoBase/.test(recalc) && /_conclusaoBase:\(resp\.conclusao/.test(HTML),
+// 24/08: a base passou a ser peneirada (tirarProbabilidade) antes de ser guardada —
+// senao a probabilidade de malignidade voltaria ao resolver uma pendencia aqui.
+ok(/_conclusaoBase/.test(recalc) && /_conclusaoBase:tirarProbabilidade\(resp\.conclusao/.test(HTML),
    'a conclusao e remontada da BASE (senao empilharia duas categorias)');
 ok(/classifPendencias=r\.pendencias/.test(recalc.replace(/\s/g, '')) ||
    /ex\.laudo\.classifPendencias\s*=\s*r\.pendencias/.test(recalc),
@@ -54,8 +56,13 @@ ok(/_escAntes=\(ex\.laudo&&ex\.laudo\._descritores\)/.test(HTML),
 ok(/_descritores:_escAntes/.test(HTML), 'e os leva para o laudo novo');
 
 console.log('=== a pendencia sabe de QUAL achado ela e ===');
-ok((HTML.match(/achado:rot, idx:i/g) || []).length === 3,
-   'os tres sistemas (TI-RADS, BI-RADS, O-RADS) marcam o indice do achado');
+// 24/08: alem das tres PENDENCIAS (uma por sistema), passou a existir tambem `lidos` —
+// os descritores lidos do texto ou assumidos, que a revisao mostra como trocaveis. Ele
+// tambem carrega o idx, pelo mesmo motivo: a troca precisa saber de qual achado e.
+ok((HTML.match(/pendencias\.push\(\{sistema:'\w+', achado:rot, idx:i/g) || []).length === 3,
+   'os tres sistemas (TI-RADS, BI-RADS, O-RADS) marcam o indice do achado na pendencia');
+ok(/lidos\.push\(\{sistema:'birads', achado:rot, idx:i/.test(HTML),
+   'e o descritor lido/assumido tambem marca o indice — senao a troca mexeria no achado errado');
 ok(/p\.sistema\+'\|'\+\(p\.idx==null\?p\.achado:p\.idx\)/.test(escolher),
    'a escolha e guardada pelo indice, nao por um nome que pode repetir');
 

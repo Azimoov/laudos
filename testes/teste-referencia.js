@@ -53,13 +53,23 @@ ok(idadeEmAnos('11') === 11, 'so o numero');
 ok(idadeEmAnos('') === null && idadeEmAnos(null) === null, 'vazio = NAO SEI');
 ok(idadeEmAnos('adulto') === null, 'palavra solta = NAO SEI (nao chuta)');
 
-console.log('=== sem idade, NAO se compara nada ===');
+console.log('=== sem idade, NAO se compara nada — mas AGORA se diz que nao comparou ===');
+// 24/08/2026: antes esta secao exigia SILENCIO total (length === 0). O silencio custou
+// caro em atendimento — um adulto sem data de nascimento teve as medidas comparadas com a
+// tabela do recem-nascido, e nada avisou. Corrigido em duas frentes: "0 anos" deixou de
+// valer como idade (ver teste-idade-zero.js) e a falta de idade passou a ser DITA.
+// O que esta secao guarda continua sendo o essencial: NENHUMA comparacao contra tabela.
 const semIdade = { cab: {}, corpo: '**Figado**\nLobo direito mede 22,0 cm.' };
-ok(alertasReferencia(semIdade).length === 0,
-   '22 cm de figado sem idade nao gera aviso — comparar com que tabela?');
+const avSemIdade = alertasReferencia(semIdade);
+ok(avSemIdade.length === 1, '22 cm de figado sem idade gera UM aviso');
+ok(/NÃO conferidas contra a referência/.test(avSemIdade[0].texto),
+   'e ele diz que NAO conferiu — comparar com que tabela?');
+ok(!/fora da referência/.test(avSemIdade[0].texto),
+   'e em nenhum momento afirma que a medida esta fora — nao houve comparacao');
+ok(/data de nascimento/.test(avSemIdade[0].texto), 'apontando a causa que ele pode corrigir');
 ok(alertasReferencia(null).length === 0, 'laudo nulo nao quebra');
 ok(alertasReferencia({ cab: { idade: 'xx' }, corpo: 'mede 30 cm' }).length === 0,
-   'idade ilegivel tambem cala');
+   'idade ilegivel SEM medida de orgao reconhecido continua calando (aviso viraria ruido)');
 
 console.log('=== FIGADO por idade (Pediatr Radiol 2026, n=4.611) ===');
 const fig = (idade, cm) => alertasReferencia({ idadePac: idade, cab: {},
@@ -214,73 +224,25 @@ ok(medidasDoLaudo({ corpo: '**Figado**\nLobo direito mede 14,2 cm.' })[0].orgao 
 ok(medidasDoLaudo({ corpo: 'Medida renal em seu maior eixo 9,0 cm.' })[0].orgao === 'rim',
    'e "medida renal" tambem, mesmo sem titulo');
 
-console.log('=== A REFERENCIA ESCRITA NO CORPO DO LAUDO (15/08) ===');
-// Pedido do medico: um laudo que afirma hepatomegalia deve trazer, no proprio corpo, o
-// tamanho esperado para a idade e de onde vem esse numero - para quem le poder conferir
-// sem ter as tabelas na mao.
+console.log('=== A REFERENCIA NO CORPO DO LAUDO: DESLIGADA (decisao do medico, 26/08) ===');
+// 26/08/2026: "remova todas as referencias. vamos ir colocando conforme formos
+// editando os laudos." A anotacao "(referencia para X anos: ...)" NAO e mais escrita
+// no corpo — refEscreverNoCorpo devolve o texto intacto, byte a byte. Os ALERTAS de
+// medida fora da faixa continuam na tela (secoes abaixo) — alerta nao e laudo.
+// As tabelas REF_MEDIDAS ficam no codigo, prontas para quando as referencias voltarem
+// modelo a modelo. O texto integral do que saiu esta em REFERENCIAS-REMOVIDAS-2026-08-26.md.
 const corpoFig = '**Figado** de dimensoes aumentadas.\nLobo direito medindo 15,5 cm.';
-const escrito = refEscreverNoCorpo({ corpo: corpoFig }, 10, '');
-ok(/refer[eê]ncia para 10 anos/.test(escrito), 'a referencia entra com a idade por extenso');
-ok(/14,4/.test(escrito), 'com o limite superior da faixa daquela idade');
-ok(/Manteghinejad/.test(escrito), 'e com o estudo de onde o numero veio');
-ok(escrito.split('\n').length === corpoFig.split('\n').length,
-   'sem criar linha nova: o laudo nao muda de forma');
-// NO FIM DA FRASE, nao colada no numero. Este teste existe porque a primeira versao
-// enfiava a referencia logo apos a medida e partia a frase ao meio:
-//   "medindo 15,5 cm (referencia...) na linha hemiclavicular"  <- errado
-const frase = '**Figado**\nLobo direito medindo 15,5 cm na linha hemiclavicular.';
-const fraseEscrita = refEscreverNoCorpo({ corpo: frase }, 10, '');
-ok(/na linha hemiclavicular \(refer[eê]ncia/.test(fraseEscrita),
-   'a referencia entra no FIM da frase, sem parti-la ao meio');
-ok(/\)\.$/.test(fraseEscrita.split('\n')[1]),
-   'e o ponto final continua fechando a frase, depois do parenteses');
-// sem ponto final na linha, vai para o fim dela e nao se perde
-const semPonto = refEscreverNoCorpo({ corpo: 'Figado medindo 15,5 cm' }, 10, '');
-ok(/15,5 cm \(refer[eê]ncia/.test(semPonto), 'linha sem ponto final: vai para o fim dela');
-// numero no padrao do laudo: nunca "7" solto
-ok(/at[ée] 7,0 cm/.test(refEscreverNoCorpo({ corpo: '**Baco** medindo 9,2 cm.' }, 0.9, '')),
-   'limite inteiro sai como "7,0 cm", nao "7 cm"');
-// ⚠️ FACTUAL, NUNCA CONCLUSIVO — e a garantia de que o app nao passou a diagnosticar.
-// Olha SO o trecho inserido: o corpo original ja dizia "dimensoes aumentadas", e esse
-// adjetivo e do medico. O que se cobra aqui e o que o PROGRAMA escreveu.
-const inserido = (escrito.match(/\(refer[eê]ncia[^)]*\)/) || [''])[0];
-ok(inserido.length > 0, 'da para isolar exatamente o trecho que o programa inseriu');
-ok(!/hepatomegalia/i.test(inserido), 'o texto inserido NAO escreve "hepatomegalia"');
-ok(!/aumentad/i.test(inserido),
-   'nem "aumentado" — o adjetivo do laudo e do medico, nao do programa');
-ok(!/acima|abaixo|alterad|anormal|megalia/i.test(inserido),
-   'nem "acima", "alterado", "anormal" ou "-megalia": so a faixa e a fonte');
-ok(/hepatomegalia|aumentad/i.test(escrito),
-   'e o que o medico ja tinha escrito continua la, intacto');
-// medida DENTRO da faixa nao ganha nada
-const corpoOk = '**Figado** de dimensoes normais.\nLobo direito medindo 12,0 cm.';
-ok(refEscreverNoCorpo({ corpo: corpoOk }, 10, '') === corpoOk,
-   'medida dentro da faixa: o corpo sai intocado, sem poluir laudo normal');
-// sem idade nao se escreve nada
-ok(refEscreverNoCorpo({ corpo: corpoFig }, null, '') === corpoFig, 'sem idade: intocado');
-// um por orgao, no valor mais extremo
-const corpoTres = '**Baco** medindo 3,0 cm.\n**Baco** medindo 14,0 cm.';
-const tresEscrito = refEscreverNoCorpo({ corpo: corpoTres }, 2, '');
-ok((tresEscrito.match(/refer[eê]ncia para/g) || []).length === 1,
-   'dois numeros do mesmo orgao geram UMA referencia so');
-ok(/14,0 cm \(/.test(tresEscrito), 'e ela vai no valor mais extremo');
-// a conclusao nao e tocada: la o medico escreve, o programa nao entra
-const comConcl = refEscreverNoCorpo({ corpo: corpoFig, conclusao: 'Figado medindo 15,5 cm.' }, 10, '');
-ok((comConcl.match(/refer[eê]ncia para/g) || []).length === 1,
-   'a conclusao nao recebe referencia — o programa so escreve no corpo');
-// adulto tambem, agora que ha limite de figado adulto
-const adultoEscrito = refEscreverNoCorpo({ corpo: 'Figado medindo 18,0 cm.' }, 40, '');
-ok(/Sienz/.test(adultoEscrito), 'no adulto, cita a fonte do limite de adulto');
-// utero: a unidade tem de sair certa
-const utEscrito = refEscreverNoCorpo({ corpo: '**Utero** medindo 4,0 x 2,5 x 2,0 cm.' }, 4, '');
-ok(/cm3|cm³/.test(utEscrito), 'no utero a referencia sai em cm3, nao em cm');
-ok(/Salardi/.test(utEscrito), 'citando o estudo do utero');
-// toda tabela precisa ter fonte curta, senao a referencia sai sem citacao
+ok(refEscreverNoCorpo({ corpo: corpoFig }, 10, '') === corpoFig,
+   'crianca com hepatomegalia: corpo devolvido INTACTO, sem anotacao');
+ok(refEscreverNoCorpo({ corpo: corpoFig }, 45, '') === corpoFig,
+   'adulto idem');
+ok(refEscreverNoCorpo({ corpo: '**Utero** aumentado, medindo 9,0 x 5,0 x 4,0 cm.' }, 5, 'F')
+   === '**Utero** aumentado, medindo 9,0 x 5,0 x 4,0 cm.',
+   'utero pediatrico idem — nenhum caso escreve mais no laudo');
+// as tabelas continuam integras no codigo, com fonte curta, para a volta
 ok(REF_MEDIDAS.figado.fonteCurta && REF_MEDIDAS.baco.fonteCurta
    && REF_MEDIDAS.rim.fonteCurta && REF_MEDIDAS.utero.fonteCurta,
-   'as quatro tabelas tem fonte curta para caber dentro do laudo');
-ok(REF_MEDIDAS.figado.adulto.fonteCurta && REF_MEDIDAS.baco.adulto.fonteCurta,
-   'e os dois limites de adulto tambem');
+   'as quatro tabelas seguem no codigo com fonte curta (prontas para voltar)');
 
 console.log('=== BEBES: a idade sai da DATA DE NASCIMENTO, nao do inteiro do agente ===');
 // O agente calcula idade em anos INTEIROS: bebe de 11 meses chega como "0". E a faixa de

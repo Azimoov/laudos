@@ -242,8 +242,12 @@ ok(/id="exCadLocal"/.test(HTML) && /id="exCadNome"/.test(HTML) && /id="exCadArq"
    'o cadastro tem nome e imagem do papel timbrado');
 ok(/DADOS_SINCRONIZADOS[^\n]*'glocais'/.test(HTML),
    'os locais vivem no COMPUTADOR, nao so neste navegador');
-ok(/FUNDOS\[l\.k\]=\{nome:l\.nome\|\|l\.k, img:l\.img\|\|null\}/.test(HTML),
+ok(/FUNDOS\[l\.k\]=\{nome:l\.nome\|\|l\.k, img:l\.img\|\|null,/.test(HTML),
    'o local cadastrado entra no FUNDOS — e de la que o laudo tira o timbrado');
+// 25/08: o cadastro deixou de APAGAR as margens do timbrado ao reescrever a entrada —
+// entrada sem padTopMm caia no padrao antigo (30 mm), menor que o cabecalho da casa
+ok(/padTopMm:(l.padTopMm||_ant.padTopMm||34)/.test(HTML),
+   'e SEM apagar as margens: o que o cadastro nao disser, herda-se ou vale 34/24');
 const cad = semComent(grab('exCadSalvar'));
 ok(/norm\(l\.rot\)===nomeNorm/.test(cad),
    'a checagem de repetido compara o NOME (comparar a chave deixava cadastrar um 2o "Capanema")');

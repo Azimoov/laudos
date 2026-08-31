@@ -40,6 +40,13 @@ const src = [
   grab('biradsAvaliar'), grab('oradsAvaliar'),
   grab('classifCategoriaDitada'), grab('classifConferir'),
   grab('tiradsCategoria'), grab('tiradsConduta'), grab('tiradsPontuarDescritores'),
+  // 24/08/2026: a categoria virou UMA por exame; processarBirads passou a depender destes
+  bloco(/const BIRADS_GRAVIDADE = \{[^}]*\};/, 'BIRADS_GRAVIDADE'), grab('biradsDoExame'),
+  // 24/08: processarBirads passou a ler descritores do TEXTO e a assumir padroes
+  bloco(/const BIRADS_PADRAO = \{[^}]*\};/, 'BIRADS_PADRAO'),
+  grab('_negadoAntesDe'), grab('classifCasarNoTexto'), grab('_mamaFraseDo'),
+// 25/08: cisto simples passou a ser lido da propria frase do laudo
+  grab('mamaCasoEspecialDoTexto'),
   grab('processarTirads'), grab('processarBirads'), grab('processarOrads'), grab('classifAplicar')
 ].join('\n');
 const A = new Function(src + '\nreturn {CLASSIF, classifVale, classifCasar, classifLerDescritores,'
@@ -88,9 +95,18 @@ ok(p.opcoes.map(o => o.rot).join(', ').includes('Microlobulada'), 'com os nomes 
    + p.opcoes.map(o => o.rot).join(', '));
 ok(/faltou ditar: margem/.test(r.obs[0]), 'o aviso em texto tambem diz o que faltou');
 
+// 24/08/2026: "achados posteriores" passou a ser ASSUMIDO como "sem alteracao" quando
+// ninguem diz nada (pedido do medico) — entao ele sai de pendencia e entra em `lidos`,
+// como escolha trocavel num toque. Os outros QUATRO continuam sendo cobrados.
 r = processarBirads([{ forma: '', orientacao: '', margem: '', eco: '', posterior: '' }], '');
-ok(r.pendencias.length === 5, 'nada ditado -> uma pendencia por descritor (' + r.pendencias.length + ')');
-ok(new Set(r.pendencias.map(x => x.chave)).size === 5, 'sem repetir descritor');
+ok(r.pendencias.length === 4, 'nada ditado -> uma pendencia por descritor cobravel (' + r.pendencias.length + ')');
+ok(new Set(r.pendencias.map(x => x.chave)).size === 4, 'sem repetir descritor');
+ok(!r.pendencias.some(x => x.chave === 'posterior'), 'e "achados posteriores" NAO e cobrado');
+const _post = (r.lidos || []).filter(x => x.chave === 'posterior')[0];
+ok(_post && _post.valor === 'nenhum' && _post.origem === 'padrao',
+   'ele vem assumido como "sem alteracao", declarado como assumido');
+ok(_post && Array.isArray(_post.opcoes) && _post.opcoes.length === 3,
+   'e com as 3 opcoes para trocar — assumido nao e imposto');
 
 console.log('=== valor nao reconhecido conta como NAO DITADO (nunca vira palpite) ===');
 r = processarBirads([{ ...MASSA_OK, margem: 'meio esquisita' }], '');

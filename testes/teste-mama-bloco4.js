@@ -38,8 +38,8 @@ const api = new Function('esc', 'norm', 'document', 'log', 'exames',
   + 'function biradsAvaliar(){return {cat:"3"};}'
   + 'function biradsLinhaCategoria(c,p){return (p||"")+"Categoria: BI-RADS "+c+".";}'
   + 'function revMarcarEditado(){}\n'
-  + ESQ + '\n' + EVO + '\n' + B3.replace('function _mamaCatDoAchado(d){',
-      'function _mamaCatDoAchado(d){ if(d&&d.__cat) return d.__cat;') + '\n' + BIO + '\n' + LEX +
+  + ESQ + '\n' + EVO + '\n' + B3.replace('function _mamaCatDoAchado(d, frase){',
+      'function _mamaCatDoAchado(d, frase){ if(d&&d.__cat) return d.__cat;') + '\n' + BIO + '\n' + LEX +
   '\nreturn {lexSubstituir, lexDefinicoes, lexAlertas, LEX_EQUIV, LEX_TERMOS,'
   + ' biopsiaPendentes, biopsiaRegistrar, biopsiaFraseComparacao, BIOPSIA_ROTULO, mamaLesoes,'
   + ' LEX_ORTOGRAFIA, LEX_BIRADS,'

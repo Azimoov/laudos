@@ -92,7 +92,7 @@ console.log('\n=== §6 — a frase diz o FATO, não o julgamento ===');
 // A leitura da fonte primária foi explícita: o manual não dá percentual de crescimento que
 // mude conduta. Inventar um corte repetiria o defeito da auditoria — número sem fonte.
 const fr = api.mamaFraseComparacao(12, 11, '20/02/2025');
-ok(/mede 12 mm \(havia 11 mm\)/.test(fr), 'traz as duas medidas: "' + fr + '"');
+ok(/mede 1,2 cm \(havia 1,1 cm\)/.test(fr), 'traz as duas medidas em cm: "' + fr + '"');
 ok(/20\/02\/2025/.test(fr), 'e a data do exame anterior');
 ok(!/cresceu|aumentou|estável|estavel|manteve|reduziu/i.test(fr),
    'e NÃO rotula a variação — a leitura clínica fica com o médico');

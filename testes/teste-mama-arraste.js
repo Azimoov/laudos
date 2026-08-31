@@ -85,11 +85,26 @@ ok(/10h, a 3 cm da papila/.test(api.mamaEsquemaHTML(laudo2)),
 console.log('\n=== encaixe: hora e centímetro inteiros (§8.2) ===');
 // O manual ACR não prevê meia-hora nem fração de centímetro. Arraste livre produziria um
 // laudo mais "preciso" do que o padrão permite — precisão inventada é pior que ausente.
+// 24/08/2026 — O ENCAIXE MUDOU DE LUGAR; a intencao e a mesma. Antes ele acontecia a CADA
+// movimento do dedo (dentro de `mover`), e o marcador pulava de hora em hora: o medico
+// descreveu como "foram rapidamente para uma posicao pre-definida e travaram la". Agora o
+// desenho segue o dedo em valor fracionario e o arredondamento acontece UMA vez, ao soltar
+// — que e o momento em que o valor vai para o laudo. O papel continua recebendo hora
+// inteira e centimetro inteiro.
 const mover = HTML.slice(HTML.indexOf('var mover=function(ev){'), HTML.indexOf('var soltar=function(){'));
-ok(/Math\.round\(\(\(ang%360\)\+360\)%360\/30\)/.test(mover), 'a hora é arredondada para inteiro');
-ok(/if\(h===0\) h=12/.test(mover), 'e 0h vira 12h, que é como o relógio se escreve');
-ok((mover.match(/Math\.round\(/g) || []).length >= 3, 'distância e profundidade também arredondam');
-ok(!/toFixed\(1\)/.test(mover), 'nenhuma casa decimal escapa para o laudo');
+const soltarBloco = HTML.slice(HTML.indexOf('var soltar=function(){'), HTML.indexOf("caixa.addEventListener('mousedown'"));
+ok(!/Math\.round\(/.test(mover),
+   'durante o arraste NADA e arredondado — o desenho acompanha o dedo');
+ok(/hora FRACION/.test(mover), 'e o codigo diz que a hora ali e fracionaria de proposito');
+ok(/a\.hora=Math\.round\(a\.hora\)%12/.test(soltarBloco),
+   'ao SOLTAR, a hora e arredondada para inteiro');
+ok(/if\(a\.hora===0\) a\.hora=12/.test(soltarBloco),
+   'e 0h vira 12h, que e como o relogio se escreve');
+ok(/a\.distCm=Math\.max\(0,Math\.round\(a\.distCm\)\)/.test(soltarBloco)
+   && /a\.profMm=Math\.max\(0,Math\.round\(a\.profMm\)\)/.test(soltarBloco),
+   'distancia e profundidade tambem arredondam ao soltar');
+ok(soltarBloco.indexOf('Math.round(a.hora)') < soltarBloco.indexOf('mamaReescreverLocal'),
+   'e tudo isso ANTES de escrever no laudo — nenhuma casa decimal chega ao papel');
 
 console.log('\n=== o ciclo, lido no código ===');
 const soltar = HTML.slice(HTML.indexOf('var soltar=function(){'), HTML.indexOf('caixa.addEventListener(\'mousedown\''));

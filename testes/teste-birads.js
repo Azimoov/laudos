@@ -64,7 +64,15 @@ const src = [
   grab('norm'), grab('classifCasar'), grab('classifLerDescritores'),
   grab('classifCategoriaDitada'), grab('classifConferir'),
   grab('calcRadio'), grab('calcOut'),
-  grab('biradsAvaliar'), grab('calcBiradsLerTela'), grab('calcBirads'), grab('processarBirads')
+  grab('biradsAvaliar'), grab('calcBiradsLerTela'), grab('calcBirads'),
+  // 24/08/2026: a categoria virou UMA por exame; processarBirads passou a depender destes
+  bloco(/const BIRADS_GRAVIDADE = \{[^}]*\};/, 'BIRADS_GRAVIDADE'), grab('biradsDoExame'),
+  // 24/08: processarBirads passou a ler descritores do TEXTO e a assumir padroes
+  bloco(/const BIRADS_PADRAO = \{[^}]*\};/, 'BIRADS_PADRAO'),
+  grab('_negadoAntesDe'), grab('classifCasarNoTexto'), grab('_mamaFraseDo'),
+// 25/08: cisto simples passou a ser lido da propria frase do laudo
+  grab('mamaCasoEspecialDoTexto'),
+  grab('processarBirads')
 ].join('\n');
 const api = new Function('document', src + '\nreturn {calcBirads, biradsAvaliar, CLASSIF, processarBirads};')(document);
 const { calcBirads, CLASSIF, processarBirads } = api;

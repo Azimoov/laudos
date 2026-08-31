@@ -19,8 +19,13 @@ function fatia(de, ate) {
   if (i < 0 || f < 0) throw new Error('não achei ' + de);
   return HTML.slice(i, f);
 }
+// 29/08/2026 — O FIM DA FATIA ERA GANANCIOSO. Ia ate o BLOCO 4, e no meio do caminho
+// engolia TODA a tela de Configuracoes (modCfg*, bzRender e, a partir de hoje, a tela do
+// Provedor de IA). Enquanto nada ali tinha `await`, passou despercebido; a tela nova do
+// provedor tem, e a assercao "nenhuma chamada a IA na secao da paciente" reprovou codigo
+// que nao e da secao da paciente. O fim CERTO e onde a proxima secao comeca.
 const PAC = fatia('/* ============ SEÇÃO "PARA A PACIENTE" ============',
-                  '/* ============ BLOCO 4 — registro pós-biópsia ============');
+                  '/* ============ TELA 1 — GRADE DE MODELOS DE LAUDO (22/08/2026) ============');
 
 let guardado = {};
 const api = new Function('esc', 'localStorage', 'log', 'dadoSalvar',
@@ -104,7 +109,10 @@ ok(/investiga(ção|cao) adicional/i.test(hv),
 console.log('\n=== onde ela entra no laudo ===');
 ok(HTML.indexOf('pacienteHTML(ex)') > HTML.indexOf('negrito(L.extra)'),
    'por ÚLTIMO: depois do texto técnico e das ressalvas');
-const ctx = HTML.slice(HTML.indexOf('pacienteHTML(ex)') - 160, HTML.indexOf('pacienteHTML(ex)') + 40);
+// 24/08: a seção passou a sair só quando TEM conteúdo (antes deixava um <div> vazio no fim
+// do laudo, ocupando espaço à toa). Com isso o contenteditable ficou DEPOIS da chamada, e
+// a janela de busca precisa olhar os dois lados.
+const ctx = HTML.slice(HTML.indexOf('pacienteHTML(ex)') - 160, HTML.indexOf('pacienteHTML(ex)') + 160);
 ok(/contenteditable="false"/.test(ctx),
    'e não editável — editá-la à mão faria o que o desenho dela evita: divergir do técnico');
 

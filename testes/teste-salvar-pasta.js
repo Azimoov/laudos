@@ -68,5 +68,33 @@ ok(/'Laudo - '\+base\+'\.html'/.test(SALVAR), 'o nome do arquivo do laudo nao mu
 ok(/'foto-'\+\(i\+1\)\+'\.jpg'/.test(SALVAR), 'as fotos continuam saindo numeradas');
 ok(/'Fotos - '\+base\+'\.pdf'/.test(SALVAR), 'o PDF das imagens continua igual');
 
+console.log('=== 24/08: o AGENTE salva primeiro (a pasta do navegador nao sobrevive) ===');
+// Falhou em atendimento DE VERDADE: a janela abre em porta sorteada, a escolha de pasta
+// morre a cada abertura, e o laudo do Wilson (24/08, 11:43) caiu na pasta temporaria.
+// O agente grava direto no disco e a pasta fica em config-agente.json — escolhe uma vez.
+const posAgente = SALVAR.indexOf('impSalvarPeloAgente');
+ok(posAgente > 0, 'salvarLaudoPasta tenta o agente');
+ok(posAgente < SALVAR.indexOf('if(destino)'),
+   'ANTES do caminho do navegador — o navegador virou o plano B de quem nao tem agente');
+ok(/semPasta/.test(SALVAR),
+   'agente sem pasta configurada abre o Explorer NA HORA e tenta de novo — nao manda o medico procurar configuracao no meio do atendimento');
+ok(/catch\(e\)\{ \/\* agente fora do ar/.test(SALVAR),
+   'agente fora do ar cai no caminho antigo em silencio (o iPad continua funcionando)');
+const AG = fs.readFileSync(path.join(__dirname, '..', '..', 'laudos-programa', 'agente', 'agente-laudos.py'), 'utf8');
+ok(/rota == "\/laudo\/salvar"/.test(AG), 'a rota de salvar existe no agente');
+ok(/rota == "\/laudo\/pasta\/escolher"/.test(AG), 'e a de escolher a pasta pelo Explorer');
+ok(/p == "\/laudo\/pasta"/.test(AG), 'e a de consultar a pasta atual');
+ok(/d\["pastaLaudos"\] = /.test(AG), 'a pasta escolhida e gravada no config do agente (disco)');
+ok(/\.laudos-teste-escrita/.test(AG.slice(AG.indexOf('/laudo/pasta'))),
+   'so aceita pasta onde consegue MESMO escrever (testa antes de prometer)');
+ok(/while os\.path\.exists\(os\.path\.join\(pasta, nome\)\)/.test(AG),
+   'a subpasta do paciente ganha nome livre — nunca sobrescreve laudo ja salvo');
+ok(/re\.sub\(r'\[\\\\\/:\*\?"<>\|\]\+'/.test(AG),
+   'o nome vindo do app e saneado no agente (nao confia em ../ nem em caractere proibido)');
+const ESCOLHER = corpoDe('escolherPastaDestino');
+ok(/laudo\/pasta\/escolher/.test(ESCOLHER),
+   'o botao "Pasta" abre o Explorer pelo agente quando ele esta no ar');
+ok(/showDirectoryPicker/.test(ESCOLHER), 'e o seletor do navegador continua como plano B');
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'TODOS OS TESTES PASSARAM'));
 process.exit(falhas ? 1 : 0);

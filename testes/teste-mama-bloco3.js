@@ -78,8 +78,8 @@ ok(r.corpo.indexOf('**MAMA DIREITA**') >= 0 && r.corpo.indexOf('Pele sem altera�
 
 console.log('\n=== e com achados de gravidade diferente, a ordem muda ===');
 // classificador de mentira: o achado "suspeito" vira 4B, os demais 2
-const B3b = B3.replace('function _mamaCatDoAchado(d){',
-  'function _mamaCatDoAchado(d){ if(d&&d.__cat) return d.__cat;');
+const B3b = B3.replace('function _mamaCatDoAchado(d, frase){',
+  'function _mamaCatDoAchado(d, frase){ if(d&&d.__cat) return d.__cat;');
 const api2 = new Function('esc', 'norm', 'document', 'log',
   'var BIRADS_ESPECIAIS={};function classifLerDescritores(){return {falta:[],achou:{}};}'
   + 'function biradsAvaliar(){return {cat:"3"};}\n' + ESQ + '\n' + EVO + '\n' + CAT + '\n' + B3b +
@@ -120,8 +120,8 @@ ok(/direita/.test(itens[0]) && /esquerda/.test(itens[3]), 'ordenado por mama: di
 const horasD = itens.slice(0, 3).map(l => +/(\d{1,2})h/.exec(l)[1]);
 ok(horasD[0] < horasD[1] && horasD[1] < horasD[2],
    'e por hora crescente dentro da mama (' + horasD.join(', ') + ')');
-ok(!/medindo 4 x/.test(rl.corpo) && /— 4 mm/.test(rl.corpo),
-   'a lista traz só o MAIOR diâmetro — é lista de triagem, não descrição detalhada');
+ok(!/medindo 4 x/.test(rl.corpo) && /— 0,4 cm/.test(rl.corpo),
+   'a lista traz só o MAIOR diâmetro, em cm — é lista de triagem, não descrição detalhada');
 
 console.log('\n=== achado dominante sai da lista e volta para a prosa ===');
 const comDominante = corpoCom([

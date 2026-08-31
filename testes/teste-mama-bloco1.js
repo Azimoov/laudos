@@ -1,7 +1,8 @@
 // PACOTE DE MAMA — BLOCO 1 (modelo + dizeres padrão), 20/08/2026.
 //
-// Fonte: manual ACR BI-RADS v2025 + AUDITORIA-CBR.md (30/07/2026), pelas especificações
-// 01-MODELO-MAMA e 02-BIZUS-MAMA que o Dr. Daniel entregou.
+// Fonte: manual ACR BI-RADS v2025, pelas especificações 01-MODELO-MAMA e 02-BIZUS-MAMA
+// que o Dr. Daniel entregou. (24/08/2026: o AUDITORIA-CBR.md constava aqui como fonte e
+// foi retirado a pedido dele — não é referência oficial deste programa.)
 //
 // Esta suíte guarda o conteúdo CLÍNICO, que é o que não pode regredir sem alguém ver:
 // categoria certa, nenhuma medida de paciente sobrevivendo, nenhum lado escrito na pedra,
@@ -61,12 +62,29 @@ ok(comLado.length === 0, 'nenhuma conclusão traz o lado fixo');
 ok(/medindo à direita \.\.\.\.\. x/.test(plano),
    'e a ginecomastia mantém os dois lados como RÓTULO de medida, que é legítimo');
 
-console.log('\n=== unidade: a do BI-RADS para mama (decisão do médico, 20/08) ===');
-ok((plano.match(/x \.\.\.\.\. mm/g) || []).length >= 12, 'tamanho de lesão em mm');
-ok(!/medindo[^.]{0,80}\.\.\.\.\. cm/.test(plano), 'nenhum tamanho ficou em cm');
+// 26/08/2026: o medico fixou CENTIMETRO como unidade padrao do laudo inteiro —
+// supersede a decisao de 20/08 (que era mm para lesao de mama). Registrado no
+// AUDITORIA-3-CICLOS e na memoria do projeto.
+console.log('\n=== unidade: CENTÍMETRO é o padrão do laudo (decisão do médico, 26/08) ===');
+ok((plano.match(/x \.\.\.\.\. cm/g) || []).length >= 12, 'tamanho de lesão em cm');
+ok(!/medindo[^.]{0,80}\.\.\.\.\. mm/.test(plano), 'nenhum tamanho ficou em mm');
 ok(!/distando \.\.\.\.\. mm/.test(plano), 'nenhuma distância ficou em mm');
-ok((plano.match(/às \.\.\.\.\. h, distando \.\.\.\.\. cm da papila até o centro do achado/g) || []).length === 8,
-   'os 8 achados focais têm hora + distância, em cm inteiro e até o CENTRO do achado (ACR)');
+// 24/08/2026: o CISTO SIMPLES deixou de pedir a distância da papila, a pedido do médico —
+// eram 8 achados com hora+distância, agora são 7. Os demais continuam pedindo, e o molde
+// continua sendo "até o CENTRO do achado" (ACR). O cisto mantém a hora e as medidas.
+ok((plano.match(/às \.\.\.\.\. h, distando \.\.\.\.\. cm da papila até o centro do achado/g) || []).length === 7,
+   'os 7 achados focais que exigem distância têm hora + distância, em cm inteiro e até o CENTRO (ACR)');
+// `plano` colapsa as quebras de linha, entao o recorte do cisto vai ate o "CONCLUSAO"
+// seguinte no texto ja achatado.
+const _cisto = (plano.match(/Cisto simples:.*?(?=CONCLUSÃO)/) || [''])[0];
+ok(_cisto.length > 40, 'achei o texto do cisto simples (' + _cisto.length + ' caracteres)');
+ok(!/distando/.test(_cisto), 'o cisto simples NÃO pede mais a distância da papila');
+ok(/às \.\.\.\.\. h/.test(_cisto), 'mas continua pedindo a HORA');
+ok(/medindo \.\.\.\.\. x \.\.\.\.\. x \.\.\.\.\. cm/.test(_cisto), 'e as três medidas (em cm, padrao de 26/08)');
+ok(/hipoecogênica/.test(plano.match(/Um nódulo BR3:.*?(?=CONCLUSÃO)/)[0]),
+   'e o nódulo BR3 nasce com o padrão ecogênico escrito (hipoecogênica)');
+ok(/hipoecogênica/.test(plano.match(/Um nódulo BR4:.*?(?=CONCLUSÃO)/)[0]),
+   'o BR4 também');
 
 console.log('\n=== o que a auditoria mandou corrigir ===');
 ok(/cisto complicado isolado[\s\S]{0,140}BI-RADS 3/.test(plano),

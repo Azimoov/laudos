@@ -353,6 +353,14 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaModelos .iaCheck input{margin-top:2px;width:15px;height:15px;accent-color:var(--doppler);cursor:pointer}
 #telaModelos .iaSalvarBarra{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   max-width:860px;padding:4px 0 10px}
+/* 31/08: os nomes de modelo da conta dele, clicáveis. Fonte mono porque são
+   identificadores — ler "gpt-5.5-mini" errado é o que deixa o programa sem IA. */
+#telaModelos .iaChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+#telaModelos .iaChip{font-family:var(--mono);font-size:11.5px;padding:4px 9px;
+  border:1px solid var(--line-2);border-radius:var(--r);background:var(--panel);
+  color:var(--ink-2);cursor:pointer}
+#telaModelos button.iaChip:hover{border-color:var(--doppler);color:var(--doppler)}
+#telaModelos .iaChip.fraco{color:var(--muted);cursor:default;opacity:.75}
 /* ---- O REVESTIMENTO DOS CONTROLES MOVIDOS (29/08/2026) ----
    Os blocos do painel antigo entram aqui com as classes de lá (.btn, .aviso, label, input).
    Aquele painel é escuro; esta tela é clara. Sem isto, botão preto sobre fundo branco e
@@ -1308,6 +1316,12 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
                 nome e tipo no ditado, a segunda leitura do laudo e os pedidos de ajuste.
                 Nenhuma delas manda foto — por isso pode ser um modelo barato.</p>
               <button class="iaMini" type="button" onclick="iaCfgUsarPrincipal()">deixar vazio (usar o principal)</button>
+              <!-- 31/08/2026, pergunta dele: "como e que eu sei quais sao os tipos de
+                   modelos que a minha conta oferece?". Escolher de cabeca e arriscado —
+                   um nome que nao existe deixa o programa sem IA no meio do atendimento.
+                   Aqui o proprio programa pergunta ao provedor. -->
+              <button class="iaMini" type="button" onclick="iaCfgListarModelos()">ver os modelos da minha conta</button>
+              <div class="iaState" id="iaListaModelos"></div>
             </div>
           </div>
           <div class="iaAlerta" id="iaAvisoCusto" style="display:none"></div>
@@ -11663,6 +11677,76 @@ function iaCfgPintarCusto(){
       +'leitura e os pedidos de ajuste pagam o preço do modelo que escreve o laudo. '
       +'Um modelo mais barato aqui costuma ser a maior economia desta tela.';
   }
+}
+/* ============ QUAIS MODELOS A CONTA DELE OFERECE (31/08/2026) ============
+   Pergunta dele. Antes a resposta morava fora do programa (a página do provedor), e
+   escolher de cabeça é o caminho curto para o programa ficar sem IA no meio do
+   atendimento: basta digitar um nome que não existe no campo do auxiliar.
+   A lista vem do AGENTE (rota /ia/modelos), que é quem tem a chave. Só nomes.
+
+   Os provedores devolvem CENTENAS de modelos (imagem, áudio, embeddings, versões
+   datadas). Despejar tudo seria tão inútil quanto não mostrar nada — então os
+   candidatos a AUXILIAR vêm primeiro e destacados: são os de conversa, e entre eles
+   os "mini"/"small"/"flash", que é o que se procura aqui. O resto fica embaixo,
+   recolhido. */
+function iaCfgModeloEhConversa(id){
+  var s=String(id||'');
+  if(/embedding|whisper|tts|audio|image|dall|moderation|realtime|transcribe|search|rerank/i.test(s)) return false;
+  return /gpt|chat|o[0-9]|claude|gemini|llama|mistral|deepseek|qwen|grok/i.test(s);
+}
+function iaCfgModeloEhBarato(id){ return /mini|small|flash|lite|nano|haiku|turbo/i.test(String(id||'')); }
+async function iaCfgListarModelos(){
+  var el=_iaEl('iaListaModelos'); if(!el) return;
+  el.textContent='consultando o provedor…';
+  var j;
+  try{
+    var r=await fetch(agenteBase()+'/ia/modelos', {cache:'no-store'});
+    j=await r.json();
+  }catch(e){
+    el.innerHTML='<b style="color:var(--flag)">Não consegui perguntar ao computador da clínica</b> '
+      +'(o agente está ligado?). Você também pode ver a lista na página do seu provedor.';
+    return;
+  }
+  if(!j || !j.ok){
+    el.innerHTML='<b style="color:var(--flag)">'+esc((j&&j.erro)||'não deu para listar')+'</b>';
+    return;
+  }
+  var todos=j.modelos||[];
+  if(!todos.length){ el.textContent='O provedor não devolveu nenhum modelo.'; return; }
+  var conversa=todos.filter(iaCfgModeloEhConversa);
+  var baratos=conversa.filter(iaCfgModeloEhBarato);
+  var outrosConversa=conversa.filter(function(m){ return !iaCfgModeloEhBarato(m); });
+  var resto=todos.filter(function(m){ return conversa.indexOf(m)<0; });
+  var chip=function(m){
+    return '<button class="iaChip" type="button" onclick="iaCfgEscolherAux(\''+esc(m)+'\')" '
+      +'title="usar &quot;'+esc(m)+'&quot; como modelo auxiliar">'+esc(m)+'</button>';
+  };
+  var h='<div style="margin-top:6px"><b>'+todos.length+' modelos na sua conta.</b> '
+    +'Toque num nome para usá-lo como <b>auxiliar</b>.</div>';
+  if(baratos.length){
+    h+='<div style="margin-top:8px"><span class="k" style="font-family:var(--mono);font-size:9.5px;'
+      +'letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Mais baratos (o que você procura)</span>'
+      +'<div class="iaChips">'+baratos.map(chip).join('')+'</div></div>';
+  }
+  if(outrosConversa.length){
+    h+='<div style="margin-top:8px"><span style="font-family:var(--mono);font-size:9.5px;'
+      +'letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Demais modelos de texto</span>'
+      +'<div class="iaChips">'+outrosConversa.map(chip).join('')+'</div></div>';
+  }
+  if(resto.length){
+    h+='<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">'
+      +'ver os outros '+resto.length+' (imagem, áudio, embeddings — não servem para o laudo)</summary>'
+      +'<div class="iaChips" style="margin-top:6px">'+resto.map(function(m){
+        return '<span class="iaChip fraco">'+esc(m)+'</span>'; }).join('')+'</div></details>';
+  }
+  el.innerHTML=h;
+}
+function iaCfgEscolherAux(m){
+  var a=_iaEl('iaNvAux'); if(a) a.value=m;
+  iaCfgMarcarSujo(); iaCfgPintarCusto();
+  var el=_iaEl('iaListaModelos');
+  if(el) el.innerHTML='<b>“'+esc(m)+'”</b> escolhido como auxiliar. '
+    +'Toque em <b>Salvar alterações</b> para valer.';
 }
 function iaCfgRender(){
   var b=_iaEl('cfgIaBase'), m=_iaEl('cfgModelo'), a=_iaEl('cfgModeloAux'), c=_iaEl('cfgConferente');

@@ -75,6 +75,7 @@ const SUITE = [
   { arq: 'teste-placa.py', o: 'reserva da placa: dois agentes nao carregam juntos', py: true },
   { arq: 'teste-volta-placa.py', o: 'volta automatica para a placa depois de cair para a CPU', py: true },
   { arq: 'teste-microfone-ocioso.py', o: 'microfone fecha sozinho quando ninguem esta atendendo', py: true },
+  { arq: 'teste-listar-modelos.py', o: 'listar os modelos da conta (a chave nao sai do agente)', py: true },
   { arq: 'teste-reiniciar.js', o: 'botao de reiniciar o agente (lado do app)' },
   { arq: 'teste-reiniciar.py', o: 'reiniciar o agente: recusa, espera e sucessor', py: true },
   { arq: 'teste-anterior.js', o: 'comparacao com o exame anterior (F2b)' },

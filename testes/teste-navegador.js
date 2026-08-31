@@ -1109,7 +1109,51 @@ const VERIFICACOES = `(async () => {
       molds.length === pgCaixa, molds.length + ' de ' + pgCaixa);
     exames = exames.filter(e => e.id !== 9914);
 
-    // ---- CONTADOR E ORDEM DA LISTA DE EXAMES (31/08, itens 2 e 3) ----
+    // ---- CONTADOR E ORDEM EM "EXAMES DE HOJE" (31/08, itens 2 e 3) ----
+    // ⚠️ ESTA e a tela que ele olha o dia inteiro (#telaDia). Na 1a tentativa os itens 2
+    // e 3 foram para a aba antiga "Exames identificados", que e OUTRA lista — ele mandou
+    // a foto da tela certa. As duas tem contador hoje; a que importa e esta.
+    const _exDia = exames.slice();
+    exames.length = 0;
+    const agora = Date.now();
+    [['Jose', 'prostata', true, true], ['Antonia', 'transvaginal', true, true],
+     ['Marinete', 'abdominal', true, false], ['RecemChegado', 'mama', false, false]]
+      .forEach(([nome, tipo, temLaudo, liberado], i) => {
+        exames.push({ id: 9600 + i, tipo, paciente: nome, imagens: [], audios: [], _dicom: true,
+          _quando: agora - (10 - i) * 60000,
+          laudo: temLaudo ? { corpo: 'x', conclusao: 'y' } : null, _liberado: liberado });
+      });
+    document.getElementById('telaDia').style.display = 'block';
+    diaRenderLista();
+    const naTelaDia = () => Array.prototype.map.call(
+      document.querySelectorAll('#diaLista .nm'), e => e.textContent.trim());
+    diz('em EXAMES DE HOJE, o mais novo fica no TOPO',
+      naTelaDia()[0] === 'RecemChegado', naTelaDia().join(' > '));
+    diz('e o mais antigo desce para o pe da lista',
+      naTelaDia()[naTelaDia().length - 1] === 'Jose');
+    // ⚠️ a ordem de CHEGADA nao pode virar: "Revisar laudos pendentes" pega o PRIMEIRO
+    // pendente, e tem de ser o mais ANTIGO — quem limpa fila comeca pelo comeco.
+    diz('a ordem de chegada continua intacta por baixo',
+      diaExamesDeHoje().map(x => x.paciente).join(',') === 'Jose,Antonia,Marinete,RecemChegado');
+    const pend = diaExamesDeHoje().filter(x => x.laudo && !x._liberado);
+    diz('e "Revisar pendentes" continua abrindo o mais ANTIGO que falta',
+      pend[0] && pend[0].paciente === 'Marinete', pend[0] ? pend[0].paciente : '(nenhum)');
+    const contDia = document.getElementById('diaConta').textContent;
+    diz('o contador conta os exames do dia', contDia.indexOf('4 exames') >= 0, contDia);
+    diz('e separa o que falta gerar do que falta assinar',
+      contDia.indexOf('1 sem laudo') >= 0 && contDia.indexOf('2 a assinar') >= 0, contDia);
+    exames.forEach(e => { e.laudo = e.laudo || { corpo: 'x' }; e._liberado = true; });
+    diaRenderLista();
+    diz('com tudo pronto, diz "todos assinados"',
+      document.getElementById('diaConta').textContent.indexOf('todos assinados') >= 0,
+      document.getElementById('diaConta').textContent);
+    exames.length = 0; diaRenderLista();
+    diz('dia sem exame nenhum nao mostra contador',
+      document.getElementById('diaConta').textContent === '');
+    document.getElementById('telaDia').style.display = 'none';
+    _exDia.forEach(e => exames.push(e));
+
+    // ---- CONTADOR E ORDEM DA LISTA ANTIGA "Exames identificados" (31/08) ----
     // Item 2: ele atende ~100 exames/dia e contava os cartoes na mao.
     // Item 3: o exame recem-chegado nascia no FIM da lista, fora da tela.
     const _examesAntes = exames.slice();

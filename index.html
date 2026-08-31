@@ -686,6 +686,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 #telaDia .ab-corpo{padding:24px 26px 26px}
 #telaDia .eb{font-size:11.5px;font-weight:700;color:#0E6E6B;letter-spacing:1.3px;margin:0 0 12px 4px}
 #telaDia .eb.dep{margin-top:32px}
+/* 31/08 (item 2): o contador ao lado de "EXAMES DE HOJE". Sem o caixa-alta e sem o
+   espacamento do rotulo — e informacao de apoio, nao um segundo titulo. */
+#telaDia .diaConta{font-weight:500;font-size:11.5px;color:#7d8c93;letter-spacing:.2px;
+  text-transform:none;margin-left:4px}
 #telaDia .agora{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:20px 24px}
 #telaDia .agora .l1{font-size:16px;font-weight:700;color:#1C2430}
 #telaDia .agora .l2{font-size:11.5px;color:#8A93A0;margin-top:8px;line-height:1.5}
@@ -733,7 +737,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
         <div class="l2" id="diaAgoraSub"></div>
       </div>
 
-      <div class="eb dep">EXAMES DE HOJE</div>
+      <!-- 31/08/2026 (item 2 do pedido dele) — o contador dos exames do dia mora AQUI,
+           que e a tela que ele olha o dia inteiro. Na 1a tentativa eu o coloquei na aba
+           antiga "Exames identificados", que e outra lista. -->
+      <div class="eb dep">EXAMES DE HOJE <span id="diaConta" class="diaConta"></span></div>
       <div id="diaLista"></div>
 
       <button class="pend" id="diaPend" onclick="diaRevisarPendentes()">Revisar laudos pendentes</button>
@@ -13690,15 +13697,41 @@ function diaExamesDeHoje(){
     return q ? (q>=hoje.getTime()) : true;
   }).sort(function(a,b){ return (a._quando||0)-(b._quando||0); });
 }
+/* 31/08/2026 (item 2) — O CONTADOR DOS EXAMES DE HOJE.
+   Ele atende perto de 100 num dia e a unica forma de saber quantos eram era contar os
+   cartoes. Os tres numeros respondem as perguntas do dia: quantos fiz, quanto falta
+   gerar, quanto falta assinar. */
+function diaAtualizarContador(lista){
+  var el=document.getElementById('diaConta'); if(!el) return;
+  var n=lista.length;
+  if(!n){ el.textContent=''; return; }
+  var semLaudo=lista.filter(function(x){ return !x.laudo; }).length;
+  var assinados=lista.filter(function(x){ return x._liberado; }).length;
+  var partes=[n+' exame'+(n===1?'':'s')];
+  if(semLaudo) partes.push(semLaudo+' sem laudo');
+  var falta=n-assinados;
+  if(falta) partes.push(falta+' a assinar');
+  else partes.push('todos assinados');
+  el.textContent='· '+partes.join(' · ');
+}
 function diaRenderLista(){
   var d=document.getElementById('diaLista'); if(!d) return;
   var lista=diaExamesDeHoje();
+  diaAtualizarContador(lista);
   var esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
   if(!lista.length){
     d.innerHTML='<div class="vazio">Nenhum exame ainda hoje. Quando o aparelho enviar as imagens, ele aparece aqui.</div>';
   }else{
     var bipar=false;
-    d.innerHTML=lista.map(function(x){
+    /* 31/08/2026 (item 3), pedido dele: "novos exames aparecem na parte de cima da lista
+       e os antigos vão sendo arrastados para baixo". O exame que acabou de chegar do
+       aparelho é o que ele vai mexer agora; no fim do dia ele nascia fora da tela.
+
+       ⚠️ INVERTE SÓ A EXIBIÇÃO. `diaExamesDeHoje` continua em ordem de chegada porque
+       "Revisar laudos pendentes" pega o PRIMEIRO da lista — invertendo na origem, ele
+       passaria a abrir o mais RECENTE em vez do mais antigo, que é a ordem errada para
+       quem está limpando a fila. */
+    d.innerHTML=lista.slice().reverse().map(function(x){
       var hora=x._quando?new Date(x._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
       var tipo=(MODELOS[x.tipo]&&MODELOS[x.tipo].nome)||x.tipo||'tipo ainda não identificado';
       /* 19/08/2026 — OS BOTÕES COEXISTEM, não se substituem (pedido do médico).

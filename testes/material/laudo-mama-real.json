@@ -1,0 +1,41 @@
+{
+ "corpo": "**MAMA DIREITA**\n**DESCRIÇÃO:**\n\nMama simétrica.\nPele e tecido celular subcutâneo sem alterações.\nMamilo e aréola sem alterações.\nParênquima mamário com ecogênicidade habituais de padrão heterogêneo, apresentando **formação cística simples, anecoica, de contornos regulares e reforço acústico posterior, localizada às 9 h, medindo 6,1 x 3,6 x 6,7 mm, já observada no exame anterior de 24/08/2026, sem crescimento relevante**.\nTecido retro-mamário sem dilatação ductal.\nRegião axilar livre.\n\n**MAMA ESQUERDA**\n**DESCRIÇÃO:**\n\nMama simétrica.\nPele e tecido celular subcutâneo sem alterações.\nMamilo e aréola sem alterações.\nParênquima mamário com ecogênicidade habituais de padrão heterogêneo, apresentando **imagem nodular sólida, de forma oval, orientação paralela à pele e margens circunscritas, localizada às 3 h, distando 5 cm da papila mamária, situada a 1,09 cm da pele, medindo 4,0 x 4,4 x 4,8 mm, já observada no exame anterior de 24/08/2026, sem crescimento relevante**.\nTecido retro-mamário sem dilatação ductal.\nRegião axilar livre.",
+ "_classifBruto": {
+  "birads": [
+   {
+    "localizacao": "mama direita, às 9 horas",
+    "tipo": "massa",
+    "forma": "",
+    "orientacao": "",
+    "margem": "",
+    "eco": "",
+    "posterior": "",
+    "halo": "",
+    "vasc": "",
+    "elasto": "",
+    "pseudocapsula": "",
+    "distribuicao": "",
+    "padrao": "",
+    "tamanho_cm": 0.67,
+    "caso_especial": "cistoSimples"
+   },
+   {
+    "localizacao": "mama esquerda, às 3 horas",
+    "tipo": "massa",
+    "forma": "",
+    "orientacao": "",
+    "margem": "",
+    "eco": "",
+    "posterior": "",
+    "halo": "",
+    "vasc": "",
+    "elasto": "",
+    "pseudocapsula": "",
+    "distribuicao": "",
+    "padrao": "",
+    "tamanho_cm": 0.48,
+    "caso_especial": ""
+   }
+  ]
+ }
+}

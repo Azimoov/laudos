@@ -107,6 +107,44 @@ regras, e é rápida.
 
 ---
 
+## 2b. Impressão automática em duas impressoras (24/08/2026) — PRECISA DAS SUAS IMPRESSORAS
+
+**Por que só você pode testar:** aqui não há impressora nenhuma. O mecanismo foi
+provado até o spooler do Windows (imprimindo para PDF, sem gastar papel), e a lista
+das suas duas impressoras — **Brother DCP-1610NW** e **EPSON L1250** — foi lida de
+verdade. O que falta é papel saindo delas.
+
+**Antes de testar:** Configurações → 🖨 Impressão → ligue *"Imprimir automaticamente
+ao liberar"*, ligue *"Usar duas impressoras"*, e escolha uma em cada campo.
+(Nasce tudo **desligado** — nada imprime sozinho até você ligar.)
+
+- [ ] **Sai nas duas ao mesmo tempo:** libere um laudo com fotos e confira que o
+      laudo saiu numa impressora e as fotos na outra, **sem nenhuma caixa de diálogo**.
+- [ ] **As fotos saem deitadas** (paisagem) e não minúsculas no meio da folha.
+- [ ] **Uma impressora só:** desmarque *"Usar duas impressoras"* e libere outro laudo —
+      tudo tem de sair na impressora do laudo.
+- [ ] **Marcar fotos:** na revisão, marque 2 das fotos e libere; só as 2 devem sair.
+      Sem marcar nenhuma, **saem todas** (diz isso na tela, acima das fotos).
+- [ ] **Laudo de 2 páginas:** libere um laudo longo e confira que **nenhuma linha de
+      texto foi cortada ao meio** entre as páginas. É o ponto mais frágil desta leva —
+      o corte recua sozinho até uma linha em branco, mas isso nunca saiu em papel.
+- [ ] **A moldura fecha em cada página** (26/08, noite): no laudo de 2 páginas, o
+      retângulo preto em volta do texto tem de aparecer **completo em cada página**
+      (quatro lados), nunca uma linha que segue aberta de uma página para a outra.
+- [ ] **Conclusão e observações finais juntas** (26/08, noite): a conclusão e os textos
+      finais ("Sugestão...", "Adotamos a normatização...") têm de sair **na mesma
+      página**, dentro do mesmo retângulo. Se o espaço apertar, só as observações
+      finais encolhem de letra — a conclusão nunca.
+- [ ] **Impressora desligada/sem papel:** o laudo tem de continuar **salvo e no
+      histórico**, com aviso na tela dizendo o que não imprimiu (laudo ou imagens).
+- [ ] **Desligado continua como sempre:** com *"Imprimir automaticamente"* desligado,
+      o botão 🖨 deve abrir a caixa do Windows, como sempre foi.
+
+> **Ainda não está na linha de produção (8977).** Foi instalado só na 2.0. Passar para
+> produção exige reiniciar o agente de produção — e isso só com a sala vazia.
+
+---
+
 ## 3. Painel de alertas (de quebra, aparece nos testes acima)
 
 - [ ] Na tela de revisão, no lugar da antiga faixa âmbar, deve haver uma fileira

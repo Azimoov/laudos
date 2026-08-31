@@ -981,15 +981,15 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
           <option>10</option><option>11</option><option selected>12</option><option>13</option><option>14</option><option>16</option>
         </select>
         <span class="sep"></span>
-        <button title="Negrito" onclick="fmtCmd('bold')"><b>N</b></button>
-        <button title="Itálico" onclick="fmtCmd('italic')"><i>I</i></button>
-        <button title="Sublinhado" onclick="fmtCmd('underline')"><u>S</u></button>
+        <button onmousedown="event.preventDefault()" title="Negrito" onclick="fmtCmd('bold')"><b>N</b></button>
+        <button onmousedown="event.preventDefault()" title="Itálico" onclick="fmtCmd('italic')"><i>I</i></button>
+        <button onmousedown="event.preventDefault()" title="Sublinhado" onclick="fmtCmd('underline')"><u>S</u></button>
         <span class="sep"></span>
-        <button title="Copiar formatação" onclick="rev2CopiarFmt()">🖌</button><span class="rot">copiar formatação</span>
-        <button title="Zerar formatação" onclick="fmtCmd('removeFormat')">🧽</button><span class="rot">zerar formatação</span>
+        <button onmousedown="event.preventDefault()" title="Copiar formatação" onclick="rev2CopiarFmt()">🖌</button><span class="rot">copiar formatação</span>
+        <button onmousedown="event.preventDefault()" title="Zerar formatação" onclick="fmtZerar()">🧽</button><span class="rot">zerar formatação</span>
         <span class="sep"></span>
-        <button title="Desfazer" onclick="fmtCmd('undo')">↶</button>
-        <button title="Refazer" onclick="fmtCmd('redo')">↷</button>
+        <button onmousedown="event.preventDefault()" title="Desfazer" onclick="fmtCmd('undo')">↶</button>
+        <button onmousedown="event.preventDefault()" title="Refazer" onclick="fmtCmd('redo')">↷</button>
       </div>
 
       <div class="duas">
@@ -2366,7 +2366,7 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
       <button onmousedown="event.preventDefault()" title="Alinhar à esquerda" onclick="fmtCmd('justifyLeft')">⬤≡</button>
       <button onmousedown="event.preventDefault()" title="Justificar" onclick="fmtCmd('justifyFull')">≡≡</button>
       <span class="fmtSep"></span>
-      <button onmousedown="event.preventDefault()" title="Limpar formatação da seleção" onclick="fmtCmd('removeFormat')" style="font-size:11px;color:#666">✕ fmt</button>
+      <button onmousedown="event.preventDefault()" title="Limpar formatação da seleção" onclick="fmtZerar()" style="font-size:11px;color:#666">✕ fmt</button>
     </div>
     <!-- painel de trabalho: aviso da IA + ferramentas (IA e áudio) lado a lado.
          Fica FORA do areaImpressao, então nada disso entra no PDF/impressão. -->
@@ -6344,6 +6344,30 @@ function fmtCmd(cmd){
     return;
   }
   document.execCommand(cmd);
+  try{ revMarcarEditado(); }catch(e){}
+}
+/* ZERAR FORMATAÇÃO — conserto de 31/08/2026.
+   O `removeFormat` do navegador NAO desmonta <b>/<i>/<u> de forma confiavel: medido
+   aqui, com o trecho em negrito selecionado, ele devolvia o texto exatamente do mesmo
+   jeito. Um botao que promete limpar e nao limpa e pior que botao nenhum.
+   Entao, depois dele, DESLIGAMOS EXPLICITAMENTE os tres formatos que o laudo carrega
+   (**negrito**, *italico* e __sublinhado__), perguntando o estado de cada um. O que o
+   laudo nao guarda (cor, familia de fonte) o removeFormat ja tirou. */
+function fmtZerar(){
+  var ed=fmtEditavelDaSelecao();
+  if(!ed){
+    fmtAvisar('Selecione o trecho que você quer limpar.');
+    return;
+  }
+  /* ⚠️ A ORDEM IMPORTA, e custou uma medicao para descobrir: o `removeFormat` DESFAZ A
+     SELECAO. Rodando ele primeiro, os comandos seguintes caiam no vazio — o
+     execCommand('bold') devolvia `false` e o negrito continuava exatamente onde estava.
+     Entao os tres formatos que o laudo carrega saem ANTES, com a selecao ainda de pe; o
+     removeFormat vem por ultimo, para o que sobrar (cor, fonte colada de fora). */
+  ['bold','italic','underline'].forEach(function(k){
+    try{ if(document.queryCommandState(k)) document.execCommand(k); }catch(e){}
+  });
+  try{ document.execCommand('removeFormat'); }catch(e){}
   try{ revMarcarEditado(); }catch(e){}
 }
 function ajustarFonte(delta){

@@ -71,6 +71,7 @@ const SUITE = [
   { arq: 'teste-tela-provedor-ia.js', o: 'tela nova do Provedor de IA (espelha os campos antigos, um salvar so)' },
   { arq: 'teste-telas-config.js', o: 'telas novas de Configuracoes (blocos movidos, nao copiados)' },
   { arq: 'teste-locais-editar.js', o: 'editar os locais de atendimento (a chave nao muda ao renomear)' },
+  { arq: 'teste-formatacao-liberacao.js', o: 'as DUAS barras de formatacao (foco preso, zerar que zera)' },
   { arq: 'teste-rede.py', o: 'queda da placa para a CPU, exercitada de verdade', py: true },
   { arq: 'teste-placa.py', o: 'reserva da placa: dois agentes nao carregam juntos', py: true },
   { arq: 'teste-volta-placa.py', o: 'volta automatica para a placa depois de cair para a CPU', py: true },

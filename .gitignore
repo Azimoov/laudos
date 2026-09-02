@@ -4,3 +4,9 @@ agente/dados/
 agente/__pycache__/
 __pycache__/
 *.db
+
+# banco de provas do recorte de audio: as FITAS DE PALAVRAS trazem o ditado do
+# paciente palavra por palavra. Os scripts entram no repo; o material, NUNCA.
+# O padrao ja aponta para fora (_banco-de-provas), isto e cinto e suspensorio.
+testes/banco-de-provas/fitas/
+testes/banco-de-provas/*.json

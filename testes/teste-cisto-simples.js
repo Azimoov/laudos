@@ -111,5 +111,35 @@ const r4 = proc([{ localizacao: 'mama direita', caso_especial: 'cistoSimples' }]
 ok(r4.obs.some(o => /por caso especial ditado/.test(o)),
    'caso especial ditado continua declarado como ditado');
 
+// ===================================================================================
+// 31/08/2026 — CISTO SIMPLES NAO LEVA DISTANCIA DA PAPILA
+// Pedido dele: "no exame de mama, quando o diagnostico for cisto simples, nao
+// precisamos de distancia para a papila mamaria; tire isso do template dessa
+// patologia especifica".
+// O dizer padrao ja tinha sido limpo em 24/08. O que SOBROU — e que esta suite passa a
+// travar — foi a regra dos cistos MULTIPLOS no pedido a IA, que mandava
+// "• as X h, a Y cm da papila, medindo...". O mesmo achado pedia a distancia quando
+// eram varios e nao pedia quando era um so: a contradicao morava em dois lugares
+// diferentes do MESMO pedido, e por isso ninguem a via.
+console.log('\n=== cisto simples: sem distancia da papila, um ou varios ===');
+const regraMult = (HTML.match(/CISTOS SIMPLES MÚLTIPLOS[^"]*/) || [''])[0];
+ok(regraMult.length > 80, 'achei a regra dos cistos multiplos');
+ok(/• às X h, medindo A x B x C cm;/.test(regraMult),
+   'o formato do bullet nao pede mais a distancia da papila');
+ok(!/a Y cm da papila/.test(regraMult), 'e a frase antiga sumiu de vez');
+ok(/BULLET POINTS/.test(regraMult), 'os bullets continuam (decisao de 26/08, nao foi desfeita)');
+ok(/CISTO SIMPLES NÃO LEVA DISTÂNCIA DA PAPILA/.test(HTML),
+   'e a regra e dita com todas as letras, nao so pela ausencia');
+ok(/nódulo, microcistos agrupados e massa sólido-cística continuam obrigados/.test(HTML),
+   'sem afrouxar os OUTROS achados, que continuam obrigados a informar a distancia');
+// o dizer padrao do cisto simples (limpo em 24/08) tem de continuar limpo
+const dadosJs = fs.readFileSync(path.join(__dirname, '..', 'dados.js'), 'utf8');
+const dizerCisto = (dadosJs.match(/Cisto simples:[\s\S]{0,400}?CONCLUS/) || [''])[0];
+ok(dizerCisto.length > 60, 'achei o dizer padrao do cisto simples');
+ok(!/papila/i.test(dizerCisto), 'e ele segue sem citar a papila');
+// e o vizinho que DEVE citar continua citando — a limpeza nao pode ter vazado
+const dizerMicro = (dadosJs.match(/Microcistos agrupados:[\s\S]{0,600}?CONCLUS/) || [''])[0];
+ok(/papila/i.test(dizerMicro), 'microcistos agrupados continuam pedindo a distancia');
+
 console.log(falhas ? ('\n' + falhas + ' FALHA(S)') : '\nTODOS OS TESTES PASSARAM');
 process.exit(falhas ? 1 : 0);

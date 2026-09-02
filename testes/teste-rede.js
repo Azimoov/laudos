@@ -160,12 +160,32 @@ console.log('=== o TERCEIRO caminho (/transcrever) tambem entrou na fila e ganho
 // Era o unico sem trava e sem rede: podia moer na placa de 4 GB ao mesmo tempo que um
 // exame ao vivo, e disputava self.model/self.device do motor — que virou estado
 // compartilhado mutavel quando a queda para a CPU foi criada.
+// 31/08/2026: a janela subiu de 3200 para 5200 caracteres. A rota cresceu ao voltar a
+// devolver a hora, e as linhas procuradas passaram do corte — dois testes reprovaram
+// codigo que estava CERTO. Janela curta demais mede tamanho de comentario, nao
+// comportamento.
+// (Tentei fechar o corte em 'def log_message' e o recorte saiu VAZIO: esse nome aparece
+//  ANTES, noutro atendedor do mesmo arquivo. Fica o corte aberto, com janela maior.)
 const rota = ag.slice(ag.indexOf('if rota != "/transcrever"'));
-ok(/with _transcr_lock:/.test(rota.slice(0, 3200)),
+ok(/with _transcr_lock:/.test(rota.slice(0, 5200)),
    'o ditado avulso entra na MESMA fila do exame ao vivo — nao disputa a placa nem o motor');
-ok(/cru, _ = transcrever_na_nuvem_bytes\(buf, boost\)/.test(rota.slice(0, 3200)),
-   'e tem a mesma rede: motor local falhou, vai para a nuvem (a hora aqui nao serve)');
-ok(/sincronizar_rotulo\(\)/.test(rota.slice(0, 3200)), 'e acerta o rotulo do motor depois');
+ok(/cru, _ = transcrever_na_nuvem_bytes\(buf, boost\)/.test(rota.slice(0, 5200)),
+   'e tem a mesma rede: motor local falhou, vai para a nuvem');
+ok(/sincronizar_rotulo\(\)/.test(rota.slice(0, 5200)), 'e acerta o rotulo do motor depois');
+// 31/08/2026 — A HORA VOLTOU A SER DEVOLVIDA POR ESTA ROTA.
+// Ela nasceu para a frase CURTA de comando, onde hora nao serve para nada. So que o app
+// usa a MESMA rota para o DITADO INTEIRO DO EXAME na esteira de arquivos ("exames
+// antigos", "arquivos acumulados", ditado gravado no navegador) — e ali a hora e tudo:
+// e ela que da o botao VOZ e o audio editado por patologia. Medido em 31/08: um laudo
+// feito por esse caminho saiu sem UM UNICO botao VOZ, com o audio inteiro tocando ao
+// lado normalmente.
+ok(/trechos = ASR\.transcribe_segments\(io\.BytesIO\(buf\), boost_terms=boost\)/.test(rota),
+   'o ditado do exame vem COM hora (transcribe_segments)');
+ok(/if rapido:/.test(rota) && /rapido=True\)/.test(rota),
+   'e a frase CURTA de comando segue sem hora — nao paga o que nao usa');
+ok(/"trechos": trechos\}\)/.test(rota), 'e a resposta leva os trechos ao app');
+ok(/motor local falhou no ditado avulso/.test(rota) && /trechos = \[\]/.test(rota),
+   'quando a nuvem entra, os trechos voltam a ficar vazios (ela nao marca hora)');
 
 console.log('=== instalacao desencontrada NAO pode virar nuvem calada ===');
 // Foi o defeito mais grave apontado na 1a avaliacao desta tarefa: com um except largo,

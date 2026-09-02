@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wbot-static",
+      "runtimeExecutable": "C:\\Users\\serru\\Desktop\\Projeto WBOT\\ditado-local\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8791", "-d", "C:\\Users\\serru\\Desktop\\Projeto WBOT\\_repo-2.0"],
+      "port": 8791
+    }
+  ]
+}

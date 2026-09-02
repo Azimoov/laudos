@@ -1774,6 +1774,20 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
       </div>
       <button class="ab-mod-ia" onclick="exIaAbrir()">✨ Criar máscara com IA</button>
 
+      <!-- Cada timbrado guarda suas areas livres: uma regra para tela, PDF e impressora. -->
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid #dbe2e8">
+        <b style="font-size:13px">Área livre para o laudo</b>
+        <p class="ab-mod-op" style="margin:4px 0 8px">Meça até onde terminam o cabeçalho e o rodapé do timbrado. O texto nunca entra nessas faixas.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <label class="ab-mod-l" style="margin:0;flex:1;min-width:180px">Acima do laudo (mm)
+            <input id="exCadTopo" class="ab-mod-i" type="number" min="15" max="80" step="1" value="50">
+          </label>
+          <label class="ab-mod-l" style="margin:0;flex:1;min-width:180px">Abaixo do laudo (mm)
+            <input id="exCadBase" class="ab-mod-i" type="number" min="15" max="80" step="1" value="35">
+          </label>
+        </div>
+      </div>
+
       <img id="exCadPrev" alt="" class="ab-mod-prev">
       <p id="exCadAviso" class="ab-mod-av"></p>
 
@@ -13187,6 +13201,14 @@ function abAtualizarTudo(){
    demais o médico cadastra em "Outro…", e ficam guardados no computador
    (chave 'glocais'), não só neste navegador. */
 var EX_LOCAIS=[{k:'labita',rot:'Tailândia'},{k:'capanema',rot:'Capanema'}];
+/* Novos timbrados começam com area livre conservadora; os campos aparecem no cadastro. */
+var EX_MARGENS_NOVO_LOCAL={topo:50,base:35};
+function exMargemValida(v,padrao){
+  v=parseFloat(v);
+  return isFinite(v) && v>=15 && v<=80 ? v : padrao;
+}
+/* A mascara AME/Tailandia termina o cabecalho na faixa turquesa e tem rodape alto. */
+if(FUNDOS.labita){ FUNDOS.labita.padTopMm=50; FUNDOS.labita.padBottomMm=48; }
 function exLocaisExtra(){
   try{ var v=JSON.parse(localStorage.getItem('glocais')||'[]'); return Array.isArray(v)?v:[]; }
   catch(e){ return []; }
@@ -13200,11 +13222,11 @@ function exAplicarLocaisExtra(){
        nome e imagem: um local cadastrado (ou um embutido de mesma chave) ficava sem
        padTopMm/padBottomMm e caía no padrão — e margem menor que o cabeçalho é texto por
        cima do logo. O que o cadastro não disser, herda-se do que já existia; faltando os
-       dois, valem os 34/24 dos timbrados da casa. */
+       dois, valem os valores conservadores do cadastro novo. */
     var _ant=FUNDOS[l.k]||{};
     FUNDOS[l.k]={nome:l.nome||l.k, img:l.img||null,
-                 padTopMm:(l.padTopMm||_ant.padTopMm||34),
-                 padBottomMm:(l.padBottomMm||_ant.padBottomMm||24)};
+                 padTopMm:exMargemValida(l.padTopMm,_ant.padTopMm||EX_MARGENS_NOVO_LOCAL.topo),
+                 padBottomMm:exMargemValida(l.padBottomMm,_ant.padBottomMm||EX_MARGENS_NOVO_LOCAL.base)};
   });
 }
 /* 31/08/2026 (item 8): um local cadastrado com a MESMA CHAVE de um embutido SUBSTITUI o
@@ -13269,6 +13291,7 @@ function exEditarLocal(k){
      já vem no programa (FUNDOS). Mostrar a atual é o que permite trocar SÓ o nome sem
      perder o papel timbrado. */
   var img=salvo.img || ((FUNDOS[k]||{}).img) || null;
+  var fnd=FUNDOS[k]||{};
   _exCadEditando=k;
   document.getElementById('exCadNome').value=l.rot||'';
   document.getElementById('exCadArq').value='';
@@ -13276,6 +13299,8 @@ function exEditarLocal(k){
   var prev=document.getElementById('exCadPrev');
   if(img){ prev.setAttribute('src', img); prev.style.display='block'; }
   else { prev.style.display='none'; prev.removeAttribute('src'); }
+  document.getElementById('exCadTopo').value=exMargemValida(salvo.padTopMm,fnd.padTopMm||EX_MARGENS_NOVO_LOCAL.topo);
+  document.getElementById('exCadBase').value=exMargemValida(salvo.padBottomMm,fnd.padBottomMm||EX_MARGENS_NOVO_LOCAL.base);
   document.getElementById('exCadAviso').textContent='';
   var tit=ov.querySelector('.ab-mod-t'); if(tit) tit.textContent='Editar local de atendimento';
   ov.classList.add('aberto');
@@ -13291,6 +13316,8 @@ function exNovoLocal(){
   document.getElementById('exCadArqNome').textContent='nenhum arquivo escolhido';
   document.getElementById('exCadPrev').style.display='none';
   document.getElementById('exCadPrev').removeAttribute('src');
+  document.getElementById('exCadTopo').value=EX_MARGENS_NOVO_LOCAL.topo;
+  document.getElementById('exCadBase').value=EX_MARGENS_NOVO_LOCAL.base;
   document.getElementById('exCadAviso').textContent='';
   ov.classList.add('aberto');
   document.getElementById('exCadNome').focus();
@@ -13449,8 +13476,10 @@ function exCadSalvar(){
   }
   var prev=document.getElementById('exCadPrev');
   var img=(prev&&prev.style.display!=='none'&&prev.getAttribute('src'))||null;
+  var topo=exMargemValida(document.getElementById('exCadTopo').value,EX_MARGENS_NOVO_LOCAL.topo);
+  var base=exMargemValida(document.getElementById('exCadBase').value,EX_MARGENS_NOVO_LOCAL.base);
   var lista=exLocaisExtra().filter(function(l){ return l.k!==k; });
-  lista.push({k:k, nome:nome, img:img});
+  lista.push({k:k, nome:nome, img:img, padTopMm:topo, padBottomMm:base});
   try{ dadoSalvar('glocais', JSON.stringify(lista)); }
   catch(e){ av.textContent='Não consegui guardar: '+((e&&e.message)||e); return; }
   exAplicarLocaisExtra();

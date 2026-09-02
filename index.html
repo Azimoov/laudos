@@ -13425,8 +13425,19 @@ function exMargemValida(v,padrao){
   v=parseFloat(v);
   return isFinite(v) && v>=15 && v<=80 ? v : padrao;
 }
-/* A mascara AME/Tailandia termina o cabecalho na faixa turquesa e tem rodape alto. */
-if(FUNDOS.labita){ FUNDOS.labita.padTopMm=50; FUNDOS.labita.padBottomMm=48; }
+/* 02/09/2026 — DE VOLTA A 34/24, MEDIDO NA PRÓPRIA IMAGEM DA MÁSCARA.
+   O commit 998d5e3 subiu esta reserva para 50/48 com a justificativa de que "a máscara
+   AME/Tailandia termina o cabecalho na faixa turquesa e tem rodape alto". A imagem do
+   Labita não tem faixa turquesa: o cabeçalho é azul-escuro e termina em 30,3 mm, e o
+   rodapé começa em 274,8 mm (precisa de 22,2 mm). Medido pixel a pixel na imagem em
+   fundos.js, e conferido a olho. 34/24 cobre os dois com folga.
+   O QUE 50/48 CUSTAVA: 40 mm a menos de área útil por folha — 17% da página. Laudos que
+   cabiam em duas folhas passavam a gastar três, e nove verificações do teste-navegador
+   caíam por isso (contagem de folhas e a escada de compactação).
+   O timbrado novo, de cabeçalho alto, é outro: ele entra pelo CADASTRO de locais, que
+   998d5e3 criou junto e que fica (área livre por local, padrão 50/35). Essa parte é boa e
+   permanece — o engano foi aplicar o número do timbrado novo à máscara antiga. */
+if(FUNDOS.labita){ FUNDOS.labita.padTopMm=34; FUNDOS.labita.padBottomMm=24; }
 function exLocaisExtra(){
   try{ var v=JSON.parse(localStorage.getItem('glocais')||'[]'); return Array.isArray(v)?v:[]; }
   catch(e){ return []; }

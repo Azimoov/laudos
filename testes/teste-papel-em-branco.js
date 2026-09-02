@@ -300,6 +300,51 @@ const MEDIR = `(() => {
       ok(Math.abs(s2.moldura - s2.caixa) < 2,
          'e ela acompanha a caixa do corpo, sem sobrar  [caixa em ' + s2.caixa + 'mm]');
     }
+
+    console.log('\n=== timbrado que come muita pagina: a assinatura NAO pula sozinha ===');
+    // 02/09/2026, relatado por ele. A caixa do corpo tem altura minima de 620px (164mm),
+    // para a folha BRANCA nao parecer um bilhete. Com um timbrado que reserva 50mm em cima
+    // e 35 embaixo sobram 212mm, e a conta estoura: 22 (cabecalho) + 164 (a altura minima)
+    // + 24 (assinatura com a rubrica dele) + 12 (rodape legal) = 222mm. A assinatura descia
+    // para uma folha nova com a primeira visivelmente vazia. Com timbrado quem da corpo a
+    // folha e o proprio timbrado — a altura minima sai, e os 164mm voltam para o conteudo.
+    await cdp.enviar('Emulation.setEmulatedMedia', { media: 'screen' });
+    const ap = await naPagina(cdp, `(() => {
+      // um timbrado exigente, como o do medico: 50mm em cima, 35 embaixo
+      FUNDOS.__teste_reserva_grande = { nome:'Teste', padTopMm:50, padBottomMm:35,
+        img:'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="210" height="297"><rect width="210" height="297" fill="#fff"/></svg>') };
+      const linhas=[]; for(let i=0;i<10;i++) linhas.push('<p>Linha '+i+' de um laudo curto.</p>');
+      document.getElementById('telaRevisao').style.display='block';
+      document.getElementById('areaImpressao').innerHTML =
+        '<div class="laudoFolha" data-fundo="__teste_reserva_grande">' +
+        '<div class="laudoCabBox"><b>Nome do Paciente:</b> Teste<br>Idade: 48 anos<br>Realizado em: 02/09/2026<br>Dados Clinicos:</div>' +
+        '<div class="laudoCorpoBox"><div class="laudoTitulo">RELATORIO</div><div class="laudoTexto">'+linhas.join('')+'</div></div>' +
+        // a rubrica escaneada dele tem 62px de altura — e foi ela que estourou a conta
+        '<div class="assin"><div style="height:62px"></div><span class="linha">Dr. Daniel Serruya<br>Crm-Pa - 9962</span></div>' +
+        '<div class="rodapeLaudo">Esclarecemos que a impressao diagnostica em exames de imagem nao e absoluta.</div>' +
+        '</div>';
+      window.__fundo='__teste_reserva_grande'; window.__fundoPerguntado=true;
+      aplicarFundoNaFolha();
+      try { paginarLaudoTela(); } catch(e) { return { erro: e.message }; }
+      const folha=document.querySelector('#areaImpressao .laudoFolha');
+      const fr=folha.getBoundingClientRect();
+      const pxmm=folha.clientWidth/210;
+      const as=folha.querySelector('.assin').getBoundingClientRect();
+      const cx=folha.querySelector('.laudoCorpoBox');
+      return { paginas: +(fr.height/pxmm/297).toFixed(2),
+               paginaDaAssinatura: Math.floor(((as.top-fr.top)/pxmm)/297)+1,
+               minHeightDaCaixa: getComputedStyle(cx).minHeight };
+    })()`);
+    if (ap.erro) { ok(false, 'nao consegui montar o caso: ' + ap.erro); }
+    else {
+      ok(ap.paginaDaAssinatura === 1,
+         'a assinatura fica na primeira folha  [pagina ' + ap.paginaDaAssinatura + ']');
+      ok(ap.paginas <= 1.05,
+         'e o laudo curto nao gasta uma folha a mais  [' + ap.paginas + ' folha(s)]');
+      ok(ap.minHeightDaCaixa === '0px',
+         'com timbrado a caixa perde a altura minima — quem da corpo a folha e o timbrado  ['
+         + ap.minHeightDaCaixa + ']');
+    }
   } catch (e) {
     ok(false, 'nao consegui rodar no navegador: ' + e.message);
   } finally {

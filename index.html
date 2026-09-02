@@ -256,6 +256,20 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 .laudoCab>div{flex:1;}
 .laudoCab b{font-weight:700;}
 .laudoCorpoBox{border:1.5px solid #000;margin-top:14px;padding:12px 14px;min-height:620px;}
+/* ===== 02/09/2026 — COM TIMBRADO, A ALTURA MÍNIMA DA CAIXA EMPURRAVA A ASSINATURA =====
+   Os 620px (164 mm) acima existem para a folha BRANCA não parecer um bilhete: sem eles, um
+   laudo curto sairia com um retângulo pequeno no alto de uma página vazia.
+   Com timbrado, esse mesmo número vira um problema. A máscara AME-Tailândia do médico
+   reserva 50 mm em cima e 35 embaixo — sobram 212 mm de página. Somando o cabeçalho do
+   laudo (22), a caixa com a altura mínima (164), a assinatura com a rubrica dele (24) e o
+   rodapé legal (12), dá 222 mm: estoura em 10 mm, e a assinatura desce para uma folha nova
+   com a primeira visivelmente vazia. Foi o que ele relatou em 02/09/2026.
+   Com timbrado quem dá corpo à folha é o PRÓPRIO timbrado — a altura mínima não tem mais
+   papel ali, e sair dela devolve os 164 mm ao conteúdo.
+   Vale nas DUAS mídias, de propósito: foi justamente uma altura diferente na tela e no
+   papel que fez a moldura de cada folha engolir a assinatura (ver o comentário do
+   @media print). Medir numa régua e desenhar noutra é o defeito que não pode voltar. */
+.laudoFolha.comFundo .laudoCorpoBox{min-height:0;}
 .laudoTitulo{text-align:center;font-weight:600;margin:2px 0 12px;font-size:14px;}
 .laudoTexto{white-space:pre-wrap;text-align:justify;outline:none;}
 .laudoTexto:focus{background:#fffbe8;}

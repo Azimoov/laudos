@@ -2548,7 +2548,51 @@ let audios = [];   // {idx, file, nome, transcricao, nomePaciente, tipoExame, ex
 
 /* MODELOS personalizados (editor em Configurações): guarda o padrão e aplica o override salvo, mutando MODELOS no lugar (é const, mas o objeto é mutável) */
 const MODELOS_PADRAO = JSON.parse(JSON.stringify(MODELOS));
-(function(){ try{ var s=localStorage.getItem('gmodelos'); if(s){ var o=JSON.parse(s); if(o&&typeof o==='object'&&Object.keys(o).length){ Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, o); } } }catch(e){} })();
+/* ===== 02/09/2026 — A LISTA SALVA DEIXAVA OS MODELOS NOVOS INVISÍVEIS =====
+   O que acontecia: ao personalizar modelos, o programa guardava a lista INTEIRA daquele
+   momento e, dali em diante, APAGAVA todos os modelos do código para usar só a salva.
+   Todo modelo acrescentado ao dados.js depois disso nascia invisível — existia, estava
+   testado, e simplesmente não chegava à tela.
+
+   Medido em 02/09/2026 no agente do Dr. Daniel: 25 modelos salvos, 26 no código, e DOIS
+   que ele nunca viu — `doppler_arterial_mmii` e `axila`. Ele pediu para "criarmos" o
+   modelo de Doppler arterial que já existia pronto havia dias.
+
+   Agora MESCLA em vez de substituir: parte dos modelos do código e aplica os
+   personalizados por cima. O que ele editou continua como ele deixou, o que ele criou
+   continua existindo, e o que o programa ganhar de novo aparece.
+
+   E o caso difícil, que exige a `base`: um modelo do código que NÃO está na lista salva
+   pode ser duas coisas muito diferentes — um que ele APAGOU de propósito, ou um que
+   ainda NÃO EXISTIA quando ele salvou. Sem saber distinguir, ou se ressuscita o apagado
+   ou se esconde o novo. Por isso, ao salvar, guarda-se junto a lista de chaves que o
+   programa tinha naquele momento (`gmodelos__base`): o que estava lá e não foi salvo foi
+   apagado de propósito; o que não estava é novo. Listas salvas ANTES desta mudança não
+   têm base — nesse caso vale "o novo aparece", que é o erro mais barato dos dois. */
+function modelosMesclarSalvos(salvos){
+  /* Parte SEMPRE do padrão do código. A sincronização com o agente chama esta função uma
+     SEGUNDA vez, depois de baixar a lista de lá; sem voltar ao padrão antes, a segunda
+     passada mesclaria em cima do resultado da primeira e um modelo apagado de propósito
+     ressuscitaria. Assim a função dá o mesmo resultado quantas vezes rodar. */
+  Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; });
+  Object.assign(MODELOS, JSON.parse(JSON.stringify(MODELOS_PADRAO)));
+  if(!salvos || typeof salvos!=='object' || !Object.keys(salvos).length) return;
+  var base=null;
+  try{ var b=localStorage.getItem('gmodelos__base'); if(b) base=JSON.parse(b); }catch(e){}
+  if(!Array.isArray(base)) base=null;
+  Object.keys(MODELOS).forEach(function(k){
+    if(salvos[k]!==undefined) return;                  // personalizado: o de cima assume
+    if(base && base.indexOf(k)>=0) delete MODELOS[k];  // estava na base e sumiu: apagado de propósito
+    // sem base, ou chave que a lista nunca conheceu: é modelo NOVO do programa — fica
+  });
+  Object.assign(MODELOS, salvos);
+}
+/* A foto das chaves que o PROGRAMA tem agora, guardada junto com a lista personalizada.
+   É ela que, na próxima abertura, separa "apagado de propósito" de "ainda não existia". */
+function modelosMarcarBase(){
+  try{ dadoSalvar('gmodelos__base', JSON.stringify(Object.keys(MODELOS_PADRAO))); }catch(e){}
+}
+(function(){ try{ var s=localStorage.getItem('gmodelos'); if(s) modelosMesclarSalvos(JSON.parse(s)); }catch(e){} })();
 
 /* 31/08/2026 — O PREENCHIMENTO SAIU DE DENTRO DO alternarConfig.
    Motivo (medido no navegador): o localStorage NASCE VAZIO a cada abertura do programa,
@@ -2985,7 +3029,11 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
 // 'glocais' (2.0): locais de atendimento cadastrados pelo médico, com o papel
 // timbrado de cada um. Entra aqui para viver no computador e não só no
 // navegador — trocar de navegador não pode custar o timbrado da clínica.
-const DADOS_SINCRONIZADOS = ['gmodelos','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais','gpaciente'];
+/* 'gmodelos__base' (02/09/2026) viaja JUNTO com 'gmodelos', e tem de viajar: é ela que
+   distingue "modelo apagado de propósito" de "modelo que ainda não existia" (ver
+   modelosMesclarSalvos). Guardada só no navegador ela sumiria na próxima abertura — a
+   porta é sorteada e aquela memória é por endereço — e o programa voltaria a adivinhar. */
+const DADOS_SINCRONIZADOS = ['gmodelos','gmodelos__base','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais','gpaciente'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -6197,6 +6245,7 @@ function salvarModelos(){
   });
   if(!Object.keys(novo).length){ log('Nenhum modelo para salvar.', true); return; }
   try{ dadoSalvar('gmodelos', JSON.stringify(novo)); }catch(e){ log('Não consegui salvar os modelos (armazenamento cheio?): '+e.message, true); return; }
+  modelosMarcarBase();   // guarda o que o PROGRAMA tinha agora — ver modelosMesclarSalvos
   Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, novo);
   var st=document.getElementById('modelosStatus'); if(st) st.textContent='✔ personalizados salvos';
   log('Modelos salvos — '+Object.keys(novo).length+' modelo(s) ativos.');
@@ -6204,7 +6253,9 @@ function salvarModelos(){
 }
 function restaurarModelos(){
   if(!confirm('Restaurar os modelos originais do código? Suas edições e adições serão apagadas.')) return;
-  try{ localStorage.removeItem('gmodelos'); }catch(e){}
+  /* a base sai JUNTO: sem lista personalizada ela não significa nada, e deixada para trás
+     passaria a esconder modelos novos de uma lista que nem existe mais. */
+  try{ localStorage.removeItem('gmodelos'); dadoSalvar('gmodelos__base',''); localStorage.removeItem('gmodelos__base'); }catch(e){}
   Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, JSON.parse(JSON.stringify(MODELOS_PADRAO)));
   var cont=document.getElementById('modelosEditor'); if(cont){ cont.__aberto=false; abrirEditorModelos(); }
   var st=document.getElementById('modelosStatus'); if(st) st.textContent='';
@@ -12459,6 +12510,7 @@ function modCfgSalvarModelo(){
   todos[chave]=m;
   try{ dadoSalvar('gmodelos', JSON.stringify(todos)); }
   catch(e){ log('Não consegui salvar o modelo (armazenamento cheio?): '+e.message, true); return; }
+  modelosMarcarBase();   // ver modelosMesclarSalvos
   MODELOS[chave]=m;
   var st=document.getElementById('modelosStatus'); if(st) st.textContent='✔ personalizados salvos';
   modCfgRender();
@@ -12478,6 +12530,7 @@ function modCfgRestaurarModelo(){
   todos[chave]=JSON.parse(JSON.stringify(padrao));
   try{ dadoSalvar('gmodelos', JSON.stringify(todos)); }
   catch(e){ log('Não consegui salvar (armazenamento cheio?): '+e.message, true); return; }
+  modelosMarcarBase();   // ver modelosMesclarSalvos
   MODELOS[chave]=todos[chave];
   modCfgRender();
   modCfgAbrirModelo(chave, true);
@@ -16828,8 +16881,11 @@ window.addEventListener('DOMContentLoaded', async function(){
     cfg.modelo=localStorage.getItem('gmodelo')||cfg.modelo;
     cfg.modeloAux=localStorage.getItem('gmodaux')||cfg.modeloAux;
     cfg.assinatura=localStorage.getItem('gass')||cfg.assinatura;
-    try{ var s=localStorage.getItem('gmodelos'); if(s){ var o=JSON.parse(s);
-      if(o&&typeof o==='object'&&Object.keys(o).length){ Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS,o); } } }catch(e){}
+    /* 02/09/2026: MESCLA, não substitui — ver modelosMesclarSalvos. Este é o segundo
+       ponto onde a lista salva era aplicada (depois de baixar do agente), e ele precisa
+       seguir a mesma regra do primeiro: dois lugares com regras diferentes dariam telas
+       diferentes conforme o agente estivesse no ar ou não. */
+    try{ var s=localStorage.getItem('gmodelos'); if(s) modelosMesclarSalvos(JSON.parse(s)); }catch(e){}
     try{ mostrarAssPrev(); }catch(e){}
     /* 31/08/2026 — ESTA LINHA E O CONSERTO. Ate aqui `cfg` acabou de ser corrigido com o
        que veio do computador; os campos da tela ainda mostram os padroes do codigo,

@@ -536,7 +536,8 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
      folha. O navegador só fatia a cada 297 mm. O que a tela mostra é o que sai. */
   body{margin:0!important;}
   .laudoFolha{border:0;max-width:none;}
-  .laudoCorpoBox{min-height:0;}
+  /* Mantém a mesma altura da tela: a moldura é medida nela. Encolher só no papel
+     faria o retângulo alcançar a assinatura e o aviso legal, que ficam fora do corpo. */
   .laudoTexto:focus{background:none;}
   /* folha SEM timbrado: o esquema antigo, com margens de página simples */
   .laudoFolha:not(.comFundo){padding:6mm 10mm;}

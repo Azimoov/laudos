@@ -13270,7 +13270,9 @@ async function abConferirMicrofone(){
       abBola('abMicBola','ruim');
       abTxt('abMicTxt','Nenhum microfone encontrado'+(j&&j.erro?' ('+j.erro+')':'')+'.');
     }
-  }catch(e){ abBola('abMicBola','ruim'); abTxt('abMicTxt','Não consegui falar com o agente.'); }
+  }catch(e){ abBola('abMicBola','ruim');
+             abTxt('abMicTxt','Não consegui falar com o agente — tentando de novo…');
+             abVigiarAgente(); }   // some sozinho quando o agente subir
 }
 
 /* Abre o microfone por 5 segundos, mostra a barra mexer e FECHA. O microfone
@@ -13426,8 +13428,9 @@ async function abConferirAparelho(){
       }
     }
   }catch(e){
-    abBola('abOrtBola','ruim'); abTxt('abOrtTxt','Não consegui falar com o agente.');
+    abBola('abOrtBola','ruim'); abTxt('abOrtTxt','Não consegui falar com o agente — tentando de novo…');
     abBola('abRelBola',''); abTxt('abRelTxt','Relógio do aparelho: sem como conferir agora.');
+    abVigiarAgente();   // some sozinho quando o agente subir
   }
 }
 
@@ -13443,7 +13446,9 @@ async function abCarregarTranscricao(){
       abBola('abAsrBola','ruim');
       abTxt('abAsrTxt','Transcrição indisponível'+(j&&j.erro?(': '+j.erro):'')+'.');
     }
-  }catch(e){ abBola('abAsrBola','ruim'); abTxt('abAsrTxt','Não consegui carregar a transcrição.'); }
+  }catch(e){ abBola('abAsrBola','ruim');
+             abTxt('abAsrTxt','Não consegui carregar a transcrição — tentando de novo…');
+             abVigiarAgente(); }   // some sozinho quando o agente subir
 }
 
 async function abContarPendentes(){
@@ -13471,6 +13476,45 @@ async function abContarPendentes(){
   }catch(e){}
 }
 
+/* ===== 02/09/2026 — AS CONFERÊNCIAS SE REFAZEM SOZINHAS QUANDO O AGENTE VOLTA =====
+   O que ele viu: abriu o programa às 16:31 e a tela de abertura disse que não conseguia
+   falar com o agente. O agente subiu às 16:36 — mas a tela continuou vermelha, porque as
+   três conferências (microfone, aparelho, transcrição) rodavam UMA VEZ SÓ, na abertura.
+   Do lado dele isso é indistinguível de "o agente não liga": a tela afirma, no presente,
+   uma coisa que só era verdade cinco minutos atrás.
+
+   POR QUE O AGENTE DEMOROU: o lançador espera 40 s por ele antes de abrir a janela (ver
+   esperar_agente, em laudos.py) e desiste depois disso. O agente daquele momento estava
+   ocupado carregando o modelo grande NO PROCESSADOR — a placa estava tomada pela linha
+   estável — e não respondeu a tempo. Carregar large-v3 na CPU leva minutos.
+
+   Agora, quando uma conferência não alcança o agente, fica um vigia batendo de 4 em 4
+   segundos; assim que ele responde, as conferências se refazem e a tela se corrige
+   sozinha. O vigia morre quando o agente volta ou quando a tela de abertura sai da
+   frente — nada de temporizador rodando para sempre atrás de uma tela que ninguém vê. */
+var _abVigiaAgente=null;
+async function abAgenteResponde(){
+  try{
+    var c=new AbortController(); var t=setTimeout(function(){ c.abort(); }, 2500);
+    var r=await fetch(agenteBase()+'/health',{signal:c.signal, cache:'no-store'});
+    clearTimeout(t);
+    return !!(r && r.ok);
+  }catch(e){ return false; }
+}
+function abVigiarAgente(){
+  if(_abVigiaAgente) return;                 // um vigia só, mesmo com três conferências falhando
+  _abVigiaAgente=setInterval(async function(){
+    var tela=document.getElementById('telaAbertura');
+    var visivel=false;
+    try{ visivel=!!(tela && getComputedStyle(tela).display!=='none'); }catch(e){}
+    if(!visivel){ clearInterval(_abVigiaAgente); _abVigiaAgente=null; return; }
+    if(await abAgenteResponde()){
+      clearInterval(_abVigiaAgente); _abVigiaAgente=null;
+      log('O agente respondeu — refazendo as conferências da tela de abertura.');
+      abAtualizarTudo();
+    }
+  }, 4000);
+}
 function abAtualizarTudo(){
   var d=document.getElementById('abData');
   if(d) d.textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});

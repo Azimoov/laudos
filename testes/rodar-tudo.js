@@ -44,6 +44,7 @@ const SUITE = [
   { arq: 'teste-impressao-verhist.js', o: 'plaquinha verHist presa: imprimir devolvia folhas em branco' },
   { arq: 'teste-papel-em-branco.js', o: 'o laudo chega ao papel (medido em midia de impressao, num Chrome)' },
   { arq: 'teste-modelos-mesclados.js', o: 'modelo novo do programa nao nasce invisivel para quem personalizou' },
+  { arq: 'teste-abertura-vigia-agente.js', o: 'tela de abertura se corrige sozinha quando o agente volta' },
   { arq: 'teste-fundo-modal.js', o: 'modal "Fundo dos laudos" nao empilha (travava o gerar)' },
   { arq: 'teste-sem-probabilidade.js', o: 'BI-RADS: probabilidade de malignidade fora do laudo' },
   { arq: 'teste-sem-auditoria-cbr.js', o: 'AUDITORIA-CBR nao volta como fonte oficial' },

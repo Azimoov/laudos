@@ -79,7 +79,11 @@ ok("iaCfgModeloEhConversa" in APP and "iaCfgModeloEhBarato" in APP,
 # os de imagem/audio/embedding nao podem ser oferecidos como auxiliar: nao escrevem laudo
 ok(re.search(r"embedding\|whisper\|tts\|audio\|image\|dall\|moderation", APP) is not None,
    "imagem, audio e embeddings ficam de fora dos candidatos")
-ok("iaCfgEscolherAux" in APP, "tocar num nome preenche o campo do auxiliar")
+# 31/08/2026: a funcao deixou de ser "so do auxiliar". A lista passou a servir aos DOIS
+# campos porque o modelo PRINCIPAL tambem precisava sair da lista fixa de tres nomes
+# (a geracao 5.6 nao estava la, e escolhe-la pelo <select> antigo gravava modelo vazio).
+ok("iaCfgEscolherModelo" in APP, "tocar num nome preenche o campo escolhido")
+ok("iaNvAlvo" in APP, "e ha um seletor dizendo se o nome vai para o auxiliar ou o principal")
 ok("Toque em <b>Salvar alterações</b> para valer" in APP,
    "e diz que ainda falta salvar (escolher nao e salvar)")
 

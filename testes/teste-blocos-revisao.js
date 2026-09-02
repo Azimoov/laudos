@@ -42,7 +42,7 @@ const api = new Function('MODELOS', [
   grab('rev2Assinatura'), grab('rev2MoldeDoTexto'), grab('rev2MoldeDoModelo'),
   grab('rev2MoldeDoLaudo'),
   grab('rev2TituloDeBloco'), grab('rev2Blocos'), grab('rev2BlocosDaTela'),
-  grab('rev2CorpoVisivel'), grab('rev2Proc'), grab('rev2Estado'),
+  grab('rev2CorpoVisivel'), grab('rev2Proc'), grab('rev2TemAchado'), grab('rev2Estado'),
   grab('rev2TermosAchado'), grab('alertasAchadoSemNegrito')
 ].join('\n') + '\nreturn {rev2NegritoDeMedida, rev2TituloDeBloco, rev2Blocos, rev2BlocosDaTela,'
   + ' rev2CorpoVisivel, rev2Estado, alertasAchadoSemNegrito, rev2Proc, rev2MoldeDoTexto, rev2Assinatura};')(MODELOS);

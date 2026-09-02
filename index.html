@@ -479,6 +479,25 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   #dicomLupa{transition-duration:.01ms}
 }
 @media print{
+  /* 01/09/2026 — QUEM VAI AO PAPEL É SÓ QUEM CARREGA A FOLHA (ver prepararPapel).
+     `display:none` de verdade, e não `visibility:hidden`: o invisível continua ocupando
+     altura, e era daí que vinham as folhas em branco de brinde. O !important existe para
+     vencer o `style.display='none'` que as telas escrevem direto no elemento — sem ele, a
+     tela antiga de revisão continuaria escondida e o laudo não sairia. */
+  /* A GARANTIA, que vale SEMPRE: a folha mora dentro de #telaRevisao, e a 2.0 esconde
+     essa tela. Sem esta linha o laudo fica na gaveta e o papel sai em branco. Ela não
+     depende de JavaScript nenhum ter rodado — é o piso. */
+  /* `body:not(.papelPreparado)` e NÃO um `#telaRevisao` solto: sozinha, esta regra tem um
+     ID e vence a limpeza logo abaixo (que só tem classes) — a tela antiga ficava visível
+     mesmo quando a folha estava em OUTRO lugar, empurrando o conteúdo do papel. O piso
+     vale só enquanto a preparação não rodou; a partir dali quem manda é a marca .noPapel. */
+  body:not(.papelPreparado) #telaRevisao{display:block!important;}
+  /* A LIMPEZA, que só vale quando a preparação REALMENTE rodou (body.papelPreparado):
+     apaga os irmãos que não carregam a folha, e com eles as folhas em branco de brinde.
+     Se o beforeprint não disparar, esta regra simplesmente não existe e a impressão cai
+     no piso acima — pior acabamento, nunca papel vazio. Falhar para o lado seguro. */
+  body.papelPreparado > *:not(.noPapel){display:none!important;}
+  body.papelPreparado > .noPapel{display:block!important;}
   body{background:#fff;}
   body *{visibility:hidden;}
   #barraFormato{display:none;}
@@ -502,15 +521,32 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
      folha. O navegador só fatia a cada 297 mm. O que a tela mostra é o que sai. */
   body{margin:0!important;}
   .laudoFolha{border:0;max-width:none;}
-  .laudoCorpoBox{min-height:0;}
+  /* 02/09/2026 — ESTA LINHA PUNHA A ASSINATURA DENTRO DA MOLDURA. A caixa do corpo tem
+     altura mínima de 620px na TELA; aqui ela era anulada, e no papel a caixa encolhia. Só
+     que a moldura de cada folha (_molduraPorFolha) é desenhada MEDINDO A TELA, em pixels
+     fixos: no papel ela continuava com a altura da tela e passava por cima da assinatura,
+     que vem depois da caixa. Medido no laudo curto com timbrado Labita: caixa terminando
+     em 116,3mm, assinatura em 154,8mm, moldura descendo até 206,5mm.
+     Sem esta linha, tela e papel usam a MESMA caixa — que é o princípio desta impressão
+     desde 25/08 ("o que a tela mostra é o que sai"). Medir numa régua e desenhar noutra
+     era o defeito. */
+
   .laudoTexto:focus{background:none;}
-  /* folha SEM timbrado: o esquema antigo, com margens de página simples */
-  .laudoFolha:not(.comFundo){padding:6mm 10mm;}
+  /* folha SEM timbrado: o respiro mora DENTRO da folha (ver _estiloPaginaTexto). Estes
+     números são o piso — valem quando o <style> de margens não chegou a ser escrito
+     (Safari do iPad, ou uma impressão disparada antes do beforeprint). Iguais aos de
+     margensDaFolha de propósito: dois valores diferentes dariam dois papéis diferentes
+     para o mesmo laudo, e foi assim que se perdeu a tarde de 25/08. */
+  .laudoFolha:not(.comFundo){padding:15mm 12mm;}
   .laudoFolha:not(.comFundo) .fundoLaudo{display:none;}
   /* folha COM timbrado: NADA muda em relação à tela — grade literal.
      height:auto: quem fecha a última folha são o vão do pé e a máscara dela. */
   .laudoFolha.comFundo{height:auto!important;}
-  @page{size:A4;margin:8mm;}
+  /* 01/09/2026 — ZERO, e é o que TIRA OS CARIMBOS DO NAVEGADOR. Com qualquer margem de
+     página o navegador escreve nela a data, o nome do exame e o endereço 127.0.0.1 — em
+     cima e embaixo do laudo, como ele viu no papel de 01/09. Sem margem não há onde
+     escrever. O respiro do laudo passou para o padding da folha, logo acima. */
+  @page{size:A4;margin:0;}
 }
 </style>
 </head>
@@ -1307,30 +1343,43 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
           <div class="iaGrade2">
             <div>
               <label class="iaLab" for="iaNvModelo">Modelo principal</label>
-              <select id="iaNvModelo" class="iaCampo" onchange="iaCfgMarcarSujo()">
-                <option value="chat-latest">chat-latest (recomendado)</option>
-                <option value="gpt-5.5">gpt-5.5 (mais capaz, mais caro)</option>
-                <option value="gpt-4o">gpt-4o (antigo)</option>
-              </select>
+              <!-- 31/08/2026: era um <select> com TRES nomes escritos a mao
+                   (chat-latest, gpt-5.5, gpt-4o). A conta dele oferecia 124 modelos e a
+                   geracao 5.6 (sol/terra/luna) nao estava na lista — pela tela era
+                   impossivel escolher o modelo novo. Virou campo livre alimentado pela
+                   MESMA lista do provedor que o auxiliar ja usava. -->
+              <input type="text" id="iaNvModelo" class="iaCampo"
+                     placeholder="ex.: gpt-5.5" oninput="iaCfgMarcarSujo()">
               <p class="iaHint">Escreve o laudo e lê as medidas nas fotos do aparelho.
-                É a chamada grande de cada exame.</p>
+                É a chamada grande de cada exame. <b>Confira o nome pela lista abaixo</b> —
+                um nome que não existe deixa o programa sem IA no meio do atendimento.</p>
             </div>
             <div>
               <label class="iaLab" for="iaNvAux">Modelo auxiliar</label>
               <input type="text" id="iaNvAux" class="iaCampo"
                      placeholder="vazio = usa o principal" oninput="iaCfgMarcarSujo()">
-              <p class="iaHint">Usado em <b>três tarefas de todo exame</b>: identificar
-                nome e tipo no ditado, a segunda leitura do laudo e os pedidos de ajuste.
-                Nenhuma delas manda foto — por isso pode ser um modelo barato.</p>
+              <p class="iaHint">Usado em <b>seis tarefas</b> — nenhuma delas é escrever o
+                laudo: identificar nome e tipo no ditado; aprender com suas correções;
+                decidir o exame pela imagem; a segunda leitura (o conferente); e os dois
+                caminhos de pedido de ajuste, que <b>reescrevem o texto do laudo</b>.
+                Só a de imagem manda foto.</p>
               <button class="iaMini" type="button" onclick="iaCfgUsarPrincipal()">deixar vazio (usar o principal)</button>
-              <!-- 31/08/2026, pergunta dele: "como e que eu sei quais sao os tipos de
-                   modelos que a minha conta oferece?". Escolher de cabeca e arriscado —
-                   um nome que nao existe deixa o programa sem IA no meio do atendimento.
-                   Aqui o proprio programa pergunta ao provedor. -->
-              <button class="iaMini" type="button" onclick="iaCfgListarModelos()">ver os modelos da minha conta</button>
-              <div class="iaState" id="iaListaModelos"></div>
             </div>
           </div>
+          <!-- 31/08/2026, pergunta dele: "como e que eu sei quais sao os tipos de
+               modelos que a minha conta oferece?". Escolher de cabeca e arriscado —
+               um nome que nao existe deixa o programa sem IA no meio do atendimento.
+               Aqui o proprio programa pergunta ao provedor. A lista serve aos DOIS
+               campos: o seletor ao lado diz onde o nome escolhido vai cair. -->
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px">
+            <button class="iaMini" type="button" onclick="iaCfgListarModelos()">ver os modelos da minha conta</button>
+            <label class="iaHint" for="iaNvAlvo" style="margin:0">usar o nome escolhido como:</label>
+            <select id="iaNvAlvo" class="iaCampo" style="width:auto;min-width:150px">
+              <option value="aux">modelo auxiliar</option>
+              <option value="pri">modelo principal</option>
+            </select>
+          </div>
+          <div class="iaState" id="iaListaModelos"></div>
           <div class="iaAlerta" id="iaAvisoCusto" style="display:none"></div>
         </section>
 
@@ -1826,11 +1875,19 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
   <div id="iaEstado" class="aviso" style="margin-top:4px"></div>
   <span class="aviso">A chave guardada <b>no navegador</b> pode ser copiada por quem abrir o console. Guardando <b>no computador</b> (no agente), o app passa a pedir os laudos através dele e a chave nunca mais aparece aqui.</span>
   <label>Modelo</label>
-  <select id="cfgModelo">
-    <option value="chat-latest">chat-latest (recomendado)</option>
-    <option value="gpt-5.5">gpt-5.5 (mais capaz, mais caro)</option>
-    <option value="gpt-4o">gpt-4o (antigo)</option>
-  </select>
+  <!-- 31/08/2026 — ERA UM <select> COM TRES OPCOES ESCRITAS A MAO, e isso causava DOIS
+       defeitos medidos no navegador:
+       (a) o valor de fabrica era "chat-latest". Quem fosse direto a tela nova (Provedor
+           de IA) SEM abrir este painel antes lia "chat-latest" na tela enquanto o
+           gravado no disco era "gpt-5.5" — porque iaCfgRender prefere o valor DESTE
+           campo. Salvar ali trocava o modelo que escreve o laudo, calado.
+       (b) atribuir a um <select> um nome que nao esta entre as <option> resulta em ""
+           (regra do HTML, nao e defeito do navegador). Escolher gpt-5.6-sol na tela
+           nova gravaria modelo VAZIO, e o programa ficaria sem IA no meio do exame.
+       Campo livre resolve os dois: aceita qualquer nome e comeca vazio (vazio e falso,
+       entao a tela nova cai no valor gravado, que e a verdade). A lista de nomes de
+       verdade vive na tela nova, vinda da conta dele. -->
+  <input type="text" id="cfgModelo" placeholder="ex.: gpt-5.5 (veja a lista em Provedor de IA)">
   <label>Modelo auxiliar (tarefas simples — ex.: aprendizado)</label>
   <input type="text" id="cfgModeloAux" placeholder="ex.: gpt-5-mini (vazio = usa o modelo acima)">
   <span class="aviso">Modelo barato, usado nas tarefas que não precisam de imagem: extração de regras do aprendizado, pedidos de ajuste na revisão e a conferência do laudo. <b>Se vazio, todas elas usam o modelo principal</b> — que é bem mais caro.</span>
@@ -2441,10 +2498,18 @@ let audios = [];   // {idx, file, nome, transcricao, nomePaciente, tipoExame, ex
 const MODELOS_PADRAO = JSON.parse(JSON.stringify(MODELOS));
 (function(){ try{ var s=localStorage.getItem('gmodelos'); if(s){ var o=JSON.parse(s); if(o&&typeof o==='object'&&Object.keys(o).length){ Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, o); } } }catch(e){} })();
 
-function alternarConfig(){
-  const c = document.getElementById('cardConfig');
-  c.style.display = c.style.display==='none'?'block':'none';
-  mostrarAssPrev();
+/* 31/08/2026 — O PREENCHIMENTO SAIU DE DENTRO DO alternarConfig.
+   Motivo (medido no navegador): o localStorage NASCE VAZIO a cada abertura do programa,
+   porque a porta e sorteada e a memoria do navegador e por endereco. Entao a sequencia
+   de toda abertura era:
+     1. `cfg` nasce com os padroes do codigo (modelo = "chat-latest");
+     2. o DOMContentLoaded chama alternarConfig(), que copia esses padroes para os campos;
+     3. SO DEPOIS a sincronizacao com o agente chega e corrige `cfg` para "gpt-5.5" —
+        mas ninguem mais toca nos campos, que ficam com o padrao velho.
+   Resultado: a tela nova (que le o valor DESTE campo) mostrava "chat-latest" e, ao
+   salvar, gravava "chat-latest" por cima do modelo de verdade. Sem aviso nenhum.
+   Agora o preenchimento e uma funcao a parte, chamada TAMBEM depois da sincronizacao. */
+function preencherCamposConfig(){
   document.getElementById('cfgChave').value = cfg.chave;
   var _cb=document.getElementById('cfgIaBase'); if(_cb) _cb.value = cfg.iaBase||IA_BASE_PADRAO;
   document.getElementById('cfgModelo').value = cfg.modelo;
@@ -2455,14 +2520,22 @@ function alternarConfig(){
   var _ia=document.getElementById('cfgImpAuto'); if(_ia) _ia.checked=impLigada();
   var _is=document.getElementById('cfgImpSeparadas'); if(_is) _is.checked=impSeparadas();
   impPintarEstado();
-  if(c.style.display!=='none'){ try{ impCarregarImpressoras(false); }catch(e){} }
+  var _cc=document.getElementById('cardConfig');
+  if(_cc && _cc.style.display!=='none'){ try{ impCarregarImpressoras(false); }catch(e){} }
   document.getElementById('cfgAgenteLocal').value = cfg.agenteLocal;
   var _cp=document.getElementById('cfgPaciente'); if(_cp) _cp.checked=pacienteLigada();
   document.getElementById('cfgMedico').value = cfg.medico;
   document.getElementById('cfgCrm').value = cfg.crm;
+  mostrarAssPrev();
   renderRegras();
   atualizarEstadoBackup();
   atualizarEstadoIA();
+}
+/* O painel antigo abre/fecha e, ao abrir, relê tudo de `cfg`. */
+function alternarConfig(){
+  const c = document.getElementById('cardConfig');
+  c.style.display = c.style.display==='none'?'block':'none';
+  preencherCamposConfig();
 }
 /* ---- Chave da OpenAI guardada no agente (2026-08-03) ----
    Tira a chave do navegador, onde qualquer um que abrisse o console a copiava.
@@ -2674,7 +2747,12 @@ function salvarConfig(){
   cfg.chave = document.getElementById('cfgChave').value.trim();
   var _cbv=document.getElementById('cfgIaBase');
   if(_cbv) cfg.iaBase = _cbv.value.trim().replace(/\/+$/,'') || IA_BASE_PADRAO;
-  cfg.modelo = document.getElementById('cfgModelo').value;
+  // 31/08/2026 — TRAVA: modelo principal vazio deixa o programa sem IA no meio do
+  // atendimento, e o unico aviso seria o laudo nao sair. Campo em branco NAO apaga o
+  // que ja estava gravado; o auxiliar pode ficar vazio de proposito (significa "usa o
+  // principal"), entao a trava vale so para o principal.
+  var _mNovo = document.getElementById('cfgModelo').value.trim();
+  cfg.modelo = _mNovo || cfg.modelo;
   cfg.modeloAux = document.getElementById('cfgModeloAux').value.trim();
   cfg.agenteLocal = document.getElementById('cfgAgenteLocal').value.trim().replace(/\/+$/,'');
   _agenteLocalOk = null;   // revalida o agente na próxima transcrição
@@ -2936,9 +3014,21 @@ function iaBase(){
   return b || IA_BASE_PADRAO;
 }
 var _agenteLocalOk=null;   // null=não checado · true/false=cache da sessão
+/* 31/08/2026 — ESTA FUNÇÃO OLHAVA UM ENDEREÇO DIFERENTE DE TODO O RESTO DO PROGRAMA.
+   Ela lia SÓ `cfg.agenteLocal` (o endereço digitado em Configurações) e, se estivesse
+   vazio, respondia "não há agente" sem sequer perguntar. Todo o resto usa `agenteBase()`,
+   que cai no endereço vindo da URL (`?agente=http://127.0.0.1:8988`) — que é COMO O
+   PROGRAMA 2.0 SEMPRE ABRE, porque a porta é sorteada e não dá para guardá-la.
+   Medido no app dele em 31/08: cfg.agenteLocal = "" e agenteBase() = 127.0.0.1:8988.
+   Consequência: todo ditado da esteira de arquivos ("exames antigos", "arquivos
+   acumulados", ditado gravado no navegador) pulava o motor da casa e ia para a NUVEM
+   PAGA. Três estragos de uma vez: pagava-se pelo que a placa faz de graça, o áudio do
+   paciente saía da máquina, e a nuvem devolve texto SEM marcação de tempo — que é
+   exatamente por que o botão VOZ não aparecia nesses laudos.
+   Agora pergunta ao mesmo endereço que o resto do programa usa. */
 async function agenteLocalDisponivel(){
   if(_agenteLocalOk!==null) return _agenteLocalOk;
-  var base=(cfg.agenteLocal||'').trim(); if(!base){ _agenteLocalOk=false; return false; }
+  var base=agenteBase(); if(!base){ _agenteLocalOk=false; return false; }
   try{
     var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},1000);
     var r=await fetch(base.replace(/\/+$/,'')+'/health',{signal:ctrl.signal}); clearTimeout(t);
@@ -2975,8 +3065,11 @@ function paciencia(wavBlob){
   var seg=(wavBlob && wavBlob.size ? wavBlob.size : 0)/32000;
   return Math.round(Math.min(120000, Math.max(25000, seg*2500)));
 }
+/* Devolve {texto, trechos}. 31/08/2026: antes devolvia SÓ o texto, e os trechos com hora
+   que o agente já mandava eram descartados aqui — a marcação de tempo morria nesta linha,
+   e com ela o botão VOZ de todo laudo feito por este caminho. */
 async function transcreverLocal(wavBlob){
-  var base=(cfg.agenteLocal||'').trim().replace(/\/+$/,'');
+  var base=agenteBase().replace(/\/+$/,'');
   var b64=await new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=function(){rej(fr.error);}; fr.readAsDataURL(wavBlob); });
   var espera=paciencia(wavBlob);
   var ctrl=new AbortController(), estourou=false;
@@ -2995,14 +3088,15 @@ async function transcreverLocal(wavBlob){
   // marcação de tempo a perder, mas há gasto — e gasto escondido é gasto que só aparece
   // na fatura do fim do mês
   capAvisarMotor(j);
-  return j.texto||'';
+  return {texto:(j.texto||''), trechos:(Array.isArray(j.trechos)?j.trechos:[])};
 }
 async function transcreverAudio(arquivoOuBlob){
   const wav = await audioParaWavBlob(arquivoOuBlob);
-  let texto=null, ultimoErro=null;
+  let texto=null, ultimoErro=null, trechos=[];
   // 1) motor LOCAL primeiro (se o agente estiver rodando): melhor vocabulário médico, áudio não sai da máquina
   if(await agenteLocalDisponivel()){
-    try{ var tl=await transcreverLocal(wav); if(tl && tl.trim()) texto=tl; }
+    try{ var tl=await transcreverLocal(wav);
+         if(tl && tl.texto && tl.texto.trim()){ texto=tl.texto; trechos=tl.trechos||[]; } }
     catch(e){
       ultimoErro='local: '+((e&&e.message)||e); _agenteLocalOk=null; /* revalida na próxima; cai na OpenAI agora */
       // a troca de motor não pode ser silenciosa: o médico precisa saber que aquele
@@ -3037,7 +3131,11 @@ async function transcreverAudio(arquivoOuBlob){
   var nomesTipos = Object.keys(MODELOS).filter(function(k){return k!=='outro';}).map(function(k){return MODELOS[k].nome;}).filter(Boolean).join('; ');
   const resp = await openai([{type:'text', text:"Do ditado de um médico ultrassonografista abaixo, extraia: (1) o NOME COMPLETO DO PACIENTE citado — o ditado SEMPRE começa pelo nome completo; transcreva todos os nomes e sobrenomes exatamente como foram ditos, sem abreviar nem omitir (ou \"\" se realmente não citado); (2) o TIPO DE EXAME ditado: quando corresponder, responda EXATAMENTE com um destes nomes de exame: "+nomesTipos+". Se o exame ditado não estiver nessa lista, responda \"outro\". Se não der para saber, responda \"\". (3) a LATERALIDADE do exame: responda exatamente \"direito\", \"esquerdo\", \"bilateral\" ou \"\" (vazio). Extraia lateralidade SOMENTE para os tipos: ombro, cotovelo, punho, mao, joelho, tornozelo, pe e partes_moles — para todos os demais tipos responda \"\" independentemente do que for dito. Responda em JSON: {\"nome_paciente\":\"...\",\"tipo_exame\":\"...\",\"lateralidade\":\"...\"}\n\nDITADO:\n"+texto}]);
   var tipoKey = mapTipo(resp.tipo_exame||'');
-  return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: tipoKey, lateralidade: resp.lateralidade||''};
+  // `trechos` viaja junto desde 31/08: é o que dá botão VOZ e áudio editado aos laudos
+  // feitos pela esteira de arquivos. Vazio quando o ditado veio da nuvem (ela não marca
+  // hora) — e aí a tela continua dizendo, com todas as letras, que não há marcação.
+  return {transcricao: texto, nome_paciente: resp.nome_paciente||'', tipo_exame: tipoKey,
+          lateralidade: resp.lateralidade||'', trechos: trechos||[]};
 }
 
 /* ============ Áudio: m4a → WAV 16 kHz mono ============ */
@@ -3744,7 +3842,7 @@ async function processar(){
       log('Transcrevendo '+f.name+' ...');
       try{
         const resp = await transcreverAudio(f);
-        audios.push({idx:i, nome:f.name, blob:f, url:URL.createObjectURL(f), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
+        audios.push({idx:i, nome:f.name, blob:f, url:URL.createObjectURL(f), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null, trechos:(resp.trechos||[])});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
         log('Falha no áudio '+f.name+': '+e.message, true);
@@ -3761,8 +3859,9 @@ async function processar(){
       const rotulo = 'Ditado '+dtg.toLocaleDateString('pt-BR').slice(0,5)+' '+dtg.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
       log('Transcrevendo '+rotulo+' ...');
       try{
-        const resp = (g.transcricao!==undefined) ? {transcricao:g.transcricao, nome_paciente:g.nome_paciente||'', tipo_exame:g.tipo_exame||'', lateralidade:g.lateralidade||''} : await transcreverAudio(g.blob);
-        audios.push({idx:audios.length, nome:rotulo, blob:g.blob, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null});
+        // ditado JÁ transcrito antes (gravação recuperada): reaproveita, e a hora vem junto
+        const resp = (g.transcricao!==undefined) ? {transcricao:g.transcricao, nome_paciente:g.nome_paciente||'', tipo_exame:g.tipo_exame||'', lateralidade:g.lateralidade||'', trechos:(g.trechos||[])} : await transcreverAudio(g.blob);
+        audios.push({idx:audios.length, nome:rotulo, blob:g.blob, url:URL.createObjectURL(g.blob), transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'', exameId:null, trechos:(resp.trechos||[])});
         log('  → paciente: '+(resp.nome_paciente||'(não citado)')+' | exame: '+(resp.tipo_exame||'?'));
       }catch(e){
         log('Falha em '+rotulo+': '+e.message, true);
@@ -4106,7 +4205,10 @@ async function salvarLaudoPasta(){
      folha salva — não a do <style> vivo, que no Safari (iPad) é esvaziado de propósito.
      Um arquivo salvo no iPad e impresso depois num computador saía com margem de 8 mm,
      invadindo o timbrado da página 2 em diante. */
-  var _estPag='@media print{@page{size:A4;margin:8mm;}}';
+  /* 01/09/2026: o socorro também vai com margem ZERO. Ele só entra em cena se a linha de
+     baixo lançar, e nesse caso um 8mm aqui devolveria os carimbos do navegador (data e
+     endereço 127.0.0.1) ao arquivo salvo — o defeito voltando pela porta dos fundos. */
+  var _estPag='@media print{@page{size:A4;margin:0;}.laudoFolha:not(.comFundo){padding:15mm 12mm!important;}}';
   try{ var _M=margensDaFolha(); _estPag=_estiloPaginaTexto(_M.topo,_M.base,_M.lado,_M.temFundo); }catch(e){}
   const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+_estPag+'</style></head><body>'+folhaHtmlLimpo()+'</body></html>';
   const laudoBlob=new Blob([html],{type:'text/html'});
@@ -4208,7 +4310,7 @@ async function gravarParaExame(id){
     try{
       const r = await transcreverAudio(blob);
       const novoIdx = audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-      const a = {idx:novoIdx, nome:nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade), url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:id};
+      const a = {idx:novoIdx, nome:nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade), url:URL.createObjectURL(blob), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:id, trechos:(r.trechos||[])};
       audios.push(a); try{ salvarAudioAuto(blob, a.nome, (blob.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){}
       const ex=exames.find(function(x){return x.id===id;});
       if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
@@ -4255,7 +4357,7 @@ async function adicionarAudioArquivo(exId, file){
   try{
     const r=await transcreverAudio(file);
     const novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-    const a={idx:novoIdx, nome:(nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||file.name||'áudio'), url:URL.createObjectURL(file), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:exId};
+    const a={idx:novoIdx, nome:(nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||file.name||'áudio'), url:URL.createObjectURL(file), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:exId, trechos:(r.trechos||[])};
     audios.push(a);
     const ex=exames.find(function(x){return x.id===exId;});
     if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
@@ -4329,6 +4431,61 @@ var _gerandoEmLote=false;
    um laudo de braço e descartou o modelo de perna inteiro. Pedir "troque superior por
    inferior" no laudo pronto só conserta a palavra — o modelo continua perdido. Regerar
    COM a correção refaz o laudo do modelo certo, com a ordem no topo da hierarquia. */
+/* ============ AS MEDIDAS QUE NÃO VÃO PARA CENTÍMETRO (31/08/2026) ============
+   Pedido dele: "todas as medidas são em centímetros, mas há algumas exceções. 2 delas
+   são endométrio e IPP, que são medidos em milímetros".
+
+   Por que EXISTE uma exceção: centímetro virou o padrão do laudo em 26/08, e a regra
+   varria tudo. Só que há estruturas cuja literatura e cuja prática são em milímetro —
+   escrever "endométrio de 0,8 cm" está certo na aritmética e errado na leitura: quem lê
+   espera 8 mm. Unidade não é só conversão, é o costume de quem lê o laudo.
+
+   PARA ACRESCENTAR OUTRA: basta pôr o nome aqui. Ele avisou que são "algumas" e citou
+   duas — as demais entram nesta lista, e nada mais precisa mudar.
+   O nome entra como o médico o DITA (inclusive a sigla): é assim que a IA vai reconhecê-lo
+   no ditado. */
+const MEDIDAS_EM_MM = ['endométrio', 'IPP (índice de protrusão prostática)'];
+function regraDeUnidade(){
+  return "UNIDADE DE MEDIDA (regra do médico, 26/08/2026): no corpo e na conclusão do laudo, "
+    + "TODA medida sai em CENTÍMETROS, com vírgula decimal (0,6 cm — nunca 0.6). Medida ditada "
+    + "em milímetros: converta dividindo por 10 (6 mm → 0,6 cm; 6,1 mm → 0,61 cm), sem arredondar "
+    + "além do ditado. Os campos numéricos estruturados (medida_1_mm etc.) continuam em milímetros, "
+    + "como especificado.\n"
+    + "EXCEÇÕES (31/08/2026) — estas medidas saem em MILÍMETROS, com a unidade escrita "
+    + "(\"mm\"), e NÃO devem ser convertidas para centímetro: " + MEDIDAS_EM_MM.join('; ') + ". "
+    + "Se o médico ditar uma delas em centímetros, converta para milímetros (0,8 cm → 8 mm). "
+    + "Vale só para estas; toda outra medida do mesmo laudo continua em centímetros.\n\n";
+}
+/* ============ A FITA NUMERADA (01/09/2026) ============
+   Por que isto existe — a lição das cinco correções seguidas de 31/08.
+
+   Até aqui o programa mandava o ditado como texto corrido, a IA devolvia uma CITAÇÃO
+   ("esteatose 3") e o app saía CAÇANDO essa citação de volta na fita de palavras. Cada
+   caçada tinha um caso de borda novo: citação de uma palavra só, palavra repetida em
+   dois achados ("cálculo" na vesícula e no rim), pausa de 15 s no meio da frase, palavra
+   colada na borda do trecho. Consertei cinco; sempre aparecia o sexto.
+
+   A causa era estrutural: A IA JÁ SABE onde olhou. Ela leu o ditado para escrever o
+   parágrafo. Só que contava isso em prosa, e o programa tinha de reconstruir por busca —
+   jogar fora a resposta e adivinhá-la de volta.
+
+   Agora o ditado vai NUMERADO, palavra por palavra, e ela devolve a FAIXA:
+   palavra_ini/palavra_fim. Não há mais busca: o recorte é exato por construção.
+
+   A numeração é GLOBAL e segue a ordem dos trechos — a mesma ordem que rev2Fita()
+   reconstrói na tela de revisão. As duas pontas têm de andar juntas. */
+function fitaDeTrechos(trechos){
+  var fita=[];
+  (trechos||[]).forEach(function(t, ti){
+    (t.palavras||[]).forEach(function(w){
+      fita.push({p:w.p, i:w.i, f:w.f, t:ti, audioUrl:t.audioUrl||''});
+    });
+  });
+  return fita;
+}
+function fitaNumeradaTexto(fita){
+  return fita.map(function(w,n){ return '['+(n+1)+']'+w.p; }).join(' ');
+}
 async function gerarLaudo(exId, opts){
   const ex = exames.find(e=>e.id===exId);
   if(!ex){ return; }
@@ -4348,6 +4505,11 @@ async function gerarLaudo(exId, opts){
     const trechosEx = audios.filter(a=>a.exameId===exId).reduce(function(m,a){
       return m.concat((a.trechos||[]).map(function(t){ return Object.assign({}, t, {audioUrl:a.url||''}); }));
     }, []);
+    /* 01/09/2026: a fita numerada só existe quando o ditado veio COM hora de palavra.
+       Sem ela (laudo antigo, ditado da nuvem), o pedido segue com o texto corrido de
+       sempre e a tela cai no casamento por busca — nada quebra, só não fica exato. */
+    const fitaEx = fitaDeTrechos(trechosEx);
+    const fitaNum = fitaEx.length ? fitaNumeradaTexto(fitaEx) : '';
     // Guardado no banco junto com o laudo: é a PERGUNTA que gerou a resposta.
     // Sem ela o banco fica com laudos sem o ditado que os originou — inútil
     // para comparar, para auditar e para treinar. Só este trecho vai para o
@@ -4379,7 +4541,12 @@ async function gerarLaudo(exId, opts){
 (EX_DOPPLER_ART[ex.tipo] ? "DOPPLER ARTERIAL DE MEMBRO INFERIOR — instruções próprias:\n- Este laudo é de UM membro só. Complete o '.....' do título e do corpo com o LADO (DIREITO ou ESQUERDO) que o médico ditou ou que estiver legível nas imagens; se não houver lado em lugar nenhum, mantenha os pontilhados e registre o fato em observacoes_para_o_medico. NUNCA descreva os dois membros no mesmo laudo.\n- VELOCIDADES: preencha 'velocidade de pico sistólico de ..... cm/s' de cada segmento com o valor de PVS/PSV lido nas legendas das imagens do aparelho ou ditado pelo médico. Copie o número, NUNCA o estime a partir da imagem. Se um segmento não tiver velocidade nem no ditado nem nas imagens, DEIXE OS PONTILHADOS INTACTOS — o aplicativo apaga a frase sozinho e avisa o médico; não invente e não reescreva a frase por conta própria.\n- Para cada segmento, descreva na ordem: perviedade, parede (placas), e comportamento ao Doppler (padrão espectral e velocidade). Segmento não citado no ditado permanece com o texto normal do modelo.\n- NÃO calcule nem escreva porcentagem de estenose por conta própria: a categoria (menor que 50%, 50-69%, 70-99%) é decisão do médico e só entra se ele a ditar.\n\n" : "")+
 "DIZERES PADRÃO DAS PATOLOGIAS (arquivo pessoal do médico — seções da região deste exame):\n"+bizusParaTipo(ex.tipo)+"\n\n"+
 (cadastro ? "DADOS DO CADASTRO (lidos do worksheet do aparelho — use como VERDADE para nome, idade e data do exame no cabeçalho, salvo se o ditado corrigir explicitamente):\n"+cadastro+"\n\n" : "")+
-"DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"+
+(fitaNum
+  ? ("DITADO DO MÉDICO (transcrição), com cada palavra NUMERADA:\n"+fitaNum+"\n\n"
+     +"Os números entre colchetes são a POSIÇÃO de cada palavra na gravação. Eles não "
+     +"fazem parte da fala e NUNCA devem aparecer no laudo — servem só para você apontar, "
+     +"no campo 'procedencia', de qual pedaço do ditado saiu cada seção.\n\n")
+  : ("DITADO DO MÉDICO (transcrição):\n"+(trans||"(sem áudio — preencha apenas com o que estiver legível nas imagens)")+"\n\n"))+
 (ex.laudo ? "LAUDO JÁ GERADO ANTERIORMENTE (versão atual aprovada como base):\nCORPO:\n"+ex.laudo.corpo+"\nCONCLUSÃO: "+ex.laudo.conclusao+"\n\nINSTRUÇÃO DE REVISÃO: o médico adicionou novas gravações e/ou imagens DEPOIS desse laudo. Trate o conteúdo mais recente do ditado como instruções de correção ou complemento: aplique somente as alterações pedidas sobre o laudo acima e mantenha intacto tudo o que não foi mencionado.\n\n" : "")+
 (correcaoMedico ? "⚠️ CORREÇÃO DIRETA DO MÉDICO — PRIORIDADE MÁXIMA, ACIMA DE TUDO:\nO médico está refazendo este laudo e deu a ordem abaixo. Ela vale MAIS que o ditado e MAIS que as legendas das imagens: onde houver conflito, a ordem do médico vence e o que estiver no ditado ou na imagem em sentido contrário deve ser IGNORADO por completo, sem ser mencionado no laudo nem em observacoes_para_o_medico como divergência.\nORDEM: "+correcaoMedico+"\n\n" : "")+
 (regrasAprend ? "REGRAS APRENDIDAS COM AS CORREÇÕES DO MÉDICO (cumpra à risca; têm prioridade sobre o estilo padrão quando houver conflito):\n"+regrasAprend+"\n\n" : "")+
@@ -4393,11 +4560,22 @@ async function gerarLaudo(exId, opts){
 (classifVale('birads', ex.tipo) ? "BI-RADS AUTOMÁTICO (somente mama): para CADA massa/nódulo mamário descrito no ditado, inclua um item no campo 'birads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado. Responda com o CÓDIGO, não com a frase:\n- localizacao: onde está, como o médico disse (ex.: \"mama direita, QSE\").\n- tipo: massa | naoMassa — use naoMassa SÓ quando o médico disser explicitamente que o achado é lesão não-massa (non-mass, não forma massa); na dúvida, massa. Para naoMassa os descritores de massa podem vir vazios.\n- forma: oval | lobulada | redonda | irregular\n- orientacao: paralela (paralela à pele) | nao (não paralela)\n- margem: circ (circunscrita) | indistinta | angular | microlobulada | espiculada\n- eco: anecoico | hiperecoico | isoecoico | hipoecoico | heterogeneo | misto (misto sólido e cístico)\n- posterior: nenhum (sem alteração) | reforco | sombra\n- halo: sim | nao — halo ecogênico (echogenic rind)\n- vasc: avascular | interna (vascularização interna) | periferica (hipervascularização periférica) — SÓ se o Doppler/vascularização foi mencionado no ditado.\n- elasto: macia | intermediaria | dura — SÓ se a elastografia foi mencionada.\n- pseudocapsula: sim | nao — pseudocápsula ecogênica (achado distinto do halo).\n- distribuicao (só quando tipo=naoMassa): regional | focal | linear | segmentar\n- padrao (só quando tipo=naoMassa): hiperecoico | heterogeneo | hipoecoico\n- tamanho_cm: maior medida em cm; 0 se não ditada nem legível.\n- caso_especial: SÓ quando o médico ditar explicitamente um destes, e aí os outros descritores podem vir vazios: cistoSimples | cistoComplicado | microcistos | linfonodo | cat0a | cat0b | cat6. Senão: \"\".\nDescritor não citado: \"\" (string vazia). Este é o léxico do ACR BI-RADS v2025 — NÃO use \"cístico complexo e sólido\" nem \"padrão combinado\": saíram nesta versão. NÃO calcule nem escreva a categoria BI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir destes descritores e insere no laudo. Se nenhuma massa for descrita: \"birads\":[].\n\n" : "")+
 (classifVale('orads', ex.tipo) ? "O-RADS AUTOMÁTICO (somente transvaginal e pélvica): para CADA lesão ovariana ou anexial descrita no ditado, inclua um item no campo 'orads' com o que foi DITADO — NUNCA infira. Responda com o CÓDIGO:\n- localizacao: ex.: \"ovário esquerdo\".\n- tipo: fisio (folículo ou corpo lúteo ≤ 3 cm) | uniSimples (cisto unilocular simples, anecoico, parede lisa) | uniNaoSimples (unilocular não simples, parede lisa) | uniIrreg (unilocular com parede interna irregular < 0,3 cm) | classica (dermoide, endometrioma ou cisto hemorrágico típicos) | multiLisa (multilocular de paredes e septos lisos) | multiIrreg (multilocular com parede ou septo irregular) | solido (com componente sólido ou projeção papilar) | solidoLiso (sólida ≥ 80% de contorno liso) | solidoIrreg (sólida ≥ 80% de contorno irregular)\n- escore_cor: 1 | 2 | 3 | 4 — escore de cor ao Doppler; \"\" se não ditado.\n- tamanho_cm: maior diâmetro em cm; 0 se não ditado.\n- papilas: número de projeções papilares; 0 se não ditado.\n- ascite: sim | nao — ascite e/ou nódulos peritoneais.\nNÃO calcule nem escreva a categoria O-RADS — o aplicativo calcula. Nenhuma lesão descrita: \"orads\":[].\n\n" : "")+
 "AVISOS SEPARADOS POR ASSUNTO (campo 'avisos'): além de 'observacoes_para_o_medico', devolva CADA aviso como um item próprio, com 'tipo' sendo EXATAMENTE uma destas palavras:\n- identificacao: nome, idade ou data que não conferem entre o ditado, as imagens e o cadastro.\n- divergencia: o ditado diz uma coisa e as imagens mostram outra.\n- faltando: medida, dado ou legenda ausente/ilegível que deixou pontilhados no laudo.\n- iacriou: você escreveu a descrição de uma patologia a partir do seu conhecimento, por não haver dizer padrão do médico (diga qual patologia).\n- outros: aviso que não caiba em nenhum acima.\nUm assunto por item, 'texto' curto e direto. Nada a avisar: \"avisos\":[]. NUNCA use os tipos 'anterior' nem 'calculo' — esses o aplicativo preenche sozinho.\n\n"+
-"DE ONDE VEIO CADA COISA (campo 'procedencia'): você já está OLHANDO as imagens para escrever este laudo — então, enquanto lê, anote de qual delas tirou cada informação. As imagens vão nesta mensagem NA ORDEM: a primeira é a imagem 1, a segunda é a 2, e assim por diante.\nDevolva um item por SEÇÃO do corpo do laudo:\n- secao: o título da seção EXATAMENTE como você o escreveu no corpo, sem os asteriscos (ex.: \"Útero\", \"RIM DIREITO\", \"Ovário direito\"). Se a informação não estiver sob um título, use \"\".\n- imagem_n: o NÚMERO da imagem de onde saiu a medida ou o achado daquela seção (1, 2, 3…). Se a informação veio SÓ do ditado e não é visível em imagem nenhuma, use 0. Se estiver em várias, use aquela em que a medida está impressa/mais legível.\n- origem: \"imagem\" (medida lida na imagem) | \"voz\" (só ditado) | \"ambos\".\n- citacao: quando a informação veio do ditado, COPIE de 4 a 12 palavras do DITADO, exatamente como estão escritas ali (sem corrigir, sem resumir) — é o pedaço que o médico falou sobre essa seção. Se não veio do ditado: \"\".\nREGRA DURA: só aponte uma imagem se você realmente leu a informação NELA. Na dúvida, imagem_n = 0 — apontar a imagem errada é pior que não apontar. Nenhuma seção identificável: \"procedencia\":[].\n\n"+
-"UNIDADE DE MEDIDA (regra do médico, 26/08/2026): no corpo e na conclusão do laudo, TODA medida sai em CENTÍMETROS, com vírgula decimal (0,6 cm — nunca 0.6). Medida ditada em milímetros: converta dividindo por 10 (6 mm → 0,6 cm; 6,1 mm → 0,61 cm), sem arredondar além do ditado. Os campos numéricos estruturados (medida_1_mm etc.) continuam em milímetros, como especificado.\n\n"+
-"CISTOS SIMPLES MÚLTIPLOS (regra do médico, 26/08/2026, só mama): quando houver MAIS DE UM cisto simples na mesma mama, escreva-os em BULLET POINTS — uma frase introdutória única com os descritores comuns terminando em dois-pontos, e depois UMA linha por cisto no formato '• às X h, a Y cm da papila, medindo A x B x C cm;'. NUNCA em frase corrida com 'respectivamente'. Um cisto só: frase normal, sem bullet.\n\n"+
+"DE ONDE VEIO CADA COISA (campo 'procedencia'): você já está OLHANDO as imagens para escrever este laudo — então, enquanto lê, anote de qual delas tirou cada informação. As imagens vão nesta mensagem NA ORDEM: a primeira é a imagem 1, a segunda é a 2, e assim por diante.\nDevolva um item por SEÇÃO do corpo do laudo:\n- secao: o título da seção EXATAMENTE como você o escreveu no corpo, sem os asteriscos (ex.: \"Útero\", \"RIM DIREITO\", \"Ovário direito\"). Se a informação não estiver sob um título, use \"\".\n- imagem_n: o NÚMERO da imagem de onde saiu a medida ou o achado daquela seção (1, 2, 3…). Se a informação veio SÓ do ditado e não é visível em imagem nenhuma, use 0. Se estiver em várias, use aquela em que a medida está impressa/mais legível.\n- origem: \"imagem\" (medida lida na imagem) | \"voz\" (só ditado) | \"ambos\".\n- citacao: quando a informação veio do ditado, COPIE de 4 a 12 palavras do DITADO, exatamente como estão escritas ali (sem corrigir, sem resumir) — é o pedaço que o médico falou sobre essa seção. Se não veio do ditado: \"\".\n"
++(fitaNum
+ ? "- palavra_ini e palavra_fim: os NÚMEROS entre colchetes da PRIMEIRA e da ÚLTIMA palavra desse trecho do ditado — os mesmos números da citação que você acabou de copiar. Ex.: se você copiou \"[26]Esteatose [27]3\", então palavra_ini=26 e palavra_fim=27. Aponte SÓ a fala daquele achado, não o exame inteiro: dez a quinze palavras costumam bastar. Estes dois números são o que permite tocar de volta exatamente o que o médico falou — errá-los faz o médico ouvir outro achado, então confira-os na fita antes de responder.\n"
+   +"  ⚠️ ZERO NÃO É FALHA SUA, É A RESPOSTA CERTA na maioria das seções. Só aponte a seção sobre a qual o médico REALMENTE FALOU. Órgão que ele não mencionou — e num exame normal são quase todos — vai com palavra_ini=0 e palavra_fim=0. NUNCA aponte fala de cortesia ou de rotina (\"tudo bem?\", \"pode se levantar\", \"respira fundo\", cumprimento, nome do paciente) só para não deixar o campo em zero: apontar isso faz o médico apertar o botão de conferência do fígado e ouvir \"tudo bem, tá?\". Vazio é honesto; preencher por preencher, não. E NUNCA repita a mesma faixa em várias seções — se você está prestes a fazer isso, é sinal de que aquelas seções não vieram do ditado: use 0.\n"
+ : "")
++"REGRA DURA: só aponte uma imagem se você realmente leu a informação NELA. Na dúvida, imagem_n = 0 — apontar a imagem errada é pior que não apontar. Nenhuma seção identificável: \"procedencia\":[].\n\n"+
+regraDeUnidade()+
+/* 31/08/2026 — A DISTÂNCIA DA PAPILA SAIU DAQUI. Pedido dele: "no exame de mama, quando
+   o diagnóstico for cisto simples, não precisamos de distância para a papila mamária".
+   Em 24/08 isso já tinha saído do DIZER PADRÃO do cisto simples, mas ficou nesta regra
+   dos cistos MÚLTIPLOS — o mesmo achado pedia a distância quando eram vários e não pedia
+   quando era um só. A contradição vivia em dois lugares diferentes do mesmo pedido.
+   O que fica: os bullets (decisão de 26/08), a hora e as medidas. */
+"CISTOS SIMPLES MÚLTIPLOS (regra do médico, 26/08/2026, só mama): quando houver MAIS DE UM cisto simples na mesma mama, escreva-os em BULLET POINTS — uma frase introdutória única com os descritores comuns terminando em dois-pontos, e depois UMA linha por cisto no formato '• às X h, medindo A x B x C cm;'. NUNCA em frase corrida com 'respectivamente'. Um cisto só: frase normal, sem bullet.\nCISTO SIMPLES NÃO LEVA DISTÂNCIA DA PAPILA (regra do médico, 24/08/2026, reafirmada em 31/08): nem quando é um só, nem nos bullets. NÃO escreva 'a X cm da papila' nem 'distando X cm da papila' em cisto simples, mesmo que a imagem traga o valor. Isso vale SÓ para o cisto simples — nódulo, microcistos agrupados e massa sólido-cística continuam obrigados a informar a distância.\n\n"+
 "DADOS ESTRUTURADOS (campo 'dados_estruturados'): além do laudo, devolva os achados campo a campo, para o arquivo longitudinal do paciente. Regras:\n- Preencha APENAS com informação presente no ditado ou legível nas imagens. Campo sem informação = null (ou \"\" em texto). NUNCA invente medida, órgão ou classificação.\n- indicacao_clinica: os dados clínicos ditados, se houver.\n- conclusao_codigo: UMA palavra que resuma a conclusão — normal | benigno | provavelmente-benigno | suspeito | indeterminado | outro.\n- achados: um item por achado DESCRITO no laudo. orgao (ex.: 'mama-direita', 'figado', 'lobo-tireoidiano-esquerdo'), localizacao (ex.: 'QSE', 'terco medio'), tipo (ex.: 'nodulo', 'cisto', 'calculo', 'esteatose'), medidas em MILÍMETROS (medida_1_mm a medida_3_mm; converta de cm; null se não medida), caracteristicas (objeto livre: ecogenicidade, margens, sombra...), classificacao (ex.: 'BI-RADS 3'; \"\" se não se aplica), descricao (a frase do achado como está no laudo).\n- Exame normal, sem achados: \"achados\":[].\n\n"+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\""+(fitaNum?",\\\"palavra_ini\\\":0,\\\"palavra_fim\\\":0":"")+"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
 +(classifVale('birads', ex.tipo)?",\"birads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"forma\":\"\",\"orientacao\":\"\",\"margem\":\"\",\"eco\":\"\",\"posterior\":\"\",\"halo\":\"\",\"vasc\":\"\",\"elasto\":\"\",\"pseudocapsula\":\"\",\"distribuicao\":\"\",\"padrao\":\"\",\"tamanho_cm\":0,\"caso_especial\":\"\"}]":"")
 +(classifVale('orads', ex.tipo)?",\"orads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"escore_cor\":\"\",\"tamanho_cm\":0,\"papilas\":0,\"ascite\":\"\"}]":"")
 +(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0,\"aua\":\"\",\"ga\":\"\",\"edd_aua\":\"\",\"edd_ga\":\"\"}":"")+"}"
@@ -4828,7 +5006,8 @@ async function cpRecuperarSessao(sessao){
   try{
     var r=await transcreverAudio(blob);
     metaG={transcricao:r.transcricao||'', nome_paciente:r.nome_paciente||'', tipo_exame:r.tipo_exame||'',
-           lateralidade:r.lateralidade||'', nome:nomeAudio(r.nome_paciente, r.tipo_exame, r.lateralidade)||'Gravação recuperada'};
+           lateralidade:r.lateralidade||'', trechos:(r.trechos||[]),
+           nome:nomeAudio(r.nome_paciente, r.tipo_exame, r.lateralidade)||'Gravação recuperada'};
     log('Gravação recuperada: '+(metaG.nome||'(sem nome)'));
   }catch(e){
     log('Recuperei o áudio, mas a transcrição falhou ('+e.message+'). Ele fica guardado na aba "🎙 Gravar ditados" para você transcrever depois.', true);
@@ -5139,7 +5318,7 @@ async function gerarInLoco(){
       const blob = lokoAudios[bi];
       log('Transcrevendo gravação...');
       const r = await transcreverAudio(blob);
-      const a = {idx:audios.length, nome:'Gravação in loco '+(bi+1), url:lokoUrls[bi], transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id};
+      const a = {idx:audios.length, nome:'Gravação in loco '+(bi+1), url:lokoUrls[bi], transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', exameId:id, trechos:(r.trechos||[])};
       audios.push(a); ex.audios.push(a.idx);
       if(!ex.tipo && a.tipoExame) ex.tipo = a.tipoExame;
       if(a.nomePaciente) ex.paciente = a.nomePaciente;
@@ -6441,10 +6620,24 @@ function _estiloPaginaTexto(topo, base, lado, temFundo){
       +'.laudoFolha{border:0!important;max-width:none;margin:0 auto;height:auto!important;}'
       +'}';
   }
+  /* 01/09/2026 — MARGEM DE PÁGINA ZERO TAMBÉM NO LAUDO SEM TIMBRADO, e o respiro passa a
+     ser padding DA FOLHA. O motivo é o que ele viu no papel de 01/09: o navegador carimba
+     data, hora, nome do exame e o endereço `127.0.0.1:.../index.html` na MARGEM DA PÁGINA
+     — em cima e embaixo. Não é conteúdo do laudo e não há como desligá-lo pelo código:
+     onde existe margem de página, o navegador escreve. Zerando a margem ele fica sem
+     onde escrever, e os dois carimbos somem para sempre, sem depender de o médico
+     desmarcar nada na caixa de impressão. É por isso que o laudo COM timbrado nunca teve
+     esse problema — ele já usava margin:0 (ver o ramo acima).
+     O CUSTO, medido antes de escolher: padding vale uma vez, então num laudo de 2+ páginas
+     a segunda em diante começaria colada no topo. Medidos os 120 laudos mais recentes do
+     banco: o maior tem 2954 caracteres e NENHUM passa de uma página (mediana 1371). O
+     custo é teórico neste consultório. Se um dia os laudos crescerem, o conserto certo é
+     dar à folha branca a mesma grade por folha que o timbrado já usa (paginarLaudoTela). */
   return '@media print{'
-    +'@page{size:A4;margin:'+topo+'mm '+lado+'mm '+base+'mm '+lado+'mm;}'
+    +'@page{size:A4;margin:0;}'
     +'body{margin:0!important;}'
-    +'.laudoFolha{border:0!important;padding:0!important;min-height:0!important;height:auto!important;}'
+    +'.laudoFolha{border:0!important;padding:'+topo+'mm '+lado+'mm '+base+'mm '+lado+'mm!important;'
+      +'min-height:0!important;height:auto!important;}'
     +'.fundoLaudo{display:none;}'
     +'}';
 }
@@ -6460,9 +6653,14 @@ function margensDaFolha(chave){
   var fnd=k ? (FUNDOS[k]||null) : null;
   var temFundo = fnd ? !!fnd.img : !!(folha && folha.querySelector('.fundoLaudo'));
   if(!k && !folha){ fnd=FUNDOS[window.__fundo||'branco']||FUNDOS.branco; temFundo=!!(fnd&&fnd.img); }
-  return { topo:temFundo?((fnd&&fnd.padTopMm)||34):10,
-           base:temFundo?((fnd&&fnd.padBottomMm)||24):10,
-           lado:8, temFundo:temFundo, fnd:fnd };
+  /* 01/09/2026, pedido dele: sem timbrado o texto ficava alto e rente às bordas, porque o
+     respiro de cima era ocupado pelo carimbo do navegador. Sem o carimbo, o espaço passa a
+     ser do laudo: 15 mm em cima e embaixo, 12 mm nas laterais — o texto assenta no meio da
+     folha, como se houvesse um cabeçalho e um rodapé reservados. São só estes três números;
+     mexer neles muda a folha inteira, na tela e no papel. */
+  return { topo:temFundo?((fnd&&fnd.padTopMm)||34):15,
+           base:temFundo?((fnd&&fnd.padBottomMm)||24):15,
+           lado:temFundo?8:12, temFundo:temFundo, fnd:fnd };
 }
 /* Qualquer impressão pelo navegador (o botão, Ctrl+P, "Salvar como PDF") recalcula as
    margens NA HORA, pela folha que vai sair — nenhum caminho fica para trás. */
@@ -7452,6 +7650,7 @@ async function capRegistrarDitado(blob){
   try{
     var r=await transcreverAudio(blob);
     a.transcricao=r.transcricao||''; a.nomePaciente=r.nome_paciente||''; a.tipoExame=r.tipo_exame||''; a.lateralidade=r.lateralidade||'';
+    if((r.trechos||[]).length) a.trechos=r.trechos;    // 31/08: a hora chega junto
     a.nome=nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||a.nome;
     log('Ditado pronto: '+(a.nomePaciente||'(nome não citado)')+(a.tipoExame?' · '+((MODELOS[a.tipoExame]&&MODELOS[a.tipoExame].nome)||a.tipoExame):''));
   }catch(e){ a._erro=e.message||String(e); log('Falha ao transcrever ditado: '+a._erro,true); }
@@ -11703,10 +11902,12 @@ function iaCfgPintarCusto(){
   var mesmo=(!aux || aux===pri);
   el.style.display=mesmo?'':'none';
   if(mesmo){
-    el.innerHTML='<b>As tarefas simples estão rodando no modelo principal'
+    el.innerHTML='<b>As tarefas de apoio estão rodando no modelo principal'
       +(pri?(' ('+esc(pri)+')'):'')+'.</b> Em todo exame, identificar o ditado, a segunda '
       +'leitura e os pedidos de ajuste pagam o preço do modelo que escreve o laudo. '
-      +'Um modelo mais barato aqui costuma ser a maior economia desta tela.';
+      +'Um modelo mais barato aqui costuma ser a maior economia desta tela. '
+      +'Enquanto os dois forem iguais, a fatura também não separa um do outro: '
+      +'o consumo é anotado por NOME de modelo, e os dois caem no mesmo balde.';
   }
 }
 /* ============ QUAIS MODELOS A CONTA DELE OFERECE (31/08/2026) ============
@@ -11725,7 +11926,15 @@ function iaCfgModeloEhConversa(id){
   if(/embedding|whisper|tts|audio|image|dall|moderation|realtime|transcribe|search|rerank/i.test(s)) return false;
   return /gpt|chat|o[0-9]|claude|gemini|llama|mistral|deepseek|qwen|grok/i.test(s);
 }
-function iaCfgModeloEhBarato(id){ return /mini|small|flash|lite|nano|haiku|turbo/i.test(String(id||'')); }
+/* ATENCAO — isto e um PALPITE PELO NOME, nao uma consulta de preco. A rota /ia/modelos
+   devolve so nomes; nenhum provedor manda a tabela de precos junto. Por isso a caixa se
+   chama "mais baratos" e nao "os baratos".
+   31/08/2026: a geracao 5.6 abandonou o sufixo mini/nano e passou a nomear os PORTES —
+   sol (topo), terra (meio), luna (pequeno). Sem luna|terra aqui, os dois unicos modelos
+   baratos da geracao atual caiam na caixa de baixo, nas posicoes 37 e 39 de 45: a tela
+   feita para ele nao garimpar obrigava a garimpar. "sol" fica DE FORA de proposito — e o
+   porte caro, custa o mesmo que o gpt-5.5. */
+function iaCfgModeloEhBarato(id){ return /mini|small|flash|lite|nano|haiku|turbo|luna|terra/i.test(String(id||'')); }
 async function iaCfgListarModelos(){
   var el=_iaEl('iaListaModelos'); if(!el) return;
   el.textContent='consultando o provedor…';
@@ -11748,12 +11957,15 @@ async function iaCfgListarModelos(){
   var baratos=conversa.filter(iaCfgModeloEhBarato);
   var outrosConversa=conversa.filter(function(m){ return !iaCfgModeloEhBarato(m); });
   var resto=todos.filter(function(m){ return conversa.indexOf(m)<0; });
+  var alvoAux=(_iaVal('iaNvAlvo')||'aux')!=='pri';
+  var comoTxt=alvoAux?'auxiliar':'principal';
   var chip=function(m){
-    return '<button class="iaChip" type="button" onclick="iaCfgEscolherAux(\''+esc(m)+'\')" '
-      +'title="usar &quot;'+esc(m)+'&quot; como modelo auxiliar">'+esc(m)+'</button>';
+    return '<button class="iaChip" type="button" onclick="iaCfgEscolherModelo(\''+esc(m)+'\')" '
+      +'title="usar &quot;'+esc(m)+'&quot; como modelo '+comoTxt+'">'+esc(m)+'</button>';
   };
   var h='<div style="margin-top:6px"><b>'+todos.length+' modelos na sua conta.</b> '
-    +'Toque num nome para usá-lo como <b>auxiliar</b>.</div>';
+    +'Toque num nome para usá-lo como <b>'+comoTxt+'</b> '
+    +'(troque no seletor acima antes de tocar, se quiser o outro campo).</div>';
   if(baratos.length){
     h+='<div style="margin-top:8px"><span class="k" style="font-family:var(--mono);font-size:9.5px;'
       +'letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Mais baratos (o que você procura)</span>'
@@ -11772,11 +11984,15 @@ async function iaCfgListarModelos(){
   }
   el.innerHTML=h;
 }
-function iaCfgEscolherAux(m){
-  var a=_iaEl('iaNvAux'); if(a) a.value=m;
+/* 31/08/2026: a lista passou a servir aos DOIS campos. O destino vem do seletor
+   #iaNvAlvo, lido na hora do toque — nao no momento em que a lista foi montada — para
+   que trocar o destino e tocar num nome ja listado faca o esperado. */
+function iaCfgEscolherModelo(m){
+  var pri=(_iaVal('iaNvAlvo')||'aux')==='pri';
+  var campo=_iaEl(pri?'iaNvModelo':'iaNvAux'); if(campo) campo.value=m;
   iaCfgMarcarSujo(); iaCfgPintarCusto();
   var el=_iaEl('iaListaModelos');
-  if(el) el.innerHTML='<b>“'+esc(m)+'”</b> escolhido como auxiliar. '
+  if(el) el.innerHTML='<b>“'+esc(m)+'”</b> escolhido como <b>'+(pri?'principal':'auxiliar')+'</b>. '
     +'Toque em <b>Salvar alterações</b> para valer.';
 }
 function iaCfgRender(){
@@ -12044,6 +12260,7 @@ function modCfgAbrir(){
   modCfgLembrarTela();   // para o "Voltar ao programa" saber para onde voltar
   ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo','telaRev2']
     .forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  hisSincronizarVerHist();   // esconder telaVerLaudo aqui NAO removia a plaquinha (ver a funcao)
   var t=document.getElementById('telaModelos'); if(t) t.style.display='block';
   /* Entrar nas Configurações começa na lista, nunca dentro do modelo que ficou aberto da
      vez anterior — senão a tela abre num texto longo e a grade nem aparece. */
@@ -12056,6 +12273,7 @@ function modCfgAbrirBizus(){
   modCfgLembrarTela();
   ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo','telaRev2']
     .forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  hisSincronizarVerHist();   // idem modCfgAbrir
   var t=document.getElementById('telaModelos'); if(t) t.style.display='block';
   modCfgIr('bizus');
   window.scrollTo(0,0);
@@ -13866,6 +14084,7 @@ function rev2Abrir(exId){
   ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo'].forEach(function(id){
     var e=document.getElementById(id); if(e) e.style.display='none';
   });
+  hisSincronizarVerHist();   // reabrir pelo historico escondia telaVerLaudo e deixava a plaquinha
   var t=document.getElementById('telaRev2'); if(t) t.style.display='block';
   rev2Render();
   window.scrollTo(0,0);
@@ -14121,6 +14340,35 @@ function rev2Casa(achado, titulo){
   if(!a || !t) return false;
   return a===t || a.indexOf(t)>=0 || t.indexOf(a)>=0;
 }
+/* ============ ESTE RETÂNGULO TEM ACHADO PATOLÓGICO? (31/08/2026) ============
+   Saiu de dentro de rev2Estado para virar pergunta própria. O motivo é um defeito real,
+   relatado por ele: no áudio editado "ele só apresentou a primeira patologia, esteatose.
+   O cálculo ele ignorou".
+
+   POR QUE ACONTECIA: o áudio editado perguntava a COR DO CARTÃO (rev2Estado==='alterado').
+   Só que rev2Estado responde a outra pergunta — "o que o médico precisa ver primeiro?" — e
+   ali a falta de medida VENCE a patologia: um retângulo com achado E com "....." por
+   preencher volta 'falta' (vermelho), nunca 'alterado'. Foi exatamente o caso do cálculo
+   renal, que estava em negrito e com a medida em branco: o cartão dizia "Rim esquerdo —
+   falta a medida", e o áudio editado o descartava por não ser 'alterado'.
+
+   São duas perguntas diferentes e agora têm duas funções diferentes. Achado é achado,
+   esteja a medida preenchida ou não — e é justamente o achado sem medida o que ele mais
+   precisa reouvir. */
+function rev2TemAchado(ex, b){
+  if(!b || b._titulo || b._dc || b._conc) return false;
+  var _molde=rev2MoldeDoLaudo(ex);
+  var resto=String(b.texto||'').replace(/\*\*([^*]+?)\*\*/g, function(m, t){
+    var lim=String(t).replace(/[:\s]+$/,'').trim(), as=rev2Assinatura(lim);
+    if(lim===b.titulo || rev2TituloDeMoldura(lim)) return '';
+    // estrutura do modelo (título OU rótulo de medida) — de qualquer tamanho
+    if(_molde && (_molde.titulos[as] || _molde.medidas[as])) return '';
+    // sem molde (laudo antigo): a heurística é a reserva, e é conservadora de propósito
+    if(!_molde && rev2NegritoDeMedida(lim)) return '';
+    return m;
+  });
+  return /\*\*/.test(resto);
+}
 function rev2Estado(ex, b){
   /* 31/08: o título é a primeira linha do documento, não um achado. Sem esta linha ele
      cairia na regra dos pontilhados e um título como "MAMA ....." pintaria o cartão de
@@ -14149,17 +14397,7 @@ function rev2Estado(ex, b){
      normal. E o verde só aparecia DEPOIS de o médico preencher as medidas, porque até lá
      o vermelho de "falta medida" mascarava. Agora cai fora todo negrito que seja o
      título, moldura ou MEDIDA — de qualquer tamanho. O que sobrar é achado de verdade. */
-  var _molde=rev2MoldeDoLaudo(ex);
-  var resto=b.texto.replace(/\*\*([^*]+?)\*\*/g, function(m, t){
-    var lim=String(t).replace(/[:\s]+$/,'').trim(), as=rev2Assinatura(lim);
-    if(lim===b.titulo || rev2TituloDeMoldura(lim)) return '';
-    // estrutura do modelo (título OU rótulo de medida) — de qualquer tamanho
-    if(_molde && (_molde.titulos[as] || _molde.medidas[as])) return '';
-    // sem molde (laudo antigo): a heurística é a reserva, e é conservadora de propósito
-    if(!_molde && rev2NegritoDeMedida(lim)) return '';
-    return m;
-  });
-  if(/\*\*/.test(resto)) return 'alterado';   // negrito além da moldura = achado patológico
+  if(rev2TemAchado(ex, b)) return 'alterado';   // negrito além da moldura = achado patológico
   // informação que veio do ditado (indicação clínica, história) não é "órgão sem
   // alteração": fica branca e legível, em vez de apagada em cinza
   var pr=rev2Proc(ex, b.titulo);
@@ -14309,7 +14547,14 @@ function rev2Render(){
     var est=rev2Estado(ex,b), pr=rev2Proc(ex,b.titulo), selo='';
     if(pr && pr.imagem_n>0 && (ex.imagens||[]).length>=pr.imagem_n)
       selo+='<button class="img" onclick="rev2VerImagem('+pr.imagem_n+')" title="mostrar a imagem de onde saiu esta medida">IMG</button>';
-    var tr=pr?rev2Trecho(ex,pr.citacao):null, trI=tr?((L.trechos||[]).indexOf(tr)):-1;
+    /* 31/08/2026: sem chave nenhuma não havia botão VOZ, mesmo com o ditado inteiro
+       guardado e a hora de cada palavra disponível.
+       01/09/2026: a faixa apontada pela IA vem primeiro (exata); na busca por trás,
+       rev2TrechoDoBloco tenta o achado em negrito antes da citação — ver o porquê lá. */
+    var _fx=rev2RecortePorFaixa(ex,b);
+    var tr=_fx?((L.trechos||[])[_fx.trecho]):null;
+    if(!tr){ var _td=rev2TrechoDoBloco(ex,b); tr=_td?_td.tr:null; }
+    var trI=tr?((L.trechos||[]).indexOf(tr)):-1;
     /* 28/08: o índice do BLOCO vai junto — é por ele que rev2Tocar acha a citação deste
        retângulo e recorta só a frase da patologia, em vez do pedaço inteiro de fala. */
     if(tr && trI>=0) selo+='<button class="voz" onclick="rev2Tocar('+trI+','+i+')" title="ouvir só a frase deste achado no ditado">VOZ</button>'
@@ -14777,12 +15022,145 @@ function rev2Parar(){
    É ESTIMATIVA, e a folga existe para errar por sobra e nunca cortar a frase no meio.
    Sem citação (ou não achando), devolve o começo do trecho limitado a TETO segundos —
    nunca o trecho inteiro de 4 minutos. */
-var RV2_FOLGA=1.2;    // segundos de respiro antes e depois da frase
+var RV2_FOLGA=1.2;    // segundos de respiro ANTES da frase
+/* 31/08/2026, pedido dele: "pode botar o corte 2 segundos depois do fim daquela
+   patologia específica, porque ele tá cortando muito em cima".
+   A folga do FIM é maior que a do começo de propósito, e não por descuido: o começo da
+   frase se reconhece pelo silêncio anterior, mas o fim costuma trazer o complemento que
+   confirma o achado ("...compatível com esteatose hepática **leve**"). Cortar em cima do
+   fim tira justamente a palavra que decide.
+   AJUSTADO PARA 1,5 s na mesma noite, depois de ele ouvir os 3 s no exame das 22h43:
+   "a folga pode ser de 1,5 segundo". Três segundos alcançavam o achado seguinte quando
+   ele dita as patologias em sequência — o que a montagem agora apara, mas aparar é
+   remendo; 1,5 s já não invade. */
+var RV2_FOLGA_FIM=1.5;
 var RV2_MIN=2.5;      // nenhum recorte menor que isto (frase curta sem contexto não confirma)
 var RV2_TETO=14;      // nem maior que isto (deixa de ser "poucos segundos")
+/* ============ O RECORTE PELA PALAVRA (31/08/2026) ============
+   Desde hoje o transcritor devolve a hora de CADA PALAVRA (asr.py, word_timestamps).
+   Quando ela existe, o recorte deixa de ser estimativa e passa a ser medida: acha-se a
+   citacao dentro da fita de palavras e corta-se na hora da primeira e da ultima.
+
+   POR QUE ISTO IMPORTA — medido no ditado real "Teste 2" de 31/08: um trecho unico de
+   1,23 s a 26,89 s, texto "Ah, teste 2, exame de mama, ok.". Parece 25 s de fala; sao
+   dois jorros, com 20 s de silencio no meio. A regra de tres punha "exame de mama" aos
+   10,79 s (silencio puro); a hora de verdade e 24,51 s. Erro de 13,7 s.
+
+   O CASAMENTO NAO EXIGE CITACAO LITERAL. A IA copia "de 4 a 12 palavras do ditado", mas
+   corrige e resume — e uma citacao que nao bate como texto corrido deixava o botao mudo.
+   Aqui procura-se a maior sequencia EM ORDEM das palavras da citacao dentro da fita,
+   tolerando palavras no meio e ignorando as curtas (de, da, com, em...). */
+var RV2_STOP=' de da do das dos e ou em no na nos nas com sem por para a o as os um uma que se ao aos ';
+/* Duas palavras são a mesma? Igualdade, ou mesmo começo com o mesmo tamanho aproximado —
+   é o que casa "cálculo/cálculos" e "hepática/hepático" sem casar bobagem.
+   31/08/2026: a versão anterior aceitava QUALQUER uma ser pedaço da outra, e isso fazia
+   "de" casar dentro de "decúbito". Palavra curta (menos de 4 letras) agora só casa exata:
+   "rim" tem de ser "rim". */
+function rev2PalavraCasa(a, b){
+  if(!a || !b) return false;
+  if(a===b) return true;
+  if(a.length<4 || b.length<4) return false;
+  return a.slice(0,4)===b.slice(0,4) && Math.abs(a.length-b.length)<=3;
+}
+/* ACHAR A PATOLOGIA NA FITA DE PALAVRAS — reescrito em 31/08/2026 depois do exame real
+   das 22h21, onde os TRÊS achados saíram errados de três maneiras diferentes:
+
+   1. "esteatose 1" (fígado) — a citação tem UMA palavra-chave só ("1" é curto demais e
+      cai). A regra antiga exigia DUAS palavras casadas ("uma só é coincidência") e
+      devolvia NADA, jogando o recorte na estimativa: tocou 22,46 s quando a esteatose
+      foi dita aos 14,22 s. Oito segundos fora. Agora a exigência é
+      min(2, quantas a citação tem): citação de uma palavra vale com uma, desde que ela
+      seja longa o bastante para não ser coincidência.
+
+   2. "cálculo na vesícula biliar" — ele disse "cálculo" aos 16,78 s e só completou "na
+      vesícula biliar" aos 31,90 s, examinando no meio. A regra antiga pegava do PRIMEIRO
+      ao ÚLTIMO casamento: 16 segundos, mais que o teto. O corte então começava aos
+      15,58 s — dentro da fala da ESTEATOSE — e terminava aos 29,58 s, ANTES de a palavra
+      "vesícula" ser dita. Era o "misturou a esteatose com a vesícula" que ele relatou.
+      Agora procura-se a JANELA MAIS DENSA: o punhado de palavras-chave que cabe no
+      tempo do recorte. Para este caso dá "vesícula biliar" aos 32,18 s — a parte que
+      nomeia o achado, que é a que confirma.
+
+   3. Como o corte do fígado e o da vesícula se sobrepunham, a montagem do áudio editado
+      fundiu os dois num só e anunciou "2 patologias" havendo três. */
+function rev2AcharNasPalavras(pals, citacao){
+  var alvo=norm(citacao||'').split(' ').filter(function(w){
+    return w.length>2 && RV2_STOP.indexOf(' '+w+' ')<0; });
+  if(!alvo.length || !(pals&&pals.length)) return null;
+  // onde cada palavra-chave aparece na fita (uma marca por palavra falada)
+  var marcas=[];
+  for(var j=0;j<pals.length;j++){
+    var w=norm(pals[j].p);
+    for(var k=0;k<alvo.length;k++){
+      if(rev2PalavraCasa(w, alvo[k])){ marcas.push({j:j, k:k}); break; }
+    }
+  }
+  if(!marcas.length) return null;
+  /* PRIMEIRO SEPARA POR PAUSA. Uma palavra-chave que aparece longe das outras quase
+     sempre é OUTRA menção, não a mesma frase — e a palavra que mais se repete no laudo é
+     justamente a que nomeia o achado ("cálculo" na vesícula E no rim). Sem este corte, a
+     busca da vesícula alcançava o "cálculo" do rim 7 s adiante, contava 3 palavras e
+     devolvia uma janela de 13 s que atropelava o achado seguinte.
+     5 segundos: mais que isso, ele parou para examinar — não é a mesma frase. */
+  var RV2_PAUSA=5.0;
+  // quanto de FALA cabe dentro de um recorte, descontadas as folgas dos dois lados
+  var util=Math.max(RV2_MIN, RV2_TETO-RV2_FOLGA-RV2_FOLGA_FIM);
+  var grupos=[[marcas[0]]];
+  for(var g=1;g<marcas.length;g++){
+    var ant=grupos[grupos.length-1], ultimo=ant[ant.length-1];
+    if(pals[marcas[g].j].i - pals[ultimo.j].f <= RV2_PAUSA) ant.push(marcas[g]);
+    else grupos.push([marcas[g]]);
+  }
+  var melhor=null;
+  grupos.forEach(function(gr){
+    // dentro do grupo, a melhor janela que ainda CABE no recorte
+    for(var a=0;a<gr.length;a++){
+      var vistos={}, n=0, b=a;
+      for(var c=a;c<gr.length;c++){
+        if(pals[gr[c].j].f - pals[gr[a].j].i > util) break;      // nao cabe no recorte
+        if(!vistos[gr[c].k]){ vistos[gr[c].k]=1; n++; }          // conta palavra DISTINTA
+        b=c;
+      }
+      var span=pals[gr[b].j].f - pals[gr[a].j].i;
+      // mais palavras-chave distintas ganha; empatou, a janela mais APERTADA ganha
+      if(!melhor || n>melhor.n || (n===melhor.n && span<melhor.span))
+        melhor={a:gr[a], b:gr[b], n:n, span:span};
+    }
+  });
+  if(!melhor) return null;
+  // Uma palavra só: aceita, mas ela tem de ser longa — "esteatose" sim, "rim" não.
+  if(melhor.n<Math.min(2, alvo.length)) return null;
+  if(melhor.n===1 && alvo[melhor.a.k].length<5) return null;
+  return {ini:pals[melhor.a.j].i, fim:pals[melhor.b.j].f,
+          casou:melhor.n, de:alvo.length};
+}
 function rev2RecorteFino(tr, citacao){
   var ini=(tr&&tr.inicio)||0, fim=(tr&&tr.fim)||ini;
   var dur=fim-ini;
+  // caminho novo: a hora de verdade, quando o ditado foi transcrito com palavras
+  var pals=(tr&&tr.palavras)||null;
+  if(pals && pals.length && norm(citacao||'').length>=6){
+    var m=rev2AcharNasPalavras(pals, citacao);
+    if(m){
+      /* NEM O COMEÇO NEM O FIM SE PRENDEM AO TRECHO (31/08/2026).
+         O fim se soltou primeiro; o começo tinha um Math.max(ini, …) que fazia o mesmo
+         estrago do outro lado, e apareceu no exame das 22h43: ele disse "Esteatose 3" e
+         o transcritor abriu o trecho EXATAMENTE na palavra (18,24 s), porque o corte de
+         silêncio encosta o trecho na primeira sílaba. A folga de 1,2 s era zerada pelo
+         limite, o tocador entrava em cima do "Es-" e ele ouviu só "três".
+         O trecho é onde a FALA foi reconhecida, não onde o áudio começa: recuar antes
+         dele é recuar para o silêncio que veio antes, que é exatamente o que se quer. */
+      var a=Math.max(0, m.ini-RV2_FOLGA);
+      var b=m.fim+RV2_FOLGA_FIM;
+      if(b-a<RV2_MIN) b=a+RV2_MIN;                      // frase curta: da contexto
+      if(b-a>RV2_TETO) b=a+RV2_TETO;
+      /* falaIni/falaFim = onde a PATOLOGIA foi dita de verdade, sem as folgas. Quem monta
+         o áudio editado usa isto para aparar folga que invade o achado seguinte, sem
+         nunca cortar a fala em si. */
+      return {ini:a, fim:b, estimado:false, palavras:true, casou:m.casou, de:m.de,
+              falaIni:m.ini, falaFim:m.fim};
+    }
+  }
   var corta=function(a,b){
     b=Math.min(b, ini+Math.max(dur,0));
     if(b-a<RV2_MIN) b=a+RV2_MIN;
@@ -14800,16 +15178,161 @@ function rev2RecorteFino(tr, citacao){
   if(pos<0 || !t.length) return corta(ini, ini+RV2_TETO);        // sem pista: começo, curto
   var segPorChar=dur/t.length;
   var comeca=ini + pos*segPorChar - RV2_FOLGA;
-  var dura=Math.max(RV2_MIN, Math.min(RV2_TETO, (c.length||40)*segPorChar + 2*RV2_FOLGA));
+  /* Na ESTIMATIVA a folga do fim entra na duração, mas o recorte segue preso ao trecho
+     (o `corta` abaixo). Aqui não se sabe onde a frase termina de verdade — esticar para
+     fora do trecho seria somar folga a um palpite. Quem tem hora de palavra estica; quem
+     só tem regra de três, não. */
+  var dura=Math.max(RV2_MIN, Math.min(RV2_TETO, (c.length||40)*segPorChar + RV2_FOLGA + RV2_FOLGA_FIM));
   return corta(Math.max(ini, comeca), Math.max(ini, comeca)+dura);
+}
+/* O ACHADO EM NEGRITO deste retângulo, sem a moldura do título.
+   31/08/2026 — serve de PLANO B da citação. Até aqui, quando a IA não devolvia
+   `procedencia.citacao`, o botão VOZ tocava o começo do trecho e o áudio editado dizia
+   "não há trecho de patologia para montar" — mesmo com o ditado inteiro guardado ali.
+   O programa dependia de a IA lembrar de copiar o ditado; agora, quando ela não copia,
+   procura-se o PRÓPRIO ACHADO na fita de palavras. "esteatose hepática moderada" está
+   escrito no laudo e foi dito no ditado: não era preciso um intermediário. */
+function rev2AchadoEmNegrito(b){
+  if(!b) return '';
+  var t=String(b.texto||'');
+  var cv=rev2CorpoVisivel(b);            // tira o "**Fígado**:" que é moldura, não achado
+  if(cv && cv.txt) t=cv.txt;
+  /* 01/09/2026 — O TETO DE 90 CARACTERES ESTAVA DESCARTANDO O ACHADO EM SILÊNCIO.
+     Medido nos laudos já gerados: de 2561 trechos em negrito, 268 (10,5%) passam de
+     90 caracteres — não é caso raro, é um em dez. Quando o achado é longo demais para
+     o teto, o regex simplesmente NÃO CASA aquele "**...**" (o fechamento fica fora da
+     janela de 90), e o exec() global recomeça a busca DEPOIS da abertura — encontrando
+     como próximo "**" o FECHAMENTO do próprio achado, e casando com ele como se fosse
+     uma NOVA abertura. O resultado, medido no exame de 01/09 07h55 (achado do Fígado
+     com 95 caracteres): rev2AchadoEmNegrito devolvia trecho de MEDIDA numérica do
+     órgão seguinte, não o achado. Sem teto: o "**...**" é delimitado pelo próprio par,
+     não por uma contagem de caracteres — não há razão para limitar aqui. */
+  var achados=[], m, re=/\*\*([^*]{3,})\*\*/g;
+  while((m=re.exec(t))) achados.push(m[1]);
+  return achados.join(' ').trim();
+}
+/* ============ O RECORTE EXATO, APONTADO PELA IA (01/09/2026) ============
+   A outra ponta da fita numerada (ver fitaDeTrechos, lá em cima). A IA devolve
+   palavra_ini/palavra_fim em cada item de procedencia; aqui esses números viram tempo.
+   Não há busca nenhuma — por isso este caminho não tem casos de borda.
+
+   MAS OS NÚMEROS SÃO DELA, e ela pode errar. Três conferências antes de aceitar:
+     · estão dentro da fita e em ordem;
+     · a fala apontada não é o exame inteiro (um achado não dura 90 s);
+     · e, havendo citação, as palavras apontadas têm de ter ALGO em comum com ela —
+       é o que pega o erro de dez posições, que seria o pior de todos: tocar com
+       confiança o achado do órgão errado.
+   Reprovando em qualquer uma, devolve null e a tela cai no casamento por busca. */
+/* O SELO: por qual caminho este recorte saiu. Três níveis de confiança, ditos com todas
+   as letras. O caminho "apontado" não tem busca nenhuma e por isso não tem caso de borda;
+   o "casado" procura na fita e acerta quase sempre; o "estimado" é regra de três e existe
+   só para ditado antigo, ou vindo da nuvem, que não devolve hora de palavra. */
+function rev2SeloDoRecorte(rec){
+  if(!rec) return '';
+  if(rec.apontado) return ' <span style="font-size:11px">(a IA apontou as palavras)</span>';
+  if(rec.palavras) return ' <span style="font-size:11px">(hora exata da fala)</span>';
+  if(rec.estimado) return ' <span class="aviso" style="font-size:11px">(recorte estimado — pode sair deslocado)</span>';
+  return '';
+}
+function rev2Fita(L){ return fitaDeTrechos((L||{}).trechos||[]); }
+function rev2RecortePorFaixa(ex, b){
+  var L=(ex||{}).laudo; if(!L) return null;
+  var pr=null; try{ pr=rev2Proc(ex, b&&b.titulo); }catch(e){}
+  if(!pr) return null;
+  var a=parseInt(pr.palavra_ini,10), z=parseInt(pr.palavra_fim,10);
+  if(!(a>0) || !(z>0) || z<a) return null;
+  var fita=rev2Fita(L); if(!fita.length || z>fita.length) return null;
+  var p1=fita[a-1], p2=fita[z-1];
+  if(p1.t!==p2.t) return null;                       // faixa cruzando gravações: desconfia
+  if(p2.f-p1.i>90) return null;                      // achado nenhum dura isso
+  /* A FAIXA DE ENCHIMENTO (medido em 01/09/2026). Num exame sem achado ditado, a IA
+     preencheu as DOZE seções com a MESMA faixa — e ela apontava "tudo bem, tá?", a
+     despedida. O médico apertaria o botão do fígado e ouviria isso. O pedido agora manda
+     usar zero nesses casos, mas a instrução é conselho: aqui é a trava.
+     Repetir uma faixa em duas seções é legítimo (ele diz "pedra no rim" uma vez e vale
+     para os dois rins). Em três ou mais, é enchimento. */
+  var repet=0, lista=(L.procedencia||[]);
+  for(var r=0;r<lista.length;r++){
+    var o=lista[r]||{};
+    if(parseInt(o.palavra_ini,10)===a && parseInt(o.palavra_fim,10)===z) repet++;
+  }
+  if(repet>=3) return null;
+  var cit=String(pr.citacao||'');
+  if(norm(cit).length>=6){
+    var alvo=norm(cit).split(' ').filter(function(w){
+      return w.length>2 && RV2_STOP.indexOf(' '+w+' ')<0; });
+    if(alvo.length){
+      var bateu=false;
+      for(var k=a-1;k<z && !bateu;k++){
+        var w=norm(fita[k].p);
+        for(var q=0;q<alvo.length;q++) if(rev2PalavraCasa(w, alvo[q])){ bateu=true; break; }
+      }
+      if(!bateu) return null;                        // apontou longe do que ela mesma citou
+    }
+  }
+  var ini=Math.max(0, p1.i-RV2_FOLGA), fim=p2.f+RV2_FOLGA_FIM;
+  if(fim-ini<RV2_MIN) fim=ini+RV2_MIN;
+  if(fim-ini>RV2_TETO) fim=ini+RV2_TETO;
+  return {ini:ini, fim:fim, estimado:false, palavras:true, apontado:true,
+          falaIni:p1.i, falaFim:p2.f, trecho:p1.t, audioUrl:p1.audioUrl||''};
 }
 /* A citação que explica ESTE retângulo (o botão VOZ manda o índice do bloco). */
 function rev2CitacaoDoBloco(ex, bi){
   try{
     var b=rev2BlocosDaTela(ex.laudo)[bi]; if(!b) return '';
-    var pr=rev2Proc(ex, b.titulo);
-    return (pr&&pr.citacao)||'';
+    return rev2ChaveDoBloco(ex, b);
   }catch(e){ return ''; }
+}
+/* A chave de busca do retângulo: a citação da IA quando existe, o achado em negrito
+   quando não. Um lugar só, para o VOZ e o áudio editado nunca discordarem. */
+function rev2ChaveDoBloco(ex, b){
+  var pr=null;
+  try{ pr=rev2Proc(ex, b&&b.titulo); }catch(e){}
+  var c=(pr&&pr.citacao)||'';
+  if(norm(c).length>=6) return c;
+  return rev2AchadoEmNegrito(b);
+}
+/* Procura a chave em TODOS os trechos e devolve o que casou melhor.
+   Só funciona onde há hora por palavra — que é justamente o caso novo. */
+function rev2TrechoPorPalavras(ex, chave){
+  var tr=((ex.laudo||{}).trechos)||[];
+  if(norm(chave||'').length<6) return null;
+  var melhor=null;
+  for(var i=0;i<tr.length;i++){
+    var p=tr[i].palavras; if(!p||!p.length) continue;
+    var m=rev2AcharNasPalavras(p, chave);
+    if(m && (!melhor || m.casou>melhor.m.casou)) melhor={tr:tr[i], m:m};
+  }
+  return melhor?melhor.tr:null;
+}
+/* ============ QUAL TRECHO, COM QUAL CHAVE (01/09/2026) ============
+   Achado em negrito primeiro, citação da IA em segundo — troca de prioridade em cima
+   da que existia até aqui (rev2ChaveDoBloco preferia a citação sempre que ela não
+   estivesse vazia).
+
+   O CASO REAL que forçou a troca (exame de 01/09, 07h55): o médico ditou "Dados
+   clínicos, rotina. Esteatose hepática leve, cálculo no rim direito...". A IA citou,
+   para a seção Fígado, "Dados clínicos, rotina. Esteatose hepática leve" — uma citação
+   CORRETA sobre a esteatose, mas CONTAMINADA com a frase anterior, de outro assunto.
+   Essa citação tem 3 palavras em comum com o trecho da rotina (dados/clínicos/rotina)
+   e 3 com o trecho da esteatose (esteatose/hepática/leve) — EMPATE. rev2Trecho, no
+   empate, fica com o primeiro trecho que encontra — que era a conversa de rotina, não
+   o achado. O botão VOZ do fígado tocava "dados clínicos, rotina, tá?".
+
+   O achado em negrito ("esteatose hepática leve", ou o texto elaborado ao redor) não
+   tem essa contaminação: é vocabulário da PATOLOGIA, específico daquele órgão, que só
+   aparece no trecho certo — não empata com a conversa de entrada do exame. Por isso
+   vai primeiro. A citação continua como reserva, para quando o achado em negrito não
+   bate com nenhuma palavra do ditado (a IA às vezes reformula o achado longe do que
+   foi dito; a citação, sendo cópia literal, cobre esse caso). */
+function rev2TrechoDoBloco(ex, b){
+  var achado=rev2AchadoEmNegrito(b);
+  var tr=rev2Trecho(ex,achado) || rev2TrechoPorPalavras(ex,achado);
+  if(tr) return {tr:tr, chave:achado};
+  var pr=null; try{ pr=rev2Proc(ex, b&&b.titulo); }catch(e){}
+  var cit=(pr&&pr.citacao)||'';
+  tr=rev2Trecho(ex,cit) || rev2TrechoPorPalavras(ex,cit);
+  return tr ? {tr:tr, chave:cit} : null;
 }
 function rev2Tocar(i, bi){
   var ex=rev2Ex(); if(!ex) return;
@@ -14818,13 +15341,25 @@ function rev2Tocar(i, bi){
   var el=document.getElementById('rv2Audio');
   var cx=document.getElementById('rv2Tocador');
   if(!a || !el){ if(cx) cx.textContent='o áudio deste exame não está disponível para tocar.'; return; }
-  var rec=rev2RecorteFino(tr, (bi==null?'':rev2CitacaoDoBloco(ex, bi)));
+  /* 01/09/2026: a faixa apontada pela IA vem primeiro, aqui como no áudio editado — os
+     dois têm de mostrar o MESMO pedaço, senão o botão de um retângulo tocaria uma coisa
+     e o áudio editado outra, para o mesmo achado.
+     O recorte fino (quando a faixa não vem) usa a MESMA chave que escolheu este `tr` lá
+     no desenho da tela — achado em negrito primeiro, citação depois (rev2TrechoDoBloco).
+     Usar a citação sozinha aqui, como antes, podia recortar dentro do trecho CERTO com
+     a palavra ERRADA quando a citação da IA vinha contaminada por uma frase vizinha. */
+  var bl=(bi==null?null:rev2BlocosDaTela(ex.laudo)[bi]);
+  var _td=bl?rev2TrechoDoBloco(ex,bl):null;
+  var rec=(bl && rev2RecortePorFaixa(ex, bl)) || rev2RecorteFino(tr, _td?_td.chave:'');
   var ini=rec.ini, fim=rec.fim;
   rev2PararEditado();                         // um tocador de cada vez
   if(el.src!==a.url) el.src=a.url;
   el.currentTime=ini; el.play();
   if(cx) cx.innerHTML='▶ trecho do ditado — <b>'+rev2Rel(ini)+'</b> · '+Math.max(1,Math.round(fim-ini))+' s'
-    +(rec.estimado?' <span class="aviso" style="font-size:11px">(recorte estimado)</span>':'');
+    /* 31/08/2026, ampliado em 01/09: a tela diz COMO o pedaço foi achado. São três
+       caminhos com confiança bem diferente, e ele precisa saber em qual está pisando —
+       boa parte da confusão de 31/08 foi descobrir o erro OUVINDO, sem a tela avisar. */
+    +rev2SeloDoRecorte(rec);
   clearTimeout(window.__rv2Par);
   window.__rv2Par=setTimeout(function(){ try{ el.pause(); }catch(e){} }, Math.max(500,(fim-ini)*1000));
 }
@@ -14842,22 +15377,58 @@ function rev2ClipesPatologia(){
   try{
     rev2BlocosDaTela(L).forEach(function(b){
       if(b._dc||b._conc||b._titulo) return;
-      if(rev2Estado(ex,b)!=='alterado') return;          // só patologia
-      var pr=rev2Proc(ex,b.titulo); if(!pr||!pr.citacao) return;
-      var tr=rev2Trecho(ex,pr.citacao); if(!tr) return;
-      var rec=rev2RecorteFino(tr, pr.citacao);
+      /* 31/08: pergunta "tem achado?" em vez de "o cartão está verde?". Ver
+         rev2TemAchado — a falta de medida repinta o cartão de vermelho e escondia do
+         áudio editado justamente o achado ainda por medir. */
+      if(!rev2TemAchado(ex,b)) return;                   // só patologia
+      /* 01/09/2026: primeiro a FAIXA apontada pela IA, que é exata. Só quando ela não
+         vem, ou não passa na conferência, é que se cai no casamento por busca. */
+      var rec=rev2RecortePorFaixa(ex,b), tr=null;
+      if(rec) tr=(trechos[rec.trecho])||null;
+      else{
+        /* 31/08/2026: a chave é a citação da IA OU o próprio achado em negrito — antes,
+           sem citação o retângulo era descartado aqui e o áudio editado saía vazio.
+           01/09/2026: o achado em negrito vai PRIMEIRO agora (rev2TrechoDoBloco) — é
+           vocabulário só daquele órgão, e não empata com uma frase vizinha contaminando
+           a citação da IA. Ver o caso real no comentário de rev2TrechoDoBloco. */
+        var _td=rev2TrechoDoBloco(ex,b); if(!_td) return;
+        tr=_td.tr;
+        if(tr) rec=rev2RecorteFino(tr, _td.chave);
+      }
+      if(!tr || !rec) return;
       clipes.push({ini:rec.ini, fim:rec.fim, rotulo:b.titulo||'achado',
+                   falaIni:(rec.falaIni!=null?rec.falaIni:rec.ini),
+                   falaFim:(rec.falaFim!=null?rec.falaFim:rec.fim),
                    url:(rev2AudioDoTrecho(audios.filter(function(x){ return x.exameId===ex.id; }), tr)||{}).url||''});
     });
   }catch(e){}
   clipes=clipes.filter(function(c){ return c.url; }).sort(function(a,b){ return a.ini-b.ini; });
+  /* ============ MONTAGEM: APARAR ANTES DE FUNDIR (31/08/2026) ============
+     A regra antiga fundia dois recortes que se encostassem por menos de 0,4 s. Com a
+     folga de 3 s no fim, isso passou a fundir achados DIFERENTES só porque a folga de um
+     invadia o começo do outro — medido no exame das 22h43: "cálculo no rim direito"
+     (até 31,56 s) e "esplenomegalia" (a partir de 34,02 s) são falas separadas por 2,5 s
+     de silêncio, e mesmo assim viravam um clipe só. A tela anunciava 2 patologias
+     havendo 3, e o contador que ele pediu perdia o sentido.
+
+     Agora a pergunta é outra: a FALA se sobrepõe, ou só a folga?
+       · a fala se sobrepõe  -> é uma frase só que descreve os dois achados: funde
+         (é o caso que o "não sair picada" queria proteger);
+       · só a folga invade   -> apara a folga do primeiro e mantém os dois separados,
+         nunca cortando a fala em si (falaFim é o piso). */
   var junto=[];
   clipes.forEach(function(c){
     var ult=junto[junto.length-1];
-    if(ult && ult.url===c.url && c.ini<=ult.fim+0.4){    // encostados: viram um só
+    if(ult && ult.url===c.url && ult.falaFim>=c.falaIni-0.05
+       && (Math.max(ult.fim,c.fim)-ult.ini)<=RV2_TETO){
       ult.fim=Math.max(ult.fim,c.fim);
+      ult.falaFim=Math.max(ult.falaFim,c.falaFim);
       if(ult.rotulo.indexOf(c.rotulo)<0) ult.rotulo+=' · '+c.rotulo;
-    } else junto.push(c);
+    } else {
+      // apara a folga do anterior para ela não entrar na fala deste
+      if(ult && ult.url===c.url && ult.fim>c.ini) ult.fim=Math.max(ult.falaFim, c.ini-0.15);
+      junto.push(c);
+    }
   });
   return junto;
 }
@@ -14883,8 +15454,9 @@ function rev2Editado(){
     if(!sessao.vivo) return;
     if(n>=clipes.length){
       try{ el.pause(); }catch(e){}
-      if(cx) cx.innerHTML='fim do áudio editado — '+clipes.length+' trecho(s), '
-        +Math.round(total)+' s no total. <button class="voz" onclick="rev2Editado()">tocar de novo</button>';
+      if(cx) cx.innerHTML='<b>'+clipes.length+'/'+clipes.length+'</b> · fim do áudio editado — '
+        +clipes.length+' patologia(s), '+Math.round(total)+' s no total. '
+        +'<button class="voz" onclick="rev2Editado()">tocar de novo</button>';
       window.__rv2Ed=null; return;
     }
     var c=clipes[n++];
@@ -14894,7 +15466,10 @@ function rev2Editado(){
       if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). O agente precisa estar ligado.';
       sessao.vivo=false;
     });
-    if(cx) cx.innerHTML='▶ áudio editado — <b>'+esc(c.rotulo)+'</b> ('+n+' de '+clipes.length+') · '
+    /* 31/08/2026, pedido dele: "na hora que eu der play, um numerozinho: 1/3, depois 2/3,
+       depois 3/3". Vai na FRENTE, antes do nome do achado — é a primeira coisa que ele
+       procura para saber se ainda falta patologia por ouvir. */
+    if(cx) cx.innerHTML='▶ <b>'+n+'/'+clipes.length+'</b> · áudio editado — <b>'+esc(c.rotulo)+'</b> · '
       +Math.max(1,Math.round(c.fim-c.ini))+' s '
       +'<button class="voz" style="margin-left:8px" onclick="rev2PararEditado();rev2Parar()">parar</button>';
     clearTimeout(window.__rv2EdPar);
@@ -15977,6 +16552,113 @@ async function hisReabrir(id){
        +'e portanto sem esquema anatômico e sem conferência contra imagem.', true);
   }catch(e){ hisAvisar('Não consegui reabrir: '+((e&&e.message)||e), true); }
 }
+/* ===== 01/09/2026 — A PLAQUINHA `verHist` FICAVA PRESA E O LAUDO SAÍA EM BRANCO =====
+   A classe `verHist` no <body> manda a impressão ESCONDER o laudo da revisão, para não
+   saírem dois laudos no mesmo papel enquanto a tela de leitura do histórico está aberta
+   (regra `body.verHist #areaImpressao` no @media print, lá em cima). A intenção é certa.
+   O defeito era quem a removia: SÓ `hisFecharLaudo`. Mas três outros caminhos escondem
+   #telaVerLaudo sem passar por ele — `modCfgAbrir`, `modCfgAbrirBizus` e `rev2Abrir`.
+   Depois de qualquer um dos três a plaquinha continuava no ar, e a impressão obedecia a
+   ela: escondia o laudo NOVO (a regra com `body.verHist` tem especificidade maior e ganha
+   da que manda mostrar) enquanto o ANTIGO já tinha sido apagado da memória. Não sobrava
+   nada para imprimir, e nenhuma mensagem de erro aparecia.
+   Medido pelo médico em 01/09/2026: Histórico → Configurações → liberar um laudo →
+   Imprimir devolvia QUATRO FOLHAS EM BRANCO. As quatro folhas são o resto do app, que
+   fica invisível na impressão mas continua ocupando altura, e o papel é fatiado por cima.
+
+   A verdade passa a ser o ESTADO DA TELA, não a memória de quem fechou. Ninguém precisa
+   lembrar de abaixar a plaquinha: ela é conferida contra a tela de verdade. */
+function hisSincronizarVerHist(){
+  var t=document.getElementById('telaVerLaudo');
+  /* getComputedStyle, e não `style.display`: um caminho novo pode esconder a tela por
+     classe de CSS em vez de estilo direto, e aí `style.display` mentiria dizendo aberta. */
+  var aberta=false;
+  try{ aberta=!!(t && getComputedStyle(t).display!=='none'); }catch(e){ aberta=false; }
+  document.body.classList.toggle('verHist', aberta);
+}
+/* Rede de segurança, e a que realmente fecha o buraco: a conferência acontece também no
+   instante em que o papel vai sair. Um quarto caminho, criado amanhã por quem não souber
+   desta regra, não faz o defeito voltar. Vale para o botão Imprimir e para o Ctrl+P. */
+try{ window.addEventListener('beforeprint', hisSincronizarVerHist); }catch(e){}
+/* ===== 01/09/2026 — O LAUDO NÃO CHEGAVA AO PAPEL PELO BOTÃO DE ASSINAR =====
+   Relatado por ele às 23:09 de 01/09: "Aprovar, assinar e imprimir → próximo laudo"
+   devolvia SEIS FOLHAS EM BRANCO, sem erro nenhum. Antes disso, quatro.
+
+   A CAUSA, medida num Chrome de verdade em mídia de impressão (não deduzida):
+     tela antiga de revisão visível ....... a folha mede 762 x 89  → sai no papel
+     tela 2.0 aberta (o dia a dia dele) ... a folha mede   0 x   0 → papel em branco
+     tela de liberação aberta ............. a folha mede 762 x 89  → sai no papel
+   O #areaImpressao mora DENTRO de #telaRevisao — a tela antiga. `rev2Abrir` esconde
+   essa tela (display:none) ao abrir a 2.0, e o que está dentro de display:none não é
+   renderizado nem impresso. O laudo está lá, com o texto todo; só não existe para o
+   papel. A tela "Ver o laudo final" escapava por acidente: ela MOVE o nó para dentro
+   de #rv2Final, que está visível — é por isso que imprimir por ali sempre funcionou, e
+   foi o que mascarou o defeito.
+
+   O CONSERTO, e por que não é `#telaRevisao{display:block!important}` e pronto: essa
+   regra faria o laudo sair, mas a tela inteira voltaria a OCUPAR ALTURA no papel, e é
+   disso que vinham as folhas em branco de brinde (o resto do app fica `visibility:hidden`
+   na impressão — invisível, mas ainda ocupando a cadeira). Aqui a página é preparada
+   antes de o papel sair: acha quem, entre os filhos diretos do <body>, carrega a folha
+   que vai ser impressa, marca esse, e o CSS de impressão apaga os outros de verdade.
+   Resolve as duas coisas de uma vez, e sem mover nó nenhum — mover teria o risco de
+   deixar o #areaImpressao órfão se algo falhasse no meio (ver rev2FinalFechar). */
+/* ===== 02/09/2026 — O TIMBRADO SAÍA DESALINHADO PELO CAMINHO DA 2.0 =====
+   Ele viu no papel: o texto do laudo por cima do desenho do cabeçalho, e o corte da
+   última página caindo ANTES do fim do rodapé do timbrado.
+
+   A causa é irmã da do papel em branco, e a mesma raiz: `paginarLaudoTela` precisa MEDIR
+   a folha (clientWidth) para saber onde cada página de 297 mm termina — e a folha mora
+   dentro de #telaRevisao, que a 2.0 esconde. Dentro de display:none tudo mede ZERO, e a
+   função desiste em silêncio, sem criar os vãos nem as máscaras das páginas seguintes.
+
+   MEDIDO num Chrome, com o mesmo laudo nos dois estados:
+     tela visível ..... 2 vãos, 2 máscaras por folha, 2,99 páginas de 297 mm  (fecha)
+     tela escondida ... 0 vãos, 0 máscaras,           2,24 páginas            (não fecha)
+   A tela "Ver o laudo final" escapava porque move a folha para um lugar visível — de novo
+   ela, mascarando o defeito para quem testasse por ali.
+
+   Aqui a folha é tornada MEDÍVEL só o tempo de paginar, e o estado da tela é devolvido
+   como estava. Roda dentro do beforeprint, antes de o papel ser capturado. */
+function rev2PaginarMedindo(alvo){
+  if(typeof paginarLaudoTela!=='function') return;
+  var raiz=alvo, tela=alvo;
+  while(tela && tela.parentNode && tela.parentNode!==document.body) tela=tela.parentNode;
+  var devolver=null;
+  try{
+    if(tela && getComputedStyle(tela).display==='none'){
+      /* guarda o que estava escrito no elemento — inclusive "nada" — para devolver igual */
+      var antes=tela.style.display;
+      tela.style.display='block';
+      devolver=function(){ tela.style.display=antes; };
+    }
+    paginarLaudoTela(raiz);
+  }catch(e){ /* paginar é acabamento: falhar aqui não pode impedir a impressão */ }
+  finally{ if(devolver) try{ devolver(); }catch(e){} }
+}
+function prepararPapel(){
+  var alvo=null;
+  try{
+    /* Qual folha vai ao papel: a do histórico quando a tela de leitura está aberta, a da
+       revisão nos outros casos. A plaquinha já foi acertada pelo listener anterior. */
+    alvo=document.body.classList.contains('verHist')
+      ? document.getElementById('areaImpressaoHist')
+      : document.getElementById('areaImpressao');
+    Array.prototype.forEach.call(document.body.children, function(c){ c.classList.remove('noPapel'); });
+    if(!alvo) return;
+    rev2PaginarMedindo(alvo);
+    var n=alvo;
+    while(n && n.parentNode && n.parentNode!==document.body) n=n.parentNode;
+    if(n && n.parentNode===document.body){
+      n.classList.add('noPapel');
+      /* A marca no <body> é o SINAL VERDE para a regra de limpeza, e é a última coisa a
+         ser posta: se qualquer passo acima falhar, ela não vem, e a impressão cai no piso
+         em vez de esconder tudo. */
+      document.body.classList.add('papelPreparado');
+    }
+  }catch(e){ /* nunca impedir uma impressão por causa desta preparação */ }
+}
+try{ window.addEventListener('beforeprint', prepararPapel); }catch(e){}
 function hisFecharLaudo(){
   var t=document.getElementById('telaVerLaudo'); if(t) t.style.display='none';
   document.body.classList.remove('verHist');
@@ -16058,6 +16740,12 @@ window.addEventListener('DOMContentLoaded', async function(){
     try{ var s=localStorage.getItem('gmodelos'); if(s){ var o=JSON.parse(s);
       if(o&&typeof o==='object'&&Object.keys(o).length){ Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS,o); } } }catch(e){}
     try{ mostrarAssPrev(); }catch(e){}
+    /* 31/08/2026 — ESTA LINHA E O CONSERTO. Ate aqui `cfg` acabou de ser corrigido com o
+       que veio do computador; os campos da tela ainda mostram os padroes do codigo,
+       preenchidos antes da sincronizacao chegar. Sem repintar, a tela de Provedor de IA
+       lia "chat-latest" e gravava isso por cima do modelo real ao salvar. */
+    try{ preencherCamposConfig(); }catch(e){}
+    try{ if(typeof iaCfgRender==='function' && document.getElementById('iaNvModelo')) iaCfgRender(); }catch(e){}
     log('Dados carregados do computador: '+r.baixados.join(', ')+'.');
   }
   if(r.enviados.length) log('Seus dados foram copiados para o computador (proteção contra perda): '+r.enviados.join(', ')+'.');

@@ -46,7 +46,7 @@ const src = [grab('norm'), grab('rev2Proc'), grab('rev2Trecho'), grab('rev2Audio
              // outro lado quando a secao vinha sem lateralidade)
              bloco(/const REV2_LADOS = [^\n]*/, 'REV2_LADOS'), grab('rev2LadoDe'),
              grab('rev2TituloDeBloco'), grab('rev2CorpoVisivel'),
-             grab('rev2Blocos'), grab('rev2Estado')].join('\n');
+             grab('rev2Blocos'), grab('rev2TemAchado'), grab('rev2Estado')].join('\n');
 // MODELOS entra no ambiente porque rev2MoldeDoModelo o consulta. Aqui os casos de teste
 // nao passam `tipo`, entao o molde vem nulo e vale a heuristica de reserva — de proposito:
 // esta suite testa a moldura, nao o molde (que tem suite propria em teste-blocos-revisao).

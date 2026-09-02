@@ -48,9 +48,46 @@ ok(/id="paneIa"/.test(HTML), 'o painel existe');
   .forEach(([id, oq]) => ok(HTML.indexOf('id="' + id + '"') >= 0, 'tem campo de ' + oq));
 ['iaCfgTestar', 'iaCfgPadrao', 'iaCfgGuardarChave', 'iaCfgApagarChave', 'iaCfgSalvar']
   .forEach(f => ok(HTML.indexOf(f + '()') >= 0, 'tem a acao ' + f));
-// o select do modelo principal oferece as MESMAS opcoes da tela antiga
-['chat-latest', 'gpt-5.5', 'gpt-4o'].forEach(m =>
-  ok(HTML.indexOf('<option value="' + m + '"') >= 0, 'o modelo "' + m + '" continua oferecido'));
+// 31/08/2026 — ESTES TRES TESTES MUDARAM DE LADO. Ate aqui eles exigiam que o modelo
+// principal continuasse sendo um <select> com "chat-latest", "gpt-5.5" e "gpt-4o"
+// escritos a mao, como na tela antiga. Isso deixou de ser o desejado: a conta do medico
+// oferece 124 modelos, e a geracao em uso (5.6 sol/terra/luna) nao estava entre as tres.
+// Pior, DOIS defeitos foram MEDIDOS no navegador por causa da lista fixa:
+//   (a) o valor de fabrica do <select> era "chat-latest"; como o localStorage nasce vazio
+//       a cada abertura (a porta e sorteada), os campos eram preenchidos ANTES de a
+//       sincronizacao com o agente chegar e ficavam com o padrao. A tela nova le o valor
+//       desse campo, entao mostrava "chat-latest" com "gpt-5.5" gravado no disco — e
+//       salvar trocava o modelo que ESCREVE O LAUDO, sem aviso nenhum.
+//   (b) atribuir a um <select> um valor fora das <option> resulta em "" (regra do HTML).
+//       Escolher "gpt-5.6-sol" gravaria modelo VAZIO: programa sem IA no meio do exame.
+// NAO devolver a lista fixa. O que se garante agora e o oposto: campo livre + a lista
+// de verdade, vinda da conta dele.
+ok(/<input type="text" id="iaNvModelo"/.test(HTML),
+   'o modelo principal e campo LIVRE (aceita qualquer modelo da conta)');
+ok(!/<select id="iaNvModelo"/.test(HTML),
+   'e nao voltou a ser lista fixa escrita a mao');
+ok(/<input type="text" id="cfgModelo"/.test(HTML),
+   'o campo antigo #cfgModelo tambem e livre (era o <select> que gravava "" no defeito b)');
+ok(/id="iaNvAlvo"/.test(HTML) && /value="pri"/.test(HTML) && /value="aux"/.test(HTML),
+   'a lista de modelos serve aos DOIS campos (seletor de destino)');
+ok(/function iaCfgEscolherModelo\(/.test(HTML) && /pri\?'iaNvModelo':'iaNvAux'/.test(HTML),
+   'tocar num nome cai no campo escolhido no seletor');
+
+console.log('\n=== os defeitos medidos em 31/08 nao voltam ===');
+ok(/function preencherCamposConfig\(/.test(HTML),
+   'o preenchimento dos campos e uma funcao propria (nao so dentro do alternarConfig)');
+ok(/try\{ preencherCamposConfig\(\); \}catch\(e\)\{\}/.test(HTML),
+   'e ela roda TAMBEM depois da sincronizacao com o agente (defeito a)');
+const salvarCfg = grab('salvarConfig');
+ok(/cfg\.modelo = _mNovo \|\| cfg\.modelo;/.test(salvarCfg),
+   'campo principal vazio NAO apaga o modelo gravado (trava do defeito b)');
+// o palpite de "barato" pelo nome tem de alcancar a geracao 5.6 (sol/terra/luna),
+// que abandonou o sufixo mini/nano. "sol" fica de fora: e o porte caro.
+const ehBarato = grab('iaCfgModeloEhBarato');
+ok(/luna/.test(ehBarato) && /terra/.test(ehBarato),
+   'a caixa "mais baratos" reconhece luna e terra');
+ok(!/\bsol\b/.test(ehBarato),
+   'e NAO trata "sol" como barato (custa o mesmo que o gpt-5.5)');
 
 console.log('\n=== NADA e gravado por um caminho novo ===');
 const salvar = grab('iaCfgSalvar');

@@ -3648,7 +3648,14 @@ function dicomTipo(descricao){
 async function dicomBuscar(){
   dicomInfoTxt('Procurando exames…');
   try{
-    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},15000);
+    /* 02/09/2026 — O PRAZO ERA MENOR QUE A BUSCA, E ELE PAROU DE TRABALHAR.
+       Medido nesta máquina com 570 exames no recebedor: a lista leva 15,6 s para vir do
+       agente (o Orthanc devolve os mesmos 570 em 0,05 s — a demora é do agente, que
+       pergunta estudo por estudo). O prazo aqui era de 15 s: passou a estourar SEMPRE, e a
+       tela dizia "o agente não respondeu a tempo" com o agente vivo e respondendo o /health
+       em 233 ms. O número cresce junto com o arquivo do aparelho, então o prazo folgado é o
+       que impede isto de voltar a travar sozinho daqui a alguns meses. */
+    var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},60000);
     var r=await fetch(agenteBase()+'/dicom/estudos',{signal:ctrl.signal}); clearTimeout(t);
     var j=await r.json();
     if(!j||!j.ok) throw new Error((j&&j.erro)||'resposta inválida');
@@ -7806,7 +7813,10 @@ let capOrtSeen=new Set(), capOrtFeitos=new Set(), capOrtStable={};
 function capOrtStatusTxt(t){ var s=document.getElementById('capOrtStatus'); if(s) s.textContent=t; }
 var _relogioAparelho={desvioSeg:null, suspeito:false, limiteSeg:900};
 async function capOrtListar(){
-  var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},12000);
+  /* 02/09/2026 — mesmo motivo do prazo em dicomBuscar: a lista leva 15,6 s com 570 exames
+     no recebedor, e 12 s aqui derrubavam a varredura do modo "aguardar exame do aparelho"
+     em TODA rodada, calada. Ver o comentário lá. */
+  var ctrl=new AbortController(); var t=setTimeout(function(){ctrl.abort();},60000);
   var r=await fetch(agenteBase()+'/dicom/estudos',{signal:ctrl.signal}); clearTimeout(t);
   var j=await r.json(); if(!j||!j.ok) throw new Error((j&&j.erro)||'resposta inválida');
   if(j.relogio) _relogioAparelho=j.relogio;

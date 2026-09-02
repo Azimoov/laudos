@@ -2,7 +2,16 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const AG = 'http://127.0.0.1:8977';
+/* 02/09/2026 — a porta sai da variavel de ambiente, mas o PADRAO continua 8977.
+   A linha estavel foi desativada a pedido do medico, e estas duas suites passaram a ser
+   PULADAS (o agente que elas procuram nao esta no ar). Apontar para a 2.0 nao resolve: as
+   expectativas daqui foram escritas para o ambiente da estavel — medido em 02/09, contra
+   a 2.0 dao 3 falhas que NAO sao defeito (ela tem 15 arquivos de dados, o teste espera
+   10). Falha falsa e pior que teste pulado: ensina a ignorar falha.
+   Ajustar estas suites para a 2.0 e tarefa propria, ainda EM ABERTO. Ate la:
+     AGENTE_URL=http://127.0.0.1:8988 node testes/teste-backup.js
+   roda contra a linha que atende, para quem for fazer esse ajuste. */
+const AG = process.env.AGENTE_URL || 'http://127.0.0.1:8977';
 // 10/08/2026: a pasta do agente saiu do cache do app Claude, onde uma
 // reinstalacao levaria o banco de pacientes junto. Ver README do laudos-programa.
 const DADOS = String(process.env.USERPROFILE || '').replace(/\\/g, '/') + '/Laudos USG/agente/dados';

@@ -100,6 +100,12 @@ ok(/localStorage\.setItem\('grev2Fonte'/.test(fonte), 'a escolha e guardada');
 ok(/rev2FonteGuardada\(\)/.test(HTML) && /_fsel\.value=String\(_fpx\)/.test(HTML),
    'e volta aplicada (e no seletor) toda vez que a tela e desenhada');
 
+console.log('=== a fonte do documento e obrigatoria ===');
+ok(/\.laudoFolha,\.laudoFolha \*\{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif!important;\}/.test(HTML),
+   'todo texto da folha usa Helvetica Neue, com reservas iguais para todos');
+ok(/function laudoCssText\(\)[\s\S]*?laudo\|assin\|linha\|rodape/.test(HTML),
+   'a regra da folha acompanha o arquivo salvo e a impressao');
+
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');
 process.exit(falhas ? 1 : 0);

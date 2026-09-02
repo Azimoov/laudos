@@ -86,6 +86,17 @@ console.log('=== os botoes do rodape existem e apontam para funcao de verdade ==
  'rev2Calculadoras', 'rev2Voltar', 'rev2CopiarFmt'].forEach(function (f) {
   ok(HTML.indexOf('function ' + f + '(') >= 0, f + ' existe');
 });
+console.log('=== calculadoras ficam dentro da Reforma/2.0 ===');
+const calcAbrir = grab('calc2Abrir');
+const calcVoltar = grab('calc2Voltar');
+ok(/classList\.add\('calc2Ativa'\)/.test(calcAbrir) && /mostrarAba\('calc'\)/.test(calcAbrir),
+   'abre as calculadoras na moldura 2.0, sem trocar de aplicativo');
+ok(/function rev2Calculadoras\(\)\{ calc2Abrir\(\); \}/.test(HTML),
+   'o botao da revisao chama a abertura 2.0, nao a aba antiga direto');
+ok(/classList\.remove\('calc2Ativa'\)/.test(calcVoltar) && /rev2Abrir\(_rev2Id\)/.test(calcVoltar),
+   'Voltar ao laudo retorna exatamente a revisao de onde saiu');
+ok(/class="calc2Topo"/.test(HTML) && /body\.calc2Ativa #pane-calc/.test(HTML),
+   'a tela tem topo proprio e estilo proprio da Reforma');
 ok(/_rev2Fim\[ex\.id\]=1/.test(grab('rev2Depois')),
    '"Deixar para depois" manda o laudo para o FIM da fila, nao para o topo');
 

@@ -177,6 +177,35 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 .calcCorpo input[type=number],.calcCorpo input[type=date]{width:100%;padding:8px;font-size:var(--fs-2);}
 .calcRes{margin-top:10px;background:var(--azul-claro);border-left:4px solid var(--acento);border-radius:var(--rd-1);padding:9px 11px;font-size:var(--fs-2);white-space:pre-wrap;}
 .calcRes:empty{display:none;}
+/* Calculadoras dentro da Reforma/2.0. As contas abaixo sao as mesmas, testadas e
+   compartilhadas com o laudo automatico; muda so a moldura em que elas aparecem.
+   Duplicar as calculadoras criaria duas fontes de verdade e, um dia, dois resultados. */
+.calc2Topo{display:none;}
+body.calc2Ativa>header,body.calc2Ativa #abas{display:none;}
+body.calc2Ativa main{max-width:none;padding:0;}
+body.calc2Ativa #pane-calc{display:block!important;min-height:100vh;margin:0;padding:20px;
+  background:#EEF1F4;color:#26303C;}
+body.calc2Ativa #pane-calc>.card{max-width:920px;margin:0 auto;background:#FAFBFC;color:#26303C;
+  border:1px solid #E2E5EA;border-radius:10px;padding:0 26px 26px;box-shadow:none;}
+body.calc2Ativa .calc2Topo{display:flex;align-items:center;gap:10px;margin:0 -26px 20px;padding:14px 26px;
+  background:#0E3A40;color:#fff;border-radius:9px 9px 0 0;}
+body.calc2Ativa .calc2Topo .tit{flex:1;font-size:16px;font-weight:700;}
+body.calc2Ativa .calc2Topo button{background:none;border:1px solid #7FA8A5;color:#DCEBEA;border-radius:16px;
+  padding:7px 13px;font:inherit;font-size:12px;cursor:pointer;}
+body.calc2Ativa .calc2Topo button:hover{background:rgba(255,255,255,.08);}
+body.calc2Ativa #pane-calc> .card>h2{display:none;}
+body.calc2Ativa #pane-calc .aviso{color:#6B7480;}
+body.calc2Ativa .calcBloco{background:#fff;border-color:#E2E5EA;margin-top:10px;}
+body.calc2Ativa .calcBloco summary{color:#0E6E6B;font-size:14px;padding:13px 14px;}
+body.calc2Ativa .calcBloco[open] summary{border-bottom-color:#DCE2E8;}
+body.calc2Ativa .calcCorpo label{color:#46505C;}
+body.calc2Ativa .calcCorpo input,body.calc2Ativa .calcCorpo select{background:#fff;color:#12202B;border-color:#C9D0D8;}
+body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#17423F;}
+@media(max-width:640px){
+  body.calc2Ativa #pane-calc{padding:0;}
+  body.calc2Ativa #pane-calc>.card{border:0;border-radius:0;padding:0 14px 18px;}
+  body.calc2Ativa .calc2Topo{margin:0 -14px 16px;border-radius:0;padding:13px 14px;}
+}
 /* ===== MODO ESCURO: neutraliza estilos inline claros dos templates JS =====
    (transitório — a modularização da F2 do produto troca inline por classes;
    NÃO afeta a folha do laudo, que não usa nenhuma destas cores) */
@@ -2071,6 +2100,10 @@ input[type=text]:focus,input[type=password]:focus,select:focus,textarea:focus{ou
 
 <div class="aba-conteudo" id="pane-calc" style="display:none">
 <div class="card">
+  <div class="calc2Topo">
+    <span class="tit">Calculadoras ultrassonograficas</span>
+    <button type="button" onclick="calc2Voltar()">Voltar ao laudo</button>
+  </div>
   <h2>🧮 Calculadoras ultrassonográficas</h2>
   <p class="aviso">Ferramentas de apoio à decisão — confira sempre os documentos oficiais (ACR TI-RADS 2017, BI-RADS® v2025 Manual, O-RADS US v2022, Bosniak v2019). A classificação final é responsabilidade do médico.</p>
 
@@ -13882,7 +13915,20 @@ function rev2Voltar(){
   if(_rev2Origem==='abertura'){ _rev2Origem='dia'; abVoltarInicio(); return; }
   diaAbrir();
 }
-function rev2Calculadoras(){ rev2Fechar(); mostrarAba('calc'); }
+/* A calculadora existe desde antes da Reforma. Ela fica na mesma fonte de contas
+   para o resultado manual nunca divergir do que o laudo calcula; esta funcao so a
+   abre na moldura nova, em vez de jogar o medico de volta ao painel antigo. */
+function calc2Abrir(){
+  rev2Fechar();
+  document.body.classList.add('calc2Ativa');
+  mostrarAba('calc');
+}
+function calc2Voltar(){
+  document.body.classList.remove('calc2Ativa');
+  var p=document.getElementById('pane-calc'); if(p) p.style.display='none';
+  rev2Abrir(_rev2Id);
+}
+function rev2Calculadoras(){ calc2Abrir(); }
 
 /* ---- corta o corpo do laudo em retângulos, um por título em negrito ---- */
 /* Títulos que são MOLDURA do laudo, não conteúdo clínico: não abrem retângulo.

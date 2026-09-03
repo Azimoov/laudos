@@ -1082,14 +1082,12 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
           <div class="eb">IMAGENS (<span id="rv2NImg">0</span>)</div>
           <div id="rv2Imgs"></div>
           <div class="tocador" id="rv2Tocador">nenhum trecho selecionado — toque em <b>VOZ</b> num trecho do laudo</div>
-          <!-- 19/08/2026: ouvir o ditado INTEIRO. Sem isto, exame transcrito na nuvem
-               (que não traz marcação de tempo) ficava sem nenhuma forma de ser ouvido. -->
-          <button class="bt larga" id="rv2BtInteiro" onclick="rev2Inteiro()">🔊 Ouvir o ditado inteiro</button>
-          <!-- 28/08/2026, pedido dele: logo ABAIXO do ditado inteiro, a montagem só das
-               patologias — os recortes de poucos segundos de todos os achados do paciente,
-               um atrás do outro. Serve para conferir de ouvido o que foi ditado. -->
-          <button class="bt larga" id="rv2BtEditado" onclick="rev2Editado()"
-                  title="toca, em sequência, só os pedaços do ditado onde você falou cada patologia">🩺 Ouvir o áudio editado (só as patologias)</button>
+          <!-- 02/09/2026, pedido dele: UM botão no lugar de dois. Saíram "Ouvir o ditado
+               inteiro" (19/08) e "Ouvir o áudio editado — só as patologias" (28/08). O que
+               ele quer ouvir é o exame do início ao fim, tirando só as partes caladas —
+               metade do áudio, medido nos 40 exames mais recentes. Ver rev2OuvirAudio. -->
+          <button class="bt larga" id="rv2BtAudio" onclick="rev2OuvirAudio()"
+                  title="toca o exame do início ao fim, pulando os silêncios">🔊 Ouvir o áudio</button>
           <div class="lb">MODELO DO EXAME</div>
           <select id="rv2Modelo" onchange="rev2TrocarModelo(this.value)"></select>
           <button class="bt larga" onclick="rev2Regerar()">🤖 Regenerar laudo pela IA</button>
@@ -15193,30 +15191,124 @@ function rev2AudiosDoExame(){
   var ex=rev2Ex(); if(!ex) return [];
   return audios.filter(function(x){ return x.exameId===ex.id && x.url; });
 }
-function rev2Inteiro(){
+/* 02/09/2026: `rev2Inteiro` saiu daqui. Ela tocava a gravação do começo ao fim e era o
+   plano B de quem não tinha marcação de tempo. O plano B continua existindo — mudou de
+   lugar, para DENTRO de rev2OuvirAudio, que é o único botão de áudio agora. */
+function rev2Parar(){
+  var el=document.getElementById('rv2Audio'); if(el){ try{ el.pause(); }catch(e){} }
+  rev2PararEditado();
+  var cx=document.getElementById('rv2Tocador');
+  if(cx) cx.innerHTML='parado — toque <b>VOZ</b> num trecho, ou ouça o áudio do exame.';
+}
+/* ============ OUVIR O ÁUDIO: O EXAME INTEIRO, SEM OS SILÊNCIOS ============
+   02/09/2026, pedido dele: os dois botões antigos ("ouvir o ditado inteiro" e "ouvir o
+   áudio editado — só as patologias") saem e dão lugar a UM. O que ele quer ouvir é o
+   exame do início ao fim, tirando só as partes caladas.
+
+   POR QUE ISSO VALE TANTO: medido nos 40 exames mais recentes com marcação de tempo —
+   196 minutos de gravação para 98 minutos de fala. METADE do áudio é silêncio. Num
+   exame havia uma pausa única de 5 minutos.
+
+   NÃO ANALISA A ONDA SONORA. O transcritor já diz onde houve fala (cada trecho tem
+   início e fim); silêncio é o que sobra entre eles. Sai de graça, é exato, e não
+   depende de escolher um limiar de volume que erraria com o ar-condicionado ligado.
+
+   O LIMITE DE 1 SEGUNDO, medido antes de escolher (792 pausas reais):
+     cortar acima de 0,5 s -> tira 97 min     cortar acima de 1,5 s -> tira 94 min
+     cortar acima de 1,0 s -> tira 96 min     cortar acima de 2,0 s -> tira 93 min
+   Um segundo pega quase todo o ganho E preserva a respiração natural entre frases.
+   Descer para 0,5 s picotaria a fala para ganhar um minuto — troca ruim para o ouvido.
+
+   A FOLGA existe porque cortar exatamente no fim da palavra come o final dela: sobra
+   um "esteatos" no lugar de "esteatose". Ela nunca invade o silêncio inteiro — no
+   máximo metade da pausa de cada lado, para dois blocos nunca se sobreporem. */
+var RV2_PAUSA_MAX = 1.0;     // silêncio acima disto é cortado
+var RV2_FOLGA_FALA = 0.25;   // respiro nas pontas de cada bloco, para não comer sílaba
+function rev2ClipesSemSilencio(){
+  var ex=rev2Ex(); if(!ex||!ex.laudo) return [];
+  var trechos=(ex.laudo.trechos||[]).filter(function(t){
+    return t && typeof t.inicio==='number' && typeof t.fim==='number' && t.fim>t.inicio;
+  }).slice().sort(function(a,b){ return a.inicio-b.inicio; });
+  if(!trechos.length) return [];
+  var meus=audios.filter(function(x){ return x.exameId===ex.id; });
+  var blocos=[];
+  trechos.forEach(function(t){
+    var url=(rev2AudioDoTrecho(meus, t)||{}).url||'';
+    if(!url) return;
+    var ult=blocos[blocos.length-1];
+    /* pausa curta continua no áudio: é a respiração da fala, não silêncio a cortar.
+       Trechos de arquivos diferentes nunca se juntam — seriam duas gravações. */
+    if(ult && ult.url===url && (t.inicio-ult.fim)<=RV2_PAUSA_MAX){
+      ult.fim=Math.max(ult.fim, t.fim);
+    } else {
+      blocos.push({ini:t.inicio, fim:t.fim, url:url});
+    }
+  });
+  // a folga entra depois de fundir, e limitada pela pausa que existe de fato
+  for(var i=0;i<blocos.length;i++){
+    var b=blocos[i], ant=blocos[i-1], prox=blocos[i+1];
+    var antes=(ant && ant.url===b.url) ? (b.ini-ant.fim)/2 : b.ini;
+    var depois=(prox && prox.url===b.url) ? (prox.ini-b.fim)/2 : RV2_FOLGA_FALA;
+    b.ini=Math.max(0, b.ini-Math.min(RV2_FOLGA_FALA, Math.max(0,antes)));
+    b.fim=b.fim+Math.min(RV2_FOLGA_FALA, Math.max(0,depois));
+  }
+  return blocos;
+}
+/* Toca os blocos em sequência, pulando o silêncio. Mesma mecânica do antigo áudio
+   editado: janelas do MESMO arquivo, sem gerar áudio novo. */
+function rev2OuvirAudio(){
   var el=document.getElementById('rv2Audio'), cx=document.getElementById('rv2Tocador');
+  if(!el) return;
   var lista=rev2AudiosDoExame();
-  if(!lista.length || !el){
+  if(!lista.length){
     if(cx) cx.textContent='este exame não tem áudio guardado para tocar '
       +'(ou o agente está desligado — o áudio mora no computador, não na janela).';
     return;
   }
-  clearTimeout(window.__rv2Par);              // toca até o fim: não é trecho
-  var a=lista[0];
-  if(el.src!==a.url) el.src=a.url;
-  el.currentTime=0;
-  el.play().then(function(){
-    if(cx) cx.innerHTML='▶ ditado inteiro — <b>'+esc(a.nome||'gravação do exame')+'</b>'
-      +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
-  }).catch(function(e){
-    if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). '
-      +'O agente precisa estar ligado.';
-  });
-}
-function rev2Parar(){
-  var el=document.getElementById('rv2Audio'); if(el){ try{ el.pause(); }catch(e){} }
-  var cx=document.getElementById('rv2Tocador');
-  if(cx) cx.innerHTML='parado — toque <b>VOZ</b> num trecho, ou ouça o ditado inteiro.';
+  var blocos=rev2ClipesSemSilencio();
+  clearTimeout(window.__rv2Par);
+  rev2PararEditado();
+  /* SEM MARCAÇÃO DE TEMPO não há como saber onde está o silêncio — é o caso do ditado
+     transcrito na nuvem e do que veio de antes de 19/08. Toca inteiro e DIZ por quê,
+     em vez de recusar: ouvir com silêncio é melhor que não ouvir. */
+  if(!blocos.length){
+    var a=lista[0];
+    if(el.src!==a.url) el.src=a.url;
+    el.currentTime=0;
+    el.play().then(function(){
+      if(cx) cx.innerHTML='▶ áudio do exame, inteiro — <b>'+esc(a.nome||'gravação')+'</b>'
+        +' <span class="aviso">(sem marcação de tempo neste ditado: não dá para tirar os silêncios)</span>'
+        +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
+    }).catch(function(e){
+      if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). O agente precisa estar ligado.';
+    });
+    return;
+  }
+  var sessao={vivo:true}; window.__rv2Ed=sessao;
+  var soma=blocos.reduce(function(s,b){ return s+(b.fim-b.ini); },0);
+  var bruto=blocos[blocos.length-1].fim-blocos[0].ini;
+  var n=0;
+  var tocar=function(){
+    if(!sessao.vivo) return;
+    if(n>=blocos.length){
+      try{ el.pause(); }catch(e){}
+      if(cx) cx.innerHTML='fim do áudio — <b>'+rev2Rel(soma)+'</b> ouvidos de '+rev2Rel(bruto)
+        +' de gravação. <button class="voz" onclick="rev2OuvirAudio()">tocar de novo</button>';
+      window.__rv2Ed=null; return;
+    }
+    var b=blocos[n++];
+    if(el.src!==b.url) el.src=b.url;
+    el.currentTime=b.ini;
+    el.play().catch(function(e){
+      if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). O agente precisa estar ligado.';
+      sessao.vivo=false;
+    });
+    if(cx) cx.innerHTML='▶ áudio do exame, sem os silêncios — <b>'+rev2Rel(soma)+'</b> no lugar de '
+      +rev2Rel(bruto)+' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
+    clearTimeout(window.__rv2EdPar);
+    window.__rv2EdPar=setTimeout(tocar, Math.max(150,(b.fim-b.ini)*1000));
+  };
+  tocar();
 }
 /* ============ RECORTE FINO: SÓ A FRASE DA PATOLOGIA (28/08/2026) ============
    Pedido dele: "no final do exame haja uma montagem de áudio, com trechos de poucos
@@ -15583,112 +15675,12 @@ function rev2Tocar(i, bi){
    e é isso que ele descreveu: fígado com esteatose e rim com cálculo entram; o resto não.
    NÃO gera arquivo novo: toca janelas do MESMO áudio, em ordem de tempo. Recortes que se
    encostam viram um só, para a frase não sair picada. */
-function rev2ClipesPatologia(){
-  var ex=rev2Ex(); if(!ex||!ex.laudo) return [];
-  var L=ex.laudo, trechos=L.trechos||[], clipes=[];
-  try{
-    rev2BlocosDaTela(L).forEach(function(b){
-      if(b._dc||b._conc||b._titulo) return;
-      /* 31/08: pergunta "tem achado?" em vez de "o cartão está verde?". Ver
-         rev2TemAchado — a falta de medida repinta o cartão de vermelho e escondia do
-         áudio editado justamente o achado ainda por medir. */
-      if(!rev2TemAchado(ex,b)) return;                   // só patologia
-      /* 01/09/2026: primeiro a FAIXA apontada pela IA, que é exata. Só quando ela não
-         vem, ou não passa na conferência, é que se cai no casamento por busca. */
-      var rec=rev2RecortePorFaixa(ex,b), tr=null;
-      if(rec) tr=(trechos[rec.trecho])||null;
-      else{
-        /* 31/08/2026: a chave é a citação da IA OU o próprio achado em negrito — antes,
-           sem citação o retângulo era descartado aqui e o áudio editado saía vazio.
-           01/09/2026: o achado em negrito vai PRIMEIRO agora (rev2TrechoDoBloco) — é
-           vocabulário só daquele órgão, e não empata com uma frase vizinha contaminando
-           a citação da IA. Ver o caso real no comentário de rev2TrechoDoBloco. */
-        var _td=rev2TrechoDoBloco(ex,b); if(!_td) return;
-        tr=_td.tr;
-        if(tr) rec=rev2RecorteFino(tr, _td.chave);
-      }
-      if(!tr || !rec) return;
-      clipes.push({ini:rec.ini, fim:rec.fim, rotulo:b.titulo||'achado',
-                   falaIni:(rec.falaIni!=null?rec.falaIni:rec.ini),
-                   falaFim:(rec.falaFim!=null?rec.falaFim:rec.fim),
-                   url:(rev2AudioDoTrecho(audios.filter(function(x){ return x.exameId===ex.id; }), tr)||{}).url||''});
-    });
-  }catch(e){}
-  clipes=clipes.filter(function(c){ return c.url; }).sort(function(a,b){ return a.ini-b.ini; });
-  /* ============ MONTAGEM: APARAR ANTES DE FUNDIR (31/08/2026) ============
-     A regra antiga fundia dois recortes que se encostassem por menos de 0,4 s. Com a
-     folga de 3 s no fim, isso passou a fundir achados DIFERENTES só porque a folga de um
-     invadia o começo do outro — medido no exame das 22h43: "cálculo no rim direito"
-     (até 31,56 s) e "esplenomegalia" (a partir de 34,02 s) são falas separadas por 2,5 s
-     de silêncio, e mesmo assim viravam um clipe só. A tela anunciava 2 patologias
-     havendo 3, e o contador que ele pediu perdia o sentido.
 
-     Agora a pergunta é outra: a FALA se sobrepõe, ou só a folga?
-       · a fala se sobrepõe  -> é uma frase só que descreve os dois achados: funde
-         (é o caso que o "não sair picada" queria proteger);
-       · só a folga invade   -> apara a folga do primeiro e mantém os dois separados,
-         nunca cortando a fala em si (falaFim é o piso). */
-  var junto=[];
-  clipes.forEach(function(c){
-    var ult=junto[junto.length-1];
-    if(ult && ult.url===c.url && ult.falaFim>=c.falaIni-0.05
-       && (Math.max(ult.fim,c.fim)-ult.ini)<=RV2_TETO){
-      ult.fim=Math.max(ult.fim,c.fim);
-      ult.falaFim=Math.max(ult.falaFim,c.falaFim);
-      if(ult.rotulo.indexOf(c.rotulo)<0) ult.rotulo+=' · '+c.rotulo;
-    } else {
-      // apara a folga do anterior para ela não entrar na fala deste
-      if(ult && ult.url===c.url && ult.fim>c.ini) ult.fim=Math.max(ult.falaFim, c.ini-0.15);
-      junto.push(c);
-    }
-  });
-  return junto;
-}
 function rev2PararEditado(){
   if(window.__rv2Ed){ window.__rv2Ed.vivo=false; window.__rv2Ed=null; }
   clearTimeout(window.__rv2EdPar);
 }
-function rev2Editado(){
-  var el=document.getElementById('rv2Audio'), cx=document.getElementById('rv2Tocador');
-  if(!el) return;
-  var clipes=rev2ClipesPatologia();
-  if(!clipes.length){
-    if(cx) cx.innerHTML='não há trecho de patologia para montar: ou o exame está normal, '
-      +'ou a IA não marcou de que parte do ditado veio o achado. Use <b>Ouvir o ditado inteiro</b>.';
-    return;
-  }
-  clearTimeout(window.__rv2Par);
-  rev2PararEditado();
-  var sessao={vivo:true}; window.__rv2Ed=sessao;
-  var total=clipes.reduce(function(s,c){ return s+(c.fim-c.ini); },0);
-  var n=0;
-  var tocar=function(){
-    if(!sessao.vivo) return;
-    if(n>=clipes.length){
-      try{ el.pause(); }catch(e){}
-      if(cx) cx.innerHTML='<b>'+clipes.length+'/'+clipes.length+'</b> · fim do áudio editado — '
-        +clipes.length+' patologia(s), '+Math.round(total)+' s no total. '
-        +'<button class="voz" onclick="rev2Editado()">tocar de novo</button>';
-      window.__rv2Ed=null; return;
-    }
-    var c=clipes[n++];
-    if(el.src!==c.url) el.src=c.url;
-    el.currentTime=c.ini;
-    el.play().catch(function(e){
-      if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). O agente precisa estar ligado.';
-      sessao.vivo=false;
-    });
-    /* 31/08/2026, pedido dele: "na hora que eu der play, um numerozinho: 1/3, depois 2/3,
-       depois 3/3". Vai na FRENTE, antes do nome do achado — é a primeira coisa que ele
-       procura para saber se ainda falta patologia por ouvir. */
-    if(cx) cx.innerHTML='▶ <b>'+n+'/'+clipes.length+'</b> · áudio editado — <b>'+esc(c.rotulo)+'</b> · '
-      +Math.max(1,Math.round(c.fim-c.ini))+' s '
-      +'<button class="voz" style="margin-left:8px" onclick="rev2PararEditado();rev2Parar()">parar</button>';
-    clearTimeout(window.__rv2EdPar);
-    window.__rv2EdPar=setTimeout(tocar, Math.max(500,(c.fim-c.ini)*1000));
-  };
-  tocar();
-}
+
 
 /* edição: o texto volta para o laudo com a formatação preservada.
    17/08/2026 — ANTES só o negrito sobrevivia: itálico e sublinhado eram

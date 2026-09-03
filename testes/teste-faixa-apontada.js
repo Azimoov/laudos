@@ -158,14 +158,12 @@ const curtinho = rev2RecortePorFaixa(
   exBase([{ secao: 'Fígado', citacao: 'Esteatose 3', palavra_ini: 5, palavra_fim: 5 }]), bloco);
 ok(curtinho && curtinho.fim - curtinho.ini >= RV2_MIN, 'e uma palavra so ainda rende o minimo de contexto');
 
-console.log('\n=== as tres pontas usam a MESMA faixa ===');
-// VOZ, audio editado e o desenho da tela tem de mostrar o mesmo pedaco do mesmo achado
-const clipes = grab('rev2ClipesPatologia');
-ok(/rev2RecortePorFaixa\(ex,b\)/.test(clipes), 'o audio editado tenta a faixa primeiro');
-// 01/09/2026: a busca de trás passou a chamar rev2TrechoDoBloco (achado primeiro,
-// citação depois), não mais rev2ChaveDoBloco direto — ver o comentário da função.
-ok(/else\{/.test(clipes) && /rev2TrechoDoBloco\(ex,b\)/.test(clipes),
-   'e so cai na busca quando ela nao vem');
+console.log('\n=== as duas pontas usam a MESMA faixa ===');
+// Eram TRES ate 02/09/2026: VOZ, audio editado e o desenho da tela. O audio editado
+// saiu quando os dois botoes de audio viraram um so ("Ouvir o audio", sem os silencios
+// — ver teste-ouvir-audio.js), e com ele saiu rev2ClipesPatologia. Restam VOZ e a tela,
+// e elas continuam tendo de mostrar o mesmo pedaco do mesmo achado: o botao de um
+// retangulo tocando uma coisa e a tela dizendo outra foi defeito real em 31/08.
 const tocar = grab('rev2Tocar');
 ok(/rev2RecortePorFaixa\(ex, bl\)/.test(tocar), 'o botao VOZ tenta a mesma faixa');
 ok(/_fx=rev2RecortePorFaixa\(ex,b\)/.test(HTML),

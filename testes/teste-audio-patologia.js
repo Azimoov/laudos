@@ -74,41 +74,21 @@ const r6 = rev2RecorteFino(ac, 'esteatose hepática leve');
 const r7 = rev2RecorteFino(ac, 'cálculo pequeno no grupo calicinal médio');
 ok(r7.ini > r6.ini, 'com acentos, os dois achados continuam em lugares diferentes');
 
-console.log('\n=== a tela: o botao novo e a ligacao do VOZ ===');
-ok(/id="rv2BtEditado"/.test(HTML) && /rev2Editado\(\)/.test(HTML),
-   'existe o botao "Ouvir o audio editado" chamando rev2Editado');
-const iInt = HTML.indexOf('id="rv2BtInteiro"'), iEd = HTML.indexOf('id="rv2BtEditado"');
-ok(iInt > 0 && iEd > iInt, 'e ele fica ABAIXO do "Ouvir o ditado inteiro", como ele pediu');
+console.log('\n=== a tela: o botao de audio e a ligacao do VOZ ===');
+// 02/09/2026 — O "AUDIO EDITADO" SAIU DA TELA, e com ele rev2ClipesPatologia e
+// rev2Editado. Pedido dele: os dois botoes de audio ("ouvir o ditado inteiro" e "ouvir
+// o audio editado — so as patologias") viraram UM, "Ouvir o audio", que toca o exame
+// inteiro sem os silencios. O comportamento novo tem suite propria: teste-ouvir-audio.js.
+//
+// O QUE CONTINUA VIVO E E O QUE ESTA SUITE PROTEGE: rev2RecorteFino, o recorte curto por
+// achado. Ele nao era so do audio editado — e o que o botao VOZ usa para tocar a frase
+// daquele retangulo, e todos os casos reais medidos abaixo continuam valendo.
+ok(/id="rv2BtAudio"[^>]*onclick="rev2OuvirAudio\(\)"/.test(HTML),
+   'a tela tem UM botao de audio, chamando rev2OuvirAudio');
+ok(!/id="rv2BtEditado"/.test(HTML) && !/id="rv2BtInteiro"/.test(HTML),
+   'e os dois botoes antigos sairam');
 ok(/onclick="rev2Tocar\('\+trI\+','\+i\+'\)"/.test(HTML),
    'o botao VOZ manda o indice do BLOCO junto — e assim que acha a citacao daquele retangulo');
-const clip = grab('rev2ClipesPatologia');
-// 31/08/2026 — ESTE TESTE MUDOU DE MECANISMO (o proposito e o mesmo: so patologia).
-// Ele exigia `rev2Estado(ex,b)!=='alterado'`, ou seja, perguntava a COR DO CARTAO. Isso
-// causou um defeito relatado por ele: "so apresentou a primeira patologia, esteatose; o
-// calculo ele ignorou". O calculo renal estava em negrito E com a medida em branco —
-// e rev2Estado responde 'falta' (vermelho) nesse caso, nunca 'alterado', porque a cor
-// do cartao responde "o que ver primeiro?", nao "tem achado?".
-// Agora pergunta rev2TemAchado. NAO devolver para a cor do cartao.
-ok(/!rev2TemAchado\(ex,b\)/.test(clip),
-   'so entra no audio editado o retangulo COM ACHADO — orgao normal fica de fora');
-ok(!/rev2Estado\(ex,b\)!=='alterado'/.test(clip),
-   'e nao pergunta mais a cor do cartao (achado sem medida ficava de fora)');
-ok(/sort\(/.test(clip), 'e os trechos saem em ordem de tempo');
-// 31/08/2026 — A REGRA DA FUSAO MUDOU DE CRITERIO (o proposito continua: frase nao sai
-// picada). Era "encostados por menos de 0,4 s viram um so", medindo o CLIPE — folga
-// inclusa. Com a folga de 3 s no fim, isso passou a fundir achados diferentes so porque
-// a folga de um alcancava o outro: no exame das 22h43, "calculo no rim direito" e
-// "esplenomegalia", separados por 2,5 s de silencio, viravam um clipe e a tela dizia
-// 2 patologias havendo 3. Agora funde pela FALA (falaFim >= falaIni), e quando nao funde
-// apara a folga. NAO devolver para a medida do clipe.
-ok(/ult\.falaFim>=c\.falaIni/.test(clip),
-   'recortes cuja FALA se encosta viram um so (frase nao sai picada)');
-ok(/ult\.fim=Math\.max\(ult\.falaFim, c\.ini-0\.15\)/.test(clip),
-   'e quando sao achados distintos, apara-se a folga em vez de fundir');
-const ed = grab('rev2Editado');
-ok(/clipes\.length/.test(ed) && /n>=clipes\.length/.test(ed), 'toca um atras do outro ate acabar');
-// sem acento no padrao: este arquivo e ASCII, mas o texto da tela e acentuado
-ok(/trecho de patologia para montar/.test(ed), 'e diz o porque quando nao ha o que montar');
 
 // ===================================================================================
 // 31/08/2026 — O RECORTE DEIXOU DE SER CHUTE
@@ -218,15 +198,14 @@ ok(rCal.palavras === true && rCal.ini > 28,
 ok(rEst.fim < rCal.ini, 'os dois recortes nao se misturam');
 
 // e a ligacao na tela
-const clipNovo = grab('rev2ClipesPatologia');
-// 01/09/2026: rev2ChaveDoBloco (so citacao-ou-achado, citacao primeiro) foi substituida
-// aqui por rev2TrechoDoBloco (achado primeiro, citacao depois) — ver o caso real da
-// citacao contaminada no comentario da funcao. O proposito do teste continua: usar
-// achado OU citacao, nao so citacao.
-ok(/rev2TrechoDoBloco\(ex,b\)/.test(clipNovo),
-   'o audio editado usa achado-ou-citacao (rev2TrechoDoBloco), nao so a citacao');
-ok(!/if\(!pr\|\|!pr\.citacao\) return;/.test(clipNovo),
-   'e nao descarta mais o retangulo so porque a IA nao citou');
+// 02/09/2026: a verificacao que ficava aqui olhava rev2ClipesPatologia, que saiu com o
+// audio editado. A regra que ela protegia — usar o achado OU a citacao, nao so a
+// citacao — vale hoje em rev2TrechoDoBloco, que e quem o botao VOZ consulta.
+const trBloco = grab('rev2TrechoDoBloco');
+ok(/rev2AchadoEmNegrito\(b\)/.test(trBloco),
+   'o achado em negrito vem primeiro (vocabulario so daquele orgao)');
+ok(/pr&&pr\.citacao/.test(trBloco),
+   'e a citacao da IA fica como reserva, quando o achado nao bate com o ditado');
 ok(/rev2TrechoPorPalavras/.test(HTML), 'ha busca do achado em TODOS os trechos pela palavra');
 
 console.log('\n=== a esteira de arquivos nao pode perder a hora (31/08/2026) ===');
@@ -328,11 +307,13 @@ ok(cRim.ini <= 39.68 && cRim.fim >= 45.04, 'rim: cobre "calculo no rim esquerdo.
 console.log('\n=== e os tres nao se atropelam (era isso que virava "2 patologias") ===');
 ok(cFig.fim < cVes.ini, 'o do figado acaba antes de o da vesicula comecar');
 ok(cVes.fim < cRim.ini, 'e o da vesicula antes do rim');
-// a fusao do audio editado junta recortes a menos de 0,4 s: com estes, nenhum funde
+// os tres recortes ficam bem separados: nenhum encosta no vizinho
 ok(cVes.ini - cFig.fim > 0.4 && cRim.ini - cVes.fim > 0.4,
-   'nenhum par fica perto o bastante para ser fundido — saem 3 patologias, nao 2');
-ok(/RV2_TETO\)/.test(clip) || /RV2_TETO/.test(clip),
-   'e a fusao tem teto: recorte errado nao engole mais o vizinho');
+   'nenhum par fica perto o bastante para se confundir — sao 3 achados, nao 2');
+// 02/09/2026: a verificacao do teto vivia em rev2ClipesPatologia, que saiu. O teto
+// continua onde sempre agiu de verdade — dentro do proprio recorte.
+ok(/RV2_TETO/.test(grab('rev2RecorteFino')),
+   'e o recorte tem teto: pedaco errado nao cresce sem limite');
 
 console.log('\n=== a palavra nao casa mais por pedaco solto ===');
 ok(rev2PalavraCasa('calculo', 'calculos'), 'plural casa (calculo/calculos)');
@@ -396,9 +377,10 @@ const montado = montar([cFig43, cRim43, cBac43]);
 ok(montado.length === 3, 'a montagem devolve TRES clipes, nao dois  [' + montado.length + ']');
 ok(montado[1].fim <= cBac43.ini, 'a folga do rim foi APARADA para nao invadir o baco');
 ok(montado[1].fim >= cRim43.falaFim, 'mas a apara nunca corta a fala do proprio rim');
-const codigo = grab('rev2ClipesPatologia');
-ok(/ult\.falaFim>=c\.falaIni/.test(codigo), 'e a regra de verdade funde pela FALA, nao pela folga');
-ok(/ult\.fim=Math\.max\(ult\.falaFim, c\.ini-0\.15\)/.test(codigo), 'aparando quando nao funde');
+// 02/09/2026: as duas verificacoes que liam rev2ClipesPatologia sairam com ela. O que
+// elas protegiam continua medido logo acima, no proprio recorte: as falas do rim e do
+// baco sao SEPARADAS (falaFim < falaIni) mesmo com as folgas se encostando. Era esse o
+// fato clinico em disputa; a montagem era so quem o consumia.
 
 console.log('\n=== o achado SEM MEDIDA tambem entra no audio editado (31/08) ===');
 // O caso relatado por ele: laudo com esteatose hepatica (medida preenchida) e calculo
@@ -411,17 +393,15 @@ ok(/if\(rev2TemAchado\(ex, b\)\) return 'alterado';/.test(estado),
 // a COR do cartao nao muda: falta de medida continua vencendo, que e o desejado na tela
 ok(estado.indexOf("return 'falta'") < estado.indexOf('rev2TemAchado'),
    'na TELA a falta de medida continua vencendo (o cartao segue vermelho, como antes)');
-ok(!/\*\*\[\^\*\]/.test(clip) && !/_molde/.test(clip),
-   'e a regra do negrito nao foi copiada para o audio editado — mora num lugar so');
+ok(/function rev2TemAchado\(/.test(HTML),
+   'e a regra de "tem achado?" mora num lugar so, sem copia');
 
-console.log('\n=== o contador 1/3 (pedido dele, 31/08) ===');
-const ed2 = grab('rev2Editado');
-ok(/'▶ <b>'\+n\+'\/'\+clipes\.length\+'<\/b>/.test(ed2),
-   'ao tocar, mostra "1/3" — numero da patologia sobre o total');
-ok(ed2.indexOf("+n+'/'+clipes.length") < ed2.indexOf('esc(c.rotulo)'),
-   'e vem ANTES do nome do achado (e o que ele procura primeiro)');
-ok(/'<b>'\+clipes\.length\+'\/'\+clipes\.length\+'<\/b>/.test(ed2),
-   'e no fim mostra "3/3", fechando a conta');
+// 02/09/2026 — O CONTADOR "1/3" SAIU JUNTO COM O AUDIO EDITADO.
+// Ele existia porque a montagem tocava N patologias em sequencia e ele precisava saber
+// quantas faltavam ("na hora que eu der play, um numerozinho: 1/3, depois 2/3"). O botao
+// novo toca o exame INTEIRO sem os silencios: nao ha patologia a contar, e o que ele
+// quer saber ali e outra coisa — quanto tempo vai ouvir. Isso o botao novo mostra
+// ("3m10s no lugar de 4m27s"), e esta coberto em teste-ouvir-audio.js.
 
 console.log('\n=== a tela diz COMO achou o pedaco ===');
 ok(/hora exata da fala/.test(HTML), 'quando e medido, a tela diz "hora exata da fala"');

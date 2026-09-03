@@ -38,15 +38,23 @@ ok(/sa\._estudoAudio \? \(agenteBase\(\)\+'\/exame\/audio\/'/.test(HTML),
 ok(/if\(dit\.temAudio\)\{ a\._estudoAudio=est\.id;/.test(HTML),
   'o caminho de recuperacao tambem grava o estudo do audio');
 
-console.log('=== item 12b — ouvir o ditado INTEIRO (nao existia) ===');
-ok(/function rev2Inteiro\(\)/.test(HTML), 'existe a funcao de tocar o ditado inteiro');
-ok(/id="rv2BtInteiro"[^>]*onclick="rev2Inteiro\(\)"/.test(HTML), 'e tem botao na tela de revisao');
+console.log('=== item 12b — ouvir o ditado (o botao mudou em 02/09/2026) ===');
+// O que este item garantiu em 19/08 continua valendo: exame transcrito na NUVEM nao tem
+// marcacao de tempo, e sem um tocador comum o medico ficava sem nenhuma forma de ouvir o
+// proprio ditado. O que mudou foi o botao: `rev2Inteiro` deu lugar a `rev2OuvirAudio`, um
+// so, que tira os silencios — e que continua tocando INTEIRO quando nao ha hora nenhuma
+// para saber onde o silencio esta. A garantia e a mesma; o caminho e outro.
+// Ver teste-ouvir-audio.js para o comportamento novo.
+ok(/function rev2OuvirAudio\(\)/.test(HTML), 'existe a funcao de tocar o ditado');
+ok(/id="rv2BtAudio"[^>]*onclick="rev2OuvirAudio\(\)"/.test(HTML), 'e tem botao na tela de revisao');
 ok(/function rev2Parar\(\)/.test(HTML), 'da para parar');
-const INT = corpoDe('rev2Inteiro');
+const INT = corpoDe('rev2OuvirAudio');
 ok(/clearTimeout\(window\.__rv2Par\)/.test(INT),
-  'cancela o corte do trecho — inteiro toca ate o fim, nao 5 segundos');
+  'cancela o corte do trecho — o audio do exame nao para em 5 segundos');
 ok(/\.catch\(function\(e\)\{/.test(INT), 'falha ao tocar vira mensagem, nao silencio');
 ok(/o agente está desligado/.test(INT), 'e a mensagem diz a causa mais provavel');
+ok(/sem marcação de tempo/.test(INT),
+  'e o ditado da nuvem, sem hora, continua tocando inteiro em vez de ser recusado');
 
 console.log('=== item 13 — o rodape deixou de ser um beco sem saida ===');
 // 19/08/2026 (2a passagem): o rodape dava "(transcrito na nuvem)" como CAUSA. Desde que a

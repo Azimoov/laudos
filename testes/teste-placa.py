@@ -35,7 +35,13 @@ fonte = open(AG, encoding="utf-8").read()
 # recorta so o pedaco da reserva e roda num modulo de mentira
 ini = fonte.index("RESERVA_PLACA = ")
 fim = fonte.index("def aquecer_motor(")
-trecho = fonte[ini:fim].replace("atexit.register(soltar_placa)", "")
+"""02/09/2026 — tira QUALQUER atexit.register, nao so o da placa. O modulo de mentira
+   nao importa atexit, entao um register perdido no recorte quebra o teste com
+   NameError. Aconteceu no dia em que a reserva do MICROFONE foi acrescentada logo
+   abaixo da reserva da placa: a linha nova entrou no recorte e a suite caiu por um
+   import que nada tinha a ver com o que ela vigia. Com o padrao amplo, a proxima
+   reserva que nascer aqui nao derruba este teste."""
+trecho = re.sub(r"atexit\.register\([^)]*\)", "", fonte[ini:fim])
 
 import json as _json
 import urllib.request as _url

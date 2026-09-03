@@ -2145,9 +2145,16 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
       <button class="btn" id="btnCapOrt" onclick="capOrtToggle()">▶ Aguardar exame do aparelho</button>
       <button class="btn sec" onclick="capRecuperar()" title="Traz de volta os exames e ditados guardados no computador">🔄 Recuperar exames</button>
+      <!-- 03/09/2026, pedido dele: a válvula de escape da trava. Exame que já estava no
+           aparelho quando a espera ligou é tratado como ANTIGO e ignorado EM SILÊNCIO —
+           reenviar do ultrassom não adianta, porque é o mesmo exame com o mesmo número.
+           "Eu gosto da trava, mas gostaria de ter a possibilidade de sobrepujá-la." -->
+      <button class="btn sec" onclick="capForcarAbrir()"
+              title="Traz um exame que está no aparelho mas não entrou sozinho na lista de hoje">⤵ Trazer exame do aparelho…</button>
       <label style="font-weight:400;display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="capOrtAuto" checked> gerar o laudo automaticamente</label>
       <span class="aviso" id="capOrtStatus">Grave o ditado, toque aqui e envie o exame no aparelho.</span>
     </div>
+    <div id="capForcarLista" style="display:none;margin-top:8px"></div>
     <div id="capMicSec" style="display:none;margin-top:8px;gap:10px;align-items:center;flex-wrap:wrap">
       <canvas id="vuAgente" width="320" height="44" title="O traço ANDANDO significa que o microfone está capturando. Linha reta parada = microfone morto." style="background:#0f1c28;border-radius:8px;border:1px solid #24384a"></canvas>
       <span class="aviso" id="capMicEstado" style="font-weight:600"></span>
@@ -8336,16 +8343,97 @@ async function capOrtCompletar(est){
       +(ex.laudo?' O laudo já tinha saído SEM elas — gere de novo antes de liberar.':''), true);
   capOrtStatusTxt('Chegaram +'+novas+' imagem(ns) de '+(ex.paciente||'?')+' — completadas.');
 }
-async function capOrtProcessar(est){
+/* ===== TRAZER UM EXAME QUE O APARELHO JÁ TEM (03/09/2026) =====
+   Pedido dele: "eu mando um exame pro dia de atendimento, não deu certo, aí eu tento
+   mandar de novo e ele não vai... eu gosto da trava, mas gostaria de ter a possibilidade
+   de sobrepujá-la".
+
+   POR QUE REENVIAR DO APARELHO NÃO RESOLVE: ao ligar a espera, tudo o que já estava no
+   recebedor é anotado como ANTIGO (capOrtSeen) para o histórico inteiro não cair na lista
+   do dia. Esse conjunto é ignorado no laço da varredura SEM UMA PALAVRA na tela — e o
+   reenvio do ultrassom manda as MESMAS imagens, que o recebedor guarda sob o mesmo
+   número: para o programa, nada mudou. Foi por isso que ele viu "não vem, e não diz nada".
+
+   A trava fica. O que muda é existir uma porta: aqui ele escolhe o exame na mão e o traz,
+   passando por cima de `capOrtSeen` e `capOrtFeitos`. */
+function capForcarFechar(){
+  var d=document.getElementById('capForcarLista');
+  if(d){ d.style.display='none'; d.innerHTML=''; }
+}
+async function capForcarAbrir(){
+  var d=document.getElementById('capForcarLista'); if(!d) return;
+  if(d.style.display!=='none' && d.innerHTML){ capForcarFechar(); return; }   // o mesmo botão fecha
+  d.style.display='block';
+  d.innerHTML='<span class="aviso">procurando exames no aparelho…</span>';
+  var lista;
+  try{ lista=await capOrtListar(); }
+  catch(e){
+    d.innerHTML='<span class="aviso">não consegui falar com o agente ('+esc((e&&e.message)||String(e))+').</span>';
+    return;
+  }
+  /* Os mais NOVOS primeiro, e só os 12 primeiros: ele está atendendo, procurando o exame
+     que acabou de mandar. Uma lista de 570 aqui seria a mesma coisa que nenhuma. */
+  var ord=(lista||[]).slice().sort(function(a,b){
+    return String(b.dataOrdem||'').localeCompare(String(a.dataOrdem||''));
+  }).slice(0,12);
+  if(!ord.length){ d.innerHTML='<span class="aviso">o aparelho não tem exame nenhum.</span>'; return; }
+  d.innerHTML='<div style="border:1px solid #c8d0da;border-radius:8px;padding:8px;background:#fbfcfe">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+    +'<b style="font-size:13px">Últimos exames no aparelho</b>'
+    +'<span class="aviso" style="flex:1">toque no que você quer trazer para a lista de hoje</span>'
+    +'<button class="btn peq sec" type="button" onclick="capForcarFechar()">fechar</button></div>'
+    + ord.map(function(e){
+        var jaNaLista=exames.some(function(x){ return x._estudoId===e.id; });
+        /* Dizer o ESTADO de cada linha é o que evita o clique às cegas: "já está na sua
+           lista" e "foi ignorado como antigo" levam a decisões diferentes. */
+        var etiq = jaNaLista ? '<span class="tag" style="background:#fdeaea;color:#a3271f">já está na sua lista</span>'
+                 : (capOrtSeen.has(e.id) ? '<span class="tag" style="background:#eef3f8;color:#3d5566">ignorado como antigo</span>' : '');
+        return '<div style="display:flex;gap:8px;align-items:center;border-top:1px solid #eef1f5;padding:6px 0">'
+          +'<span style="flex:1;font-size:13px"><b>'+esc(e.paciente||'(sem nome)')+'</b> '+etiq
+          +'<span class="aviso"> · '+esc(e.data||'')+(e.hora?' '+esc(e.hora):'')+' · '+(e.nImagens||0)+' imagem(ns)</span></span>'
+          +'<button class="btn peq" type="button" onclick="capForcarTrazer(\''+esc(e.id)+'\')">trazer</button></div>';
+      }).join('')
+    +'</div>';
+}
+async function capForcarTrazer(id){
+  var d=document.getElementById('capForcarLista');
+  try{
+    var lista=await capOrtListar();
+    var est=(lista||[]).filter(function(e){ return String(e.id)===String(id); })[0];
+    if(!est){ capOrtStatusTxt('esse exame não está mais no aparelho.'); return; }
+    if(!est.nImagens){ capOrtStatusTxt('o exame de '+(est.paciente||'?')+' está sem imagens no aparelho.'); return; }
+    capForcarFechar();
+    /* Sai das duas listas de controle ANTES de processar: sem isso a varredura seguinte o
+       trataria de novo como antigo, e um exame trazido na mão sumiria da vigilância que
+       completa as imagens que chegam atrasadas (capOrtCompletar). */
+    capOrtSeen.delete(est.id);
+    capOrtFeitos.delete(est.id);
+    await capOrtProcessar(est, true);
+    capOrtFeitos.add(est.id);   // daqui em diante ele é vigiado como qualquer outro
+  }catch(e){
+    if(d) d.innerHTML='<span class="aviso">não consegui trazer o exame ('+esc((e&&e.message)||String(e))+').</span>';
+  }
+}
+async function capOrtProcessar(est, forcar){
   // Já temos este exame do aparelho na lista? As listas de controle (capOrtSeen/capOrtFeitos)
   // vivem só na memória e são zeradas ao RECARREGAR a página — sem esta conferência o mesmo
   // exame entrava outra vez e o médico ficava com o exame duplicado.
   var repetido=exames.find(function(e){ return e._estudoId && est.id && e._estudoId===est.id; });
-  if(repetido){
+  if(repetido && !forcar){
     capOrtFeitos.add(est.id);
     capOrtStatusTxt('Exame de '+(repetido.paciente||'?')+' já estava na lista — não dupliquei.');
     log('Exame do aparelho já estava na lista ('+(repetido.paciente||'?')+') — ignorado para não duplicar.');
     return;
+  }
+  /* 03/09/2026: com `forcar`, o exame entra mesmo já estando na lista — mas nunca em
+     silêncio. Ele pediu para poder sobrepujar a trava, não para a trava sumir: duplicar
+     um exame do dia sem querer daria dois laudos do mesmo paciente na fila, e ele
+     descobriria na hora de assinar. */
+  if(repetido && forcar){
+    if(!confirm('O exame de '+(repetido.paciente||'?')+' JÁ ESTÁ na lista de hoje.\n\n'
+               +'Trazer de novo vai criar um SEGUNDO exame igual, e você vai ver os dois na fila.\n\n'
+               +'OK = trazer assim mesmo · Cancelar = deixar como está')) return;
+    log('Exame do aparelho trazido DE NOVO a pedido ('+(repetido.paciente||'?')+') — agora há dois na lista.', true);
   }
   capOrtStatusTxt('🆕 Exame de '+(est.paciente||'?')+' chegou — baixando '+est.nImagens+' imagem(ns)…');
   // imagens e instIds andam EMPARELHADOS: é o mapa que permite completar depois

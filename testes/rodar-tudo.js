@@ -73,6 +73,7 @@ const SUITE = [
   { arq: 'teste-moldura-protegida.js', o: '"DESCRIÇÃO:" nao pode ser apagado por acidente (caso Jacilene, 26/08)' },
   { arq: 'teste-audio-patologia.js', o: 'recorte curto por achado (o que o botao VOZ toca)' },
   { arq: 'teste-ouvir-audio.js', o: 'ouvir o audio: o exame inteiro, sem os silencios' },
+  { arq: 'teste-trazer-exame.js', o: 'trazer na mao um exame que o aparelho ja tem' },
   { arq: 'teste-faixa-apontada.js', o: 'a IA aponta a POSICAO no ditado (fim da caca a citacao)' },
   { arq: 'teste-tela-provedor-ia.js', o: 'tela nova do Provedor de IA (espelha os campos antigos, um salvar so)' },
   { arq: 'teste-telas-config.js', o: 'telas novas de Configuracoes (blocos movidos, nao copiados)' },

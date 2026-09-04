@@ -806,6 +806,66 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 #telaDia .rodape{text-align:center;font-size:12px;color:#6B7480;margin-top:16px}
 </style>
 
+<!-- ============ O REPOSITÓRIO ÚNICO DE EXAMES — 04/09/2026, pedido do Dr. Daniel ============
+     "Um repositório único de exames, separados por datas... linhas com a data. Quando você
+     clica, existe uma expansão para baixo dos exames daquele dia."
+
+     O estilo NÃO está preso a #telaDia de propósito: a MESMA lista aparece no painel do dia
+     (hoje aberto, os outros dias fechados embaixo) e na tela de exames antigos. Uma lista,
+     dois lugares — foi assim que ele pediu, e é o que impede as duas telas de divergirem.
+
+     AS CORES SÃO A LEGENDA, não enfeite — mesma ideia dos alertas da revisão:
+       verde-azulado = imagens     · azul = áudio
+       verde         = liberado    · âmbar = ainda a liberar
+       cinza         = não existe (mais)
+     Sinal cinza quer dizer "não tem", e é informação clínica: exame sem áudio guardado é
+     exame que não dá mais para reconferir pelo ditado. -->
+<style>
+.repoBloco{margin-top:10px}
+.repoDia{border:1px solid #E2E5EA;border-radius:10px;background:#fff;margin-bottom:10px}
+.repoDia>summary{list-style:none;cursor:pointer;padding:12px 18px;display:flex;
+  align-items:center;gap:12px;font-size:14px;font-weight:700;color:#1C2430;border-radius:10px}
+.repoDia>summary::-webkit-details-marker{display:none}
+.repoDia>summary:hover{background:#F3F7F7}
+.repoDia>summary .seta{color:#0E6E6B;font-size:12px;transition:transform .15s;flex:0 0 12px}
+.repoDia[open]>summary .seta{transform:rotate(90deg)}
+.repoDia>summary .cont{margin-left:auto;font-weight:500;font-size:12px;color:#7d8c93}
+.repoDia>summary .hoje{background:#0E6E6B;color:#fff;border-radius:10px;padding:2px 9px;
+  font-size:11px;font-weight:700;letter-spacing:.3px}
+.repoLinha{border-top:1px solid #EEF1F5;padding:12px 18px;display:flex;align-items:center;
+  gap:14px;flex-wrap:wrap}
+.repoLinha .hr{font-size:13px;font-weight:600;color:#26303C;flex:0 0 46px}
+.repoLinha .quem{flex:1;min-width:180px}
+.repoLinha .nm{display:block;font-size:14.5px;font-weight:700;color:#1C2430}
+.repoLinha .tp{display:block;font-size:12px;color:#6B7480;margin-top:2px}
+.repoSelos{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.repoSelo{display:inline-flex;align-items:center;gap:5px;border-radius:14px;padding:5px 12px;
+  font-size:12px;font-weight:600;font-family:inherit;border:1px solid transparent;white-space:nowrap}
+button.repoSelo{cursor:pointer}
+button.repoSelo:hover{filter:brightness(.95)}
+.repoSelo.img{background:#E3F0EF;color:#0B5A57;border-color:#A9CFCB}
+.repoSelo.aud{background:#E7EFF9;color:#24507F;border-color:#AEC6E4}
+.repoSelo.lib{background:#E5F4EC;color:#1B7048;border-color:#A6D4BC}
+.repoSelo.falta{background:#FBF3E1;color:#8A6210;border-color:#DDBE72}
+.repoSelo.vazio{background:#F1F3F5;color:#8A93A0;border-color:#DDE2E7;font-weight:500}
+.repoSelo.on{box-shadow:inset 0 0 0 2px rgba(14,110,107,.35)}
+.repoAcoes{display:flex;gap:6px;flex-wrap:wrap}
+.repoBt{background:#fff;border:1px solid #0E6E6B;color:#0E6E6B;border-radius:14px;padding:6px 14px;
+  font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.repoBt:hover{background:#E7F1F0}
+.repoBt.cinza{border-color:#C3CAD2;color:#5A646F}
+.repoBt.cinza:hover{background:#EEF1F4}
+.repoPainel{flex:1 0 100%;margin-top:4px}
+.repoPainel:empty{display:none}
+.repoMinis{display:flex;gap:6px;flex-wrap:wrap}
+.repoMinis img{width:96px;height:96px;object-fit:cover;border:1px solid #C8D0DA;border-radius:6px;cursor:pointer}
+.repoNota{font-size:11.5px;color:#8A93A0;margin-top:5px;display:block}
+.repoLegenda{font-size:11.5px;color:#7d8c93;margin:0 2px 10px;display:flex;gap:14px;flex-wrap:wrap}
+.repoLegenda b{font-weight:700}
+.repoVazio{background:#fff;border:1px dashed #CBD4DC;border-radius:10px;padding:22px;
+  text-align:center;font-size:13px;color:#8A93A0}
+</style>
+
 <div id="telaDia">
   <div class="ab-folha">
     <div class="ab-topo">
@@ -841,6 +901,16 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
               title="Traz um exame que está no aparelho mas não entrou sozinho na lista de hoje"
               style="background:#eef3f8;color:#2b4a5e">⤵ Trazer exame do aparelho…</button>
       <div id="capForcarLista" style="display:none;margin-top:8px"></div>
+
+      <!-- 04/09/2026, pedido dele: "mesmo na lista de exames realizados no próprio dia, vai
+           ter lá embaixo os outros dias fechados em uma linha. Mas, se você clicar, tem a
+           possibilidade de abrir para observar os exames realizados em outros dias."
+           NASCE FECHADO E SEM CUSTO: a lista do aparelho leva ~1 s com 575 exames, e o
+           painel do dia se redesenha a cada 5 s — carregá-la junto seria bater no recebedor
+           720 vezes por hora para mostrar uma linha que ele quase nunca abre. Só busca
+           quando ele toca. -->
+      <div class="eb dep">OUTROS DIAS</div>
+      <div id="diaOutrosDias"></div>
 
       <button class="pend" id="diaPend" onclick="diaRevisarPendentes()">Revisar laudos pendentes</button>
       <p class="rodape">nada abre sozinho: o painel avisa (som + faixa) e você toca quando quiser</p>
@@ -1589,7 +1659,17 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
     </div>
     <div class="ab-corpo">
 
-      <p class="eb">1 · DE ONDE VEM O MATERIAL?</p>
+      <!-- 04/09/2026 — O REPOSITÓRIO ENTRA AQUI, ANTES DE TUDO.
+           "Essa mesma lista de exames vai servir tanto para os exames realizados em outros
+           dias, ao botão de fazer exames anteriores, como para a lista do próprio dia."
+           É a MESMA função que desenha as linhas no painel do dia (repoDiasHtml) — uma
+           lista só, dois lugares. O que já existia nesta tela (arrastar imagem, gravar
+           ditado, buscar no aparelho) continua abaixo, intocado: aquilo MONTA um laudo,
+           isto MOSTRA o que existe. São coisas diferentes e as duas têm de existir. -->
+      <p class="eb">EXAMES GUARDADOS</p>
+      <div id="antRepo"></div>
+
+      <p class="eb dep">1 · DE ONDE VEM O MATERIAL?</p>
       <div class="duas">
         <button class="fonte" id="antFonteArq" onclick="antFonte('arquivados')">
           <span class="n">Exames arquivados <span class="selo" id="antGuardados">—</span></span>
@@ -14336,6 +14416,12 @@ async function diaAtualizar(){
   emAndamento.textContent='Gravando o ditado — o exame aparece na lista quando as imagens chegarem';
   sub.textContent='o nome da paciente e o tipo do exame chegam junto com as imagens, no fim do exame — fale normalmente';
 
+  /* Os selos de áudio e de liberado saem do computador, não da janela: sem isto, quem
+     recarregasse a página veria "sem áudio" em exame com o ditado inteiro no disco.
+     Ele mesmo se segura em 60 s — as três leituras são baratas, a do aparelho não entra
+     aqui (ver repoCarregarLeve). */
+  repoCarregarLeve().then(function(){ try{ diaRenderLista(); }catch(_){} });
+
   diaRenderLista();
 }
 function diaExamesDeHoje(){
@@ -14370,12 +14456,371 @@ function diaAtualizarContador(lista){
   else partes.push('todos assinados');
   el.textContent='· '+partes.join(' · ');
 }
+/* ===================== O REPOSITÓRIO ÚNICO DE EXAMES — 04/09/2026 =====================
+   Pedido do Dr. Daniel, por inteiro: "um repositório único de exames, separados por datas,
+   e aí eles podem ser linhas com a data. Quando você clica, existe uma expansão para baixo
+   dos exames daquele dia... com o nome do paciente e se tem o áudio, se tem as imagens, se
+   o exame já foi liberado. Tudo com botões, sinais, cada um com uma cor... e nesses botões
+   você continua tendo acesso às imagens e ao áudio enquanto aquilo estiver armazenado."
+
+   A DESCOBERTA QUE FEZ ISTO SER POSSÍVEL: as quatro verdades deste programa já se
+   encontram numa chave só — o identificador do estudo no recebedor de imagens (Orthanc).
+     · o exame e as imagens .... /dicom/estudos       (o que o aparelho mandou)
+     · o ditado curto ......... /exame/ditados        (7 dias, guardado pelo agente)
+     · o áudio do paciente .... /capturas             (90 dias, a pasta de consulta)
+     · o laudo assinado ....... /exames/liberados     (study_uid = este mesmo id)
+   Nada disso precisou ser inventado: já existia, cada um servindo a uma tela diferente.
+   O repositório é o cruzamento.
+
+   O QUE ELE NÃO SABE E É DITO NA TELA, não escondido: exame antigo pode ter perdido o
+   áudio (90 dias) sem ter perdido as imagens, e o selo cinza é essa notícia. */
+var _repo={estudos:null, ditados:{}, capturas:{}, liberados:{},
+           quando:0, erro:'', carregando:false, retAudio:90};
+var _repoIndice={};      // chave da linha -> item, para os botões acharem o exame
+var _repoFotos={};       // estudo -> imagens já baixadas (não rebaixa a cada toque)
+var _repoPainel={};      // o que está aberto dentro de cada linha: 'fotos' | 'audio' | ''
+var _repoAberto={};      // dias abertos, para o redesenho não fechar o que ele abriu
+var _diaListaHtml='';    // a última lista do dia desenhada — ver o porquê em diaRenderLista
+
+function repoDiaIso(dataBr){
+  var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(dataBr||''));
+  return m ? (m[3]+'-'+m[2]+'-'+m[1]) : '';
+}
+function repoHojeBr(){
+  var h=new Date();
+  return ('0'+h.getDate()).slice(-2)+'/'+('0'+(h.getMonth()+1)).slice(-2)+'/'+h.getFullYear();
+}
+/* As quatro fontes, com QUEDA SUAVE em cada uma: o recebedor fora do ar não pode apagar
+   os selos de áudio, e o banco vazio não pode esconder as imagens. Cada falha some com um
+   selo, nunca com a lista. */
+/* AS TRÊS BARATAS, separadas da lista do aparelho de propósito. Ler a pasta de ditados,
+   a pasta de áudio e uma conta no banco custa milissegundos; a lista do recebedor custa
+   ~1 s com 575 exames. Os selos do painel do dia precisam só destas três — e é por isso
+   que o painel do dia ganha os selos sem pagar nada. */
+var _repoLeveQuando=0;
+async function repoCarregarLeve(forcar){
+  if(!forcar && (Date.now()-_repoLeveQuando)<60000) return;
+  var veio=0;
+  try{ var j=await (await fetch(agenteBase()+'/exame/ditados')).json();
+       _repo.ditados=(j&&j.ditados)||{}; veio++; }catch(_){}
+  try{ var c=await (await fetch(agenteBase()+'/capturas')).json();
+       _repo.capturas=(c&&c.dias)||{}; if(c&&c.retencaoDias) _repo.retAudio=c.retencaoDias; veio++; }catch(_){}
+  try{ var l=await (await fetch(agenteBase()+'/exames/liberados')).json();
+       var m={}; ((l&&l.uids)||[]).forEach(function(u){ m[u]=true; }); _repo.liberados=m; veio++; }catch(_){}
+  /* SÓ MARCA A HORA SE ALGO VEIO. Com o agente subindo (ou fora do ar), as três falham —
+     e marcar a hora aqui prenderia a tela por um minuto inteiro em "sem áudio, nada
+     liberado", com tudo intacto no disco. Falhar não é ter feito. */
+  if(veio) _repoLeveQuando=Date.now();
+}
+async function repoCarregar(forcar){
+  if(_repo.carregando) return;
+  if(!forcar && _repo.estudos && (Date.now()-_repo.quando)<90000) return;
+  _repo.carregando=true; _repo.erro='';
+  try{ _repo.estudos=await capOrtListar(); _repo.quando=Date.now(); }
+  catch(e){ _repo.erro=(e&&e.message)||String(e); if(!_repo.estudos) _repo.estudos=[]; }
+  await repoCarregarLeve(forcar);
+  _repo.carregando=false;
+}
+/* ONDE ESTÁ O ÁUDIO DESTE EXAME — três lugares, nesta ordem, e a ordem tem motivo:
+     1. o ditado do agente (7 dias) casa pelo ID DO ESTUDO, que não erra de paciente;
+     2. a cópia de consulta (90 dias) casa por DIA + NOME, que é o único vínculo que
+        aquele arquivo tem — é por isso que ela vem depois, e não antes;
+     3. o áudio ainda na memória desta sessão, que some ao recarregar a página.
+   O casamento por nome usa `norm` (o mesmo do resto do app) em vez de repetir aqui a
+   regra de nome de arquivo do agente: regra copiada diverge, e divergir aqui daria o
+   áudio de um paciente a outro. Tolerante de propósito — acento e caixa não separam. */
+function repoDiaSeguinte(diaIso){
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(diaIso||''); if(!m) return '';
+  var d=new Date(+m[1], +m[2]-1, +m[3]+1);
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+function repoCapturaNoDia(diaIso, alvo){
+  var arqs=_repo.capturas[diaIso]||[];
+  for(var i=0;i<arqs.length;i++){
+    // "Maria (2).wav" é o segundo exame do mesmo paciente no mesmo dia — o nome é o mesmo
+    var base=String(arqs[i]).replace(/\.[^.]+$/,'').replace(/\s*\(\d+\)$/,'');
+    if(norm(base)===alvo) return arqs[i];
+  }
+  return '';
+}
+function repoUrlCaptura(diaIso, arq){
+  return agenteBase()+'/captura/audio?dia='+encodeURIComponent(diaIso)+'&arq='+encodeURIComponent(arq);
+}
+function repoAudioDe(est, ex, diaIso, paciente){
+  var eid=(est&&est.id)||(ex&&ex._estudoId)||'';
+  if(eid && _repo.ditados[eid] && _repo.ditados[eid].temAudio)
+    return {tem:true, dia:diaIso, fonte:'ditado',
+            url:agenteBase()+'/exame/audio/'+encodeURIComponent(eid)};
+  var alvo=norm(paciente||'');
+  if(alvo){
+    var arq=repoCapturaNoDia(diaIso, alvo);
+    if(arq) return {tem:true, dia:diaIso, fonte:'arquivo', url:repoUrlCaptura(diaIso, arq)};
+    /* ⚠️ O DIA DA PASTA É O DIA EM QUE O EXAME FECHOU, não o dia em que foi feito.
+       Exame da noite que só fecha na manhã seguinte cai na pasta do dia seguinte, e a
+       busca acima o daria como "sem áudio" com o arquivo intacto no disco. Medido aqui em
+       04/09/2026: exames de 02/09 com o áudio guardado nas pastas de 03 e 04.
+       A GUARDA, e a razão dela: dar o áudio de um exame a OUTRO exame é o erro mais caro
+       que este programa comete — é assim que um laudo sai com o ditado do paciente
+       errado. Então só se olha no dia seguinte quando esse paciente tem UM exame só
+       nesses dois dias. Havendo dois, não há como saber qual gravação é qual, e a resposta
+       honesta é "sem áudio". */
+    var d2=repoDiaSeguinte(diaIso);
+    var arq2=d2 && repoCapturaNoDia(d2, alvo);
+    if(arq2){
+      var quantos=(_repo.estudos||[]).filter(function(e){
+        var di=repoDiaIso(e.data||'');
+        return (di===diaIso||di===d2) && norm(capNome(e.paciente||''))===alvo;
+      }).length;
+      if(quantos<=1)
+        return {tem:true, dia:d2, fonte:'arquivo', url:repoUrlCaptura(d2, arq2)};
+    }
+  }
+  if(ex){
+    var a=(typeof audios!=='undefined'?audios:[]).filter(function(x){ return x.exameId===ex.id && x.url; })[0];
+    if(a) return {tem:true, dia:diaIso, fonte:'sessao', url:a.url};
+  }
+  return {tem:false, url:'', fonte:'', dia:''};
+}
+/* Uma linha do repositório. `est` = o exame no aparelho · `ex` = o exame desta sessão.
+   Os dois podem existir sozinhos: exame do aparelho que ele ainda não abriu (só `est`),
+   e ditado avulso ou laudo reaberto do histórico (só `ex`). */
+function repoItem(est, ex){
+  var diaBr = est ? (est.data||'')
+            : (ex&&ex._quando ? new Date(ex._quando).toLocaleDateString('pt-BR') : '');
+  var hora  = est ? (est.hora||'')
+            : (ex&&ex._quando ? new Date(ex._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '');
+  /* O `^` é o separador do DICOM (SOBRENOME^NOME). Sem trocá-lo por espaço, o nome sai
+     "Ana^maria" na tela — e `capNome` não o vê, porque ela só maiúscula o que vem depois
+     de um espaço. Este aparelho costuma mandar o nome já com espaços; nem todos mandam. */
+  var paciente=(ex&&ex.paciente)
+             ||capNome(String((est&&est.paciente)||'').replace(/\^+/g,' '))||'(sem nome)';
+  var eid=(est&&est.id)||(ex&&ex._estudoId)||'';
+  var tipo=(ex&&MODELOS[ex.tipo]&&MODELOS[ex.tipo].nome)||(ex&&ex.tipo)
+          ||(est&&est.descricao)||'tipo ainda não identificado';
+  var diaIso=repoDiaIso(diaBr);
+  var nImg = ex ? ((ex.imagens||[]).length||(est?(est.nImagens||0):0))
+                : (est?(est.nImagens||0):0);
+  return {
+    chave: est?('E'+est.id):('S'+((ex&&ex.id)||0)),
+    estudoId: eid, est:est, ex:ex||null,
+    paciente:paciente, tipo:tipo, dia:diaBr, diaIso:diaIso, hora:hora,
+    ordem: (est&&est.dataOrdem) || ((diaIso||'')+String(hora||'').replace(':','')),
+    nImagens: nImg,
+    instancias: (est&&est.instancias)||(ex&&ex._instIds)||[],
+    audio: repoAudioDe(est, ex, diaIso, paciente),
+    // liberado: o banco é a fonte (study_uid); o exame da sessão sabe de si mesmo
+    liberado: !!((ex&&ex._liberado) || (eid && _repo.liberados[eid]))
+  };
+}
+function repoItens(){
+  var itens=[], jaVi={};
+  (_repo.estudos||[]).forEach(function(e){
+    var ex=exames.filter(function(x){ return x._estudoId && x._estudoId===e.id; })[0]||null;
+    if(ex) jaVi[ex.id]=true;
+    itens.push(repoItem(e, ex));
+  });
+  // exame desta sessão que NÃO veio do aparelho: ditado avulso, laudo reaberto do
+  // histórico, material antigo montado à mão. Existe e tem de aparecer.
+  exames.forEach(function(x){ if(!jaVi[x.id]) itens.push(repoItem(null, x)); });
+  /* ACRESCENTA, não substitui: o painel do dia registra os exames de hoje pela chave
+     dele ('S…') e esta lista registra os do aparelho ('E…'). Zerar aqui deixaria os
+     selos de hoje sem dono até o próximo desenho, e um toque não faria nada. */
+  itens.forEach(function(it){ _repoIndice[it.chave]=it; });
+  return itens;
+}
+function repoAgrupar(itens){
+  var por={};
+  itens.forEach(function(it){ var d=it.dia||'sem data'; (por[d]=por[d]||[]).push(it); });
+  Object.keys(por).forEach(function(d){
+    por[d].sort(function(a,b){ return String(b.ordem||'').localeCompare(String(a.ordem||'')); });
+  });
+  return por;
+}
+/* OS TRÊS SINAIS. Cada um diz o que existe e, quando há o que abrir, abre.
+   Sinal que não abre nada é <span>, não <button>: botão que não faz nada ensina a não
+   confiar nos outros botões. */
+function repoSelosHtml(it){
+  var s=[], ab=_repoPainel[it.chave]||'';
+  if(it.nImagens>0)
+    s.push('<button type="button" class="repoSelo img'+(ab==='fotos'?' on':'')+'" '
+      +'onclick="repoVerFotos(\''+esc(it.chave)+'\')" title="ver as imagens deste exame">'
+      +'🖼 '+it.nImagens+(it.nImagens===1?' imagem':' imagens')+'</button>');
+  else
+    s.push('<span class="repoSelo vazio" title="o aparelho não tem imagem deste exame">🖼 sem imagens</span>');
+
+  if(it.audio.tem)
+    s.push('<button type="button" class="repoSelo aud'+(ab==='audio'?' on':'')+'" '
+      +'onclick="repoOuvir(\''+esc(it.chave)+'\')" title="ouvir o ditado deste exame">'
+      +'🎧 áudio</button>');
+  else
+    s.push('<span class="repoSelo vazio" title="o áudio guardado se apaga aos '
+      +_repo.retAudio+' dias — este já não existe">🎧 sem áudio</span>');
+
+  if(it.liberado){
+    if(it.ex && it.ex.laudo)
+      s.push('<button type="button" class="repoSelo lib" onclick="diaRevisar('+it.ex.id+')" '
+        +'title="abrir o laudo assinado">✓ liberado</button>');
+    else s.push('<span class="repoSelo lib" title="laudo já assinado">✓ liberado</span>');
+  }else{
+    if(it.ex && it.ex.laudo)
+      s.push('<button type="button" class="repoSelo falta" onclick="diaRevisar('+it.ex.id+')" '
+        +'title="revisar e assinar">○ a liberar</button>');
+    else s.push('<span class="repoSelo falta" title="ainda não há laudo assinado deste exame">○ a liberar</span>');
+  }
+  return '<span class="repoSelos">'+s.join('')+'</span>';
+}
+/* Os botões de AÇÃO da linha. Exame desta sessão já tem os seus no cartão do dia; aqui
+   valem os dois destinos que ele escolheu em 03/09 — trazer para hoje ou para a tela de
+   exames antigos. */
+function repoAcoesHtml(it){
+  if(!it.est) return '';
+  var na=it.ex?' cinza':'';
+  return '<span class="repoAcoes">'
+    +'<button type="button" class="repoBt'+na+'" onclick="repoTrazer(\''+esc(it.chave)+'\',\'hoje\')" '
+    +'title="põe este exame no painel de hoje">⤵ para hoje</button>'
+    +'<button type="button" class="repoBt cinza" onclick="repoTrazer(\''+esc(it.chave)+'\',\'antigos\')" '
+    +'title="abre a tela de fotos e áudios antigos com as imagens já baixadas">⤵ para antigos</button>'
+    +'</span>';
+}
+function repoLinhaHtml(it){
+  return '<div class="repoLinha" id="repoL'+esc(it.chave)+'">'
+    +'<span class="hr">'+esc(it.hora||'--:--')+'</span>'
+    +'<span class="quem"><span class="nm">'+esc(it.paciente)+'</span>'
+    +'<span class="tp">'+esc(it.tipo)+'</span></span>'
+    +repoSelosHtml(it)+repoAcoesHtml(it)
+    +'<div class="repoPainel" id="repoP'+esc(it.chave)+'"></div></div>';
+}
+/* As linhas de data. `opc.excluirDia` tira um dia da lista (no painel do dia, HOJE já
+   está desenhado acima — repeti-lo seria mostrar o mesmo exame duas vezes na mesma tela).
+   `opc.abrirPrimeiro` deixa o dia mais recente aberto. */
+function repoDiasHtml(opc){
+  opc=opc||{};
+  var por=repoAgrupar(repoItens());
+  var dias=Object.keys(por).filter(function(d){ return d!==opc.excluirDia; })
+    .sort(function(a,b){ return repoOrdemDia(b).localeCompare(repoOrdemDia(a)); });
+  if(!dias.length) return '<div class="repoVazio">'+esc(opc.vazio||'Nenhum exame guardado.')+'</div>';
+  var hoje=repoHojeBr();
+  return '<p class="repoLegenda"><span>🖼 <b>imagens</b></span><span>🎧 <b>áudio</b> '
+    +'(guardado por '+_repo.retAudio+' dias)</span><span>✓ <b>liberado</b></span>'
+    +'<span>○ <b>a liberar</b></span><span style="color:#98a2ac">cinza = já não existe</span></p>'
+    + dias.map(function(dia, i){
+    var regs=por[dia];
+    var aberto = _repoAberto[dia]!=null ? _repoAberto[dia] : (opc.abrirPrimeiro && i===0);
+    return '<details class="repoDia"'+(aberto?' open':'')
+      +' ontoggle="_repoAberto['+JSON.stringify(dia).replace(/"/g,'&quot;')+']=this.open">'
+      +'<summary><span class="seta">▶</span>'+esc(dia)
+      +(dia===hoje?' <span class="hoje">HOJE</span>':'')
+      +'<span class="cont">'+regs.length+' exame'+(regs.length===1?'':'s')+'</span></summary>'
+      + regs.map(repoLinhaHtml).join('')
+      +'</details>';
+  }).join('');
+}
+function repoOrdemDia(dia){
+  var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dia);
+  return m ? (m[3]+m[2]+m[1]) : '0';      // 'sem data' vai para o fim
+}
+/* ---- os painéis que abrem dentro da linha ---- */
+function repoFecharPainel(chave){
+  _repoPainel[chave]='';
+  var p=document.getElementById('repoP'+chave); if(p) p.innerHTML='';
+  var l=document.getElementById('repoL'+chave);
+  if(l) l.querySelectorAll('.repoSelo.on').forEach(function(b){ b.classList.remove('on'); });
+}
+async function repoVerFotos(chave){
+  var it=_repoIndice[chave]; if(!it) return;
+  var p=document.getElementById('repoP'+chave); if(!p) return;
+  if(_repoPainel[chave]==='fotos'){ repoFecharPainel(chave); return; }
+  repoFecharPainel(chave);
+  _repoPainel[chave]='fotos';
+  var sel=document.querySelector('#repoL'+chave+' .repoSelo.img'); if(sel) sel.classList.add('on');
+  // já estão na tela? (exame desta sessão) — não pede nada ao aparelho
+  var fotos=(it.ex&&(it.ex.imagens||[]).length)?it.ex.imagens:_repoFotos[it.estudoId];
+  if(!fotos){
+    p.innerHTML='<span class="repoNota">baixando '+it.instancias.length+' imagem(ns) do aparelho…</span>';
+    fotos=[];
+    for(var i=0;i<it.instancias.length;i++){
+      try{ fotos.push(await dicomBaixarImagem(it.instancias[i])); }
+      catch(e){ /* uma foto ilegível não pode esconder as outras */ }
+    }
+    _repoFotos[it.estudoId]=fotos;
+  }
+  if(_repoPainel[chave]!=='fotos') return;      // ele fechou enquanto baixava
+  p.innerHTML = fotos.length
+    ? '<div class="repoMinis">'+fotos.map(function(u){
+        return '<img src="'+u+'" onclick="ampliarImg(this)">'; }).join('')+'</div>'
+      +'<span class="repoNota">toque numa foto para ver em tamanho cheio</span>'
+    : '<span class="repoNota">não consegui ler as imagens deste exame no aparelho.</span>';
+}
+function repoOuvir(chave){
+  var it=_repoIndice[chave]; if(!it) return;
+  var p=document.getElementById('repoP'+chave); if(!p) return;
+  /* Sem endereço não há o que tocar. Um <audio src=""> não fica mudo: ele aponta para a
+     PRÓPRIA PÁGINA e o navegador tenta tocar o programa como se fosse som. */
+  if(!it.audio.tem || !it.audio.url){
+    p.innerHTML='<span class="repoNota">este exame não tem áudio guardado para tocar.</span>';
+    return;
+  }
+  if(_repoPainel[chave]==='audio'){ repoFecharPainel(chave); return; }
+  repoFecharPainel(chave);
+  _repoPainel[chave]='audio';
+  var sel=document.querySelector('#repoL'+chave+' .repoSelo.aud'); if(sel) sel.classList.add('on');
+  var de = it.audio.fonte==='ditado' ? 'ditado guardado pelo agente'
+         : it.audio.fonte==='arquivo' ? 'áudio do exame, da pasta de consulta'
+         : 'gravação desta sessão';
+  /* Quando a gravação está guardada num dia diferente do exame (exame que fechou no dia
+     seguinte), a tela DIZ. Ele precisa ver de onde veio o áudio que está ouvindo. */
+  if(it.audio.dia && it.audio.dia!==it.diaIso) de+=' — guardado em '+it.audio.dia;
+  p.innerHTML='<audio controls autoplay preload="none" style="width:100%;max-width:420px" '
+    +'src="'+esc(it.audio.url)+'"></audio>'
+    +'<span class="repoNota">'+esc(de)+' · o áudio mora no computador: com o agente '
+    +'desligado não há o que tocar</span>';
+}
+/* Trazer daqui é o MESMO caminho do botão "Trazer exame do aparelho" (03/09), com as
+   mesmas travas — inclusive a pergunta antes de criar um segundo exame igual. */
+async function repoTrazer(chave, destino){
+  var it=_repoIndice[chave]; if(!it||!it.est) return;
+  await capForcarTrazer(it.est.id, destino);
+  if(destino==='hoje'){ try{ diaRenderLista(); }catch(_){} }
+}
+/* ---- as duas casas da mesma lista ---- */
+async function repoPintar(idAlvo, opc){
+  var d=document.getElementById(idAlvo); if(!d) return;
+  d.innerHTML='<div class="repoVazio">procurando os exames guardados…</div>';
+  await repoCarregar((opc||{}).forcar);
+  if(_repo.erro && !(_repo.estudos||[]).length){
+    d.innerHTML='<div class="repoVazio">não consegui falar com o agente ('+esc(_repo.erro)+'). '
+      +'Os exames antigos moram no computador — ligue o agente e toque de novo.</div>';
+    return;
+  }
+  d.innerHTML=repoDiasHtml(opc)
+    +'<p class="repoNota" style="text-align:right">'
+    +'<button type="button" class="repoBt cinza" onclick="repoPintar(\''+esc(idAlvo)
+    +'\',{forcar:true'+((opc&&opc.excluirDia)?(',excluirDia:'+JSON.stringify(opc.excluirDia)):'')
+    +((opc&&opc.abrirPrimeiro)?',abrirPrimeiro:true':'')+'})">↻ atualizar</button></p>';
+}
+/* No painel do dia a lista nasce FECHADA e só busca quando ele toca: com 575 exames no
+   recebedor a busca leva ~1 s, e esta tela se redesenha a cada 5 s. */
+function repoOutrosDiasBotao(){
+  var d=document.getElementById('diaOutrosDias'); if(!d) return;
+  if(d.getAttribute('data-aberto')==='1') return;      // já aberto: não desfaz
+  d.innerHTML='<button type="button" class="repoBt cinza" style="width:100%;padding:12px" '
+    +'onclick="repoOutrosDiasAbrir()">▶ Ver os exames de outros dias</button>';
+}
+async function repoOutrosDiasAbrir(){
+  var d=document.getElementById('diaOutrosDias'); if(!d) return;
+  d.setAttribute('data-aberto','1');
+  await repoPintar('diaOutrosDias', {excluirDia:repoHojeBr(), abrirPrimeiro:true,
+                                     vazio:'Não há exames de outros dias no aparelho.'});
+}
+
 function diaRenderLista(){
   var d=document.getElementById('diaLista'); if(!d) return;
+  repoOutrosDiasBotao();
   var lista=diaExamesDeHoje();
   diaAtualizarContador(lista);
   var esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
   if(!lista.length){
+    _diaListaHtml='';
     d.innerHTML='<div class="vazio">Nenhum exame ainda hoje. Quando o aparelho enviar as imagens, ele aparece aqui.</div>';
   }else{
     var bipar=false;
@@ -14387,7 +14832,7 @@ function diaRenderLista(){
        "Revisar laudos pendentes" pega o PRIMEIRO da lista — invertendo na origem, ele
        passaria a abrir o mais RECENTE em vez do mais antigo, que é a ordem errada para
        quem está limpando a fila. */
-    d.innerHTML=lista.slice().reverse().map(function(x){
+    var htmlLista=lista.slice().reverse().map(function(x){
       var hora=x._quando?new Date(x._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
       var tipo=(MODELOS[x.tipo]&&MODELOS[x.tipo].nome)||x.tipo||'tipo ainda não identificado';
       /* 19/08/2026 — OS BOTÕES COEXISTEM, não se substituem (pedido do médico).
@@ -14427,11 +14872,29 @@ function diaRenderLista(){
       bts.push('<button class="bt cinza" onclick="diaReabrir('+x.id+')" '
               +'title="devolve o exame para receber mais ditado ou imagens">Reabrir exame</button>');
       var acoes=bts.join('');
+      /* 04/09/2026 — OS TRÊS SINAIS entram TAMBÉM no cartão de hoje. Ele pediu uma lista
+         só: se o exame de anteontem mostra áudio, imagens e liberado, o de hoje tem de
+         mostrar o mesmo, senão são duas listas outra vez. O cartão de hoje guarda o que
+         só ele tem — a situação do laudo e os botões de trabalho —, e ganha os selos. */
+      var it=repoItem(null, x); _repoIndice[it.chave]=it;
       return '<div class="item'+classe+'"><span class="hr">'+hora+'</span>'
         +'<span class="quem"><span class="nm">'+esc(x.paciente||'(sem nome)')+'</span>'
         +'<span class="tp">'+esc(tipo)+'</span></span>'+sit
-        +'<span style="display:flex;gap:8px;flex-wrap:wrap">'+acoes+'</span></div>';
+        +'<span style="display:flex;gap:8px;flex-wrap:wrap">'+acoes+'</span>'
+        +'<div id="repoL'+it.chave+'" style="flex:1 0 100%;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
+        +repoSelosHtml(it)
+        +'<div class="repoPainel" id="repoP'+it.chave+'"></div></div></div>';
     }).join('');
+    /* 04/09/2026 — SÓ ESCREVE SE MUDOU. Esta lista se refaz a cada 5 s, e a partir de
+       hoje ela tem painéis que ABREM dentro dela: reescrever a cada volta fecharia as
+       fotos na cara dele e cortaria o áudio no meio da frase, cinco segundos depois de
+       ele tocar. Quando muda de verdade (um exame novo chegou), os painéis se fecham —
+       e a marca de aberto é apagada junto, para o selo não ficar aceso mentindo. */
+    if(htmlLista!==_diaListaHtml){
+      _diaListaHtml=htmlLista;
+      d.innerHTML=htmlLista;
+      _repoPainel={};
+    }
     // som só quando um exame ENTRA em falta, não a cada 5 s: aviso repetido vira ruído
     if(bipar){ try{ micSom('falta'); }catch(_){} }
   }
@@ -16452,6 +16915,9 @@ function antAbrir(){
   var a=document.getElementById('telaAntigos'); if(a) a.style.display='block';
   antModelos(); antContarArquivados(); antPintar();
   antAvisar('');
+  /* 04/09/2026: o repositório é a primeira coisa desta tela. Não espera nada: pinta e
+     segue — se o agente demorar, a lista diz isso no lugar dela mesma. */
+  repoPintar('antRepo', {abrirPrimeiro:true, vazio:'O aparelho não tem exame nenhum guardado.'});
   window.scrollTo(0,0);
 }
 function antFechar(){

@@ -1312,6 +1312,128 @@ const VERIFICACOES = `(async () => {
     try { document.getElementById('telaRevisao').style.display = 'none'; } catch (e) {}
   }
 
+  // 04/09/2026 — O REPOSITORIO UNICO DE EXAMES, montado de verdade.
+  // As outras verificacoes dele leem o codigo-fonte; esta o FAZ DESENHAR numa pagina
+  // carregada inteira. Falha de montagem (id que nao existe, funcao chamada antes de
+  // existir, selo que nao acha o item) so aparece aqui.
+  try {
+    const fetchAntes = window.fetch;
+    const HOJE = new Date();
+    const dd = n => ('0' + n).slice(-2);
+    const hojeBr = dd(HOJE.getDate()) + '/' + dd(HOJE.getMonth() + 1) + '/' + HOJE.getFullYear();
+    const hojeIso = HOJE.getFullYear() + '-' + dd(HOJE.getMonth() + 1) + '-' + dd(HOJE.getDate());
+    const ESTUDOS = [
+      // de outro dia, com imagens e com audio na pasta de consulta
+      { id: 'R-ANTIGO', paciente: 'ANA^MARIA', data: '02/09/2026', hora: '09:15',
+        dataOrdem: '202609020915', nImagens: 4, instancias: ['i1', 'i2', 'i3', 'i4'],
+        descricao: 'ABDOME TOTAL' },
+      // de outro dia, SEM audio nenhum: e o selo cinza
+      { id: 'R-SEMAUDIO', paciente: 'JOAO^PEDRO', data: '02/09/2026', hora: '10:40',
+        dataOrdem: '202609021040', nImagens: 2, instancias: ['j1', 'j2'], descricao: 'TIREOIDE' },
+      // de HOJE: nao pode aparecer na lista de "outros dias"
+      { id: 'R-HOJE', paciente: 'CARLA^SOUZA', data: hojeBr, hora: '08:00',
+        dataOrdem: hojeIso.replace(/-/g, '') + '0800', nImagens: 1, instancias: ['c1'],
+        descricao: 'MAMA' },
+    ];
+    window.fetch = async (url, opt) => {
+      const u = String(url);
+      if (u.includes('/dicom/estudos')) return new Response(JSON.stringify({ ok: true, estudos: ESTUDOS, relogio: { desvioSeg: 0, suspeito: false, limiteSeg: 900 } }));
+      if (u.includes('/exame/ditados')) return new Response(JSON.stringify({ ok: true, ditados: {}, retencaoDias: 7 }));
+      if (u.includes('/capturas')) return new Response(JSON.stringify({ ok: true, retencaoDias: 90, dias: { '2026-09-02': ['Ana Maria.wav'] } }));
+      if (u.includes('/exames/liberados')) return new Response(JSON.stringify({ uids: ['R-ANTIGO'] }));
+      return fetchAntes(url, opt);
+    };
+    exames = []; audios = [];
+    _repo = { estudos: null, ditados: {}, capturas: {}, liberados: {}, quando: 0, erro: '', carregando: false, retAudio: 90 };
+    _repoAberto = {}; _repoPainel = {}; _repoIndice = {}; _repoLeveQuando = 0;
+    document.getElementById('telaAntigos').style.display = 'block';
+    await repoPintar('antRepo', { abrirPrimeiro: true });
+    const caixa = document.getElementById('antRepo');
+    const linhasDia = caixa.querySelectorAll('details.repoDia');
+    diz('a lista desenha linhas de data', linhasDia.length === 2, 'dias: ' + linhasDia.length);
+    diz('o dia mais recente vem primeiro e ja aberto',
+      linhasDia[0] && linhasDia[0].open && linhasDia[0].querySelector('summary').textContent.indexOf(hojeBr) >= 0,
+      linhasDia[0] ? linhasDia[0].querySelector('summary').textContent : 'sem dia');
+    diz('e o dia de hoje vem marcado como HOJE', !!caixa.querySelector('.repoDia .hoje'));
+    diz('cada exame do aparelho virou uma linha', caixa.querySelectorAll('.repoLinha').length === 3,
+      'linhas: ' + caixa.querySelectorAll('.repoLinha').length);
+    diz('o nome do paciente sai legivel, nao no formato do DICOM',
+      (caixa.textContent.indexOf('Ana Maria') >= 0) && caixa.textContent.indexOf('ANA^MARIA') < 0);
+
+    const lAntigo = document.getElementById('repoL' + 'E' + 'R-ANTIGO');
+    diz('a linha do exame existe com a chave dele', !!lAntigo);
+    diz('o selo das imagens diz quantas sao',
+      !!lAntigo && lAntigo.querySelector('button.repoSelo.img')
+      && lAntigo.querySelector('button.repoSelo.img').textContent.indexOf('4 imagens') >= 0,
+      lAntigo ? (lAntigo.querySelector('.repoSelo.img') || {}).textContent : '');
+    diz('com audio na pasta de consulta, o selo de audio e BOTAO',
+      !!lAntigo && !!lAntigo.querySelector('button.repoSelo.aud'));
+    diz('e o exame assinado mostra o selo de liberado',
+      !!lAntigo && !!lAntigo.querySelector('.repoSelo.lib'));
+
+    const lSem = document.getElementById('repoL' + 'E' + 'R-SEMAUDIO');
+    diz('sem audio guardado, o selo e cinza e NAO e botao',
+      !!lSem && !!lSem.querySelector('span.repoSelo.vazio')
+      && !lSem.querySelector('button.repoSelo.aud'));
+    diz('e o exame sem laudo assinado mostra "a liberar"',
+      !!lSem && !!lSem.querySelector('.repoSelo.falta'));
+    // <audio src=""> nao fica mudo: aponta para a PROPRIA PAGINA e o navegador tenta
+    // tocar o programa como se fosse som
+    repoOuvir('E' + 'R-SEMAUDIO');
+    diz('pedir audio de quem nao tem diz isso, em vez de abrir um tocador vazio',
+      !document.querySelector('#repoP' + 'E' + 'R-SEMAUDIO audio')
+      && document.getElementById('repoP' + 'E' + 'R-SEMAUDIO').textContent.indexOf('não tem áudio') >= 0);
+
+    // o audio ABRE de verdade, e aponta para a rota da pasta de consulta
+    repoOuvir('E' + 'R-ANTIGO');
+    const tocador = document.querySelector('#repoP' + 'E' + 'R-ANTIGO audio');
+    diz('tocar o selo de audio abre um tocador na propria linha', !!tocador);
+    diz('e ele aponta para o audio daquele dia e daquele paciente',
+      !!tocador && tocador.src.indexOf('dia=2026-09-02') >= 0
+      && decodeURIComponent(tocador.src).indexOf('Ana Maria.wav') >= 0,
+      tocador ? tocador.src.split('/').pop() : '');
+    repoOuvir('E' + 'R-ANTIGO');
+    diz('e tocar de novo fecha', !document.querySelector('#repoP' + 'E' + 'R-ANTIGO audio'));
+
+    // as fotos, com o download de mentira
+    const baixarAntes = window.dicomBaixarImagem;
+    window.dicomBaixarImagem = async () => 'data:image/png;base64,iVBORw0KGgo=';
+    await repoVerFotos('E' + 'R-ANTIGO');
+    diz('o selo das imagens abre as fotos na propria linha',
+      document.querySelectorAll('#repoP' + 'E' + 'R-ANTIGO img').length === 4,
+      'fotos: ' + document.querySelectorAll('#repoP' + 'E' + 'R-ANTIGO img').length);
+    window.dicomBaixarImagem = baixarAntes;
+
+    // e no painel do dia: hoje NAO pode aparecer duas vezes
+    document.getElementById('telaAntigos').style.display = 'none';
+    _repoAberto = {};
+    await repoPintar('diaOutrosDias', { excluirDia: repoHojeBr(), abrirPrimeiro: true });
+    const outros = document.getElementById('diaOutrosDias');
+    diz('no painel do dia, "outros dias" nao repete o dia de hoje',
+      outros.textContent.indexOf(hojeBr) < 0 && outros.textContent.indexOf('02/09/2026') >= 0);
+    diz('e mostra so os exames dos outros dias',
+      outros.querySelectorAll('.repoLinha').length === 2,
+      'linhas: ' + outros.querySelectorAll('.repoLinha').length);
+
+    // agente fora do ar: mensagem, nao lista vazia
+    window.fetch = async () => { throw new Error('sem agente'); };
+    _repo = { estudos: null, ditados: {}, capturas: {}, liberados: {}, quando: 0, erro: '', carregando: false, retAudio: 90 };
+    _repoLeveQuando = 0;
+    await repoPintar('antRepo', {});
+    diz('agente fora do ar vira mensagem, nao lista vazia',
+      document.getElementById('antRepo').textContent.indexOf('agente') >= 0);
+    // falhar nao e ter feito: senao a tela ficaria presa um minuto inteiro dizendo
+    // "sem audio, nada liberado" com tudo intacto no disco
+    diz('e uma carga que falhou NAO conta como feita',
+      _repoLeveQuando === 0, 'marca: ' + _repoLeveQuando);
+
+    window.fetch = fetchAntes;
+    document.getElementById('antRepo').innerHTML = '';
+    document.getElementById('diaOutrosDias').innerHTML = '';
+  } catch (e) {
+    diz('o repositorio unico de exames monta na pagina', false, e.constructor.name + ': ' + e.message);
+  }
+
   return R;
 })()`;
 

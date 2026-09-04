@@ -75,6 +75,7 @@ const SUITE = [
   { arq: 'teste-ouvir-audio.js', o: 'ouvir o audio: o exame inteiro, sem os silencios' },
   { arq: 'teste-trazer-exame.js', o: 'trazer na mao um exame que o aparelho ja tem' },
   { arq: 'teste-fotos-nao-somem.js', o: 'as fotos do exame nao somem num recarregamento' },
+  { arq: 'teste-repositorio.js', o: 'repositorio unico de exames (dias que abrem, tres sinais, audio e fotos)' },
   { arq: 'teste-faixa-apontada.js', o: 'a IA aponta a POSICAO no ditado (fim da caca a citacao)' },
   { arq: 'teste-tela-provedor-ia.js', o: 'tela nova do Provedor de IA (espelha os campos antigos, um salvar so)' },
   { arq: 'teste-telas-config.js', o: 'telas novas de Configuracoes (blocos movidos, nao copiados)' },

@@ -43,6 +43,32 @@ console.log('\n=== e agora ha uma porta ===');
 ok(/onclick="capForcarAbrir\(\)"/.test(HTML), 'existe o botao de trazer na mao');
 ok(/Trazer exame do aparelho/.test(HTML), 'com nome que diz o que faz');
 ok(/id="capForcarLista"/.test(HTML), 'e um lugar na tela para a lista aparecer');
+
+console.log('\n=== e ele esta na tela que ELE USA ===');
+// 03/09/2026 — ESTA VERIFICACAO NASCEU DE UM ERRO MEU. Pus o botao ao lado do "Aguardar
+// exame do aparelho", que vive na telaExames — a interface ANTIGA, que ele nao abre. O
+// codigo compilou, a suite passou inteira, e ele respondeu: "tenho certeza que tu
+// colocou aqui, porque eu nao estou achando".
+// O index.html tem DUAS interfaces vivas: a nova (telaAbertura/telaDia/telaRev2) e a
+// velha (telaExames/telaRevisao/telaAntigos), e a velha continua no arquivo inteira. Um
+// comentario de 31/08 no proprio codigo registra o MESMO engano com o contador do dia.
+// Testar que o botao existe nao basta: tem de estar na tela certa.
+function telaDe(marca) {
+  const i = HTML.indexOf(marca);
+  if (i < 0) return 'NAO ACHEI';
+  const m = [...HTML.slice(0, i).matchAll(/<div id="(tela[A-Za-z0-9]+)"/g)];
+  return m.length ? m[m.length - 1][1] : '(fora de tela)';
+}
+const NOVAS = ['telaDia', 'telaAbertura', 'telaRev2'];
+const telaBotao = telaDe('onclick="capForcarAbrir()"');
+ok(NOVAS.indexOf(telaBotao) >= 0,
+   'o botao vive numa tela da interface NOVA  [' + telaBotao + ']');
+ok(telaBotao === 'telaDia',
+   'e especificamente no painel do dia, que e o que ele olha enquanto atende');
+ok(telaDe('id="capForcarLista"') === telaBotao,
+   'a lista abre na MESMA tela do botao  [' + telaDe('id="capForcarLista"') + ']');
+ok((HTML.match(/id="capForcarLista"/g) || []).length === 1,
+   'e ha um so lugar com esse id — dois iguais fariam a lista abrir na tela errada');
 ok(/function capForcarAbrir\(/.test(HTML) && /function capForcarTrazer\(/.test(HTML),
    'as duas funcoes existem');
 

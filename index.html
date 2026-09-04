@@ -827,6 +827,21 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
       <div class="eb dep">EXAMES DE HOJE <span id="diaConta" class="diaConta"></span></div>
       <div id="diaLista"></div>
 
+      <!-- 03/09/2026, pedido dele: a válvula de escape da trava dos exames repetidos.
+           Exame que já estava no aparelho quando a espera ligou é tratado como ANTIGO e
+           ignorado EM SILÊNCIO — reenviar do ultrassom não adianta, é o mesmo exame com
+           o mesmo número. "Eu gosto da trava, mas gostaria de ter a possibilidade de
+           sobrepujá-la."
+           MORA AQUI, e não ao lado do "Aguardar exame do aparelho": aquele botão está na
+           telaExames, a interface ANTIGA, que ele não usa. Pus lá primeiro e ele
+           respondeu "tenho certeza que tu colocou, porque eu não estou achando". O mesmo
+           engano está registrado no comentário do contador, logo acima — é a terceira
+           vez que esta casa cobra o pedágio. Esta é a tela que ele olha o dia inteiro. -->
+      <button class="pend" onclick="capForcarAbrir()"
+              title="Traz um exame que está no aparelho mas não entrou sozinho na lista de hoje"
+              style="background:#eef3f8;color:#2b4a5e">⤵ Trazer exame do aparelho…</button>
+      <div id="capForcarLista" style="display:none;margin-top:8px"></div>
+
       <button class="pend" id="diaPend" onclick="diaRevisarPendentes()">Revisar laudos pendentes</button>
       <p class="rodape">nada abre sozinho: o painel avisa (som + faixa) e você toca quando quiser</p>
     </div>
@@ -2145,16 +2160,9 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
       <button class="btn" id="btnCapOrt" onclick="capOrtToggle()">▶ Aguardar exame do aparelho</button>
       <button class="btn sec" onclick="capRecuperar()" title="Traz de volta os exames e ditados guardados no computador">🔄 Recuperar exames</button>
-      <!-- 03/09/2026, pedido dele: a válvula de escape da trava. Exame que já estava no
-           aparelho quando a espera ligou é tratado como ANTIGO e ignorado EM SILÊNCIO —
-           reenviar do ultrassom não adianta, porque é o mesmo exame com o mesmo número.
-           "Eu gosto da trava, mas gostaria de ter a possibilidade de sobrepujá-la." -->
-      <button class="btn sec" onclick="capForcarAbrir()"
-              title="Traz um exame que está no aparelho mas não entrou sozinho na lista de hoje">⤵ Trazer exame do aparelho…</button>
       <label style="font-weight:400;display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="capOrtAuto" checked> gerar o laudo automaticamente</label>
       <span class="aviso" id="capOrtStatus">Grave o ditado, toque aqui e envie o exame no aparelho.</span>
     </div>
-    <div id="capForcarLista" style="display:none;margin-top:8px"></div>
     <div id="capMicSec" style="display:none;margin-top:8px;gap:10px;align-items:center;flex-wrap:wrap">
       <canvas id="vuAgente" width="320" height="44" title="O traço ANDANDO significa que o microfone está capturando. Linha reta parada = microfone morto." style="background:#0f1c28;border-radius:8px;border:1px solid #24384a"></canvas>
       <span class="aviso" id="capMicEstado" style="font-weight:600"></span>

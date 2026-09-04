@@ -1434,6 +1434,39 @@ const VERIFICACOES = `(async () => {
     diz('o repositorio unico de exames monta na pagina', false, e.constructor.name + ': ' + e.message);
   }
 
+  // 04/09/2026 — O BOTAO "GERAR LAUDO" NAO LIGAVA COM O EXAME DO APARELHO.
+  // Ele buscou um exame no Orthanc, ele entrou na LISTA DE EXAMES, gravou o ditado no
+  // microfone da linha — e o botao seguiu apagado, sem dizer por que. antPintar contava
+  // so as duas caixas de arrastar; antGerar, do outro lado, ja contava dicomProntos.
+  // Duas contas para a mesma pergunta ("ha material?"), e a que ele VE era a errada.
+  // So o navegador prova isto: e o estado do botao na tela, nao o texto do arquivo.
+  try {
+    document.getElementById('telaAntigos').style.display = 'block';
+    _antImgs = []; _antAuds = [];
+    dicomProntos = [];
+    dicomProntosRender();
+    const bt = document.getElementById('antGerar');
+    diz('sem material nenhum, "Gerar laudo" nasce apagado', bt.disabled === true);
+
+    dicomProntos = [{ id: 'X1', instancias: ['x1'], paciente: 'Teste Aparelho', idade: '40',
+                      data: '02/09/2026', imagens: ['data:image/png;base64,iVBORw0KGgo='],
+                      codigo: '', nascimento: '', sexo: '', audios: [] }];
+    dicomProntosRender();
+    diz('exame vindo do aparelho JA acende o botao (sem arrastar nada)', bt.disabled === false);
+
+    // e o ditado gravado na linha nao pode apaga-lo de volta
+    dicomProntos[0].audios.push(new File([new Blob(['x'])], 'ditado.webm', { type: 'audio/webm' }));
+    dicomProntosRender();
+    diz('e continua aceso depois de gravar o ditado na linha do exame', bt.disabled === false);
+
+    dicomTirar(0);
+    diz('tirar o ultimo exame apaga o botao de novo', bt.disabled === true);
+    dicomProntos = [];
+    document.getElementById('telaAntigos').style.display = 'none';
+  } catch (e) {
+    diz('o botao "Gerar laudo" acompanha a lista de exames', false, e.constructor.name + ': ' + e.message);
+  }
+
   // 04/09/2026 — O CARTAO DO "MAIOR DIAMETRO" TEM DE ACEITAR A RESPOSTA.
   // Ele fez um transvaginal e o O-RADS foi recusado por falta do maior diametro. Alem de a
   // medida ja estar escrita no laudo (corrigido em processarOrads), o cartao da pendencia

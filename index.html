@@ -1670,16 +1670,6 @@ button.repoSelo:hover{filter:brightness(.95)}
     </div>
     <div class="ab-corpo">
 
-      <!-- 04/09/2026 — O REPOSITÓRIO ENTRA AQUI, ANTES DE TUDO.
-           "Essa mesma lista de exames vai servir tanto para os exames realizados em outros
-           dias, ao botão de fazer exames anteriores, como para a lista do próprio dia."
-           É a MESMA função que desenha as linhas no painel do dia (repoDiasHtml) — uma
-           lista só, dois lugares. O que já existia nesta tela (arrastar imagem, gravar
-           ditado, buscar no aparelho) continua abaixo, intocado: aquilo MONTA um laudo,
-           isto MOSTRA o que existe. São coisas diferentes e as duas têm de existir. -->
-      <p class="eb">EXAMES GUARDADOS</p>
-      <div id="antRepo"></div>
-
       <!-- 04/09/2026 — A PERGUNTA "1 · DE ONDE VEM O MATERIAL?" SAIU, com os dois botões.
            Pedido dele, e eu concordo — com um motivo a mais que o "são inúteis":
              · "Laudo novo em branco" não fazia NADA. Era o estado em que a tela já nasce;
@@ -1774,6 +1764,18 @@ button.repoSelo:hover{filter:brightness(.95)}
       <button class="acao" id="antGerar" onclick="antGerar()">Gerar laudo → enviar para Liberar laudos</button>
       <p class="nota">o laudo gerado entra na fila de “Liberar laudos” com os mesmos alertas coloridos da revisão</p>
       <p class="aviso2" id="antAviso"></p>
+
+      <!-- 04/09/2026 (mesmo dia, segunda passada) — O REPOSITÓRIO DESCEU PARA CÁ, a pedido
+           dele: "o material do exame fica acima da lista de datas".
+           Faz sentido e vale escrever por quê: as duas metades desta tela olham para lados
+           opostos. De cima para baixo, MATERIAL DO EXAME → LISTA DE EXAMES → Gerar laudo é
+           um caminho que se percorre uma vez e termina num botão; EXAMES GUARDADOS é uma
+           estante que se consulta. Com a estante em primeiro lugar, quem abria a tela para
+           fazer um laudo tinha de rolar por ela antes de chegar ao trabalho.
+           É a MESMA função que desenha as linhas no painel do dia (repoDiasHtml) — uma
+           lista só, dois lugares. -->
+      <p class="eb dep">EXAMES GUARDADOS</p>
+      <div id="antRepo"></div>
     </div>
   </div>
 </div>
@@ -3863,6 +3865,11 @@ function dicomLupaLigar(){
 function dicomProntosRender(){
   var div=document.getElementById('dicomProntosLista'); if(!div) return;
   dicomLupaLigar();
+  /* 04/09/2026 — TODA MUDANÇA NA LISTA PASSA POR AQUI (importar do aparelho, tirar um
+     exame, gravar ou apagar um ditado), então é aqui que o botão "Gerar laudo" acorda.
+     Antes cada caminho tinha de lembrar de chamar `antPintar` por conta própria, e o de
+     importar do aparelho — justamente o principal — não chamava. */
+  try{ antPintar(); }catch(e){}
   if(!dicomProntos.length){
     div.innerHTML='<span class="aviso">Nenhum exame importado ainda. Use “🔍 Buscar no aparelho”, ao lado.</span>';
     return;
@@ -17280,8 +17287,9 @@ function antAbrir(){
      Quem entra na tela tem de ver o estado dela, e não um vazio ambíguo. */
   antModelos(); antPintar(); dicomProntosRender();
   antAvisar('');
-  /* 04/09/2026: o repositório é a primeira coisa desta tela. Não espera nada: pinta e
-     segue — se o agente demorar, a lista diz isso no lugar dela mesma. */
+  /* 04/09/2026: a estante de exames guardados fica no PÉ da tela (o trabalho vem primeiro).
+     Não espera nada: pinta e segue — se o agente demorar, a lista diz isso no lugar dela
+     mesma, em vez de deixar a tela travada esperando. */
   repoPintar('antRepo', {abrirPrimeiro:true, vazio:'O aparelho não tem exame nenhum guardado.'});
   window.scrollTo(0,0);
 }
@@ -17354,8 +17362,15 @@ function antPintar(){
         +'<span>'+esc(f.name||'ditado')+(f._seg?(' · '+antSeg(f._seg)):'')+'</span>'
         +'<button class="x" onclick="antTirarAud('+i+')" title="tirar">✕</button></div>'; }).join('');
   }
+  /* 04/09/2026 — O BOTÃO NÃO LIGAVA COM O EXAME DO APARELHO. Ele contava só as duas caixas
+     de arrastar (`_antImgs`, `_antAuds`) e ignorava a LISTA DE EXAMES. Quem buscava um
+     exame no aparelho e gravava o ditado na linha dele tinha material de sobra e o botão
+     seguia apagado, sem dizer por quê — e não havia como gerar o laudo.
+     `antGerar` já contava `dicomProntos` desde 21/08; era só aqui que a conta era outra.
+     Duas contas para a mesma pergunta ("há material?"), e a que o médico vê era a errada. */
+  var _naLista=(typeof dicomProntos!=='undefined') ? dicomProntos.length : 0;
   var b=document.getElementById('antGerar');
-  if(b) b.disabled=!(_antImgs.length || _antAuds.length);
+  if(b) b.disabled=!(_antImgs.length || _antAuds.length || _naLista);
 }
 function antOuvir(i){
   var f=_antAuds[i]; if(!f) return;

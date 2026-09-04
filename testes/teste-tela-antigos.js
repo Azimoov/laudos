@@ -64,6 +64,17 @@ ok(/MODELO DO EXAME/.test(HTML) && /PACIENTE/.test(HTML), 'os dois campos de bai
 ok(/Gerar laudo → enviar para Liberar laudos/.test(HTML), 'o botao principal, com o texto do desenho');
 ok(/mesmos alertas coloridos da revisão/.test(HTML), 'e a nota de rodape');
 
+console.log('=== a ordem da tela: primeiro o trabalho, depois a estante ===');
+/* 04/09/2026, pedido dele: "o material do exame fica acima da lista de datas". As duas
+   metades olham para lados opostos — MATERIAL → LISTA DE EXAMES → Gerar laudo e um caminho
+   que termina num botao; EXAMES GUARDADOS e uma estante que se consulta. Com a estante em
+   cima, quem abria a tela para FAZER um laudo tinha de rolar por ela antes de comecar. */
+const _iMat = HTML.indexOf('>MATERIAL DO EXAME<');
+const _iBot = HTML.indexOf('id="antGerar"');
+const _iRepo = HTML.indexOf('id="antRepo"');
+ok(_iMat >= 0 && _iRepo > _iMat, 'o material do exame vem ANTES da lista de datas');
+ok(_iBot >= 0 && _iRepo > _iBot, 'e o botao "Gerar laudo" tambem — a estante fica no pe');
+
 console.log('=== a porta usa a esteira que ja existe (nao uma nova) ===');
 const gerar = grab('antGerar');
 ok(/antParaInput\('inpExames'/.test(gerar) && /antParaInput\('inpAudios'/.test(gerar),
@@ -88,8 +99,21 @@ ok(/imagens adicionadas/.test(pintar) && /imagem adicionada/.test(pintar),
 ok(!/imagemns/.test(HTML), 'e nao escreve "imagemns" (erro de 18/08, achado no teste)');
 ok(/antTirarImg\(/.test(pintar) && /antTirarAud\(/.test(pintar),
    'da para tirar uma imagem ou um audio que entrou por engano');
-ok(/b\.disabled=!\(_antImgs\.length \|\| _antAuds\.length\)/.test(pintar),
+ok(/b\.disabled=!\(_antImgs\.length \|\| _antAuds\.length \|\| _naLista\)/.test(pintar),
    'o botao de gerar so liga quando ha material');
+/* 04/09/2026 — O DEFEITO: ele buscou um exame no aparelho, gravou o ditado na linha e o
+   botao "Gerar laudo" seguiu apagado. `antPintar` contava so as duas caixas de arrastar e
+   ignorava a LISTA DE EXAMES; `antGerar`, do outro lado, ja contava `dicomProntos`. Duas
+   contas para a mesma pergunta ("ha material?") — e a que ele VE era a errada. */
+ok(/dicomProntos!=='undefined'\) \? dicomProntos\.length/.test(pintar),
+   'e o exame vindo do aparelho CONTA como material (o defeito de 04/09)');
+ok(/typeof dicomProntos!=='undefined'/.test(pintar),
+   'sem quebrar se a lista do aparelho nao existir nesta pagina');
+const rend = grab('dicomProntosRender');
+ok(/antPintar\(\)/.test(rend),
+   'e toda mudanca na lista repinta o botao — importar, tirar, gravar, apagar ditado');
+ok(rend.indexOf('antPintar()') < rend.indexOf('if(!dicomProntos.length)'),
+   'inclusive quando a lista fica VAZIA (o botao tem de apagar de novo)');
 
 console.log('=== o microfone mora na LINHA do exame ===');
 /* 04/09/2026, pedido dele: "cada um deles tenha um microfonezinho para gravar o audio.

@@ -83,7 +83,12 @@ def preparar(device_atual, quando, espera, gravando=False, reserva_ok=True, carr
     ag.reservar_placa = lambda: (chamou.__setitem__("reservou", chamou["reservou"] + 1)
                                  or reserva_ok)
     ag.soltar_placa = lambda: chamou.__setitem__("soltou", chamou["soltou"] + 1)
-    ag._reserva_ler = lambda: {"porta": 8977}
+    # 04/09/2026: este dubl aceitava ZERO argumentos e o agente passou a chamar
+    # `_reserva_ler(RESERVA_MIC)`. O erro aparecia no meio da bateria, em vermelho, e a
+    # suite mesmo assim dava verde — quer dizer que o pedaco que depende de saber QUEM
+    # tem o microfone nao estava sendo exercitado. Assinatura de dubl que envelhece nao
+    # quebra o teste: emudece.
+    ag._reserva_ler = lambda _caminho=None: {"porta": 8977}
 
     # o dubl do Transcriber entra por sys.modules, que e onde o `from src.asr import`
     # vai procurar — assim nao carregamos modelo nenhum de verdade

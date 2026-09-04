@@ -240,7 +240,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
    variar e a FONTE. O !important vence texto colado de fora ou estilo que ficou gravado
    num laudo antigo, para tela, PDF, arquivo salvo e impressao terem o mesmo padrao. */
 .laudoFolha,.laudoFolha *{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif!important;}
-.fundoLaudo{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;}
+.fundoLaudo{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;object-fit:fill;display:block;}
 .laudoFolha.comFundo{background:transparent;min-height:297mm;}
 .laudoFolha.comFundo>*:not(.fundoLaudo){position:relative;z-index:1;}
 /* 25/08/2026 — quebra de folha NA TELA (ver paginarLaudoTela): um vão que empurra o
@@ -251,7 +251,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
    altura que tem, para a assinatura cair no mesmo lugar do papel. */
 .quebraFolha{user-select:none;-webkit-user-select:none;pointer-events:none;}
 .peDaFolha{user-select:none;-webkit-user-select:none;pointer-events:none;}
-.fundoFolhaTela{pointer-events:none;}
+.fundoFolhaTela{pointer-events:none;object-fit:fill;display:block;}
 .laudoCab{border:1.5px solid #000;padding:8px 10px;display:flex;gap:14px;font-size:13px;}
 .laudoCab>div{flex:1;}
 .laudoCab b{font-weight:700;}
@@ -1926,7 +1926,7 @@ button.repoSelo:hover{filter:brightness(.95)}
       <label class="ab-mod-l" for="exCadNome">Nome do local</label>
       <input id="exCadNome" class="ab-mod-i" type="text" placeholder="ex.: Clínica São Lucas — Belém">
 
-      <label class="ab-mod-l">Papel timbrado <span class="ab-mod-op">(opcional — PNG ou JPG, até 4 MB)</span></label>
+      <label class="ab-mod-l">Papel timbrado <span class="ab-mod-op">(opcional — PNG ou JPG, até 4 MB; ajustado automaticamente para A4)</span></label>
       <input id="exCadArq" type="file" accept="image/*" onchange="exCadPreview(this)" style="display:none">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <button class="ab-mod-arq" onclick="document.getElementById('exCadArq').click()">
@@ -1954,7 +1954,7 @@ button.repoSelo:hover{filter:brightness(.95)}
 
       <div class="ab-mod-acoes">
         <button class="ab-mod-b sec" onclick="exCadFechar()">Cancelar</button>
-        <button class="ab-mod-b" onclick="exCadSalvar()">Salvar local</button>
+        <button class="ab-mod-b" id="exCadSalvarBtn" onclick="exCadSalvar()">Salvar local</button>
       </div>
     </div>
   </div>
@@ -14100,14 +14100,75 @@ function exNovoLocal(){
 }
 function exCadFechar(){ _exCadEditando=null;   // cancelar sai do modo edicao: o proximo "Outro..." e cadastro
   var ov=document.getElementById('exCadLocal'); if(ov) ov.classList.remove('aberto'); }
+/* Uma mascara enviada vira uma folha A4 de verdade antes de ser guardada. O navegador
+   ja esticava o <img> na tela, mas o arquivo continuava com suas medidas originais e
+   caminhos diferentes de impressao podiam interpreta-lo de modo diferente. A copia
+   normalizada elimina essa ambiguidade: 794 x 1123 px, a mesma grade usada pela IA. */
+var EX_MASCARA_A4={larg:794,alt:1123,aviso:0.05};
+var _exCadMascaraPreparando=false;
+function exCadMascaraOcupada(sim){
+  _exCadMascaraPreparando=!!sim;
+  var bt=document.getElementById('exCadSalvarBtn'); if(bt) bt.disabled=!!sim;
+}
+function exMascaraDistorcao(larg,alt){
+  if(!(larg>0) || !(alt>0)) return 1;
+  var origem=larg/alt, a4=EX_MASCARA_A4.larg/EX_MASCARA_A4.alt;
+  return Math.max(origem/a4,a4/origem)-1;
+}
+function exMascaraParaA4(dataUrl){
+  return new Promise(function(res,rej){
+    var im=new Image();
+    im.onload=function(){
+      try{
+        var c=document.createElement('canvas');
+        c.width=EX_MASCARA_A4.larg; c.height=EX_MASCARA_A4.alt;
+        var x=c.getContext('2d');
+        x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+        /* fill, de proposito: ocupa a folha inteira. A confirmacao abaixo protege
+           contra uma imagem muito larga, muito alta ou enviada deitada. */
+        x.drawImage(im,0,0,c.width,c.height);
+        var png=c.toDataURL('image/png');
+        /* Uma foto complexa pode crescer ao virar PNG e estourar o armazenamento local.
+           Nesse caso somente, JPEG de alta qualidade mantem a mascara abaixo do limite. */
+        var saida=png.length<=4*1024*1024 ? png : c.toDataURL('image/jpeg',0.94);
+        res({img:saida,larg:im.naturalWidth||im.width,alt:im.naturalHeight||im.height,
+             distorcao:exMascaraDistorcao(im.naturalWidth||im.width,im.naturalHeight||im.height)});
+      }catch(e){ rej(e); }
+    };
+    im.onerror=function(){ rej(new Error('não consegui abrir a imagem escolhida')); };
+    im.src=dataUrl;
+  });
+}
 function exCadPreview(input){
   var f=input.files&&input.files[0]; var av=document.getElementById('exCadAviso');
   if(!f) return;
   if(!/^image\//.test(f.type)){ av.textContent='Escolha uma imagem (PNG ou JPG).'; input.value=''; return; }
   if(f.size>4*1024*1024){ av.textContent='Imagem muito grande (máx. 4 MB). Reduza e tente de novo.'; input.value=''; return; }
-  document.getElementById('exCadArqNome').textContent=f.name;
+  var rot=document.getElementById('exCadArqNome'), rotAntes=rot.textContent;
+  exCadMascaraOcupada(true);
+  av.textContent='Ajustando a máscara para uma folha A4 inteira…';
   var fr=new FileReader();
-  fr.onload=function(){ var p=document.getElementById('exCadPrev'); p.src=fr.result; p.style.display='block'; av.textContent=''; };
+  fr.onerror=function(){ exCadMascaraOcupada(false); av.textContent='Não consegui ler o arquivo escolhido.'; input.value=''; };
+  fr.onload=function(){
+    exMascaraParaA4(fr.result).then(function(a4){
+      if(a4.distorcao>=EX_MASCARA_A4.aviso){
+        var pct=Math.round(a4.distorcao*100);
+        var seguir=confirm('Esta imagem mede '+a4.larg+' × '+a4.alt+' e tem formato diferente de uma folha A4.\n\n'
+          +'Para preencher a página inteira, o desenho será ajustado em aproximadamente '+pct+'%. '
+          +'Logos e letras podem ficar esticados.\n\nDeseja usar esta máscara mesmo assim?');
+        if(!seguir){ exCadMascaraOcupada(false); input.value=''; rot.textContent=rotAntes; av.textContent='A máscara não foi alterada.'; return; }
+      }
+      var p=document.getElementById('exCadPrev');
+      p.src=a4.img; p.style.display='block'; p.setAttribute('data-a4','1');
+      rot.textContent=f.name+' — ajustada para A4';
+      av.textContent='Máscara ajustada para preencher toda a folha A4.';
+      exCadMascaraOcupada(false);
+    }).catch(function(e){
+      exCadMascaraOcupada(false);
+      input.value=''; rot.textContent=rotAntes;
+      av.textContent='Não consegui preparar a máscara: '+((e&&e.message)||e)+'.';
+    });
+  };
   fr.readAsDataURL(f);
 }
 
@@ -14222,6 +14283,7 @@ function exIaAprovar(){
 function exCadSalvar(){
   var nome=(document.getElementById('exCadNome').value||'').trim();
   var av=document.getElementById('exCadAviso');
+  if(_exCadMascaraPreparando){ av.textContent='Aguarde: ainda estou ajustando a máscara para A4.'; return; }
   if(!nome){ av.textContent='Dê um nome ao local.'; return; }
   // chave estável a partir do nome; cadastrar o MESMO nome de novo atualiza o
   // que já estava (serve para trocar o timbrado sem criar um local repetido)

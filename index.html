@@ -1030,6 +1030,11 @@ button.repoSelo:hover{filter:brightness(.95)}
 #telaRev2 .caixa .ficha:hover{background:#B0851C;color:#fff}
 #telaRev2 .caixa.ver .ficha{border-color:#B32E2E;color:#8F2222}
 #telaRev2 .caixa.ver .ficha:hover{background:#B32E2E;color:#fff}
+/* 04/09/2026 — o campo do descritor que é MEDIDA. Mesma altura e mesma borda das fichas:
+   é a resposta a uma pergunta da mesma caixa, não um formulário à parte. */
+#telaRev2 .caixa .rv2num{width:88px;background:#fff;border:1.5px solid #B0851C;color:#6B5010;
+  border-radius:11px;padding:5px 10px;font-size:11.5px;font-weight:600;font-family:inherit}
+#telaRev2 .caixa.ver .rv2num{border-color:#B32E2E;color:#8F2222}
 #telaRev2 .caixa .ficha.mic{border-color:#0B5F5C;color:#0B5F5C}
 #telaRev2 .caixa .ficha.mic:hover{background:#0B5F5C;color:#fff}
 #telaRev2 .caixa .abrir{background:none;border:1px solid currentColor;border-radius:11px;
@@ -9562,12 +9567,31 @@ function processarBirads(lista, ditadoTexto, corpo){
    A calculadora, quando falta um dado, assume o menor risco e avisa. Aqui NÃO: assumir o
    menor risco num laudo que ninguém está conferindo é a forma mais silenciosa de errar
    para baixo. Falta dado, não sai categoria — sai o pedido do dado. */
-function processarOrads(lista, ditadoTexto){
-  var linhas=[], obs=[], pendencias=[], conflitos=[];
+function processarOrads(lista, ditadoTexto, corpo){
+  var linhas=[], obs=[], pendencias=[], conflitos=[], lidos=[];
   var n=(lista||[]).length;
   (lista||[]).forEach(function(d,i){
     d=d||{};
     var rot=(d.localizacao||d.local||'').trim() || (n>1?('Lesão '+(i+1)):'Lesão anexial');
+    /* 04/09/2026 — O MAIOR DIÂMETRO ESCRITO NO LAUDO VALE. Ele fez um transvaginal e o
+       programa recusou o cálculo por falta do maior diâmetro, com a medida na imagem e no
+       texto. Quando a IA deixa `tamanho_cm` em zero mas escreve o número na frase, é dali
+       que se lê — em vez de cobrar dele o que já foi ditado. Ver classifMedidaDoTexto.
+       A CÓPIA existe para NÃO mexer no que a IA mandou: aquilo é registro de procedência
+       e fica como veio (mesma regra do caso especial do BI-RADS). */
+    var _tamIA=parseFloat(String(d.tamanho_cm==null?'':d.tamanho_cm).replace(',','.'));
+    if(!(_tamIA>0)){
+      var _frase='';
+      try{ _frase=(_mamaFraseDo(String(corpo||''), rot, n)||{}).texto||''; }catch(_e){ _frase=''; }
+      var _tamTxt=_frase?classifMedidaDoTexto(_frase):null;
+      if(_tamTxt!=null){
+        var _d2={}; for(var _k in d) _d2[_k]=d[_k];
+        _d2.tamanho_cm=_tamTxt; d=_d2;
+        lidos.push({sistema:'orads', achado:rot, idx:i, chave:'tamanho_cm',
+                    rotulo:'Maior diâmetro (cm)', tipo:'numero', valor:_tamTxt,
+                    rotValor:String(_tamTxt).replace('.',',')+' cm', opcoes:[], origem:'texto'});
+      }
+    }
     var L=classifLerDescritores('orads', d);
     var r=oradsAvaliar(L.achou, L.falta);   // pode acrescentar faltas sob demanda (tamanho, CS, papilas)
     if(!r || L.falta.length){
@@ -9576,7 +9600,7 @@ function processarOrads(lista, ditadoTexto){
                +L.falta.map(function(f){ return f.rot.toLowerCase()+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):''); }).join(', ')+'.');
       L.falta.forEach(function(f){
         pendencias.push({sistema:'orads', achado:rot, idx:i, chave:f.k, rotulo:f.rot,
-                         ditado:f.ditado, opcoes:f.ops,
+                         ditado:f.ditado, opcoes:f.ops, tipo:f.tipo,
                          texto:f.rot+(f.ditado?(' ("'+f.ditado+'" não reconhecida)'):'')});
       });
       return;
@@ -9588,7 +9612,7 @@ function processarOrads(lista, ditadoTexto){
     if(cf.conflito) conflitos.push({sistema:'orads', nome:'O-RADS', achado:rot,
                                     ditado:cf.ditado, calculado:cf.calculado});
   });
-  return {linhas:linhas, obs:obs, pendencias:pendencias, conflitos:conflitos};
+  return {linhas:linhas, obs:obs, pendencias:pendencias, conflitos:conflitos, lidos:lidos};
 }
 
 /* Junta o resultado dos três num pacote só, para o laudo e para a tela.
@@ -13298,6 +13322,50 @@ function classifCasarNoTexto(D, frase){
   });
   return melhor;
 }
+/* ---- O MAIOR DIÂMETRO QUE JÁ ESTÁ ESCRITO NO LAUDO — 04/09/2026 ----
+   O QUE ACONTECEU: num exame transvaginal o programa recusou calcular o O-RADS dizendo
+   que faltou o "maior diâmetro" — com a medida na imagem E escrita no texto do laudo.
+   A medida vem da IA, no campo `tamanho_cm`; quando ela escreve o número na frase e
+   deixa o campo em zero, o programa cobrava do médico algo que ele já tinha ditado.
+   É o mesmo defeito que o BI-RADS teve em 24/08, e a mesma correção: o que está escrito
+   na frase do achado vale.
+
+   DUAS GUARDAS, porque num exame pélvico o laudo é cheio de medidas que NÃO são da lesão
+   (útero, endométrio, os dois ovários):
+     1. corta no SUBSTANTIVO DO ACHADO — o que vem antes dele é outra estrutura;
+     2. sem substantivo reconhecível, NÃO lê. Preferir não ler a ler a medida do útero:
+        a categoria O-RADS muda em 10 cm, e o útero passa perto disso.
+   O que é lido aparece na revisão como "lido do texto do laudo", trocável num toque. */
+const CLASSIF_ACHADO_RE = /\b(imagem\s+(?:nodular|c[íi]stica|anecoica)|forma[çc][ãa]o|n[óo]dulo|massa|les[ãa]o|cisto|c[íi]stica|fol[íi]culo|corpo\s+l[úu]teo|endometrioma|teratoma|dermoid[e]?)\b/i;
+function classifMedidaDoTexto(frase){
+  var t=String(frase||'').replace(/\s+/g,' ');
+  var m=CLASSIF_ACHADO_RE.exec(t);
+  if(!m) return null;                      // sem achado nomeado, não há medida de achado
+  t=t.slice(m.index);
+  // a PRIMEIRA medida depois do achado — nunca a maior do laudo, que pode ser de outro órgão
+  var mt=/([\d.,]+)\s*[x×]\s*([\d.,]+)(?:\s*[x×]\s*([\d.,]+))?\s*(mm|cm)\b/i.exec(t);
+  if(mt){
+    var u=mt[4];
+    var vs=[mt[1],mt[2],mt[3]].filter(function(v){ return v; })
+      .map(function(v){ return mamaMm(v,u); }).filter(function(x){ return x!=null; });
+    if(vs.length) return Math.round(Math.max.apply(null, vs))/10;   // mm -> cm
+  }
+  var m1=/(?:medindo|mede|medida\s+de|com)\s*(?:cerca\s+de\s*)?([\d.,]+)\s*(mm|cm)\b/i.exec(t);
+  if(m1){ var v1=mamaMm(m1[1], m1[2]); if(v1!=null) return Math.round(v1)/10; }
+  return null;
+}
+/* Um número dito ou digitado -> centímetros. "4,5" e "4,5 cm" são a mesma coisa; "45 mm"
+   também. Sem unidade vale CENTÍMETRO, que é como ele dita e como o rótulo do campo pede. */
+function classifNumeroEmCm(txt){
+  var s=String(txt||'').trim().toLowerCase().replace(/\s+/g,' ');
+  // o sinal entra na captura DE PROPÓSITO: sem ele, "-3" casava só o "3" e virava 3 cm
+  var m=/(-?[\d]+(?:[.,][\d]+)?)\s*(mil[íi]metros?|mm|cent[íi]metros?|cm)?/.exec(s);
+  if(!m) return null;
+  var n=parseFloat(m[1].replace(',','.'));
+  if(!isFinite(n) || n<=0) return null;
+  if(m[2] && /^m/.test(m[2])) n=n/10;       // milímetro
+  return Math.round(n*10)/10;
+}
 /* Lê os descritores ditados e devolve o que falta, com as OPÇÕES de cada um em falta —
    é isso que alimenta o botão "clique ou dite o descritor" da tela de revisão. */
 function classifLerDescritores(sis, d){
@@ -13312,7 +13380,7 @@ function classifLerDescritores(sis, d){
     var o=classifCasar(D, d[D.k]);
     if(o) achou[D.k]=o;
     else if(!D.opcional && !D.sobDemanda){
-      falta.push({k:D.k, rot:D.rot, ditado:String(d[D.k]||''),
+      falta.push({k:D.k, rot:D.rot, ditado:String(d[D.k]||''), tipo:D.tipo,
                   ops:(D.ops||[]).map(function(x){ return {v:x.v, rot:x.rot}; })});
     }
   });
@@ -13324,7 +13392,7 @@ function classifExigir(sis, chave, achou, falta){
   if(achou[chave]!=null) return;
   var D=(CLASSIF[sis].desc||[]).filter(function(x){ return x.k===chave; })[0];
   if(!D || falta.some(function(f){ return f.k===chave; })) return;
-  falta.push({k:D.k, rot:D.rot, ditado:'',
+  falta.push({k:D.k, rot:D.rot, ditado:'', tipo:D.tipo,
               ops:(D.ops||[]).map(function(x){ return {v:x.v, rot:x.rot}; })});
 }
 
@@ -15545,8 +15613,10 @@ function rev2Caixas(ex,b){
       +(p.origem==='texto'?'lido do texto do laudo':'assumido — nada foi dito')+'</span>'
       +'<button class="abrir" onclick="rev2AbrirOpcoesLido('+i+')">trocar</button>'
       +'<div class="fichas" id="rv2lo'+i+'" style="display:none">'
-      +(p.opcoes||[]).map(function(o){
-          return '<button class="ficha'+(o.v===p.valor?' on':'')+'" onclick="rev2TrocarLido('+i+',\''+esc(o.v)+'\')">'+esc(o.rot)+'</button>'; }).join('')
+      +(p.tipo==='numero'
+        ? rev2CampoNumero('rv2ln'+i, p.valor, 'rev2TrocarLidoNumero('+i+')')
+        : (p.opcoes||[]).map(function(o){
+            return '<button class="ficha'+(o.v===p.valor?' on':'')+'" onclick="rev2TrocarLido('+i+',\''+esc(o.v)+'\')">'+esc(o.rot)+'</button>'; }).join(''))
       +'</div></div>';
   });
   (L.classifPendencias||[]).forEach(function(p,i){
@@ -15554,10 +15624,16 @@ function rev2Caixas(ex,b){
     h+='<div class="caixa amb" id="rv2p'+i+'">'
       +esc(CLASSIF[p.sistema].nome+' não calculado — faltou o descritor: '+p.rotulo)
       +(p.ditado?esc(' (ouvi “'+p.ditado+'”, que não é um descritor válido)'):'')
-      +'<button class="abrir" onclick="rev2AbrirOpcoes('+i+')">escolher</button>'
+      /* 04/09/2026 — DESCRITOR QUE É NÚMERO ganhou onde ser respondido. Até aqui o cartão
+         do "maior diâmetro" abria uma caixa VAZIA (as fichas vêm das opções, e medida não
+         tem opções) e o 🎙 falar recusava qualquer número. O programa pedia um dado e não
+         aceitava a resposta — pior que não pedir. */
+      +'<button class="abrir" onclick="rev2AbrirOpcoes('+i+')">'+(p.tipo==='numero'?'informar':'escolher')+'</button>'
       +'<div class="fichas" id="rv2po'+i+'" style="display:none">'
-      +(p.opcoes||[]).map(function(o){
-          return '<button class="ficha" onclick="rev2Escolher('+i+',\''+esc(o.v)+'\')">'+esc(o.rot)+'</button>'; }).join('')
+      +(p.tipo==='numero'
+        ? rev2CampoNumero('rv2pn'+i, '', 'rev2EscolherNumero('+i+')')
+        : (p.opcoes||[]).map(function(o){
+            return '<button class="ficha" onclick="rev2Escolher('+i+',\''+esc(o.v)+'\')">'+esc(o.rot)+'</button>'; }).join(''))
       +'<button class="ficha mic" onclick="rev2DitarDescritor('+i+')">🎙 falar</button>'
       +'</div></div>';
   });
@@ -15615,6 +15691,39 @@ function rev2RecalcularClassif(){
 function rev2AbrirOpcoesLido(i){
   var d=document.getElementById('rv2lo'+i); if(d) d.style.display=(d.style.display==='none'?'flex':'none');
 }
+/* O campo de um descritor que é MEDIDA. Enter vale como o botão: ele digita o número e
+   aperta Enter — parar para procurar o botão com a mão no teclado é atrito à toa. */
+/* ⚠️ `type="text"` com `inputmode="decimal"`, NUNCA `type="number"`. Ele escreve medida
+   com VÍRGULA — "4,5" —, e um campo numérico recusa a vírgula: o valor some e o campo
+   fica em branco depois de ele digitar certo. O teclado do telefone/tablet continua
+   abrindo em números por causa do inputmode, e quem lê o valor (classifNumeroEmCm)
+   já entende vírgula, ponto, "cm" e "mm". */
+function rev2CampoNumero(id, valor, acao){
+  return '<input type="text" inputmode="decimal" id="'+id+'" class="rv2num" '
+    +'value="'+(valor==null?'':esc(String(valor).replace('.',',')))+'" placeholder="cm" '
+    +'onkeydown="if(event.key===\'Enter\'){event.preventDefault();'+acao+';}">'
+    +'<button class="ficha" onclick="'+acao+'">usar</button>';
+}
+function rev2LerCampoNumero(id){
+  var el=document.getElementById(id); if(!el) return null;
+  return classifNumeroEmCm(el.value);
+}
+function rev2EscolherNumero(i){
+  var v=rev2LerCampoNumero('rv2pn'+i);
+  if(v==null){ log('Informe a medida em centímetros (ex.: 4,5).', true); return; }
+  rev2Escolher(i, v);
+}
+function rev2TrocarLidoNumero(i){
+  var v=rev2LerCampoNumero('rv2ln'+i);
+  if(v==null){ log('Informe a medida em centímetros (ex.: 4,5).', true); return; }
+  rev2TrocarLido(i, v);
+}
+/* Como o valor escolhido é DITO no diário e no cartão. Medida não tem rótulo de opção —
+   ela é o próprio número, e sai com a vírgula e a unidade, como ele lê num laudo. */
+function rev2RotuloValor(p, valor){
+  if(p && p.tipo==='numero') return String(valor).replace('.',',')+' cm';
+  return ((p&&p.opcoes||[]).filter(function(o){ return o.v===valor; })[0]||{}).rot||valor;
+}
 /* Trocar um descritor que veio LIDO do texto ou ASSUMIDO. Mesmo caminho de rev2Escolher:
    grava em _descritores (que vence tudo no recálculo) e refaz a classificação. */
 function rev2TrocarLido(i, valor){
@@ -15623,7 +15732,7 @@ function rev2TrocarLido(i, valor){
   ex.laudo._descritores=ex.laudo._descritores||{};
   var chaveAchado=p.sistema+'|'+(p.idx==null?p.achado:p.idx);
   (ex.laudo._descritores[chaveAchado]=ex.laudo._descritores[chaveAchado]||{})[p.chave]=valor;
-  var rot=((p.opcoes||[]).filter(function(o){return o.v===valor;})[0]||{}).rot||valor;
+  var rot=rev2RotuloValor(p, valor);
   var r=rev2RecalcularClassif();
   if(!r){
     log('Descritor anotado em '+p.achado+': '+p.rotulo+' = '+rot
@@ -15640,7 +15749,7 @@ function rev2Escolher(i, valor){
   ex.laudo._descritores=ex.laudo._descritores||{};
   var chaveAchado=p.sistema+'|'+(p.idx==null?p.achado:p.idx);
   (ex.laudo._descritores[chaveAchado]=ex.laudo._descritores[chaveAchado]||{})[p.chave]=valor;
-  var rot=((p.opcoes||[]).filter(function(o){return o.v===valor;})[0]||{}).rot||valor;
+  var rot=rev2RotuloValor(p, valor);
   var antes=(ex.laudo.classifPendencias||[]).length;
   var r=rev2RecalcularClassif();
   if(!r){   // laudo antigo, sem o que a IA anotou guardado: cai no caminho de antes
@@ -15662,6 +15771,15 @@ function rev2DitarDescritor(i){
   var p=(ex.laudo.classifPendencias||[])[i]; if(!p) return;
   rev2Ouvir(function(txt){
     var D=(CLASSIF[p.sistema].desc||[]).filter(function(x){ return x.k===p.chave; })[0];
+    /* MEDIDA FALADA. `classifCasar` compara com as opções do descritor, e medida não tem
+       opções — então o 🎙 recusava todo número, inclusive o certo. Sem unidade vale
+       centímetro, que é como ele dita ("quatro e meio" sai do transcritor como "4,5"). */
+    if((D&&D.tipo==='numero') || p.tipo==='numero'){
+      var v=classifNumeroEmCm(txt);
+      if(v!=null) rev2Escolher(i, v);
+      else log('Não entendi "'+txt+'" como medida. Diga o número em centímetros (ex.: "4,5") ou digite no campo.', true);
+      return;
+    }
     var o=D?classifCasar(D, txt):null;
     if(o) rev2Escolher(i, o.v);
     else log('Não reconheci "'+txt+'" como '+p.rotulo+'. Toque numa das opções.', true);

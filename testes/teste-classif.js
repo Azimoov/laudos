@@ -45,6 +45,11 @@ const src = [
   // 24/08: processarBirads passou a ler descritores do TEXTO e a assumir padroes
   bloco(/const BIRADS_PADRAO = \{[^}]*\};/, 'BIRADS_PADRAO'),
   grab('_negadoAntesDe'), grab('classifCasarNoTexto'), grab('_mamaFraseDo'),
+  // 04/09: o O-RADS passou a ler o maior diametro da propria frase do achado. Sem estes
+  // tres aqui, o caminho novo daria ReferenceError — e as O-RADS daqui passariam so
+  // porque nunca chegam a ele. Verde por ausencia e o pior tipo de verde.
+  bloco(/const CLASSIF_ACHADO_RE = .*;/, 'CLASSIF_ACHADO_RE'),
+  grab('mamaMm'), grab('classifMedidaDoTexto'),
 // 25/08: cisto simples passou a ser lido da propria frase do laudo
   grab('mamaCasoEspecialDoTexto'),
   grab('processarTirads'), grab('processarBirads'), grab('processarOrads'), grab('classifAplicar')

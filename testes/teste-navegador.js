@@ -1434,6 +1434,59 @@ const VERIFICACOES = `(async () => {
     diz('o repositorio unico de exames monta na pagina', false, e.constructor.name + ': ' + e.message);
   }
 
+  // 04/09/2026 — O CARTAO DO "MAIOR DIAMETRO" TEM DE ACEITAR A RESPOSTA.
+  // Ele fez um transvaginal e o O-RADS foi recusado por falta do maior diametro. Alem de a
+  // medida ja estar escrita no laudo (corrigido em processarOrads), o cartao da pendencia
+  // abria uma caixa VAZIA: as fichas vem das OPCOES do descritor, e medida nao tem opcoes.
+  // O programa pedia um dado e nao tinha onde receber a resposta.
+  try {
+    const exN = { id: 9930, tipo: 'transvaginal', paciente: 'Teste O-RADS',
+      laudo: { cab: { nome: 'Teste O-RADS' }, titulo: 't', tecnica: 't',
+               corpo: 'Ovário esquerdo com 3,4 x 2,2 cm.', conclusao: 'c', obs: '',
+               classifPendencias: [{ sistema: 'orads', achado: 'ovário esquerdo', idx: 0,
+                 chave: 'tamanho_cm', rotulo: 'Maior diâmetro (cm)', ditado: '',
+                 opcoes: [], tipo: 'numero', texto: 'Maior diâmetro (cm)' }],
+               classifLidos: [{ sistema: 'orads', achado: 'ovário esquerdo', idx: 0,
+                 chave: 'escore_cor', rotulo: 'Escore de cor', tipo: undefined,
+                 valor: '1', rotValor: '1', origem: 'texto',
+                 opcoes: [{ v: '1', rot: '1' }, { v: '2', rot: '2' }] }] } };
+    exames.push(exN);
+    const alvo = document.createElement('div');
+    alvo.innerHTML = rev2Caixas(exN, { titulo: 'ovário esquerdo' });
+    document.body.appendChild(alvo);
+    const campo = alvo.querySelector('#rv2pn0');
+    diz('o cartao do maior diametro traz um campo para a medida', !!campo);
+    // type="number" RECUSA a virgula, e ele escreve "4,5". O campo tem de ser de texto,
+    // com o teclado numerico do tablet vindo pelo inputmode.
+    diz('o campo aceita virgula (nao e type=number)',
+      !!campo && campo.type === 'text' && campo.getAttribute('inputmode') === 'decimal',
+      campo ? (campo.type + '/' + campo.getAttribute('inputmode')) : 'sem campo');
+    diz('o botao do cartao diz "informar", nao "escolher"',
+      (alvo.querySelector('#rv2p0 .abrir') || {}).textContent === 'informar',
+      (alvo.querySelector('#rv2p0 .abrir') || {}).textContent);
+    diz('e o microfone continua ali, para ele so falar a medida',
+      !!alvo.querySelector('.ficha.mic'));
+    // o descritor com OPCOES continua com fichas — o campo nao pode ter comido o caso normal
+    diz('descritor com opcoes continua desenhando fichas',
+      alvo.querySelectorAll('#rv2lo0 .ficha').length === 2,
+      'fichas: ' + alvo.querySelectorAll('#rv2lo0 .ficha').length);
+    diz('e nao ganha campo de numero', !alvo.querySelector('#rv2ln0'));
+
+    // responder de verdade: o valor tem de chegar em _descritores, que e o que o recalculo le
+    campo.value = '4,5';
+    document.body.appendChild(campo);          // rev2LerCampoNumero busca por id no documento
+    _rev2Id = 9930;
+    rev2EscolherNumero(0);
+    const grav = ((exN.laudo._descritores || {})['orads|0'] || {}).tamanho_cm;
+    diz('digitar a medida e tocar "usar" grava o valor em centimetros',
+      grav === 4.5, 'gravado: ' + grav);
+    _rev2Id = null;
+    exames = exames.filter(e => e.id !== 9930);
+    alvo.remove(); campo.remove();
+  } catch (e) {
+    diz('o cartao do maior diametro aceita a resposta', false, e.constructor.name + ': ' + e.message);
+  }
+
   return R;
 })()`;
 

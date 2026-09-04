@@ -7117,7 +7117,8 @@ function normalizarFolhaTela(raiz, chave){
    leitor sem JavaScript o laudo abre com a caixa de sempre, inteira — nunca sem caixa. */
 var _JS_MOLDURA_ARQUIVO='<script>(function(){function d(){'
  +'var f=document.querySelector(".laudoFolha");'
- +'if(!f||!f.querySelector(".fundoLaudo")||!f.clientWidth) return;'
+ +'if(!f||!f.classList.contains("comFundo")||f.getAttribute("data-fundo")==="branco") return;'
+ +'if(!f.clientWidth) return;'
  +'var c=f.querySelector(".laudoCorpoBox"); if(!c) return;'
  +'Array.prototype.forEach.call(f.querySelectorAll(".laudoMoldura"),function(n){n.parentNode.removeChild(n);});'
  +'var s=getComputedStyle(f),m=f.clientWidth/210,H=297*m;'
@@ -7302,8 +7303,12 @@ function molduraRedesenhar(raiz){
   if(!r) return 0;
   var folha=(r.classList&&r.classList.contains('laudoFolha'))?r:r.querySelector('.laudoFolha');
   if(!folha) return 0;
-  /* folha branca não tem moldura por folha — ali quem desenha é a borda da própria caixa */
-  if(!folha.querySelector('.fundoLaudo')) return 0;
+  /* Folha branca não tem moldura por folha — ali quem desenha é a borda da própria caixa.
+     A pergunta é a MESMA que `margensDaFolha` faz, e de propósito: a imagem do timbrado
+     NÃO serve de prova aqui. O laudo guardado no histórico tem a imagem retirada (é ela
+     que estoura a cota do navegador) e continua sendo um laudo com timbrado — procurar
+     pela imagem deixaria justamente o laudo reaberto sem retângulo nenhum. */
+  if(!folha.classList.contains('comFundo') || folha.getAttribute('data-fundo')==='branco') return 0;
   if(!folha.clientWidth) return 0;                 // escondida: mede zero, não inventa
   var cs=getComputedStyle(folha), pxmm=folha.clientWidth/210;
   return _molduraPorFolha(folha, 297*pxmm, parseFloat(cs.paddingTop)||0, parseFloat(cs.paddingBottom)||0);

@@ -145,6 +145,11 @@ const GUARDAR = `(() => {
   document.getElementById('areaImpressaoHist').innerHTML = html;
   document.getElementById('telaVerLaudo').style.display = 'block';
   try { aplicarMargensImpressao(); } catch (e) {}
+  /* 04/09/2026 — E ISTO E O QUE hisRevisar FAZ: redesenha os retangulos DEPOIS de a tela
+     aparecer. Sem esta linha o que se media aqui era uma folha SEM moldura nenhuma, e as
+     tres verificacoes de descolamento la embaixo davam verde por falta de objeto —
+     Math.abs(null) e zero. Verificacao muda e pior que verificacao ausente. */
+  try { molduraRedesenhar(document.getElementById('areaImpressaoHist')); } catch (e) {}
   return html.indexOf('fundoLaudo') < 0;
 })()`;
 
@@ -194,6 +199,11 @@ const GUARDAR = `(() => {
        + hist.temFundo + ']');
     ok(hist.lado === 8,
        'com a mesma margem lateral do original — 8 mm, nao 12  [lado ' + hist.lado + 'mm]');
+    /* 04/09/2026 — O RETANGULO POR FOLHA VOLTOU AO LAUDO REABERTO. Ele nunca pode ser
+       GUARDADO (e medida, e medida nao viaja), mas pode ser REFEITO por quem mostra.
+       Sem esta verificacao, as tres de descolamento abaixo continuariam mudas. */
+    ok(hist.molL != null,
+       'e o retangulo por folha e REFEITO ao reabrir — nao vem guardado  [molL ' + hist.molL + ']');
 
     console.log('\n=== e no PAPEL, que e onde essa margem manda ===');
     await cdp.enviar('Emulation.setEmulatedMedia', { media: 'print' });
@@ -219,6 +229,102 @@ const GUARDAR = `(() => {
        'a folha impressa mantem os 8 mm de lado (30 px), nao os 12 mm (45 px)  ['
        + papel.pad + ' px]');
     await cdp.enviar('Emulation.setEmulatedMedia', { media: 'screen' });
+
+    console.log('\n=== A ANCORA: a caixa anda e o retangulo anda junto ===');
+    /* 04/09/2026 — O CONSERTO DE RAIZ. O retangulo era filho da FOLHA, com left e width em
+       pixels medidos naquele instante; bastava a folha ganhar outra margem para a caixa
+       andar e ele ficar parado. Agora ele nasce DENTRO da caixa, colado nas bordas dela.
+       A prova e mexer na margem da folha SEM redesenhar nada: com o defeito, o retangulo
+       ficava ~15 px para fora; com a ancora, ele acompanha sozinho. */
+    const ancora = await naPagina(cdp, `(() => {
+      const f = document.querySelector('#areaImpressaoHist .laudoFolha');
+      const dentroDaCaixa = !!f.querySelector('.laudoCorpoBox > .laudoMoldura');
+      const filhaDaFolha = Array.prototype.some.call(f.children, n => n.classList && n.classList.contains('laudoMoldura'));
+      f.style.paddingLeft = '12mm'; f.style.paddingRight = '12mm';   // a margem da folha branca
+      return { dentroDaCaixa, filhaDaFolha };
+    })()`);
+    await esperar(250);
+    const depois = await naPagina(cdp, MEDIR('#areaImpressaoHist'));
+    ok(ancora.dentroDaCaixa && !ancora.filhaDaFolha,
+       'o retangulo e filho da CAIXA, nao da folha');
+    ok(Math.abs(depois.desloc) <= 2,
+       'mexer a margem da folha NAO descola o retangulo  [descolamento ' + depois.desloc + ' px]');
+    ok(!depois.cortaTexto, 'e nenhuma linha dele cai dentro do texto');
+    await naPagina(cdp, `(() => { const f = document.querySelector('#areaImpressaoHist .laudoFolha');
+      f.style.paddingLeft = ''; f.style.paddingRight = ''; })()`);
+
+    console.log('\n=== O ARQUIVO SALVO REFAZ O DESENHO SOZINHO, AO ABRIR ===');
+    /* O laudo salvo na pasta e aberto FORA do programa, noutra janela, noutra largura. Por
+       isso ele leva dentro dele a mesma conta (_JS_MOLDURA_ARQUIVO) em vez de levar o
+       retangulo pronto. Aqui o arquivo e montado exatamente como salvarLaudoPasta o monta e
+       aberto de verdade, num quadro a parte (iframe) — nao basta procurar o texto do script
+       no arquivo: a pergunta e se ele DESENHA quando aquele arquivo abre. */
+    const arquivo = await naPagina(cdp, `(async () => {
+      let est = '';
+      try { const M = margensDaFolha(); est = _estiloPaginaTexto(M.topo, M.base, M.lado, M.temFundo); } catch (e) {}
+      const folha = folhaHtmlLimpo();
+      const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>'
+        + 'body{margin:16px;background:#fff;color:#000}' + laudoCssText() + est
+        + '</style></head><body>' + folha + _JS_MOLDURA_ARQUIVO + '</body></html>';
+      const q = document.createElement('iframe');
+      q.id = 'provaArquivo';
+      q.style.cssText = 'position:fixed;left:-4000px;top:0;width:900px;height:1400px;border:0';
+      q.srcdoc = html;
+      document.body.appendChild(q);
+      await new Promise(r => q.addEventListener('load', r, { once: true }));
+      await new Promise(r => setTimeout(r, 400));
+      const d = q.contentDocument;
+      const fo = d.querySelector('.laudoFolha'), cx = fo && fo.querySelector('.laudoCorpoBox');
+      const ms = fo ? fo.querySelectorAll('.laudoMoldura') : [];
+      // quantas VIAJARAM prontas na FOLHA (o script, esse, cita o nome da classe de proposito)
+      const guardadas = (folha.match(/laudoMoldura/g) || []).length;
+      const out = { n: ms.length, guardadas, borda: cx ? getComputedStyle(cx).borderTopColor : '?' };
+      if (ms.length) {
+        const br = cx.getBoundingClientRect(), mr = ms[0].getBoundingClientRect();
+        out.desloc = +(mr.left - br.left).toFixed(1);
+        out.deslocV = +(mr.top - br.top).toFixed(1);
+        out.larg = +(mr.width - br.width).toFixed(1);
+      }
+      return out;   // o quadro fica de pe: a conferencia no PAPEL vem logo abaixo
+    })()`);
+    ok(arquivo.guardadas === 0,
+       'nenhum retangulo VIAJA dentro do arquivo — medida nao viaja  [' + arquivo.guardadas + ']');
+    ok(arquivo.n > 0,
+       'e mesmo assim o arquivo aberto mostra o retangulo por folha  [' + arquivo.n + ']');
+    ok(Math.abs(arquivo.desloc) <= 2 && Math.abs(arquivo.larg) <= 2,
+       'na largura exata da caixa do texto  [descolamento ' + arquivo.desloc
+       + ' px, largura ' + arquivo.larg + ' px]');
+    ok(Math.abs(arquivo.deslocV) <= 2,
+       'e no topo dela  [descolamento ' + arquivo.deslocV + ' px]');
+    /* Se o desenho sai, a borda propria da caixa apaga (senao seriam duas). Se NAO sair —
+       leitor sem JavaScript — ela tem de continuar la: laudo sem caixa nenhuma em volta do
+       texto e o pior dos casos, e e o que acontecia se a ordem fosse a inversa. */
+    ok(/transparent|rgba\(0, 0, 0, 0\)/.test(arquivo.borda),
+       'com o desenho feito, a borda propria da caixa sai de cena  [' + arquivo.borda + ']');
+    /* E o arquivo salvo existe para ser IMPRESSO. No papel a margem lateral muda (a regra de
+       pagina do proprio arquivo manda), a caixa anda — e era exatamente ai que o retangulo
+       ficava para tras. Com a ancora ele acompanha mesmo sem redesenhar. */
+    await cdp.enviar('Emulation.setEmulatedMedia', { media: 'print' });
+    await esperar(500);
+    const arqPapel = await naPagina(cdp, `(() => {
+      const q = document.getElementById('provaArquivo');
+      const fo = q.contentDocument.querySelector('.laudoFolha');
+      const cx = fo.querySelector('.laudoCorpoBox'), ms = fo.querySelectorAll('.laudoMoldura');
+      if (!ms.length) return { n: 0 };
+      const br = cx.getBoundingClientRect(), mr = ms[0].getBoundingClientRect();
+      return { n: ms.length, pad: Math.round(parseFloat(getComputedStyle(fo).paddingLeft)),
+               desloc: +(mr.left - br.left).toFixed(1), larg: +(mr.width - br.width).toFixed(1),
+               deslocV: +(mr.top - br.top).toFixed(1) };
+    })()`);
+    ok(arqPapel.n > 0, 'no papel o retangulo continua la  [' + arqPapel.n + ']');
+    ok(Math.abs(arqPapel.desloc) <= 2 && Math.abs(arqPapel.larg) <= 2,
+       'e continua colado na caixa mesmo com a margem do papel  [descolamento '
+       + arqPapel.desloc + ' px, largura ' + arqPapel.larg + ' px, pad ' + arqPapel.pad + ' px]');
+    ok(Math.abs(arqPapel.deslocV) <= 2,
+       'na vertical tambem  [descolamento ' + arqPapel.deslocV + ' px]');
+    await cdp.enviar('Emulation.setEmulatedMedia', { media: 'screen' });
+    await naPagina(cdp, `(() => { const q = document.getElementById('provaArquivo');
+      if (q) q.parentNode.removeChild(q); })()`);
 
     console.log('\n=== A REGRESSAO QUE A 1a CORRECAO CRIOU: marca sem timbrado ===');
     /* `abrirRevisao` escreve `data-fundo` SEMPRE, mesmo quando nao ha timbrado nenhum para

@@ -109,19 +109,35 @@ ok(/slice\(0,\s*12\)/.test(abrir),
 ok(/nImagens/.test(abrir), 'cada linha mostra quantas imagens tem');
 ok(/capForcarFechar\(\)/.test(abrir), 'da para fechar a lista');
 
-console.log('\n=== exame de OUTRO DIA nao some em silencio ===');
-// 03/09/2026 — ELE CLICOU E "NAO VEIO". O exame ENTROU; o painel do dia e que mostra so
-// os de HOJE (diaExamesDeHoje), e os 12 exames mais recentes do aparelho eram todos de
-// 02/09 — nao havia nenhum de hoje. Sem aviso, o botao parece quebrado quando na verdade
-// funcionou.
-ok(/estudoDeOutroDia\(est\)/.test(trazer), 'antes de trazer, pergunta se o exame e de outro dia');
-ok(/nao de hoje|não de hoje/.test(trazer), 'e diz que ele nao e de hoje');
-ok(/painel do dia mostra só os exames de HOJE|painel do dia mostra so os exames de HOJE/.test(trazer),
-   'explicando POR QUE ele nao vai aparecer no painel');
-ok(/Exames antigos/.test(trazer), 'e onde encontra-lo');
-ok(/confirm\(/.test(trazer), 'perguntando antes, em vez de trazer e deixar sumir');
-ok(/estudoDeOutroDia\(e\)/.test(abrir) && /de outro dia/.test(abrir),
-   'e a propria lista ja marca quais sao de outro dia, antes do clique');
+console.log('\n=== DOIS destinos, escolhidos por ele (03/09/2026, 2a leva) ===');
+// A 1a versao recusava o exame de outro dia com um aviso ("nao entra no painel de hoje").
+// Ele pediu o contrario: dois botoes, e a decisao com ele. Melhor um caminho a escolher
+// do que um aviso do que nao da.
+ok(/Trazer para tela de hoje/.test(abrir), 'ha o botao "Trazer para tela de hoje"');
+ok(/Trazer para tela de exames antigos/.test(abrir), 'e o "Trazer para tela de exames antigos"');
+// as aspas do destino vao escapadas dentro do template: \'hoje\'
+ok(/hoje\\'\)/.test(abrir), 'o botao de hoje manda o destino "hoje"');
+ok(/antigos\\'\)/.test(abrir), 'e o de antigos manda "antigos"');
+ok(!/de outro dia — não entra no painel de hoje/.test(HTML),
+   'a etiqueta que recusava o exame de outro dia SAIU, como ele pediu');
+ok(/destino==='antigos'/.test(trazer), 'o destino "antigos" tem caminho proprio');
+ok(/capAntigoLevar\(/.test(trazer), 'e usa a tela de fotos e audios antigos que ja existia');
+
+console.log('\n=== trazer para hoje NAO falsifica a data do exame ===');
+// `_quando` e a hora REAL do aparelho, e e ela que casa o ditado com o exame. Mexer nela
+// para o exame "caber no filtro" mandaria o audio para o exame errado — que e o erro mais
+// caro que este programa pode cometer. A marca e so de exibicao.
+ok(/_forcadoHoje=true/.test(trazer), 'marca o exame como trazido a mao para hoje');
+ok(!/_quando *=/.test(trazer), 'e NAO mexe em _quando, a hora real do exame');
+const deHoje = grab('diaExamesDeHoje');
+ok(/x\._forcadoHoje/.test(deHoje), 'e o painel do dia aceita o exame por causa dessa marca');
+ok(/_quando/.test(deHoje), 'sem deixar de filtrar os demais pela hora de sempre');
+
+console.log('\n=== a tela de antigos aceita o estudo vindo daqui ===');
+const levar = grab('capAntigoLevar');
+ok(/function capAntigoLevar\(id, estudo\)/.test(HTML) || /estudo\|\|_capAntigos\[id\]/.test(levar),
+   'capAntigoLevar aceita o estudo por parametro, nao so o que a varredura recusou');
+ok(/antAbrir\(\)/.test(levar), 'e abre a tela de antigos com as imagens ja baixadas');
 
 console.log('\n=== o retorno aparece na tela que ELE olha ===');
 // capOrtStatusTxt escreve em #capOrtStatus, que vive na telaExames — a interface antiga.

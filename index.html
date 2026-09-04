@@ -8271,8 +8271,12 @@ function capAntigoOferecer(e){
 }
 /* Leva o estudo para a tela de exames antigos JÁ IMPORTADO — as imagens vêm do aparelho,
    que é exatamente o que ele pediu: não precisar arrastar arquivo do computador. */
-async function capAntigoLevar(id){
-  var e=_capAntigos[id]; if(!e){ log('Não achei mais esse exame.', true); return; }
+async function capAntigoLevar(id, estudo){
+  /* 03/09/2026: aceita o estudo por parâmetro. Antes só sabia buscar em `_capAntigos`,
+     preenchido por capAntigoOferecer — ou seja, só servia ao exame que a varredura tinha
+     recusado sozinha. O botão "Trazer para tela de exames antigos" chama daqui com o
+     estudo na mão, e esse nunca passou pela recusa. */
+  var e=estudo||_capAntigos[id]; if(!e){ log('Não achei mais esse exame.', true); return; }
   try{
     log('Baixando as imagens de '+(e.paciente||'?')+' do aparelho…');
     var imagens=[];
@@ -8392,19 +8396,19 @@ async function capForcarAbrir(){
     +'<button class="btn peq sec" type="button" onclick="capForcarFechar()">fechar</button></div>'
     + ord.map(function(e){
         var jaNaLista=exames.some(function(x){ return x._estudoId===e.id; });
-        /* Dizer o ESTADO de cada linha é o que evita o clique às cegas: "já está na sua
-           lista" e "foi ignorado como antigo" levam a decisões diferentes.
-           03/09/2026: entrou "de outro dia", e ele é o mais importante dos três. Ele
-           clicou num exame de ontem e o exame ENTROU — mas o painel do dia só mostra os
-           de hoje, então sumiu da vista e pareceu que o botão não funcionou. */
-        var deOutroDia=false; try{ deOutroDia=estudoDeOutroDia(e); }catch(_){}
+        /* 03/09/2026 (2ª leva), pedido dele: a etiqueta "de outro dia — não entra no
+           painel de hoje" SAIU, e no lugar dela vieram dois botões. A etiqueta explicava
+           uma recusa; os botões deixam ELE decidir para onde vai. Melhor um caminho a
+           escolher do que um aviso do que não dá.
+           "já está na sua lista" fica: essa não é uma recusa, é o que evita ele criar
+           dois laudos do mesmo paciente sem perceber. */
         var etiq = jaNaLista ? '<span class="tag" style="background:#fdeaea;color:#a3271f">já está na sua lista</span>'
-                 : (deOutroDia ? '<span class="tag" style="background:#fdf6e9;color:#7a5310">de outro dia — não entra no painel de hoje</span>'
-                 : (capOrtSeen.has(e.id) ? '<span class="tag" style="background:#eef3f8;color:#3d5566">ignorado como antigo</span>' : ''));
-        return '<div style="display:flex;gap:8px;align-items:center;border-top:1px solid #eef1f5;padding:6px 0">'
-          +'<span style="flex:1;font-size:13px"><b>'+esc(e.paciente||'(sem nome)')+'</b> '+etiq
+                 : (capOrtSeen.has(e.id) ? '<span class="tag" style="background:#eef3f8;color:#3d5566">ignorado como antigo</span>' : '');
+        return '<div style="display:flex;gap:8px;align-items:center;border-top:1px solid #eef1f5;padding:6px 0;flex-wrap:wrap">'
+          +'<span style="flex:1;min-width:180px;font-size:13px"><b>'+esc(e.paciente||'(sem nome)')+'</b> '+etiq
           +'<span class="aviso"> · '+esc(e.data||'')+(e.hora?' '+esc(e.hora):'')+' · '+(e.nImagens||0)+' imagem(ns)</span></span>'
-          +'<button class="btn peq" type="button" onclick="capForcarTrazer(\''+esc(e.id)+'\')">trazer</button></div>';
+          +'<button class="btn peq" type="button" onclick="capForcarTrazer(\''+esc(e.id)+'\',\'hoje\')">Trazer para tela de hoje</button>'
+          +'<button class="btn peq sec" type="button" onclick="capForcarTrazer(\''+esc(e.id)+'\',\'antigos\')">Trazer para tela de exames antigos</button></div>';
       }).join('')
     +'</div>';
 }
@@ -8419,24 +8423,23 @@ function capForcarAviso(html, cor){
     +'background:#fbfcfe;font-size:13px">'+html
     +' <button class="btn peq sec" type="button" style="margin-left:6px" onclick="capForcarFechar()">ok</button></div>';
 }
-async function capForcarTrazer(id){
+/* 03/09/2026 (2ª leva), pedido dele: DOIS destinos, escolhidos por ele no botão, em vez
+   de o programa recusar o exame de outro dia com um aviso.
+     'hoje'    -> entra no painel do dia, mesmo sendo de outro dia
+     'antigos' -> vai para a tela de fotos e áudios antigos, já com as imagens baixadas */
+async function capForcarTrazer(id, destino){
   try{
     var lista=await capOrtListar();
     var est=(lista||[]).filter(function(e){ return String(e.id)===String(id); })[0];
     if(!est){ capForcarAviso('esse exame não está mais no aparelho.'); return; }
     if(!est.nImagens){ capForcarAviso('o exame de <b>'+esc(est.paciente||'?')+'</b> está sem imagens no aparelho.'); return; }
-    /* EXAME DE OUTRO DIA: ele entra, mas o painel do dia mostra só os de hoje — some da
-       vista e parece que o botão não fez nada. Foi exatamente o que aconteceu em
-       03/09/2026: os 12 exames mais recentes do aparelho eram todos de 02/09, e não havia
-       nenhum de hoje. Avisar ANTES, e dizer onde ele vai aparecer. */
-    var outroDia=false; try{ outroDia=estudoDeOutroDia(est); }catch(_){}
-    if(outroDia){
-      var quando=(est.data||'')+(est.hora?(' '+est.hora):'');
-      if(!confirm('O exame de '+(est.paciente||'?')+' é de '+quando+', não de hoje.\n\n'
-                 +'O painel do dia mostra só os exames de HOJE, então ele NÃO vai aparecer ali.\n'
-                 +'Ele entra na lista e você o encontra em "Exames antigos".\n\n'
-                 +'OK = trazer assim mesmo · Cancelar = não trazer')) return;
+
+    if(destino==='antigos'){
+      capForcarAviso('baixando as imagens de <b>'+esc(est.paciente||'?')+'</b>…');
+      await capAntigoLevar(est.id, est);      // abre a tela de antigos já com as fotos
+      return;
     }
+
     /* Sai das duas listas de controle ANTES de processar: sem isso a varredura seguinte o
        trataria de novo como antigo, e um exame trazido na mão sumiria da vigilância que
        completa as imagens que chegam atrasadas (capOrtCompletar). */
@@ -8446,11 +8449,15 @@ async function capForcarTrazer(id){
     await capOrtProcessar(est, true);
     capOrtFeitos.add(est.id);   // daqui em diante ele é vigiado como qualquer outro
     if(exames.length<=antes){ capForcarAviso('o exame de <b>'+esc(est.paciente||'?')+'</b> não entrou. Veja o diário para o motivo.', '#d99a26'); return; }
+    /* A MARCA QUE O FAZ APARECER NO PAINEL DE HOJE, e a razão de ela existir: o painel
+       filtra por `_quando`, que é a hora REAL do exame no aparelho — e essa hora não pode
+       ser mexida, porque é ela que casa o ditado com o exame. Então em vez de falsificar a
+       data, marca-se o exame como trazido à mão para hoje, e o filtro o aceita por isso.
+       Ver diaExamesDeHoje. */
+    var novo=exames[exames.length-1];
+    if(novo){ novo._forcadoHoje=true; }
     try{ diaRenderLista(); }catch(_){}      // a lista do dia se redesenha na hora, sem esperar os 5 s
-    capForcarAviso(outroDia
-      ? 'Exame de <b>'+esc(est.paciente||'?')+'</b> ('+esc((est.data||''))+') trazido. Como é de outro dia, ele <b>não</b> aparece no painel de hoje — abra em <b>Exames antigos</b>.'
-      : '✔ Exame de <b>'+esc(est.paciente||'?')+'</b> trazido para a lista de hoje.',
-      outroDia ? '#d99a26' : '#1f7a3d');
+    capForcarAviso('✔ Exame de <b>'+esc(est.paciente||'?')+'</b> ('+esc(est.data||'')+') está na lista de hoje.', '#1f7a3d');
   }catch(e){
     capForcarAviso('não consegui trazer o exame ('+esc((e&&e.message)||String(e))+').', '#b3261e');
   }
@@ -14261,6 +14268,13 @@ function diaExamesDeHoje(){
   var hoje=new Date(); hoje.setHours(0,0,0,0);
   return exames.filter(function(x){
     if(!x._captura && !x._dicom) return false;
+    /* 03/09/2026 — EXAME TRAZIDO À MÃO PARA HOJE entra mesmo sendo de outro dia. Ele
+       pediu o botão "Trazer para tela de hoje" justamente para isso: o exame do dia
+       anterior que ficou por fazer, ou o que não chegou na hora e ele quer laudar agora.
+       A DATA DO EXAME NÃO É MEXIDA. `_quando` é a hora real do aparelho, e é ela que casa
+       o ditado com o exame — falsificá-la para o exame "caber no filtro" mandaria o áudio
+       para o exame errado. A marca é só de exibição. */
+    if(x._forcadoHoje) return true;
     var q=x._quando||0;
     return q ? (q>=hoje.getTime()) : true;
   }).sort(function(a,b){ return (a._quando||0)-(b._quando||0); });

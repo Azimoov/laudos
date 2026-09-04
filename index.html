@@ -6946,7 +6946,40 @@ function margensDaFolha(chave){
     : document.querySelector('#areaImpressao .laudoFolha');
   var k=chave || (folha&&folha.getAttribute('data-fundo')) || null;
   var fnd=k ? (FUNDOS[k]||null) : null;
-  var temFundo = fnd ? !!fnd.img : !!(folha && folha.querySelector('.fundoLaudo'));
+  /* ⚠️ 04/09/2026 — A IMAGEM DO TIMBRADO NÃO PODE SER A ÚNICA PROVA DE QUE HÁ TIMBRADO.
+     Defeito relatado por ele: "quando eu libero um exame a partir da tela de visualizar
+     laudo, a caixa em volta do texto principal fica arrastada mais para a esquerda e
+     acaba sobrepondo o texto".
+
+     O ENCADEAMENTO, medido em 04/09:
+       · o timbrado dele é um LOCAL DE ATENDIMENTO que ele mesmo cadastrou. Ele SÓ entra
+         em FUNDOS quando `exAplicarLocaisExtra` roda — e ela rodava em dois lugares:
+         ao salvar o cadastro e ao abrir "Realizar exames". Numa sessão em que ele vai
+         direto para "Liberar laudos" ou para o Histórico, o timbrado dele não existe
+         para o programa: `fnd` é nulo e a decisão caía no `querySelector`;
+       · `salvarLaudoHistorico` RETIRA `<img class="fundoLaudo">` antes de guardar (é ela
+         que estoura a cota do navegador) — exatamente a prova que se estava procurando;
+       · sem a imagem, o laudo guardado era julgado "sem timbrado" e o lado ia de 8 mm
+         para 12 mm, e o topo de 34 mm para 15;
+       · as molduras de cada folha (`_molduraPorFolha`) são desenhadas em PIXELS FIXOS,
+         medidos no desenho antigo, e não andam junto.
+     Medido no papel: moldura 14,1 px fora da caixa na horizontal e 72,8 px na VERTICAL —
+     e é a vertical que cumpre a queixa dele, com a linha de cima da moldura caindo 26 px
+     DENTRO do texto. É a mesma classe de defeito de sempre nesta casa: medir numa régua
+     e desenhar noutra.
+
+     A REGRA CERTA, E POR QUE ELA É A CLASSE `comFundo` E NÃO A MARCA SOZINHA: `data-fundo`
+     é escrito SEMPRE por `abrirRevisao`, mesmo quando não há timbrado nenhum para pôr —
+     aceitar a marca sozinha dava 8 mm de lado e 5,8 mm de topo a uma folha branca no
+     arquivo salvo, ressuscitando o defeito de 01/09 ("texto alto e rente às bordas").
+     `comFundo` é a classe que o próprio CSS usa para decidir o desenho da folha, viaja
+     no laudo guardado (folhaHtmlLimpo clona a folha inteira) e não é retirada. Duas
+     fontes de verdade que discordam é o que criou este defeito; esta linha alinha as
+     duas. A imagem embutida fica como reforço, para a folha que não trouxer a classe. */
+  var _marcaTimbrada = !!(k && k!=='branco') && !!(folha && folha.classList
+                       && folha.classList.contains('comFundo'));
+  var temFundo = fnd ? !!fnd.img
+                     : (_marcaTimbrada || !!(folha && folha.querySelector('.fundoLaudo')));
   if(!k && !folha){ fnd=FUNDOS[window.__fundo||'branco']||FUNDOS.branco; temFundo=!!(fnd&&fnd.img); }
   /* 01/09/2026, pedido dele: sem timbrado o texto ficava alto e rente às bordas, porque o
      respiro de cima era ocupado pelo carimbo do navegador. Sem o carimbo, o espaço passa a
@@ -17748,6 +17781,15 @@ function hisFecharLaudo(){
 
 window.addEventListener('DOMContentLoaded', function(){
   mostrarAba('captura');       // deixa uma aba pronta atrás da tela de abertura
+  /* 04/09/2026 — OS TIMBRADOS DELE ENTRAM NA ABERTURA, e não só ao passar por "Realizar
+     exames". Os locais que ele cadastra vivem em `glocais`; `exAplicarLocaisExtra` é quem
+     os põe em FUNDOS, e ela só rodava ao salvar o cadastro e ao abrir aquela tela. Numa
+     sessão em que ele vai direto para "Liberar laudos" ou para o Histórico, o timbrado
+     dele simplesmente não existia para o programa: o laudo guardado reabria e IMPRIMIA
+     SEM O TIMBRADO, e as margens saíam pelas de folha branca. A margem era o sintoma
+     menor. Rodar aqui é barato (é uma leitura de `glocais`) e vale para todos os
+     caminhos, em vez de depender de por qual porta ele entrou. */
+  try{ exAplicarLocaisExtra(); }catch(e){}
   abAtualizarTudo();
 });
 /* UMA BARRA DE ROLAGEM SÓ (15/08/2026 — o médico viu duas na lateral direita).

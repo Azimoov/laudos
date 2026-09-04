@@ -77,6 +77,7 @@ const SUITE = [
   { arq: 'teste-fotos-nao-somem.js', o: 'as fotos do exame nao somem num recarregamento' },
   { arq: 'teste-repositorio.js', o: 'repositorio unico de exames (dias que abrem, tres sinais, audio e fotos)' },
   { arq: 'teste-reabrir-exame.js', o: 'Reabrir exame nao joga o medico na interface antiga' },
+  { arq: 'teste-moldura-timbrado-proprio.js', o: 'a caixa do texto nao descola do texto (timbrado proprio, medido em papel)' },
   { arq: 'teste-orads-diametro.js', o: 'O-RADS: o maior diametro escrito no laudo vale, e da para responder' },
   { arq: 'teste-faixa-apontada.js', o: 'a IA aponta a POSICAO no ditado (fim da caca a citacao)' },
   { arq: 'teste-tela-provedor-ia.js', o: 'tela nova do Provedor de IA (espelha os campos antigos, um salvar so)' },

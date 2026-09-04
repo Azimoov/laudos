@@ -8393,9 +8393,14 @@ async function capForcarAbrir(){
     + ord.map(function(e){
         var jaNaLista=exames.some(function(x){ return x._estudoId===e.id; });
         /* Dizer o ESTADO de cada linha é o que evita o clique às cegas: "já está na sua
-           lista" e "foi ignorado como antigo" levam a decisões diferentes. */
+           lista" e "foi ignorado como antigo" levam a decisões diferentes.
+           03/09/2026: entrou "de outro dia", e ele é o mais importante dos três. Ele
+           clicou num exame de ontem e o exame ENTROU — mas o painel do dia só mostra os
+           de hoje, então sumiu da vista e pareceu que o botão não funcionou. */
+        var deOutroDia=false; try{ deOutroDia=estudoDeOutroDia(e); }catch(_){}
         var etiq = jaNaLista ? '<span class="tag" style="background:#fdeaea;color:#a3271f">já está na sua lista</span>'
-                 : (capOrtSeen.has(e.id) ? '<span class="tag" style="background:#eef3f8;color:#3d5566">ignorado como antigo</span>' : '');
+                 : (deOutroDia ? '<span class="tag" style="background:#fdf6e9;color:#7a5310">de outro dia — não entra no painel de hoje</span>'
+                 : (capOrtSeen.has(e.id) ? '<span class="tag" style="background:#eef3f8;color:#3d5566">ignorado como antigo</span>' : ''));
         return '<div style="display:flex;gap:8px;align-items:center;border-top:1px solid #eef1f5;padding:6px 0">'
           +'<span style="flex:1;font-size:13px"><b>'+esc(e.paciente||'(sem nome)')+'</b> '+etiq
           +'<span class="aviso"> · '+esc(e.data||'')+(e.hora?' '+esc(e.hora):'')+' · '+(e.nImagens||0)+' imagem(ns)</span></span>'
@@ -8403,23 +8408,51 @@ async function capForcarAbrir(){
       }).join('')
     +'</div>';
 }
+/* O retorno aparece NA PRÓPRIA LISTA, que vive na telaDia. `capOrtStatusTxt` escreve em
+   #capOrtStatus, que está na telaExames — a interface antiga. Toda mensagem daquele
+   caminho é invisível para quem trabalha no painel do dia, e foi por isso que ele clicou,
+   o exame entrou, e a tela não disse absolutamente nada. */
+function capForcarAviso(html, cor){
+  var d=document.getElementById('capForcarLista'); if(!d) return;
+  d.style.display='block';
+  d.innerHTML='<div style="border:1px solid '+(cor||'#c8d0da')+';border-radius:8px;padding:8px 10px;'
+    +'background:#fbfcfe;font-size:13px">'+html
+    +' <button class="btn peq sec" type="button" style="margin-left:6px" onclick="capForcarFechar()">ok</button></div>';
+}
 async function capForcarTrazer(id){
-  var d=document.getElementById('capForcarLista');
   try{
     var lista=await capOrtListar();
     var est=(lista||[]).filter(function(e){ return String(e.id)===String(id); })[0];
-    if(!est){ capOrtStatusTxt('esse exame não está mais no aparelho.'); return; }
-    if(!est.nImagens){ capOrtStatusTxt('o exame de '+(est.paciente||'?')+' está sem imagens no aparelho.'); return; }
-    capForcarFechar();
+    if(!est){ capForcarAviso('esse exame não está mais no aparelho.'); return; }
+    if(!est.nImagens){ capForcarAviso('o exame de <b>'+esc(est.paciente||'?')+'</b> está sem imagens no aparelho.'); return; }
+    /* EXAME DE OUTRO DIA: ele entra, mas o painel do dia mostra só os de hoje — some da
+       vista e parece que o botão não fez nada. Foi exatamente o que aconteceu em
+       03/09/2026: os 12 exames mais recentes do aparelho eram todos de 02/09, e não havia
+       nenhum de hoje. Avisar ANTES, e dizer onde ele vai aparecer. */
+    var outroDia=false; try{ outroDia=estudoDeOutroDia(est); }catch(_){}
+    if(outroDia){
+      var quando=(est.data||'')+(est.hora?(' '+est.hora):'');
+      if(!confirm('O exame de '+(est.paciente||'?')+' é de '+quando+', não de hoje.\n\n'
+                 +'O painel do dia mostra só os exames de HOJE, então ele NÃO vai aparecer ali.\n'
+                 +'Ele entra na lista e você o encontra em "Exames antigos".\n\n'
+                 +'OK = trazer assim mesmo · Cancelar = não trazer')) return;
+    }
     /* Sai das duas listas de controle ANTES de processar: sem isso a varredura seguinte o
        trataria de novo como antigo, e um exame trazido na mão sumiria da vigilância que
        completa as imagens que chegam atrasadas (capOrtCompletar). */
     capOrtSeen.delete(est.id);
     capOrtFeitos.delete(est.id);
+    var antes=exames.length;
     await capOrtProcessar(est, true);
     capOrtFeitos.add(est.id);   // daqui em diante ele é vigiado como qualquer outro
+    if(exames.length<=antes){ capForcarAviso('o exame de <b>'+esc(est.paciente||'?')+'</b> não entrou. Veja o diário para o motivo.', '#d99a26'); return; }
+    try{ diaRenderLista(); }catch(_){}      // a lista do dia se redesenha na hora, sem esperar os 5 s
+    capForcarAviso(outroDia
+      ? 'Exame de <b>'+esc(est.paciente||'?')+'</b> ('+esc((est.data||''))+') trazido. Como é de outro dia, ele <b>não</b> aparece no painel de hoje — abra em <b>Exames antigos</b>.'
+      : '✔ Exame de <b>'+esc(est.paciente||'?')+'</b> trazido para a lista de hoje.',
+      outroDia ? '#d99a26' : '#1f7a3d');
   }catch(e){
-    if(d) d.innerHTML='<span class="aviso">não consegui trazer o exame ('+esc((e&&e.message)||String(e))+').</span>';
+    capForcarAviso('não consegui trazer o exame ('+esc((e&&e.message)||String(e))+').', '#b3261e');
   }
 }
 async function capOrtProcessar(est, forcar){

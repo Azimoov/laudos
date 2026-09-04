@@ -109,6 +109,34 @@ ok(/slice\(0,\s*12\)/.test(abrir),
 ok(/nImagens/.test(abrir), 'cada linha mostra quantas imagens tem');
 ok(/capForcarFechar\(\)/.test(abrir), 'da para fechar a lista');
 
+console.log('\n=== exame de OUTRO DIA nao some em silencio ===');
+// 03/09/2026 — ELE CLICOU E "NAO VEIO". O exame ENTROU; o painel do dia e que mostra so
+// os de HOJE (diaExamesDeHoje), e os 12 exames mais recentes do aparelho eram todos de
+// 02/09 — nao havia nenhum de hoje. Sem aviso, o botao parece quebrado quando na verdade
+// funcionou.
+ok(/estudoDeOutroDia\(est\)/.test(trazer), 'antes de trazer, pergunta se o exame e de outro dia');
+ok(/nao de hoje|não de hoje/.test(trazer), 'e diz que ele nao e de hoje');
+ok(/painel do dia mostra só os exames de HOJE|painel do dia mostra so os exames de HOJE/.test(trazer),
+   'explicando POR QUE ele nao vai aparecer no painel');
+ok(/Exames antigos/.test(trazer), 'e onde encontra-lo');
+ok(/confirm\(/.test(trazer), 'perguntando antes, em vez de trazer e deixar sumir');
+ok(/estudoDeOutroDia\(e\)/.test(abrir) && /de outro dia/.test(abrir),
+   'e a propria lista ja marca quais sao de outro dia, antes do clique');
+
+console.log('\n=== o retorno aparece na tela que ELE olha ===');
+// capOrtStatusTxt escreve em #capOrtStatus, que vive na telaExames — a interface antiga.
+// Era por ali que este caminho falava, e por isso ele clicou e a tela nao disse nada.
+ok(/function capForcarAviso\(/.test(HTML), 'ha um aviso proprio, na lista da telaDia');
+ok(telaDe('function capForcarAviso') !== 'telaExames', 'que nao usa o status da tela antiga');
+ok(!/capOrtStatusTxt\(/.test(trazer),
+   'e capForcarTrazer nao fala mais pelo status invisivel  [nenhuma chamada]');
+ok(/capForcarAviso\(/.test(trazer), 'usa o aviso visivel');
+ok(/Exame de <b>/.test(trazer), 'confirmando o sucesso com o nome do paciente');
+ok(/exames\.length<=antes/.test(trazer),
+   'e se o exame NAO entrar, diz isso — em vez de anunciar sucesso a toa');
+ok(/diaRenderLista\(\)/.test(trazer),
+   'a lista do dia se redesenha na hora, sem esperar os 5 s do ciclo');
+
 console.log('\n=== nao trava nem mente quando algo falha ===');
 ok(/nao consegui falar com o agente/.test(abrir) || /não consegui falar com o agente/.test(abrir),
    'agente fora do ar vira mensagem, nao lista vazia');

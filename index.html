@@ -8581,6 +8581,14 @@ function capForcarAviso(html, cor){
   d.innerHTML='<div style="border:1px solid '+(cor||'#c8d0da')+';border-radius:8px;padding:8px 10px;'
     +'background:#fbfcfe;font-size:13px">'+html
     +' <button class="btn peq sec" type="button" style="margin-left:6px" onclick="capForcarFechar()">ok</button></div>';
+  /* 04/09/2026 — E ROLA ATÉ ELE. Esta caixa vive DEPOIS da lista de exames do dia. Num dia
+     de 25 exames ela nasce a 5.793 px do topo, numa janela de 484: "visível" no papel do
+     código e fora da tela na prática. Ele atende perto de 100 por dia — sem isto, trocar o
+     diário por esta caixa só mudaria de "atrás da tela" para "abaixo da dobra". */
+  /* Rolagem INSTANTÂNEA, não suave: com 25 exames a caixa está a 5.793 px, e uma rolagem
+     suave por essa distância é uma viagem — além de assíncrona, o que faria a tela ainda
+     estar no meio do caminho quando ele olhasse. `nearest` rola o mínimo necessário. */
+  try{ d.scrollIntoView({block:'nearest'}); }catch(_){}
 }
 /* 03/09/2026 (2ª leva), pedido dele: DOIS destinos, escolhidos por ele no botão, em vez
    de o programa recusar o exame de outro dia com um aviso.
@@ -14676,8 +14684,17 @@ function repoItem(est, ex){
     nImagens: nImg,
     instancias: (est&&est.instancias)||(ex&&ex._instIds)||[],
     audio: repoAudioDe(est, ex, diaIso, paciente),
-    // liberado: o banco é a fonte (study_uid); o exame da sessão sabe de si mesmo
-    liberado: !!((ex&&ex._liberado) || (eid && _repo.liberados[eid]))
+    /* LIBERADO — e a regra tem TRÊS casos, não dois:
+       · exame com LAUDO nesta sessão: o estado de agora manda, e só ele. É o que conserta
+         a contradição de reabrir — o exame volta para a fila, mas o banco continua com o
+         laudo antigo registrado, e o cartão dizia "aguarda revisão" mostrando "✓ liberado";
+       · exame nesta sessão SEM laudo: a sessão não sabe de nada. Foi só trazido do
+         aparelho (capOrtProcessar cria o exame sem `_liberado`), e o banco pode muito bem
+         ter o laudo assinado de outro dia. Aqui o banco ainda vale — deixar a sessão mandar
+         punha "○ a liberar" num exame já assinado, que é a mesma mentira ao contrário;
+       · exame que não está na sessão: o banco, que é a única fonte. */
+    liberado: (ex && ex.laudo) ? !!ex._liberado
+                               : !!((ex && ex._liberado) || (eid && _repo.liberados[eid]))
   };
 }
 function repoItens(){
@@ -14938,7 +14955,8 @@ function diaRenderLista(){
         bts.push('<button class="bt" onclick="diaAbrirNaPasta('+x.id+')">Abrir na pasta de destino</button>');
       }
       bts.push('<button class="bt cinza" onclick="diaReabrir('+x.id+')" '
-              +'title="devolve o exame para receber mais ditado ou imagens">Reabrir exame</button>');
+              +'title="devolve o exame para a fila a liberar e volta a receber as imagens do aparelho">'
+              +'Reabrir exame</button>');
       var acoes=bts.join('');
       /* 04/09/2026 — OS TRÊS SINAIS entram TAMBÉM no cartão de hoje. Ele pediu uma lista
          só: se o exame de anteontem mostra áudio, imagens e liberado, o de hoje tem de
@@ -16935,21 +16953,58 @@ function diaRevisarPendentes(){
   if(!p.length) return;
   diaRevisar(p[0].id);
 }
-/* "Reabrir exame": devolve o exame para a fila de captura, para receber ditado
-   ou imagens de novo. */
+/* "Reabrir exame": devolve o exame para a fila de laudos a liberar e o põe de volta sob
+   a vigilância do aparelho, para as imagens que chegarem atrasadas o completarem.
+   NÃO traz ditado de volta — não existe caminho para acrescentar ditado a um exame já
+   capturado, e prometê-lo aqui era prometer o que o programa não faz. */
 function diaReabrir(exId){
   var x=exames.find(function(e){ return e.id===exId; }); if(!x) return;
   /* Reabrir um exame JÁ ASSINADO o devolve para a fila de pendentes — é o que permite
      acrescentar a foto que faltou, mas o médico precisa saber que aquele laudo volta a
      aparecer como "a liberar". Perguntar só quando há o que desfazer. */
+  /* As palavras dizem só o que existe: NÃO há caminho para acrescentar ditado a um exame
+     já capturado — `capOrtCompletar` baixa imagem, e o anexo manual da revisão é de foto.
+     Prometer ditado aqui era uma promessa que o programa não cumpre. */
+  var jaEstavaAberto=!x._liberado;
   if(x._liberado && !confirm('O laudo de '+(x.paciente||'este paciente')
-      +' já foi assinado.\n\nReabrir devolve o exame para receber mais ditado ou imagens, e ele '
-      +'volta para a fila de laudos a liberar.\n\nO arquivo já salvo na pasta continua lá.\n\nReabrir?'))
+      +' já foi assinado.\n\nReabrir devolve o exame para a fila de laudos a liberar, e ele '
+      +'volta a receber as imagens que o aparelho enviar.\n\nO arquivo já salvo na pasta continua lá.\n\nReabrir?'))
     return;
   x._liberado=false;
-  diaFechar(); mostrarAba('captura');
+  /* 04/09/2026 — NÃO SAI MAIS DO PAINEL DO DIA. Até aqui esta função fazia
+   `diaFechar(); mostrarAba('captura')`, que joga na aba "Captura" da interface ANTIGA:
+   uma tela sem "voltar", sem "início" e sem caminho nenhum de saída. Ele descreveu como
+   "um beco sem saída" — apertava Reabrir e ficava preso.
+   Reabrir é uma mudança de ESTADO do exame, não uma mudança de tela: o exame volta para
+   a fila de "a liberar" e continua ali na lista, agora com o botão Revisar. Quem decide
+   ir para algum lugar é ele. É a mesma armadilha das outras três vezes — a interface
+   antiga continua inteira no arquivo, e qualquer `mostrarAba` leva para dentro dela. */
+  /* VOLTA A SER VIGIADO PELO APARELHO — e são DUAS listas, não uma. `capOrtSeen` é
+     peneirada ANTES de `capOrtFeitos` na varredura (capOrtVarrer): um exame que esteja em
+     `capOrtSeen` é pulado sem sequer chegar em `capOrtCompletar`, e ao religar a espera
+     TUDO que já está no aparelho entra em `capOrtSeen`. Marcar só `capOrtFeitos` era uma
+     promessa que a varredura não cumpria. É o mesmo par que `capForcarTrazer` limpa. */
+  try{ if(x._estudoId){ capOrtSeen.delete(x._estudoId); capOrtFeitos.add(x._estudoId); } }catch(_){}
   try{ capRenderNovos(); capRenderPendentes(); }catch(_){}
-  log('Exame de '+(x.paciente||'?')+' reaberto — ele volta a receber ditado e imagens.');
+  try{ renderExames(); }catch(_){}
+  try{ diaRenderLista(); }catch(_){}
+  /* O RETORNO APARECE NA telaDia, não no diário. `log()` escreve em #log, que vive ATRÁS
+     do painel do dia (position:fixed, fundo opaco): a frase existia e ele nunca a leria.
+     É a mesma armadilha registrada em capForcarTrazer, e por isso se usa o mesmo aviso. */
+  var _quem=esc(x.paciente||'este exame');
+  /* A frase das imagens SÓ SAI quando há mesmo o que vigiar. Ditado avulso não tem estudo
+     no aparelho, e a espera pode estar desligada — prometer "as imagens que chegarem
+     entram sozinhas" nesses casos é afirmar o que não vai acontecer. */
+  var _vigia=(x._estudoId && (typeof capOrtWatching==='undefined' || capOrtWatching))
+    ? ' As imagens que o aparelho enviar agora entram sozinhas.' : '';
+  if(jaEstavaAberto)
+    capForcarAviso('O exame de <b>'+_quem+'</b> já estava aberto (não assinado).'+_vigia);
+  else
+    capForcarAviso('✔ Exame de <b>'+_quem+'</b> reaberto — voltou para a fila de laudos a '
+      +'liberar e continua na lista de hoje. Toque em <b>Revisar</b> para trabalhar nele.'
+      +_vigia, '#1f7a3d');
+  log('Exame de '+(x.paciente||'?')+(jaEstavaAberto?' já estava aberto':' reaberto')
+     +(_vigia?' — volta a receber as imagens que o aparelho enviar.':' — sem estudo no aparelho para vigiar.'));
   try{ agendarSalvarSessao(); }catch(_){}
 }
 /* ABRIR A PASTA DE VERDADE (19/08/2026). Antes esta função só reabria o laudo na tela —

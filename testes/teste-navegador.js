@@ -1487,6 +1487,95 @@ const VERIFICACOES = `(async () => {
     diz('o cartao do maior diametro aceita a resposta', false, e.constructor.name + ': ' + e.message);
   }
 
+  // 04/09/2026 — "REABRIR EXAME" NAO PODE SER UM BECO SEM SAIDA.
+  // Ele apertava Reabrir no painel do dia e caia na aba "Captura ao vivo" da interface
+  // ANTIGA, com o painel fechado e o botao de voltar apagado: sem saida nenhuma.
+  try {
+    const confAntes = window.confirm;
+    window.confirm = () => true;
+    // UM DIA DE VERDADE: ele atende perto de 100 exames. Com um so, "o aviso esta visivel"
+    // passa a toa — a caixa vive DEPOIS da lista, e e a lista longa que a empurra para
+    // fora da tela. Foi assim que a 1a versao desta correcao trocou "atras da tela" por
+    // "abaixo da dobra" sem que o teste percebesse.
+    exames = [{ id: 9940, paciente: 'Teste Reabrir', tipo: 'abdominal', laudo: { corpo: 'x' },
+                imagens: [], audios: [], _liberado: true, _captura: true,
+                _estudoId: 'EST-REAB', _instIds: [], _quando: Date.now() }];
+    for (let k = 0; k < 24; k++) {
+      exames.push({ id: 9950 + k, paciente: 'Enchimento ' + k, tipo: 'abdominal',
+        laudo: { corpo: 'x' }, imagens: [], audios: [], _liberado: true, _captura: true,
+        _estudoId: 'EST-' + k, _instIds: [], _quando: Date.now() - (k + 1) * 60000 });
+    }
+    _diaListaHtml = '';
+    // o estado REAL da varredura: o exame ja visto (era so isso que a versao anterior
+    // desta correcao nao desfazia, e por isso a promessa nao se cumpria)
+    capOrtFeitos = new Set(); capOrtSeen = new Set(['EST-REAB']); capOrtWatching = true;
+    // O BANCO TAMBEM DIZ QUE ESTE EXAME ESTA LIBERADO — e e so com ele preenchido que a
+    // assercao do selo testa alguma coisa. Sem esta linha o "ou" antigo (sessao OU banco)
+    // nunca era exercitado e a verificacao passava vazia.
+    _repo.liberados = { 'EST-REAB': true };
+    diaAbrir();
+    const antesVisivel = document.getElementById('telaDia').style.display;
+    diaReabrir(9940);
+    const dia = document.getElementById('telaDia');
+    diz('o painel do dia continua aberto depois de reabrir',
+      getComputedStyle(dia).display === 'block',
+      'antes: ' + antesVisivel + ' / depois: ' + getComputedStyle(dia).display);
+    // a telaDia e position:fixed com fundo opaco: se ela esta na frente, o que a interface
+    // antiga fizer atras nao prende ninguem. Mede-se pelo PONTO, nao por um id existir.
+    const noMeio = document.elementFromPoint(Math.round(innerWidth / 2), Math.round(innerHeight / 2));
+    diz('e e ELE que esta na frente da tela (nada da interface antiga por cima)',
+      !!noMeio && !!noMeio.closest && !!noMeio.closest('#telaDia'),
+      noMeio ? (noMeio.tagName + '#' + (noMeio.closest('[id]') || {}).id) : 'nada');
+    diz('o exame voltou para a fila de laudos a liberar',
+      exames[0]._liberado === false);
+    const cartao = [...document.querySelectorAll('#diaLista .item')]
+      .find(el => el.textContent.indexOf('Teste Reabrir') >= 0);
+    diz('e continua na lista de hoje, com o cartao desenhado', !!cartao);
+    // o selo NAO pode continuar dizendo "liberado" num exame que acabou de ser reaberto
+    diz('o cartao nao se contradiz: some o selo "liberado", entra "a liberar"',
+      !!cartao && !cartao.querySelector('.repoSelo.lib') && !!cartao.querySelector('.repoSelo.falta'),
+      cartao ? (cartao.querySelector('.repoSelo.lib') ? 'ainda diz liberado' : 'ok') : 'sem cartao');
+    diz('e a situacao escrita concorda com o selo',
+      !!cartao && cartao.textContent.indexOf('revisado e assinado') < 0);
+    // exame SEM laudo nesta sessao: a sessao nao sabe de nada e quem manda e o banco.
+    // Deixar a sessao mandar poria "a liberar" num exame ja assinado — a mesma mentira
+    // ao contrario. E o caso do exame trazido pelo "para hoje", que nasce sem _liberado.
+    const semLaudo = repoItem({ id: 'EST-REAB', paciente: 'X', data: '01/01/2026', nImagens: 1,
+                                instancias: ['i'], hora: '08:00', dataOrdem: '202601010800' },
+                              { id: 9941, paciente: 'X', imagens: [], audios: [] });
+    diz('exame trazido do aparelho, sem laudo aqui, ainda ouve o banco',
+      semLaudo.liberado === true, 'liberado: ' + semLaudo.liberado);
+
+    // o retorno tem de ser VISIVEL: log() escreve atras da telaDia
+    const aviso = document.getElementById('capForcarLista');
+    diz('o retorno aparece na propria telaDia, nao so no diario',
+      !!aviso && aviso.style.display !== 'none' && aviso.textContent.indexOf('Teste Reabrir') >= 0,
+      aviso ? aviso.textContent.slice(0, 60) : 'sem aviso');
+    // "visivel" nao basta: a caixa vive DEPOIS da lista. Num dia de 25 exames ela nasce
+    // a milhares de pixels do topo — visivel no papel do codigo, fora da tela na pratica.
+    const rAviso = aviso.getBoundingClientRect();
+    diz('e esta DENTRO da janela, nao abaixo da dobra',
+      rAviso.top < innerHeight && rAviso.bottom > 0,
+      'top ' + Math.round(rAviso.top) + ' de ' + innerHeight);
+    diz('e o exame saiu das DUAS listas de controle da varredura',
+      capOrtFeitos.has('EST-REAB') && !capOrtSeen.has('EST-REAB'),
+      'feitos: ' + capOrtFeitos.has('EST-REAB') + ' / seen: ' + capOrtSeen.has('EST-REAB'));
+    // exame que NAO estava assinado tambem tem de dar retorno — botao sem efeito visivel
+    // ensina a nao confiar nos outros
+    aviso.innerHTML = ''; aviso.style.display = 'none';
+    diaReabrir(9940);
+    diz('reabrir um exame que ja estava aberto tambem diz o que aconteceu',
+      aviso.style.display !== 'none' && /já estava aberto/.test(aviso.textContent),
+      aviso.textContent.slice(0, 60));
+    diaFechar();
+    window.confirm = confAntes;
+    exames = [];
+    _diaListaHtml = '';
+    document.getElementById('capForcarLista').innerHTML = '';
+  } catch (e) {
+    diz('reabrir exame nao prende o medico numa tela antiga', false, e.constructor.name + ': ' + e.message);
+  }
+
   return R;
 })()`;
 

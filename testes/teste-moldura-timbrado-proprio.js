@@ -262,6 +262,10 @@ const GUARDAR = `(() => {
     const chamadaNaAbertura = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
     ok(/DOMContentLoaded[\s\S]{0,900}exAplicarLocaisExtra\(\)/.test(chamadaNaAbertura),
        'e ela e chamada na ABERTURA, nao so ao passar por "Realizar exames"');
+    ok(/if\(r\.baixados\.length\)[\s\S]{0,4000}exAplicarLocaisExtra\(\);\s*rev2AtualizarFundos\(\)/.test(chamadaNaAbertura),
+       'e a copia de locais que chega depois, pelo agente, atualiza a liberacao ja aberta');
+    ok(/id="rv2Fundo"/.test(chamadaNaAbertura) && /function rev2AtualizarFundos\(\)/.test(chamadaNaAbertura),
+       'a atualizacao troca so a lista de fundos, sem remontar o laudo em edicao');
 
     console.log('\n=== OS DOIS CAMINHOS DE SALVAR TEM DE GUARDAR A MESMA COISA ===');
     /* Ele mostrou a folha e disse a frase que resolveu o caso: "se eu salvo apertando

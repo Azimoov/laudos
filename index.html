@@ -4520,7 +4520,7 @@ async function salvarLaudoPasta(){
      endereço 127.0.0.1) ao arquivo salvo — o defeito voltando pela porta dos fundos. */
   var _estPag='@media print{@page{size:A4;margin:0;}.laudoFolha:not(.comFundo){padding:15mm 12mm!important;}}';
   try{ var _M=margensDaFolha(); _estPag=_estiloPaginaTexto(_M.topo,_M.base,_M.lado,_M.temFundo); }catch(e){}
-  const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+_estPag+'</style></head><body>'+folhaHtmlLimpo()+'</body></html>';
+  const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+_estPag+'</style></head><body>'+folhaHtmlLimpo()+_JS_MOLDURA_ARQUIVO+'</body></html>';
   const laudoBlob=new Blob([html],{type:'text/html'});
   const ex=(window.__revAtual&&window.__revAtual.exId!=null)?exames.find(function(e){return e.id===window.__revAtual.exId;}):null;
   const imgs=(ex&&ex.imagens)?ex.imagens:[];
@@ -7107,6 +7107,36 @@ function normalizarFolhaTela(raiz, chave){
   folha.style.paddingTop=((fnd&&fnd.padTopMm)||34)+'mm';
   folha.style.paddingBottom=((fnd&&fnd.padBottomMm)||24)+'mm';
 }
+/* ===== O RETÂNGULO POR FOLHA VIAJA COMO CONTA, NÃO COMO MEDIDA (04/09/2026) =====
+   Este pedacinho vai DENTRO do arquivo salvo. É a mesma conta de `_molduraPorFolha`,
+   escrita sem depender de nada do programa: acha a folha, mede a janela em que ela está
+   AGORA e desenha um retângulo fechado por página, colado nas bordas da caixa do texto.
+   Refaz ao abrir, ao mudar o tamanho da janela e ao entrar em modo de impressão — que é
+   quando a margem muda (12mm no papel, 8mm na tela) e tudo anda de lugar.
+   REGRA DE OURO: se não conseguir desenhar nada, NÃO apaga a borda própria da caixa. Num
+   leitor sem JavaScript o laudo abre com a caixa de sempre, inteira — nunca sem caixa. */
+var _JS_MOLDURA_ARQUIVO='<script>(function(){function d(){'
+ +'var f=document.querySelector(".laudoFolha");'
+ +'if(!f||!f.querySelector(".fundoLaudo")||!f.clientWidth) return;'
+ +'var c=f.querySelector(".laudoCorpoBox"); if(!c) return;'
+ +'Array.prototype.forEach.call(f.querySelectorAll(".laudoMoldura"),function(n){n.parentNode.removeChild(n);});'
+ +'var s=getComputedStyle(f),m=f.clientWidth/210,H=297*m;'
+ +'var T=parseFloat(s.paddingTop)||0,B=parseFloat(s.paddingBottom)||0;'
+ +'var fr=f.getBoundingClientRect(),br=c.getBoundingClientRect();'
+ +'var t0=br.top-fr.top,b0=br.bottom-fr.top;'
+ +'var w=parseFloat(getComputedStyle(c).borderTopWidth)||0;'
+ +'c.style.position="relative";'
+ +'var p0=Math.floor((t0+1)/H),pf=Math.floor((b0-2)/H),n=0;'
+ +'for(var p=p0;p<=pf;p++){var t=(p===p0)?t0:(p*H+T),b=(p===pf)?b0:((p+1)*H-B);'
+ +'if(b-t<10) continue;var e=document.createElement("div");e.className="laudoMoldura";'
+ +'e.style.cssText="position:absolute;left:"+(-w)+"px;right:"+(-w)+"px;top:"+(t-t0-w)'
+ +'+"px;height:"+(b-t)+"px;border:1.5px solid #000;box-sizing:border-box;pointer-events:none;z-index:1;";'
+ +'c.appendChild(e);n++;}'
+ +'c.style.borderColor=n?"transparent":"";}'
+ +'if(document.readyState!=="loading") d(); else document.addEventListener("DOMContentLoaded",d);'
+ +'window.addEventListener("resize",d);window.addEventListener("beforeprint",d);'
+ +'try{window.matchMedia("print").addEventListener("change",d);}catch(_){}'
+ +'})();<'+'/script>';
 /* O conteúdo da área de impressão SEM a mobília da tela — é isto que se guarda,
    salva e manda imprimir. */
 function folhaHtmlLimpo(){
@@ -7134,11 +7164,17 @@ function folhaHtmlLimpo(){
      Limpando aqui, os dois caminhos passam a guardar a mesma coisa por construção, e não
      por sorte de qual tela estava aberta.
 
-     O QUE SE PERDE, e é uma troca consciente: no arquivo guardado a moldura volta a ser
-     UMA caixa só, que atravessa a quebra de página, em vez de um retângulo fechado por
-     folha (o desenho de 26/08). O desenho por folha continua valendo onde ele é MEDIDO —
-     na tela e na impressão, onde `prepararPapel` repagina antes de imprimir. Um retângulo
-     fechado no lugar errado é pior que um retângulo aberto no lugar certo. */
+     04/09/2026, MAIS TARDE — E O RETÂNGULO POR FOLHA VOLTOU, sem voltar o defeito.
+     A saída não era guardar a medida: era REFAZÊ-LA na hora de mostrar. O que sai daqui
+     continua sendo a folha com a caixa própria (é o que se vê se nada mais acontecer), e
+     quem mostra a folha redesenha os retângulos na janela em que ela está:
+       · o laudo reaberto do histórico — `hisRevisar` chama `molduraRedesenhar`;
+       · o arquivo salvo na pasta — leva dentro dele uma versão enxuta da mesma conta
+         (ver `_JS_MOLDURA_ARQUIVO`), que roda ao abrir, ao redimensionar e ao imprimir.
+     Se o desenho por folha não puder ser feito (janela escondida, leitor sem JavaScript),
+     fica a caixa própria: um retângulo aberto no lugar certo, que é o pior caso aceitável.
+     O que NÃO se faz nunca é guardar o retângulo medido — número medido numa régua e
+     desenhado noutra foi exatamente o defeito que ele viu. */
   Array.prototype.forEach.call(c.querySelectorAll('.laudoMoldura'), function(n){ n.parentNode.removeChild(n); });
   Array.prototype.forEach.call(c.querySelectorAll('.laudoCorpoBox'), function(n){ n.style.borderColor=''; });
   var f=c.querySelector('.laudoFolha'); if(f) f.style.height='';
@@ -7224,13 +7260,24 @@ function _pagAplicarExtra(folha, px){
    folha (imprimem — tela = papel), não mobília de tela: quem lê a folha como texto os
    ignora (são vazios) e a repaginação os redesenha do zero. Estilo todo inline: o
    retângulo não pode depender de folha de estilo no HTML guardado/impresso. */
+/* ===== 04/09/2026 — A MOLDURA PASSOU A SER FILHA DA CAIXA =====
+   Ela era filha da FOLHA, com `left` e `width` em pixels medidos naquele instante. O lado
+   de fora e o lado de dentro eram medidos com réguas diferentes: bastava a folha ganhar
+   outra margem (a da impressão é 12mm; a da tela, 8mm) para a caixa andar e o retângulo
+   ficar parado. Era isto que ele via — a caixa deslocada, o texto escapando por fora.
+   Agora o retângulo nasce DENTRO da caixa, colado nas bordas dela (`left:-b; right:-b`):
+   a caixa anda, ele anda junto, sem conta nenhuma. Só a altura continua medida — é a
+   única coisa que depende de saber onde a página quebra.
+   E se não sair retângulo nenhum, a borda PRÓPRIA da caixa volta: laudo sem caixa em
+   volta do texto é pior que caixa que atravessa a quebra de página. */
 function _molduraPorFolha(folha, pageH, topPx, botPx){
   Array.prototype.forEach.call(folha.querySelectorAll('.laudoMoldura'), function(n){ n.parentNode.removeChild(n); });
-  var caixa=folha.querySelector('.laudoCorpoBox'); if(!caixa) return;
+  var caixa=folha.querySelector('.laudoCorpoBox'); if(!caixa) return 0;
   var fr=folha.getBoundingClientRect(), br=caixa.getBoundingClientRect();
-  var esq=br.left-fr.left, larg=br.width;
   var topo=br.top-fr.top, base=br.bottom-fr.top;
-  var pIni=Math.floor((topo+1)/pageH), pFim=Math.floor((base-2)/pageH);
+  var bw=parseFloat(getComputedStyle(caixa).borderTopWidth)||0;
+  caixa.style.position='relative';   // âncora dos retângulos (com timbrado o CSS já dá)
+  var pIni=Math.floor((topo+1)/pageH), pFim=Math.floor((base-2)/pageH), feitas=0;
   for(var p=pIni;p<=pFim;p++){
     var t=(p===pIni)?topo:(p*pageH+topPx);
     var b=(p===pFim)?base:((p+1)*pageH-botPx);
@@ -7238,9 +7285,28 @@ function _molduraPorFolha(folha, pageH, topPx, botPx){
     var d=document.createElement('div');
     d.className='laudoMoldura';
     d.setAttribute('contenteditable','false');
-    d.style.cssText='position:absolute;left:'+esq+'px;top:'+t+'px;width:'+larg+'px;height:'+(b-t)+'px;border:1.5px solid #000;box-sizing:border-box;pointer-events:none;z-index:1;';
-    folha.appendChild(d);
+    d.style.cssText='position:absolute;left:'+(-bw)+'px;right:'+(-bw)+'px;top:'+(t-topo-bw)+'px;'
+      +'height:'+(b-t)+'px;border:1.5px solid #000;box-sizing:border-box;pointer-events:none;z-index:1;';
+    caixa.appendChild(d);
+    feitas++;
   }
+  caixa.style.borderColor = feitas ? 'transparent' : '';
+  return feitas;
+}
+/* Redesenha os retângulos NA JANELA EM QUE A FOLHA ESTÁ AGORA. É a peça que faltava:
+   o desenho por folha nunca pôde ser guardado (é medida, e medida não viaja), mas pode
+   ser REFEITO na hora de mostrar. Serve ao laudo reaberto do histórico e ao arquivo
+   salvo, que leva uma versão enxuta desta mesma conta dentro dele. */
+function molduraRedesenhar(raiz){
+  var r=raiz||document.getElementById('areaImpressao');
+  if(!r) return 0;
+  var folha=(r.classList&&r.classList.contains('laudoFolha'))?r:r.querySelector('.laudoFolha');
+  if(!folha) return 0;
+  /* folha branca não tem moldura por folha — ali quem desenha é a borda da própria caixa */
+  if(!folha.querySelector('.fundoLaudo')) return 0;
+  if(!folha.clientWidth) return 0;                 // escondida: mede zero, não inventa
+  var cs=getComputedStyle(folha), pxmm=folha.clientWidth/210;
+  return _molduraPorFolha(folha, 297*pxmm, parseFloat(cs.paddingTop)||0, parseFloat(cs.paddingBottom)||0);
 }
 function _pagAplicarNivel(folha, n){
   var nv=PAG_NIVEIS[Math.min(n, PAG_NIVEIS.length-1)];
@@ -15642,9 +15708,7 @@ function rev2Render(){
   // ---- cabeçalho: qual laudo, quem, e o fundo ----
   var hora=ex._quando?new Date(ex._quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
   var tipo=(MODELOS[ex.tipo]&&MODELOS[ex.tipo].nome)||ex.tipo||'tipo não identificado';
-  var opFundo=Object.keys(FUNDOS||{}).map(function(k){
-    return '<option value="'+esc(k)+'"'+((window.__fundo||'branco')===k?' selected':'')+'>'+esc((FUNDOS[k]&&FUNDOS[k].nome)||k)+'</option>';
-  }).join('');
+  var opFundo=rev2OpcoesFundo();
   /* TIPO DE EXAME COM A REGIÃO (19/08/2026, pedido do médico): o nome do modelo sozinho
      ("Partes moles") não diz QUAL região foi examinada, e é justamente nesses exames que a
      área precisa estar à vista. O TÍTULO do laudo já carrega isso ("...PARTES MOLES
@@ -15660,7 +15724,7 @@ function rev2Render(){
     +'<span class="l2">Paciente: '+esc(c.nome||ex.paciente||'(sem nome)')+(c.idade?(', '+esc(c.idade)):'')
     +(ex._dicom?' — identificada pelo aparelho':'')+'</span></span>'
     +'<span><span class="fundo">Fundo do laudo</span>'
-    +'<select onchange="rev2Fundo(this.value)">'+opFundo+'</select></span>';
+    +'<select id="rv2Fundo" onchange="rev2Fundo(this.value)">'+opFundo+'</select></span>';
 
   // ---- os alertas, que são a legenda das cores ----
   var lista=alertasDoLaudo(L).concat(alertasFaltando(L)).concat(alertasConferente(L))
@@ -16763,6 +16827,20 @@ function rev2CopiarFmt(){
   if(cx) rev2Editou(cx);
   log('Formatação aplicada.');
 }
+/* A lista de fundos pode chegar do agente DEPOIS de a tela de liberação já ter aberto.
+   Atualizar somente este <select> preserva o laudo que o médico esteja corrigindo; chamar
+   rev2Render aqui apagaria a edição em andamento para resolver apenas uma lista nova. */
+function rev2OpcoesFundo(){
+  return Object.keys(FUNDOS||{}).map(function(k){
+    return '<option value="'+esc(k)+'"'+((window.__fundo||'branco')===k?' selected':'')+'>'+esc((FUNDOS[k]&&FUNDOS[k].nome)||k)+'</option>';
+  }).join('');
+}
+function rev2AtualizarFundos(){
+  var sel=document.getElementById('rv2Fundo'); if(!sel) return;
+  var escolhido=sel.value||window.__fundo||'branco';
+  sel.innerHTML=rev2OpcoesFundo();
+  if(FUNDOS[escolhido]) sel.value=escolhido;
+}
 function rev2Fundo(k){ window.__fundo=k; try{ exLocalSalvar&&exLocalSalvar(k); }catch(e){} }
 function rev2TrocarModelo(k){
   var ex=rev2Ex(); if(!ex) return;
@@ -17816,6 +17894,10 @@ async function hisRevisar(id){
     if(_bt) _bt.onclick=function(){ hisReabrir(r.id); };
     document.getElementById('telaVerLaudo').style.display='block';
     document.body.classList.add('verHist');
+    /* 04/09/2026 — O RETÂNGULO POR FOLHA É REFEITO AQUI, e só DEPOIS de a tela aparecer:
+       antes disso a folha mede zero e o desenho sairia em cima de nada. O guardado traz
+       só a caixa própria (medida não viaja); quem mostra é quem mede. */
+    try{ molduraRedesenhar(document.getElementById('areaImpressaoHist')); }catch(e){}
     window.scrollTo(0,0);
     hisAvisar('');
   }catch(e){ hisAvisar('Não consegui abrir: '+((e&&e.message)||e), true); }
@@ -18119,6 +18201,10 @@ window.addEventListener('DOMContentLoaded', async function(){
     try{ if(typeof iaCfgRender==='function' && document.getElementById('iaNvModelo')) iaCfgRender(); }catch(e){}
     log('Dados carregados do computador: '+r.baixados.join(', ')+'.');
   }
+  /* A abertura já aplicou a cópia local de `glocais`, mas ela pode ter acabado de ser
+     substituída pela cópia mais nova do agente. Sem reaplicar aqui, quem vai direto para
+     “Liberar laudos” só vê o timbrado novo depois de visitar “Realizar exames”. */
+  try{ exAplicarLocaisExtra(); rev2AtualizarFundos(); }catch(e){}
   if(r.enviados.length) log('Seus dados foram copiados para o computador (proteção contra perda): '+r.enviados.join(', ')+'.');
   if(el) el.innerHTML='<span class="aviso" style="color:#1f7a3d;font-weight:600">✔ Seus modelos, dizeres, aprendizados e histórico estão guardados no computador (com backup diário).</span>';
 });

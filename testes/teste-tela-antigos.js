@@ -33,15 +33,33 @@ ok(!/onclick="abEscolher\('acumulados'\)"/.test(HTML),
 ok(/#telaAntigos\{[^}]*display:none/.test(HTML), 'nasce escondida (so aparece quando chamada)');
 
 console.log('=== o desenho do medico, secao por secao ===');
-ok(/1 · DE ONDE VEM O MATERIAL\?/.test(HTML), 'secao 1: de onde vem o material');
-ok(/2 · MATERIAL DO EXAME/.test(HTML), 'secao 2: material do exame');
-ok(/Exames arquivados/.test(HTML) && /id="antGuardados"/.test(HTML),
-   'cartao "Exames arquivados" com o selo de quantos ha guardados');
-ok(/Laudo novo em branco/.test(HTML), 'cartao "Laudo novo em branco"');
+/* 04/09/2026 — A PERGUNTA "DE ONDE VEM O MATERIAL?" E OS DOIS CARTOES SAIRAM, a pedido
+   dele. Um deles nao fazia nada ("Laudo novo em branco" era o estado em que a tela ja
+   nasce); o outro, "Exames arquivados", chamava capRecuperar — que so olha os exames de
+   HOJE e os despeja na fila de "Liberar laudos", outra tela. Numa tela de fotos e audios
+   ANTIGOS isso nao e inutil, e enganoso. */
+/* SEM OS COMENTARIOS. O proprio comentario que registra a remocao CITA os nomes dos
+   botoes removidos — sem isto, a explicacao do conserto faria o teste do conserto falhar,
+   e a saida seria apagar a explicacao. */
+const VIVO = HTML.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+ok(!/DE ONDE VEM O MATERIAL/.test(VIVO), 'a pergunta "de onde vem o material?" saiu');
+ok(!/Exames arquivados/.test(VIVO) && !/id="antGuardados"/.test(VIVO),
+   'e o cartao "Exames arquivados", que so alcancava hoje, saiu junto');
+ok(!/Laudo novo em branco/.test(VIVO), 'e o "Laudo novo em branco", que nao fazia nada');
+ok(!/antFonte\(/.test(HTML), 'a funcao dos dois botoes saiu — nao ficou codigo sem porta');
+ok(!/function antContarArquivados\(/.test(HTML), 'nem o contador do selo que nao existe mais');
+ok(/>MATERIAL DO EXAME</.test(HTML), 'a secao do material continua, agora sem numero');
 ok(/arraste as imagens de ultrassom aqui/.test(HTML), 'area de arrastar as imagens');
 ok(/JPG · PNG · DICOM/.test(HTML), 'com os formatos aceitos escritos');
-ok(/Gravar ditado agora/.test(HTML), 'botao redondo de gravar o ditado');
-ok(/ou anexar um arquivo de áudio antigo/.test(HTML), 'e a opcao de anexar audio antigo');
+/* 04/09/2026, pedido dele: uma caixa de arrastar AUDIO, igual a das imagens. Antes o
+   audio so entrava por um link de texto, que nao se parecia com nada e nao aceitava
+   arrastar. Arrastar imagem e arrastar audio sao o mesmo gesto. */
+ok(/id="antSoltaAud"/.test(HTML), 'ha uma caixa PROPRIA de arrastar audios');
+ok(/arraste os áudios do ditado aqui/.test(HTML), 'com o mesmo convite da de imagens');
+ok(/MP3 · M4A · WAV · WEBM/.test(HTML), 'e os formatos de som escritos');
+const _iImg = HTML.indexOf('id="antSolta"'), _iAud = HTML.indexOf('id="antSoltaAud"');
+ok(_iImg >= 0 && _iAud > _iImg, 'a de audios vem depois da de imagens, na mesma coluna');
+ok(/LISTA DE EXAMES/.test(HTML), 'e a coluna da direita passou a se chamar "lista de exames"');
 ok(/MODELO DO EXAME/.test(HTML) && /PACIENTE/.test(HTML), 'os dois campos de baixo');
 ok(/Gerar laudo → enviar para Liberar laudos/.test(HTML), 'o botao principal, com o texto do desenho');
 ok(/mesmos alertas coloridos da revisão/.test(HTML), 'e a nota de rodape');
@@ -73,20 +91,52 @@ ok(/antTirarImg\(/.test(pintar) && /antTirarAud\(/.test(pintar),
 ok(/b\.disabled=!\(_antImgs\.length \|\| _antAuds\.length\)/.test(pintar),
    'o botao de gerar so liga quando ha material');
 
-console.log('=== gravar o ditado aqui mesmo ===');
-const grava = grab('antGravar');
-ok(/MediaRecorder/.test(grava), 'grava pelo navegador');
-ok(/toque de novo para parar/.test(grava), 'e diz como parar (nao e obvio)');
-ok(/gravando /.test(grava), 'mostrando o tempo enquanto grava');
-ok(/NotAllowedError/.test(grava) && /anexar um arquivo de áudio antigo/.test(grava),
-   'permissao negada explica E oferece a saida (anexar arquivo), em vez de so falhar');
-ok(/antAvisar\(/.test(grava) && !/^\s*log\(/m.test(grava),
-   'os avisos aparecem NA TELA — o diario fica atras dela');
+console.log('=== o microfone mora na LINHA do exame ===');
+/* 04/09/2026, pedido dele: "cada um deles tenha um microfonezinho para gravar o audio.
+   Dessa forma, o audio fica vinculado especificamente a aquele exame."
+   O QUE ISSO EVITA: ate aqui todo audio desta tela era AVULSO, e quem decidia de quem ele
+   era foi sempre o casamento por nome/tipo (vincularAudios) — um bom palpite, mas palpite,
+   e o preco de errar e o ditado de um paciente entrar no laudo de outro. */
+ok(!/function antGravar\(/.test(HTML),
+   'o microfone AVULSO saiu — gravador sem botao e codigo que parece vivo e nao e');
+ok(!/Gravar ditado agora/.test(VIVO), 'e o botao redondo dele tambem');
+const grava = grab('antGravarNoExame');
+ok(/MediaRecorder/.test(grava), 'o microfone da linha grava pelo navegador');
+ok(/dicomProntos\[i\]/.test(grava), 'e sabe de QUAL exame esta gravando');
+ok(/d\.audios=d\.audios\|\|\[\]/.test(grava),
+   'o arquivo entra na lista DAQUELE exame, nao numa lista geral');
+ok(/parar/.test(grava) && /gravando /.test(grava),
+   'diz como parar e mostra o tempo enquanto grava');
+ok(/NotAllowedError/.test(grava), 'permissao negada explica, em vez de so falhar');
+ok(/antAvisar\(/.test(grava), 'e os avisos aparecem NA TELA — o diario fica atras dela');
+/* Duas gravacoes ao mesmo tempo dariam duas fitas do mesmo minuto, e ele nao teria como
+   saber qual e de quem. */
+ok(/_antMrEx\.state==='recording'/.test(grava) && /_antMrEx\.stop\(\)/.test(grava),
+   'tocar noutro microfone enquanto um grava PARA o que grava, e nao abre um segundo');
+ok(/antMicExSub/.test(HTML), 'cada linha tem onde dizer se ja tem ditado');
+ok(/function antOuvirDoExame\(/.test(HTML) && /function antTirarAudDoExame\(/.test(HTML),
+   'e da para ouvir e tirar o ditado de um exame');
+
+console.log('=== e o vinculo sobrevive ate virar laudo ===');
+/* Nao adianta prender o audio ao exame na tela e solta-lo no meio do caminho. */
+ok(/_audiosProprios:\(d\.audios\|\|\[\]\)\.slice\(\)/.test(HTML),
+   'o exame criado a partir da lista leva os ditados dele junto');
+const vinc = grab('antVincularAudiosProprios');
+ok(/exameId:ex\.id/.test(vinc),
+   'e ao transcrever, o audio ja nasce com dono — sem passar pelo casamento por nome');
+ok(/ex\.audios\.push\(idx\)/.test(vinc), 'o exame passa a apontar para ele');
+ok(/transcreverAudio\(f\)/.test(vinc), 'usa a mesma transcricao do resto do programa');
+ok(/catch\(e\)/.test(vinc) && /continua guardado no exame/.test(vinc),
+   'falha de transcricao NAO perde o vinculo, e avisa');
+ok(gerar.indexOf('antVincularAudiosProprios') > gerar.indexOf('await processar()'),
+   'roda DEPOIS de processar (que e quem cria os exames) e antes de gerar');
 
 console.log('=== avisos e volta ===');
 ok(/function antAvisar/.test(HTML), 'a tela tem aviso proprio');
 ok(/function antFechar/.test(HTML) && /_antMr\.state==='recording'/.test(grab('antFechar')),
    'sair da tela para a gravacao em curso (senao o microfone ficaria aberto)');
+ok(/_antMrEx\.state==='recording'/.test(grab('antFechar')),
+   'e para TAMBEM a gravacao da linha do exame — sao dois gravadores agora');
 
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');

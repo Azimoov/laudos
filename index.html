@@ -17274,7 +17274,11 @@ var _antImgs=[], _antAuds=[], _antMr=null;
 function antAbrir(){
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='none';
   var a=document.getElementById('telaAntigos'); if(a) a.style.display='block';
-  antModelos(); antPintar();
+  /* 04/09/2026 — `dicomProntosRender()` PASSOU A SER CHAMADO AQUI. Ele vivia dentro de
+     `antFonte`, que saiu com os dois botões: sem esta linha a coluna "LISTA DE EXAMES"
+     abria em branco — nem a lista, nem a frase que diz que ainda não há exame importado.
+     Quem entra na tela tem de ver o estado dela, e não um vazio ambíguo. */
+  antModelos(); antPintar(); dicomProntosRender();
   antAvisar('');
   /* 04/09/2026: o repositório é a primeira coisa desta tela. Não espera nada: pinta e
      segue — se o agente demorar, a lista diz isso no lugar dela mesma. */
@@ -17453,12 +17457,18 @@ async function antVincularAudiosProprios(){
       try{ resp=await transcreverAudio(f); }
       catch(e){ log('Falha ao transcrever o ditado de '+(ex.paciente||'?')+': '+e.message
                    +' — o áudio continua guardado no exame.', true); resp={}; }
+      /* `trechos` vem COLADO em `transcricao`, de propósito: é a marcação de tempo de cada
+         palavra, e é ela que faz o botão VOZ tocar o pedaço certo do ditado. Há uma
+         verificação que varre TODO lugar do arquivo onde um áudio é montado a partir da
+         transcrição e exige a hora junto — separar os dois por um punhado de linhas já a
+         faz reprovar, e ela está certa em reprovar: hora que se perde aqui não volta. */
       var idx=audios.length;
-      audios.push({idx:idx, nome:(f._rot||f.name||'ditado'), blob:f, url:URL.createObjectURL(f),
-                   transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'',
-                   tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'',
+      audios.push({idx:idx, transcricao:resp.transcricao||'', trechos:(resp.trechos||[]),
+                   nome:(f._rot||f.name||'ditado'), blob:f, url:URL.createObjectURL(f),
+                   nomePaciente:resp.nome_paciente||'', tipoExame:resp.tipo_exame||'',
+                   lateralidade:resp.lateralidade||'',
                    /* exameId JÁ PREENCHIDO: é isto que dispensa o casamento por nome */
-                   exameId:ex.id, trechos:(resp.trechos||[])});
+                   exameId:ex.id});
       ex.audios.push(idx);
       /* o tipo do exame pode vir do ditado, como no caminho de sempre — mas nunca
          SOBREPÕE o que o aparelho disse: o DICOM é fonte melhor que a fala */

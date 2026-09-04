@@ -77,7 +77,22 @@ ok(/dicomProntosRender\(\);/.test(HTML.slice(HTML.indexOf('function dicomImporta
    'depois de importar, ele é redesenhado');
 const procAqui = HTML.slice(HTML.indexOf('async function processar()'), HTML.indexOf('// 2. transcrever áudios'));
 ok(/dicomProntosRender\(\)/.test(procAqui), 'depois de virar exame, ele é esvaziado junto com a lista');
-ok(/dicomProntosRender\(\);\s*\/\/ o painel nasce/.test(HTML), 'e desenhado ao entrar na tela');
+/* 04/09/2026 — ESTA VERIFICACAO ESTAVA PRESA A UM COMENTARIO. Ela exigia a frase
+   "// o painel nasce" logo depois da chamada, e essa frase morava dentro de `antFonte` —
+   que saiu com os dois botoes de "de onde vem o material?". O que importa nao e o
+   comentario: e que a lista de exames seja desenhada AO ENTRAR na tela, senao a coluna
+   abre em branco, sem nem a frase que diz que ainda nao ha exame importado. */
+const _antAbrir = (() => {
+  const i = HTML.indexOf('function antAbrir(');
+  if (i < 0) return '';
+  let d = 0, on = false;
+  for (let j = i; j < HTML.length; j++) {
+    if (HTML[j] === '{') { d++; on = true; }
+    else if (HTML[j] === '}') { d--; if (on && d === 0) return HTML.slice(i, j + 1); }
+  }
+  return '';
+})();
+ok(/dicomProntosRender\(\)/.test(_antAbrir), 'e desenhado ao ENTRAR na tela (dentro de antAbrir)');
 
 console.log('\n=== 21/08: os botões GRUDAM no alto da lista ===');
 // São 277 estudos. Rolando para achar o exame, a barra saía da tela e o médico tinha de

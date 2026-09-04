@@ -1680,19 +1680,17 @@ button.repoSelo:hover{filter:brightness(.95)}
       <p class="eb">EXAMES GUARDADOS</p>
       <div id="antRepo"></div>
 
-      <p class="eb dep">1 · DE ONDE VEM O MATERIAL?</p>
-      <div class="duas">
-        <button class="fonte" id="antFonteArq" onclick="antFonte('arquivados')">
-          <span class="n">Exames arquivados <span class="selo" id="antGuardados">—</span></span>
-          <span class="s">puxa as imagens e o áudio de um exame que você arquivou</span>
-        </button>
-        <button class="fonte on" id="antFonteNovo" onclick="antFonte('novo')">
-          <span class="n">Laudo novo em branco ✓</span>
-          <span class="s">monte do zero com o material abaixo</span>
-        </button>
-      </div>
-
-      <p class="eb dep">2 · MATERIAL DO EXAME</p>
+      <!-- 04/09/2026 — A PERGUNTA "1 · DE ONDE VEM O MATERIAL?" SAIU, com os dois botões.
+           Pedido dele, e eu concordo — com um motivo a mais que o "são inúteis":
+             · "Laudo novo em branco" não fazia NADA. Era o estado em que a tela já nasce;
+               tocar nele só limpava o aviso e redesenhava uma lista vazia.
+             · "Exames arquivados" fazia algo, mas não o que a tela promete: chamava
+               `capRecuperar`, que só olha os exames de HOJE (`e.data===hoje`) e os despeja
+               na fila de "Liberar laudos" — outra tela. Numa tela cujo título é "fotos e
+               áudios ANTIGOS", um botão que só alcança o dia de hoje e leva embora para
+               outro lugar não é inútil: é enganoso.
+           O material desta tela vem das caixas abaixo e do botão "Buscar no aparelho". -->
+      <p class="eb">MATERIAL DO EXAME</p>
       <div class="duas">
         <div class="cx">
           <div class="lb">IMAGENS</div>
@@ -1710,6 +1708,27 @@ button.repoSelo:hover{filter:brightness(.95)}
           </div>
           <div class="minis" id="antMinis"></div>
           <input type="file" id="antImgs" accept="application/pdf,image/*,.dcm" multiple style="display:none">
+
+          <!-- 04/09/2026, pedido dele: uma caixa de ARRASTAR ÁUDIO, igual à das imagens.
+               Antes o áudio só entrava por um link de texto ("ou anexar um arquivo…"), que
+               não se parecia com nada e não aceitava arrastar. Arrastar imagem e arrastar
+               áudio são o mesmo gesto; agora têm a mesma cara.
+               ⚠️ O áudio que entra AQUI é o áudio SOLTO: ele ainda passa pelo casamento
+               por nome/tipo com os exames (vincularAudios). Quem quer o áudio preso a UM
+               exame usa o microfone na linha daquele exame, ao lado. -->
+          <div class="lb" style="margin-top:18px">ÁUDIOS</div>
+          <div class="solta" id="antSoltaAud" onclick="document.getElementById('antAudio').click()">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9AA5B1"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"></path>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><path d="M12 18v4"></path></svg>
+            <div class="t">arraste os áudios do ditado aqui</div>
+            <div class="t2">ou toque para escolher — MP3 · M4A · WAV · WEBM<br>
+              <b>para prender o áudio a um exame, use o 🎙 na linha dele</b></div>
+          </div>
+          <div id="antArqs"></div>
+          <input type="file" id="antAudio" accept="audio/*,.m4a" multiple style="display:none">
+
           <!-- 21/08/2026 — BUSCAR NO APARELHO, de volta e no lugar certo.
                As funções dicom* existem desde 89f935e, mas o botão que as chamava saiu em
                07/08 (a57725c), quando o médico pediu para enxugar a aba "Arquivos
@@ -1726,28 +1745,15 @@ button.repoSelo:hover{filter:brightness(.95)}
           <div id="dicomLista" style="margin-top:6px;max-height:340px;overflow:auto"></div>
         </div>
 
+        <!-- 04/09/2026, pedido dele: esta coluna era "ÁUDIO" (um microfone solto e um link
+             de anexar) e passa a ser a LISTA DE EXAMES. O microfone saiu daqui e foi para
+             DENTRO de cada linha de exame — é isso que prende o ditado àquele exame, em vez
+             de gravar um áudio avulso e deixar o programa adivinhar de quem é.
+             O que se ganha: o casamento por nome/tipo (vincularAudios) deixa de ser o único
+             caminho. Ele continua existindo para o áudio arrastado na caixa ao lado; aqui a
+             ligação é dita por ele, e ditada não se erra. -->
         <div class="cx">
-          <div class="lb">ÁUDIO</div>
-          <div class="gravar">
-            <button class="bolha" id="antMic" onclick="antGravar()" title="Gravar ditado agora">🎙</button>
-            <span style="flex:1">
-              <span class="n">Gravar ditado agora</span>
-              <span class="s" id="antMicSub">fale o tipo do exame e os achados</span>
-            </span>
-          </div>
-          <hr class="risco">
-          <button class="anexar" onclick="document.getElementById('antAudio').click()">ou anexar um arquivo de áudio antigo…</button>
-          <div id="antArqs"></div>
-          <input type="file" id="antAudio" accept="audio/*,.m4a" multiple style="display:none">
-          <!-- 21/08/2026 — O QUE FOI IMPORTADO, À VISTA.
-               O médico importou um exame do aparelho e não viu nada acontecer: nem o exame,
-               nem as imagens, nem confirmação. Importar às cegas e ter de acreditar que deu
-               certo é o oposto do que este programa faz em todo o resto.
-               O painel vive AQUI, no espaço vazio ao lado do microfone, porque é a ordem em
-               que ele trabalha: importa (à esquerda), confere as fotos (aqui) e grava o
-               ditado daquele exame (logo acima). -->
-          <hr class="risco">
-          <div class="lb">EXAME IMPORTADO DO APARELHO</div>
+          <div class="lb">LISTA DE EXAMES</div>
           <div id="dicomProntosLista"></div>
           <!-- a foto ampliada mora AQUI fora, pointer-events:none — ver dicomLupaLigar. -->
           <img id="dicomLupa" alt="">
@@ -3862,17 +3868,37 @@ function dicomProntosRender(){
     return;
   }
   div.innerHTML=dicomProntos.map(function(d,i){
+    /* 04/09/2026 — O MICROFONE MORA NA LINHA DO EXAME. Cada gravação feita aqui entra em
+       `d.audios`, que viaja com o exame até virar laudo: o ditado fica preso àquele exame
+       e não passa pelo casamento por nome. Ver antGravarNoExame. */
+    var _n=(d.audios||[]).length;
+    var _grav=(_antMicExame===i);
     return '<div style="border:1px solid #c8d0da;border-radius:9px;padding:8px 10px;margin-top:6px;background:#fff">'
       +'<div style="font-size:13px;color:#22303f"><b>'+String(d.paciente||'(sem nome)').replace(/</g,'&lt;')+'</b>'
       +(d.regiao?' <span class="tag" style="background:#e6efee;color:#1f5f5b;border-radius:10px;padding:1px 8px;font-size:11.5px;font-weight:600">'+String(d.regiao).replace(/</g,'&lt;')+'</span>':'')
       +'<span class="aviso"> · '+(d.idade?d.idade+' anos · ':'')+(d.data||'')+(d.hora?' '+d.hora:'')
       +' · '+(d.imagens||[]).length+' foto(s)</span></div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center">'
+      +'<button class="btn peq'+(_grav?'':' sec')+' antMicEx'+(_grav?' gravando':'')+'" type="button" '
+        +'onclick="antGravarNoExame('+i+')" '
+        +'title="'+(_grav?'toque para parar':'grava o ditado DESTE exame — o áudio fica preso a ele')+'">'
+        +(_grav?'⏹ parar':'🎙 gravar o ditado')+'</button>'
       +'<button class="btn peq sec" type="button" onclick="dicomVerFotos('+i+')">📷 Ver as fotos</button>'
       +'<button class="btn peq sec" type="button" onclick="dicomTirar('+i+')">✕ tirar este</button>'
-      +'</div><div id="dicomFotos'+i+'" style="display:none;margin-top:6px"></div></div>';
+      +'<span class="aviso" id="antMicExSub'+i+'">'
+        +(_n?('✔ '+_n+' ditado(s) preso(s) a este exame'):'sem ditado ainda')+'</span>'
+      +'</div>'
+      +((d.audios||[]).length?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+        +d.audios.map(function(f,j){
+          return '<span class="arq" style="display:inline-flex;align-items:center;gap:6px">'
+            +'<button class="pl" type="button" onclick="antOuvirDoExame('+i+','+j+')" title="ouvir">▶</button>'
+            +'<span style="font-size:12px">'+esc(f._rot||('ditado '+(j+1)))
+            +(f._seg?(' · '+antSeg(f._seg)):'')+'</span>'
+            +'<button class="x" type="button" onclick="antTirarAudDoExame('+i+','+j+')" title="tirar">✕</button>'
+            +'</span>'; }).join('')+'</div>'):'')
+      +'<div id="dicomFotos'+i+'" style="display:none;margin-top:6px"></div></div>';
   }).join('')
-   +'<p class="aviso" style="margin-top:6px">Confira as fotos, grave o ditado acima e toque em <b>Gerar laudo</b>.</p>';
+   +'<p class="aviso" style="margin-top:6px">Confira as fotos, toque em <b>🎙 gravar o ditado</b> na linha do exame e depois em <b>Gerar laudo</b>.</p>';
 }
 /* Segundo toque fecha — mesma regra do verFotosPendente, para não empilhar galeria aberta. */
 function dicomVerFotos(i){
@@ -4058,7 +4084,12 @@ async function processar(){
        janela: um F5 as apagava e não havia de onde rebuscá-las. Foi assim que o laudo de
        mama da Maria de Fátima saiu com ZERO fotos em 03/09/2026. Com o vínculo,
        restaurarSessao rebusca as imagens sozinha, como já fazia com o áudio. */
-    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:d.tipo||'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true, _estudoId:d.id||'', _instIds:(d.instancias||[]).slice()}); }
+    /* 04/09/2026 — `_audiosProprios` VIAJA JUNTO. É o ditado gravado pelo microfone da
+       LINHA daquele exame, na tela de fotos e áudios antigos. Ele não pode entrar na lista
+       geral de áudios: lá ele voltaria a disputar dono no casamento por nome, que é
+       exatamente o palpite que o microfone da linha existe para dispensar. Fica preso ao
+       exame e é transcrito depois, em antVincularAudiosProprios. */
+    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:d.tipo||'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true, _estudoId:d.id||'', _instIds:(d.instancias||[]).slice(), _audiosProprios:(d.audios||[]).slice()}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s)'+(dicomProntos.length?' + '+dicomProntos.length+' exame(s) do aparelho':'')+' em '+exames.length+' exame(s).');
     /* 21/08/2026 — a lista de importados é ESVAZIADA aqui, depois de virar exame. Ela
@@ -8525,7 +8556,6 @@ async function capAntigoLevar(id, estudo){
       codigo:codDoEstudo(e), nascimento:e.nascimento||'', sexo:e.sexo||'',
       regiao:dicomRegiao(e.descricao), tipo:dicomTipo(e.descricao), hora:e.hora||''});
     antAbrir();                       // a tela de exames antigos
-    antFonte('novo');
     dicomProntosRender();
     log('Exame de '+(e.paciente||'?')+' ('+(e.data||'')+') pronto em exames antigos, com '
        +imagens.length+' foto(s). Grave o ditado e toque em "Gerar laudo".');
@@ -17244,7 +17274,7 @@ var _antImgs=[], _antAuds=[], _antMr=null;
 function antAbrir(){
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='none';
   var a=document.getElementById('telaAntigos'); if(a) a.style.display='block';
-  antModelos(); antContarArquivados(); antPintar();
+  antModelos(); antPintar();
   antAvisar('');
   /* 04/09/2026: o repositório é a primeira coisa desta tela. Não espera nada: pinta e
      segue — se o agente demorar, a lista diz isso no lugar dela mesma. */
@@ -17252,7 +17282,12 @@ function antAbrir(){
   window.scrollTo(0,0);
 }
 function antFechar(){
+  /* Sair da tela PARA o microfone. Vale para os dois gravadores — o antigo (avulso) e o
+     da linha do exame: uma gravação seguindo com a tela fechada deixa o microfone aberto
+     sem nada na tela dizendo isso, que é o oposto do desenho deste programa. */
   if(_antMr && _antMr.state==='recording'){ try{ _antMr.stop(); }catch(e){} }
+  if(_antMrEx && _antMrEx.state==='recording'){ try{ _antMrEx.stop(); }catch(e){} }
+  clearInterval(window.__antRelEx);
   var a=document.getElementById('telaAntigos'); if(a) a.style.display='none';
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';
   try{ abContarPendentes(); }catch(e){}
@@ -17273,33 +17308,14 @@ function antModelos(){
   s.innerHTML='<option value="">Detectar pelo ditado</option>'
     +ks.map(function(k){ return '<option value="'+esc(k)+'">'+esc(MODELOS[k].nome||k)+'</option>'; }).join('');
 }
-/* quantos exames o agente guardou (é o mesmo número que o "Recuperar" usa) */
-async function antContarArquivados(){
-  var e=document.getElementById('antGuardados'); if(e) e.textContent='—';
-  try{
-    var r=await fetch(agenteBase()+'/exame/ditados');
-    var j=await r.json();
-    var n=Object.keys((j&&j.ditados)||{}).length;
-    if(e) e.textContent=n+' guardado'+(n===1?'':'s');
-  }catch(err){ if(e) e.textContent='agente fora do ar'; }
-}
-function antFonte(qual){
-  var arq=document.getElementById('antFonteArq'), novo=document.getElementById('antFonteNovo');
-  if(qual==='arquivados'){
-    // não muda de tela por conta própria: puxa o material guardado para cá
-    antAvisar('Buscando os exames guardados no computador…');
-    if(arq) arq.classList.add('on'); if(novo) novo.classList.remove('on');
-    capRecuperar().then(function(){
-      var n=exames.filter(function(x){ return x.laudo; }).length;
-      antAvisar(n? ('Recuperados '+n+' laudo(s) — toque em “Liberar laudos” na tela inicial para revisar.')
-                 : 'Nada novo a recuperar. Os exames que já estavam carregados continuam na fila.');
-    }).catch(function(e){ antAvisar('Não consegui recuperar: '+(e&&e.message||e), true); });
-    return;
-  }
-  if(novo) novo.classList.add('on'); if(arq) arq.classList.remove('on');
-  antAvisar('');
-  dicomProntosRender();   // o painel nasce dizendo que nada foi importado ainda
-}
+/* 04/09/2026 — `antFonte` e `antContarArquivados` SAÍRAM, com os dois botões da pergunta
+   "de onde vem o material?". Ele os chamou de inúteis; um deles era pior que isso:
+     · "Laudo novo em branco" não fazia nada — era o estado em que a tela já nasce;
+     · "Exames arquivados" chamava `capRecuperar`, que só olha os exames de HOJE e os
+       despeja na fila de "Liberar laudos", outra tela. Numa tela de fotos e áudios
+       ANTIGOS, isso não é inútil, é enganoso.
+   `capRecuperar` continua existindo e sendo usada pelo caminho da captura ao vivo — o que
+   saiu foi a porta errada para ela, não a função. */
 /* ---- imagens: escolher, arrastar, mostrar ---- */
 function antAddImgs(lista){
   Array.prototype.forEach.call(lista||[], function(f){
@@ -17341,47 +17357,116 @@ function antOuvir(i){
   var f=_antAuds[i]; if(!f) return;
   var au=new Audio(URL.createObjectURL(f)); au.play().catch(function(){});
 }
-/* ---- gravar o ditado agora (mesmo caminho do 1.0: grava e vira arquivo) ---- */
-function antGravar(){
-  var b=document.getElementById('antMic'), s=document.getElementById('antMicSub');
-  if(_antMr && _antMr.state==='recording'){ try{ _antMr.stop(); }catch(e){} return; }
+/* ===== O DITADO DE UM EXAME EM PARTICULAR — 04/09/2026, pedido dele =====
+   "Cada um deles tenha um microfonezinho para gravar o áudio. Dessa forma, o áudio fica
+   vinculado especificamente a aquele exame."
+
+   POR QUE ISTO IMPORTA MAIS DO QUE PARECE: até aqui todo áudio desta tela era AVULSO, e
+   quem decidia de quem ele era foi sempre o casamento por nome/tipo (`vincularAudios`),
+   que pontua e, na dúvida, manda para revisão manual. É um bom palpite — mas continua
+   sendo palpite, e o preço de errar é o ditado de um paciente entrar no laudo de outro.
+   Gravando pela linha do exame não há palpite: ele disse de quem é.
+
+   O arquivo fica em `d.audios` e viaja com o exame (ver `_audiosProprios` em processar e
+   `antVincularAudiosProprios`). Nada aqui mexe no caminho do áudio avulso, que continua
+   existindo para o que ele arrasta na caixa ao lado. */
+var _antMicExame=null, _antMrEx=null;
+function antGravarNoExame(i){
+  var d=dicomProntos[i]; if(!d) return;
+  if(_antMrEx && _antMrEx.state==='recording'){
+    /* Tocar no microfone de OUTRO exame enquanto este grava: para o que está gravando e
+       não começa outro. Duas gravações ao mesmo tempo dariam duas fitas do mesmo minuto,
+       e o médico não teria como saber qual é de quem. */
+    try{ _antMrEx.stop(); }catch(e){}
+    return;
+  }
   if(!navigator.mediaDevices||!window.MediaRecorder){
-    antAvisar('Este navegador não grava áudio. Use “anexar um arquivo de áudio antigo”.', true); return; }
+    antAvisar('Este navegador não grava áudio. Arraste um arquivo na caixa de áudios.', true); return; }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
     var mr=new MediaRecorder(st), pedacos=[], t0=Date.now();
     mr.ondataavailable=function(e){ if(e.data&&e.data.size) pedacos.push(e.data); };
     mr.onstop=function(){
       st.getTracks().forEach(function(t){ t.stop(); });
-      if(b) b.classList.remove('gravando');
-      clearInterval(window.__antRel);
+      clearInterval(window.__antRelEx);
+      _antMicExame=null; _antMrEx=null;
       var seg=Math.round((Date.now()-t0)/1000);
       var blob=new Blob(pedacos,{type:(mr.mimeType||'audio/webm')});
-      if(!blob.size){ if(s) s.textContent='fale o tipo do exame e os achados';
+      if(!blob.size){ dicomProntosRender();
         antAvisar('Não gravou nada — o microfone pode estar mudo.', true); return; }
-      var f=new File([blob], 'ditado-gravado-'+new Date().toISOString().slice(11,19).replace(/:/g,'')+'.webm',
-                     {type:blob.type});
-      f._seg=seg; _antAuds.push(f); antPintar();
-      if(s) s.textContent='gravado ('+antSeg(seg)+') — pode gravar outro se quiser';
+      var f=new File([blob], 'ditado-'+String(d.paciente||'exame').replace(/[^\w]+/g,'-').toLowerCase()
+                     +'-'+new Date().toISOString().slice(11,19).replace(/:/g,'')+'.webm', {type:blob.type});
+      f._seg=seg; f._rot='ditado de '+(d.paciente||'este exame');
+      (d.audios=d.audios||[]).push(f);
+      dicomProntosRender();
+      antPintar();          // o botão "Gerar laudo" pode ter deixado de estar desabilitado
       antAvisar('');
     };
-    if(b) b.classList.add('gravando');
-    mr.start(); _antMr=mr;
-    clearInterval(window.__antRel);
-    window.__antRel=setInterval(function(){
-      if(s) s.textContent='🔴 gravando '+antSeg(Math.round((Date.now()-t0)/1000))+' — toque de novo para parar';
+    _antMicExame=i; _antMrEx=mr;
+    mr.start();
+    dicomProntosRender();
+    clearInterval(window.__antRelEx);
+    window.__antRelEx=setInterval(function(){
+      var s=document.getElementById('antMicExSub'+i);
+      if(s) s.textContent='🔴 gravando '+antSeg(Math.round((Date.now()-t0)/1000))+' — toque em parar';
     }, 500);
-    if(s) s.textContent='🔴 gravando — toque de novo para parar';
   }).catch(function(e){
-    antAvisar('Não consegui abrir o microfone'+((e&&e.name==='NotAllowedError')
-      ?': o Windows ou o programa negou a permissão. Use “anexar um arquivo de áudio antigo”.':'.'), true);
+    _antMicExame=null; _antMrEx=null; dicomProntosRender();
+    antAvisar('Não consegui abrir o microfone'
+      +((e&&e.name==='NotAllowedError')?' — a permissão foi negada.':' ('+((e&&e.message)||e)+').'), true);
   });
 }
+function antOuvirDoExame(i, j){
+  var d=dicomProntos[i]; if(!d) return;
+  var f=(d.audios||[])[j]; if(!f) return;
+  var au=new Audio(URL.createObjectURL(f)); au.play().catch(function(){});
+}
+function antTirarAudDoExame(i, j){
+  var d=dicomProntos[i]; if(!d||!d.audios) return;
+  d.audios.splice(j,1);
+  dicomProntosRender(); antPintar();
+}
+/* 04/09/2026 —  SAIU. Era o microfone AVULSO desta tela, e o botao que
+   o chamava deu lugar ao microfone da LINHA de cada exame (antGravarNoExame). Um
+   gravador sem botao e codigo que parece vivo e nao e: quem lesse acharia que ha dois
+   caminhos de gravar, e so ha um. O audio SOLTO continua entrando — arrastado na caixa
+   de audios, que e o caminho para o arquivo que ja existe. */
 /* ---- gerar: deposita nas entradas de sempre e chama a esteira testada ---- */
 function antParaInput(id, arquivos){
   var inp=document.getElementById(id); if(!inp) return;
   var dt=new DataTransfer();
   arquivos.forEach(function(f){ dt.items.add(f); });
   inp.files=dt.files;
+}
+/* Transcreve o ditado gravado na LINHA do exame e o prende AQUELE exame — sem passar pelo
+   casamento por nome. É o que torna verdadeira a promessa do microfone da linha.
+   Falha de transcrição não derruba o resto: o áudio continua preso ao exame (dá para ouvir
+   e reprocessar), e o médico é avisado — perder o vínculo em silêncio seria pior. */
+async function antVincularAudiosProprios(){
+  var alvo=exames.filter(function(e){ return (e._audiosProprios||[]).length; });
+  if(!alvo.length) return;
+  for(var k=0;k<alvo.length;k++){
+    var ex=alvo[k];
+    for(var q=0;q<ex._audiosProprios.length;q++){
+      var f=ex._audiosProprios[q];
+      log('Transcrevendo o ditado de '+(ex.paciente||'?')+'…');
+      var resp={};
+      try{ resp=await transcreverAudio(f); }
+      catch(e){ log('Falha ao transcrever o ditado de '+(ex.paciente||'?')+': '+e.message
+                   +' — o áudio continua guardado no exame.', true); resp={}; }
+      var idx=audios.length;
+      audios.push({idx:idx, nome:(f._rot||f.name||'ditado'), blob:f, url:URL.createObjectURL(f),
+                   transcricao:resp.transcricao||'', nomePaciente:resp.nome_paciente||'',
+                   tipoExame:resp.tipo_exame||'', lateralidade:resp.lateralidade||'',
+                   /* exameId JÁ PREENCHIDO: é isto que dispensa o casamento por nome */
+                   exameId:ex.id, trechos:(resp.trechos||[])});
+      ex.audios.push(idx);
+      /* o tipo do exame pode vir do ditado, como no caminho de sempre — mas nunca
+         SOBREPÕE o que o aparelho disse: o DICOM é fonte melhor que a fala */
+      if(!ex.tipo && resp.tipo_exame){ try{ ex.tipo=mapTipo(resp.tipo_exame)||ex.tipo; }catch(_){} }
+    }
+    delete ex._audiosProprios;
+  }
+  log('Ditado preso ao exame: '+alvo.length+' exame(s) com áudio gravado na própria linha.');
 }
 async function antGerar(){
   /* `dicomProntos` conta como material: quem puxou o exame do aparelho JÁ escolheu as
@@ -17401,6 +17486,10 @@ async function antGerar(){
     var pac=((document.getElementById('antPaciente')||{}).value||'').trim();
     window.__antForcar={tipo:mod, paciente:pac};   // aplicado depois, em antAplicarEscolhas
     await processar();
+    /* O ditado gravado NA LINHA do exame entra AQUI, depois de processar (que é quem cria
+       os exames) e ANTES de gerar. Se entrasse antes, viraria áudio avulso e voltaria a
+       disputar dono no casamento por nome. */
+    await antVincularAudiosProprios();
     /* As escolhas do médico (tipo do exame, nome) MANDAM, e têm de valer ANTES de gerar —
        gerarLaudo lê ex.tipo para escolher o modelo. Aplicar depois seria escolher o modelo
        errado e corrigir o rótulo em cima do laudo já escrito. */
@@ -17469,18 +17558,25 @@ function antAplicarEscolhas(){
   });
   window.__antForcar=null;
 }
-function antLigarArrastar(){
-  var z=document.getElementById('antSolta'); if(!z || z._ligado) return;
+/* 04/09/2026 — SÃO DUAS CAIXAS DE ARRASTAR AGORA (imagens e áudios), e o realce de
+   "arrastando por cima" é por caixa. Antes havia uma só, e este código a tratava pelo id
+   direto; com duas, a mesma ligação vira função e nenhuma delas fica sem o realce. */
+function _antLigarSolta(idCaixa, receber){
+  var z=document.getElementById(idCaixa); if(!z || z._ligado) return;
   ['dragenter','dragover'].forEach(function(ev){
     z.addEventListener(ev, function(e){ e.preventDefault(); z.classList.add('sobre'); }); });
   ['dragleave','drop'].forEach(function(ev){
     z.addEventListener(ev, function(e){ e.preventDefault(); z.classList.remove('sobre'); }); });
-  z.addEventListener('drop', function(e){ antAddImgs(e.dataTransfer&&e.dataTransfer.files); });
-  var i=document.getElementById('antImgs');
-  if(i) i.addEventListener('change', function(){ antAddImgs(i.files); i.value=''; });
-  var a=document.getElementById('antAudio');
-  if(a) a.addEventListener('change', function(){ antAddAuds(a.files); a.value=''; });
+  z.addEventListener('drop', function(e){ receber(e.dataTransfer&&e.dataTransfer.files); });
   z._ligado=true;
+}
+function antLigarArrastar(){
+  _antLigarSolta('antSolta', antAddImgs);
+  _antLigarSolta('antSoltaAud', antAddAuds);
+  var i=document.getElementById('antImgs');
+  if(i && !i._ligado){ i.addEventListener('change', function(){ antAddImgs(i.files); i.value=''; }); i._ligado=true; }
+  var a=document.getElementById('antAudio');
+  if(a && !a._ligado){ a.addEventListener('change', function(){ antAddAuds(a.files); a.value=''; }); a._ligado=true; }
 }
 window.addEventListener('DOMContentLoaded', antLigarArrastar);
 

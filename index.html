@@ -7065,6 +7065,29 @@ function folhaHtmlLimpo(){
      não faz sentido fora da tela: as máscaras repetidas (o timbrado original fica) e a
      altura travada da folha. */
   Array.prototype.forEach.call(c.querySelectorAll('.fundoFolhaTela'), function(n){ n.parentNode.removeChild(n); });
+  /* ⚠️ 04/09/2026 — AS MOLDURAS POR FOLHA NÃO VIAJAM, E A BORDA DA CAIXA VOLTA.
+     Ele mandou a folha: salvando por "Aprovar, assinar e imprimir" o laudo sai certo;
+     salvando por "Ver o laudo final → Salvar e liberar" a caixa em volta do texto sai mais
+     estreita e deslocada, com o texto escapando por fora dela.
+
+     POR QUE: `_molduraPorFolha` desenha um retângulo por página em PIXELS FIXOS, medidos
+     na janela em que a folha estava naquele instante, e apaga a borda própria da caixa
+     (`borderColor:transparent`) para não haver duas. Isso é um bom desenho ENQUANTO a
+     folha está naquela janela. Guardado, vira um número medido numa régua e desenhado
+     noutra — o arquivo é reaberto com outra largura, e o retângulo não acompanha.
+     Medido: os dois caminhos guardavam coisas diferentes, e só um deles estava certo.
+
+     AQUI É O PONTO ÚNICO: esta função alimenta o ARQUIVO salvo na pasta e o HISTÓRICO.
+     Limpando aqui, os dois caminhos passam a guardar a mesma coisa por construção, e não
+     por sorte de qual tela estava aberta.
+
+     O QUE SE PERDE, e é uma troca consciente: no arquivo guardado a moldura volta a ser
+     UMA caixa só, que atravessa a quebra de página, em vez de um retângulo fechado por
+     folha (o desenho de 26/08). O desenho por folha continua valendo onde ele é MEDIDO —
+     na tela e na impressão, onde `prepararPapel` repagina antes de imprimir. Um retângulo
+     fechado no lugar errado é pior que um retângulo aberto no lugar certo. */
+  Array.prototype.forEach.call(c.querySelectorAll('.laudoMoldura'), function(n){ n.parentNode.removeChild(n); });
+  Array.prototype.forEach.call(c.querySelectorAll('.laudoCorpoBox'), function(n){ n.style.borderColor=''; });
   var f=c.querySelector('.laudoFolha'); if(f) f.style.height='';
   return c.innerHTML;
 }
@@ -7200,6 +7223,12 @@ function paginarLaudoTela(raiz){
   }
   if(!folha.clientWidth){
     /* a tela ainda está escondida — mede zero. Uma nova tentativa quando aparecer. */
+    /* ⚠️ 04/09/2026 — E A BORDA DA CAIXA VOLTA ANTES DE DESISTIR. As molduras por folha já
+       foram removidas lá em cima (elas seriam desenhadas na régua errada); se a borda da
+       caixa continuar transparente, o laudo fica SEM NENHUMA caixa em volta do texto —
+       nem a de verdade, nem a desenhada. Desistir de medir não pode custar o retângulo:
+       a caixa própria é o desenho que não depende de medida nenhuma. */
+    var _cxZ=folha.querySelector('.laudoCorpoBox'); if(_cxZ) _cxZ.style.borderColor='';
     if(!_pagRetry){ _pagRetry=true; setTimeout(function(){ _pagRetry=false; try{ paginarLaudoTela(raiz); }catch(e){} }, 150); }
     return;
   }
@@ -16887,6 +16916,25 @@ async function rev2FinalSalvarLiberar(){
      tem de encontrar o #areaImpressao no lugar de sempre. E `jaPreparado=true` porque o
      laudo já está montado NA TELA, com as edições dele — remontar apagaria o que digitou. */
   rev2FinalFechar();
+  /* ⚠️ 04/09/2026 — E A PAGINAÇÃO SE REFAZ NO LUGAR DE DESTINO. Ele mostrou a folha:
+     salvando por "Aprovar, assinar e imprimir" o laudo sai certo; salvando por
+     "Ver o laudo final → Salvar e liberar" a caixa em volta do texto sai mais estreita e
+     deslocada, com o texto escapando por fora dela.
+
+     A DIFERENÇA MEDIDA ENTRE OS DOIS CAMINHOS, em 04/09:
+       · "Aprovar e assinar" chama rev2Preparar antes de salvar. O #areaImpressao está
+         dentro da telaRevisao, escondida, e a paginação desiste de medir: o laudo é
+         guardado com ZERO molduras e com a BORDA PRÓPRIA da caixa — que é o desenho certo.
+       · "Ver o laudo final" pagina com a folha VISÍVEL, e por isso desenha 2 molduras em
+         pixels fixos (left 31,2 / width 731,2) e apaga a borda própria da caixa
+         (borderColor:transparent). `jaPreparado=true` faz o salvamento pegar exatamente
+         esse estado — e aqueles pixels foram medidos na janela "Ver o laudo final", não
+         na folha que vai ao papel.
+     Repaginar aqui devolve o laudo ao MESMO estado do outro caminho: as molduras saem e a
+     borda da caixa volta. É o oposto de remontar — `rev2Preparar` redesenharia o laudo a
+     partir do objeto e apagaria o que ele digitou; isto só refaz o desenho da moldura,
+     que é o que não pode viajar. */
+  try{ paginarLaudoTela(); }catch(e){}
   await rev2Aprovar(false, true);
 }
 /* `jaPreparado` (24/08/2026): pular a remontagem do laudo. rev2Preparar() redesenha o

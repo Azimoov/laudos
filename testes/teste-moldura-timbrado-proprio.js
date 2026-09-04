@@ -263,6 +263,99 @@ const GUARDAR = `(() => {
     ok(/DOMContentLoaded[\s\S]{0,900}exAplicarLocaisExtra\(\)/.test(chamadaNaAbertura),
        'e ela e chamada na ABERTURA, nao so ao passar por "Realizar exames"');
 
+    console.log('\n=== OS DOIS CAMINHOS DE SALVAR TEM DE GUARDAR A MESMA COISA ===');
+    /* Ele mostrou a folha e disse a frase que resolveu o caso: "se eu salvo apertando
+       'aprovar e assinar próximo laudo' na tela anterior, ele salva certo, mas se eu faço
+       esse caminho [Ver o laudo final → Salvar e liberar], ele salva dessa forma".
+
+       O QUE OS DOIS FAZIAM DE DIFERENTE, medido em 04/09:
+         · "Aprovar e assinar" chama rev2Preparar antes de salvar. O #areaImpressao está
+           dentro da telaRevisao, escondida, e a paginação desiste de medir: o laudo é
+           guardado com ZERO molduras e com a BORDA PRÓPRIA da caixa;
+         · "Ver o laudo final" pagina com a folha VISÍVEL: desenha molduras em pixels fixos
+           (medidos NAQUELA janela) e APAGA a borda própria da caixa. `jaPreparado=true`
+           fazia o salvamento levar exatamente esse estado.
+       Na folha dele o retângulo saiu mais estreito que a caixa e o texto escapou por fora
+       dele — porque aqueles pixels foram medidos noutra régua.
+
+       Esta verificação compara os DOIS caminhos. É a mais valiosa da suíte: enquanto eles
+       guardarem a mesma coisa, não importa por qual porta ele salva. */
+    const dois = await naPagina(cdp, `(() => {
+      document.getElementById('telaVerLaudo').style.display = 'none';
+      document.getElementById('areaImpressaoHist').innerHTML = '';
+      const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      const L = [];
+      for (let i = 0; i < 26; i++) L.push('Linha ' + i + ' do laudo com bastante texto para ocupar a largura toda.');
+      const montar = () => {
+        exames = [{ id: 8001, paciente: 'Teste Dois Caminhos', tipo: 'abdominal',
+          imagens: [], audios: [], _liberado: false, _quando: Date.now(),
+          laudo: { cab: { nome: 'Teste Dois Caminhos' }, titulo: 'T', tecnica: 't',
+                   corpo: L.join(String.fromCharCode(10, 10)), conclusao: 'Normal.', obs: '' } }];
+        window.__fundo = 'capanema'; window.__fundoPerguntado = true;
+        _rev2Id = 8001; _rev2Origem = 'dia';
+        rev2Abrir(8001);
+      };
+      const retrato = () => {
+        const f = document.querySelector('#areaImpressao .laudoFolha');
+        const cx = f && f.querySelector('.laudoCorpoBox');
+        const h = folhaHtmlLimpo();
+        return { molduras: f ? f.querySelectorAll('.laudoMoldura').length : -1,
+                 bordaCaixa: cx ? (cx.style.borderColor || '(propria)') : '(sem caixa)',
+                 htmlTemMoldura: h.indexOf('laudoMoldura') >= 0,
+                 htmlTemTransparente: h.indexOf('border-color: transparent') >= 0
+                                   || h.indexOf('border-color:transparent') >= 0 };
+      };
+      // CAMINHO A — 'Aprovar, assinar e imprimir -> proximo laudo'. O #areaImpressao
+      // volta para a telaRevisao, escondida, que e onde ele esta na vida real.
+      document.getElementById('rv2Final').classList.remove('aberta');
+      document.getElementById('revLayout').appendChild(document.getElementById('areaImpressao'));
+      montar(); rev2Preparar();
+      const A = retrato();
+      // CAMINHO B — "Ver o laudo final" -> "Salvar e liberar"
+      montar(); rev2VerFinal();
+      rev2FinalFechar(); try { paginarLaudoTela(); } catch (e) {}
+      const B = retrato();
+      try { rev2FinalFechar(); } catch (e) {}
+      exames = [];
+      return { A: A, B: B };
+    })()`);
+    ok(dois.A.molduras === 0 && dois.A.htmlTemMoldura === false,
+       'o caminho "Aprovar e assinar" guarda o laudo SEM moldura em pixels  ['
+       + dois.A.molduras + ']');
+    ok(dois.B.molduras === 0 && dois.B.htmlTemMoldura === false,
+       'e o caminho "Ver o laudo final" passou a guardar igual  [' + dois.B.molduras + ']');
+    ok(dois.A.bordaCaixa === dois.B.bordaCaixa,
+       'a borda da caixa fica igual nos dois  [A ' + dois.A.bordaCaixa
+       + ' · B ' + dois.B.bordaCaixa + ']');
+    ok(dois.B.htmlTemTransparente === false,
+       'e a borda propria da caixa NAO viaja apagada — era ela que sumia, deixando so o '
+       + 'retangulo desenhado na regua errada');
+    ok(JSON.stringify(dois.A) === JSON.stringify(dois.B),
+       'os dois caminhos guardam exatamente a mesma coisa');
+
+    console.log('\n=== desistir de medir nao pode custar o retangulo ===');
+    /* Quando a paginacao desiste (folha escondida, largura zero) ela ja removia as
+       molduras; se a borda propria continuasse transparente, o laudo ficava SEM caixa
+       nenhuma em volta do texto — nem a de verdade, nem a desenhada. */
+    const semCaixa = await naPagina(cdp, `(() => {
+      const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      const area = document.getElementById('areaImpressao');
+      document.getElementById('rv2Final').classList.remove('aberta');
+      document.getElementById('telaRevisao').appendChild(area);
+      document.getElementById('telaRevisao').style.display = 'none';
+      area.innerHTML = '<div class="laudoFolha comFundo" data-fundo="capanema">'
+        + '<img class="fundoLaudo" src="' + PX + '">'
+        + '<div class="laudoCorpoBox" style="border-color:transparent">'
+        + '<div class="laudoTexto"><p>x</p></div></div></div>';
+      try { paginarLaudoTela(); } catch (e) {}
+      const cx = area.querySelector('.laudoCorpoBox');
+      return { largura: area.querySelector('.laudoFolha').clientWidth,
+               borda: cx.style.borderColor || '(propria)' };
+    })()`);
+    ok(semCaixa.largura === 0, 'o cenario e mesmo o da folha escondida  [' + semCaixa.largura + ' px]');
+    ok(semCaixa.borda === '(propria)',
+       'e a borda propria da caixa volta antes de desistir  [' + semCaixa.borda + ']');
+
     console.log('\n=== e a folha BRANCA continua com o respiro dela ===');
     // 12 mm nas laterais e regra de 01/09 para o laudo sem timbrado: a correcao nao pode
     // ter transformado toda folha em folha timbrada.

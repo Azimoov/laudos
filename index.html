@@ -4355,7 +4355,16 @@ async function salvarAudioAuto(blob, nomeBase, ext){ if(!suportaFS()) return; tr
 async function salvarAudioIdx(idx){ const a=audios.find(function(x){return x.idx===idx;}); if(!a||!a.url){ log('Áudio indisponível.', true); return; } try{ const blob=await fetch(a.url).then(function(r){return r.blob();}); const ext=(blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro(a.nome||'audio')+'.'+ext, blob, blob.type); }catch(e){ log('Falha ao salvar áudio: '+e.message, true); } }
 async function salvarLokoIdx(i){ try{ const blob=lokoAudios[i]; if(!blob) return; const ext=(blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro('Gravacao in loco '+(i+1))+'.'+ext, blob, blob.type); }catch(e){ log('Falha ao salvar áudio: '+e.message, true); } }
 async function salvarDitado(id){ try{ const l=await gravListar(); const g=l.find(function(x){return x.id===id;}); if(!g) return; const ext=(g.blob.type||'').indexOf('webm')>=0?'webm':'m4a'; await salvarAlvo('audio', nomeArquivoSeguro(g.nome||('ditado-'+id))+'.'+ext, g.blob, g.blob.type); }catch(e){ log('Falha ao salvar ditado: '+e.message, true); } }
-function laudoCssText(){ let css=''; try{ const sh=document.styleSheets; for(let i=0;i<sh.length;i++){ let rules; try{ rules=sh[i].cssRules; }catch(e){ continue; } for(let j=0;j<rules.length;j++){ const r=rules[j]; if(r.selectorText && /laudo|assin|linha|rodape/i.test(r.selectorText)) css+=r.cssText+'\n'; } } }catch(e){} return css; }
+function laudoCssText(){
+  /* O agente fotografa o laudo em uma pagina HTML isolada. A tela principal tem
+     `box-sizing:border-box` para TODOS os elementos, mas essa regra geral ficava fora
+     do pacote porque o filtro abaixo leva apenas seletores do laudo. Resultado: no
+     agente, os 210 mm da folha recebiam o padding POR FORA e ultrapassavam o A4; no
+     visualizador, os mesmos 210 mm ja incluiam o padding. A regra viaja explicitamente
+     para os dois caminhos terem a mesma regua. */
+  let css='*,*:before,*:after{box-sizing:border-box;}\n';
+  try{ const sh=document.styleSheets; for(let i=0;i<sh.length;i++){ let rules; try{ rules=sh[i].cssRules; }catch(e){ continue; } for(let j=0;j<rules.length;j++){ const r=rules[j]; if(r.selectorText && /laudo|assin|linha|rodape/i.test(r.selectorText)) css+=r.cssText+'\n'; } } }catch(e){} return css;
+}
 function dataURLtoBlob(d){ const p=d.split(','); const mime=(p[0].match(/:(.*?);/)||[])[1]||'image/jpeg'; const bin=atob(p[1]); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:mime}); }
 async function pastaLivre(parent, base){
   var nome=base, n=2;

@@ -138,6 +138,11 @@ ok(/Get-CorteSeguro/.test(ps1) && /recua/.test(ps1),
    'e o corte da pagina recua para uma linha em branco — cortar no ponto exato partiria a linha de texto (podia partir um numero de medida)');
 ok(/Paisagem/.test(ps1) && /paisagem=True/.test(py),
    'as fotos saem deitadas: em pe ficariam pequenas no meio da folha');
+const escolhaA4 = ps1.slice(ps1.indexOf('if ($DaBorda)'), ps1.indexOf('$temMargens'));
+ok(/borderless|sem\\s\+\(borda\|margem\|margens\)/.test(escolhaA4) && !/if\s*\(\$Fundo\)/.test(escolhaA4),
+   'o laudo prefere A4 sem bordas mesmo sem timbrado — senao o driver pode encolher a folha');
+ok(/if \(\$DaBorda -and -not \$script:papelSemBorda/.test(ps1),
+   'avisa quando a impressora nao tem A4 sem bordas, mesmo no laudo sem timbrado');
 ok(/svg/i.test(py) && /nao pode ser impresso/.test(py),
    'formato que o spooler nao desenha e recusado dizendo QUAL era');
 

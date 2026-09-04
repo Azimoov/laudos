@@ -3834,7 +3834,11 @@ async function dicomImportar(){
     // nascimento e sexo vêm das tags DICOM (o agente já os entrega em cada estudo).
     // Até 10/08/2026 eram descartados aqui, e o banco ficou com 74 pacientes sem
     // data de nascimento — sem ela, dois homônimos viram a mesma pessoa.
-    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens, codigo:codDoEstudo(e), nascimento:e.nascimento||'', sexo:e.sexo||'',
+    /* 03/09/2026 — AS INSTÂNCIAS VIAJAM JUNTO. Sem elas o exame nasce sem vínculo com o
+       aparelho, e as fotos passam a existir SÓ na memória da janela: um F5 as apaga e não
+       há de onde rebuscá-las. Foi o que aconteceu com o exame de mama da Maria de Fátima
+       em 03/09 — o laudo saiu com ZERO fotos. Ver rev2/restaurarSessao. */
+    dicomProntos.push({id:e.id, instancias:(e.instancias||[]).slice(), paciente:capNome(e.paciente||''), idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens, codigo:codDoEstudo(e), nascimento:e.nascimento||'', sexo:e.sexo||'',
                        // a região viaja junto: sem ela o painel do importado não saberia
                        // dizer QUAL exame o médico acabou de trazer. `tipo` é a MESMA
                        // região traduzida em chave de modelo — ver dicomTipo.
@@ -3958,7 +3962,12 @@ async function processar(){
        saía (com a IA nem sendo chamada). O aparelho já diz a região; usá-la não é chute.
        Onde a região é ambígua (GYN, OB, URO…), dicomTipo devolve vazio de propósito e o
        comportamento continua o de antes — o médico escolhe em "Modelo do exame". */
-    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:d.tipo||'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true}); }
+    /* 03/09/2026 — `_estudoId` e `_instIds` PASSAM A VIR JUNTO. Sem eles o exame vindo
+       desta tela nascia sem vínculo com o aparelho, e as fotos só existiam na memória da
+       janela: um F5 as apagava e não havia de onde rebuscá-las. Foi assim que o laudo de
+       mama da Maria de Fátima saiu com ZERO fotos em 03/09/2026. Com o vínculo,
+       restaurarSessao rebusca as imagens sozinha, como já fazia com o áudio. */
+    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:d.tipo||'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true, _estudoId:d.id||'', _instIds:(d.instancias||[]).slice()}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s)'+(dicomProntos.length?' + '+dicomProntos.length+' exame(s) do aparelho':'')+' em '+exames.length+' exame(s).');
     /* 21/08/2026 — a lista de importados é ESVAZIADA aqui, depois de virar exame. Ela
@@ -4317,6 +4326,35 @@ async function gerarPdfImagens(imagens, paciente){
    erro invisível é erro nenhum, e este some com o laudo. */
 async function salvarLaudoPasta(){
   const area=document.getElementById('areaImpressao'); if(!area||!area.innerHTML){ log('Nada para salvar.', true); return false; }
+  /* ===== 03/09/2026 — LAUDO DE IMAGEM NÃO SAI SEM IMAGEM SEM ELE SABER =====
+     O log de 03/09 mostra o laudo de mama da Maria de Fátima sendo salvo DUAS VEZES com
+     "0 foto(s)", sem uma palavra na tela. As fotos tinham sumido num recarregamento; o
+     programa gravou o laudo assim mesmo, como se estivesse completo.
+     Perder as fotos tem conserto — refazer. Um laudo de ultrassom entregue sem as imagens
+     não tem: ele vai para a pasta, para a nuvem e para a mão do paciente.
+     A pergunta só aparece quando o exame TEM fotos no aparelho e está sem nenhuma agora —
+     ou seja, quando algo se perdeu. Exame que nunca teve imagem (ditado avulso, laudo
+     refeito do histórico) passa direto, como sempre passou. */
+  try{
+    var _exAtual=(window.__revAtual&&window.__revAtual.exId!=null)
+      ? exames.find(function(e){ return e.id===window.__revAtual.exId; }) : null;
+    if(_exAtual && (!_exAtual.imagens || !_exAtual.imagens.length) && (_exAtual._instIds||[]).length){
+      var _n=_exAtual._instIds.length;
+      log('Tentando recuperar as '+_n+' foto(s) deste exame antes de salvar…');
+      try{ await rev2RebuscarImagens(); }catch(_){}
+      if(!_exAtual.imagens || !_exAtual.imagens.length){
+        if(!confirm('Este exame tinha '+_n+' imagem(ns) e agora está SEM NENHUMA.\n\n'
+          +'O laudo vai ser salvo sem as fotos — e não dá para acrescentá-las depois no '
+          +'arquivo já gravado.\n\n'
+          +'Cancelar = não salvar (traga o exame de novo pelo aparelho)\n'
+          +'OK = salvar assim mesmo')){
+          log('Salvamento cancelado: o laudo de '+((_exAtual.paciente)||'?')+' está sem as imagens.', true);
+          return false;
+        }
+        log('⚠️ Laudo de '+((_exAtual.paciente)||'?')+' salvo SEM as '+_n+' imagens, a seu pedido.', true);
+      }
+    }
+  }catch(_){}
   const pac=(window.__revAtual&&window.__revAtual.paciente)?window.__revAtual.paciente:'laudo';
   const base=nomeArquivoSeguro(pac);
   // ---- primeiro a pasta, enquanto o clique ainda conta como gesto do usuário ----
@@ -5255,6 +5293,30 @@ async function verificarSessaoSalva(){
     document.body.appendChild(b);
   }catch(e){}
 }
+/* Rebusca no aparelho as fotos dos exames que voltaram sem elas. Ver restaurarSessao. */
+async function rev2RebuscarImagens(){
+  var alvos=exames.filter(function(e){
+    return (!e.imagens || !e.imagens.length) && (e._instIds||[]).length;
+  });
+  if(!alvos.length) return;
+  var total=alvos.reduce(function(s,e){ return s+e._instIds.length; },0);
+  log('Recuperando '+total+' foto(s) do aparelho para '+alvos.length+' exame(s) que voltaram sem imagem…');
+  var ok=0, falhou=0;
+  for(var i=0;i<alvos.length;i++){
+    var ex=alvos[i], imgs=[], ids=[];
+    for(var q=0;q<ex._instIds.length;q++){
+      try{ imgs.push(await dicomBaixarImagem(ex._instIds[q])); ids.push(ex._instIds[q]); }
+      catch(err){ falhou++; }
+    }
+    if(imgs.length){
+      ex.imagens=imgs; ex._instIds=ids; ok+=imgs.length;
+      try{ renderExames(); }catch(_){}
+      try{ diaRenderLista(); }catch(_){}
+    }
+  }
+  if(ok) log('✔ '+ok+' foto(s) recuperadas do aparelho.'+(falhou?(' '+falhou+' não voltaram.'):''));
+  else if(falhou) log('Não consegui recuperar as fotos do aparelho ('+falhou+' falha(s)) — o aparelho pode não ter mais esse exame.', true);
+}
 async function restaurarSessao(id){
   try{
     var sess;
@@ -5266,6 +5328,17 @@ async function restaurarSessao(id){
     if(!sess) return;
     exames=sess.exames.map(function(e){return Object.assign({audios:[],imagens:[],metaConf:1,_liberado:false},e);});   // _liberado/audios salvos no snapshot sobrescrevem os defaults
     _sessaoViva=true;   // restaurou: a partir daqui, apagar tudo tem de valer de verdade
+    /* 03/09/2026 — AS FOTOS VOLTAM DO APARELHO, como o áudio já voltava.
+       As imagens são a única peça do exame que vivia só na memória da janela: o retrato da
+       sessão tem um modo LEVE (sem fotos) para não travar em dias de 100 exames, e ao
+       recarregar elas voltavam vazias. O ditado tinha proteção (o endereço se refaz por
+       `_estudoAudio`); a imagem, nenhuma.
+       Custou um laudo em 03/09/2026: o exame de mama da Maria de Fátima foi salvo com ZERO
+       fotos, duas vezes, depois de um F5. `_instIds` já viajava no retrato — só ninguém o
+       usava para isto.
+       Roda em segundo plano e por exame: a tela abre na hora, e cada exame recupera as
+       suas conforme chegam. Falhar aqui não pode impedir a sessão de voltar. */
+    setTimeout(function(){ rev2RebuscarImagens(); }, 0);
     audios=[];
     var comSom=0;
     try{
@@ -8284,7 +8357,8 @@ async function capAntigoLevar(id, estudo){
       try{ imagens.push(await dicomBaixarImagem(e.instancias[q])); }catch(err){}
     }
     if(!imagens.length){ log('Não consegui baixar imagem nenhuma desse exame.', true); return; }
-    dicomProntos.push({id:e.id, paciente:capNome(e.paciente||''),
+    dicomProntos.push({id:e.id, instancias:(e.instancias||[]).slice(),   // o vínculo com o aparelho viaja junto (ver dicomImportar)
+      paciente:capNome(e.paciente||''),
       idade:(e.idade===''||e.idade==null)?'':String(e.idade), data:e.data||'', imagens:imagens,
       codigo:codDoEstudo(e), nascimento:e.nascimento||'', sexo:e.sexo||'',
       regiao:dicomRegiao(e.descricao), tipo:dicomTipo(e.descricao), hora:e.hora||''});

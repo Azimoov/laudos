@@ -1080,14 +1080,20 @@ button.repoSelo:hover{filter:brightness(.95)}
 /* O palco cinza existe para a folha parecer FOLHA: branco sobre branco não mostra onde a
    página começa e acaba, e é justamente isso que ele quer conferir aqui. */
 #rv2Final .rv2fPalco{padding:20px 14px 40px;display:flex;justify-content:center}
-#rv2Final #rv2FinalHost{width:100%;max-width:820px}
-#rv2Final #areaImpressao{background:#fff;box-shadow:0 10px 34px rgba(0,0,0,.35);border-radius:2px}
+/* A folha tem 210 mm (cerca de 794 px), mas #areaImpressao chegava a 816 px. Como os
+   dois eram brancos, os 11 px de sobra de cada lado pareciam parte do papel e davam a
+   impressao de que o timbrado nao preenchia a pagina. O palco passa a emoldurar a
+   folha real, sem uma segunda "folha" branca por tras. */
+#rv2Final #rv2FinalHost{width:210mm;max-width:210mm}
+#rv2Final #areaImpressao{width:210mm;max-width:210mm!important;flex:0 0 210mm!important;
+  background:transparent;box-shadow:none;border-radius:0}
+#rv2Final #areaImpressao>.laudoFolha{box-shadow:0 10px 34px rgba(0,0,0,.35);border-radius:2px}
 @media print{
   /* Na impressão vale a mesma regra de sempre: só a folha. O palco e a barra somem. */
   #rv2Final{position:static;background:none;overflow:visible}
   #rv2Final .rv2fTopo,#rv2Final .rv2fDica{display:none}
   #rv2Final .rv2fPalco{padding:0;display:block}
-  #rv2Final #areaImpressao{box-shadow:none;border-radius:0}
+  #rv2Final #areaImpressao>.laudoFolha{box-shadow:none;border-radius:0}
 }
 #rv2Lupa{position:fixed;z-index:9999;display:none;object-fit:contain;
   background:#05141B;border:3px solid #12B5AC;border-radius:10px;

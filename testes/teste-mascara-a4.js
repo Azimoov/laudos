@@ -52,5 +52,13 @@ ok(/\.fundoLaudo\{[^}]*object-fit:fill/.test(HTML), 'primeira folha preenche o p
 ok(/\.fundoFolhaTela\{[^}]*object-fit:fill/.test(HTML), 'folhas seguintes tambem preenchem o papel');
 ok(/ajustado automaticamente para A4/.test(HTML), 'o cadastro avisa o que fara com o arquivo');
 
+console.log('\n=== a visualizacao nao inventa margem branca fora da folha ===');
+ok(/#rv2Final #rv2FinalHost\{width:210mm;max-width:210mm\}/.test(HTML),
+   'o suporte da visualizacao tem a largura exata de uma folha A4');
+ok(/#rv2Final #areaImpressao\{width:210mm;max-width:210mm!important;flex:0 0 210mm!important/.test(HTML),
+   'a caixa que carrega a folha nao fica mais larga que ela');
+ok(/#rv2Final #areaImpressao>\.laudoFolha\{box-shadow:/.test(HTML),
+   'a sombra marca a borda da folha verdadeira, nao a caixa externa');
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'tudo certo'));
 process.exit(falhas ? 1 : 0);

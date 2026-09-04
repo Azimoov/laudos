@@ -85,14 +85,40 @@ console.log('=== IDA E VOLTA: o laudo nao pode mudar sozinho ===');
   ok(paraTexto(negrito(t)) === t, 'volta identico: ' + t.slice(0, 44));
 });
 
-console.log('=== o pincel de formatacao (que antes mentia) ===');
-const pincel = grab('rev2CopiarFmt');
-ok(/queryCommandState/.test(pincel), 'ele LE a formatacao da origem de verdade');
-ok(/execCommand/.test(pincel), 'e aplica no destino');
-ok(!/removeFormat/.test(pincel),
-   'e NAO limpa mais o destino fingindo que copiou');
-ok(/DESTINO/.test(pincel) && /ORIGEM/.test(pincel),
-   'diz ao medico qual selecao ele deve fazer em cada toque');
+console.log('=== o pincel de formatacao: copiar e colar sao DOIS botoes ===');
+/* 04/09/2026, pedido dele: "existe o botao Copiar formatacao, mas nao existe o botao Colar
+   formatacao. Precisa ter." Era um botao so, que copiava no 1o toque e colava no 2o — o que
+   ele fazia dependia de uma coisa invisivel (se ja havia algo copiado), e o 2o toque GASTAVA
+   a copia: repetir o mesmo negrito em cinco lugares dava dez toques e cinco viagens ate a
+   origem. */
+const copiar = grab('rev2CopiarFmt');
+const colar = grab('rev2ColarFmt');
+ok(colar.length > 0, 'a funcao de colar existe');
+ok(/id="rv2BtColarFmt"/.test(HTML) && /onclick="rev2ColarFmt\(\)"/.test(HTML),
+   'e ha um botao na barra da tela de liberacao que a chama');
+ok(/id="rv2BtColarFmt"[^>]*disabled/.test(HTML),
+   'que NASCE apagado — sem nada copiado, ele nao promete o que nao pode fazer');
+ok(/#telaRev2 \.fmt button:disabled\{/.test(HTML),
+   'e apagado ele PARECE apagado (senao o medico toca, nada acontece, e nao sabe por que)');
+ok(/queryCommandState/.test(copiar), 'copiar LE a formatacao da origem de verdade');
+ok(/execCommand/.test(colar), 'e colar aplica no destino');
+ok(!/execCommand/.test(copiar),
+   'copiar NAO mexe no texto — quem escreve e so o colar');
+ok(!/removeFormat/.test(copiar) && !/removeFormat/.test(colar),
+   'e NAO limpa mais o destino fingindo que copiou (o defeito de 17/08)');
+ok(/ORIGEM/.test(copiar) && /DESTINO/.test(colar),
+   'cada um diz qual selecao o medico precisa fazer');
+/* O ganho que o botao novo traz junto: a copia nao se gasta. */
+ok(!/_rev2Fmt=null/.test(colar),
+   'colar NAO gasta a copia — da para colar o mesmo negrito em varios trechos');
+ok(/_rev2Fmt===null/.test(colar),
+   'e colar sem ter copiado explica, em vez de nao fazer nada');
+const pintar = grab('rev2FmtPintar');
+ok(/b\.colar\.disabled=!armado/.test(pintar),
+   'um lugar so desenha o estado dos dois botoes');
+ok(/function rev2FmtEsquecer\(\)/.test(HTML)
+   && /rev2FmtEsquecer\(\)/.test(grab('rev2Abrir')),
+   'e trocar de laudo esvazia o pincel — formatacao de um paciente nao segue armada no outro');
 
 console.log('=== o tamanho da letra fica guardado ===');
 const fonte = grab('rev2Fonte');

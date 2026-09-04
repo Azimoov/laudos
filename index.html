@@ -965,6 +965,15 @@ button.repoSelo:hover{filter:brightness(.95)}
 #telaRev2 .fmt button{background:#fff;border:1px solid #C9D0D8;border-radius:6px;min-width:28px;
   height:28px;padding:0 8px;cursor:pointer;font-family:inherit;font-size:13px;color:#26303C}
 #telaRev2 .fmt button:hover{background:#EEF3F7}
+/* 04/09/2026 — "Colar formatação" nasce APAGADO e só acende quando há algo copiado.
+   Um botão que existe mas não pode fazer nada tem de PARECER que não pode: senão o médico
+   toca, nada acontece, e ele fica sem saber se o programa falhou ou se ele errou o passo.
+   O rótulo embaixo apaga junto — os dois são a mesma informação. */
+#telaRev2 .fmt button:disabled{background:#F2F4F6;color:#AEB6BF;border-color:#E2E6EA;cursor:default}
+#telaRev2 .fmt button:disabled:hover{background:#F2F4F6}
+#telaRev2 .fmt button:disabled + .rot{color:#AEB6BF}
+/* e ACESO, quando há formatação na mão: a mesma cor do pincel que a copiou */
+#telaRev2 .fmt button.fmtArmado{background:#CDE8E4;border-color:#0E6E6B}
 /* o `width:100%` e o fundo escuro dos selects gerais do app não valem aqui: na barra
    de formatação o seletor é um botãozinho, não um campo de formulário */
 #telaRev2 .fmt select{border:1px solid #C9D0D8;border-radius:6px;height:28px;font:inherit;
@@ -1165,7 +1174,15 @@ button.repoSelo:hover{filter:brightness(.95)}
         <button onmousedown="event.preventDefault()" title="Itálico" onclick="fmtCmd('italic')"><i>I</i></button>
         <button onmousedown="event.preventDefault()" title="Sublinhado" onclick="fmtCmd('underline')"><u>S</u></button>
         <span class="sep"></span>
+        <!-- 04/09/2026, pedido dele: "existe o botão Copiar formatação, mas não existe o
+             botão Colar formatação. Precisa ter."
+             Ele tem razão, e o botão que faltava conserta mais que a falta: o 🖌 sozinho
+             era COPIAR no 1º toque e COLAR no 2º, no mesmo botão. Nada na tela dizia isso,
+             e o efeito de tocar nele dependia de uma coisa invisível (se já havia algo
+             copiado ou não). Agora cada botão faz UMA coisa, e colar pode ser repetido
+             quantas vezes ele quiser — antes o segundo toque gastava a cópia. -->
         <button onmousedown="event.preventDefault()" title="Copiar formatação" onclick="rev2CopiarFmt()">🖌</button><span class="rot">copiar formatação</span>
+        <button onmousedown="event.preventDefault()" id="rv2BtColarFmt" title="Colar formatação" onclick="rev2ColarFmt()" disabled>🖍</button><span class="rot">colar formatação</span>
         <button onmousedown="event.preventDefault()" title="Zerar formatação" onclick="fmtZerar()">🧽</button><span class="rot">zerar formatação</span>
         <span class="sep"></span>
         <button onmousedown="event.preventDefault()" title="Desfazer" onclick="fmtCmd('undo')">↶</button>
@@ -15297,6 +15314,10 @@ function rev2Abrir(exId){
   hisSincronizarVerHist();   // reabrir pelo historico escondia telaVerLaudo e deixava a plaquinha
   var t=document.getElementById('telaRev2'); if(t) t.style.display='block';
   rev2Render();
+  /* 04/09/2026: o pincel esquece o que estava na mão ao trocar de laudo. Formatação copiada
+     no laudo de um paciente não pode seguir armada no do seguinte, com o botão de colar
+     aceso prometendo uma coisa que veio de outro lugar. */
+  try{ rev2FmtEsquecer(); }catch(e){}
   window.scrollTo(0,0);
 }
 function rev2Fechar(){ var t=document.getElementById('telaRev2'); if(t) t.style.display='none';
@@ -16799,38 +16820,64 @@ function rev2FonteGuardada(){
   var px; try{ px=localStorage.getItem('grev2Fonte'); }catch(e){}
   px=parseInt(px||'12',10); return (px>=10&&px<=16)?px:12;
 }
-/* PINCEL DE FORMATAÇÃO — 1º toque copia, 2º toque aplica.
-   17/08/2026: antes ele MENTIA. Dizia "Formatação copiada" e, no segundo
-   toque, apenas apagava a formatação do destino — nunca copiou nada de
-   ninguém. Agora ele lê de verdade os três atributos que o laudo sabe
-   guardar (negrito, itálico, sublinhado) e os reproduz no destino, ligando
-   o que falta e desligando o que sobra. */
+/* ===== PINCEL DE FORMATAÇÃO: DOIS BOTÕES, UM GESTO CADA (04/09/2026) =====
+   Pedido dele: "existe o botão Copiar formatação, mas não existe o botão Colar formatação.
+   Precisa ter."
+   Era um botão só, que COPIAVA no primeiro toque e COLAVA no segundo. O que ele fazia
+   dependia de uma coisa que ninguém via — se já havia formatação guardada ou não —, e o
+   segundo toque GASTAVA a cópia: para repetir o mesmo negrito em cinco lugares, era
+   preciso voltar à origem e copiar cinco vezes.
+   Agora: 🖌 copia (quantas vezes quiser, sempre trocando o que está na mão) e 🖍 cola
+   (quantas vezes quiser, sem gastar). O 🖍 fica APAGADO enquanto não houver nada copiado.
+
+   17/08/2026, e continua valendo: antes disso tudo, o pincel MENTIA — dizia "Formatação
+   copiada" e no segundo toque só apagava a formatação do destino, sem nunca ter copiado
+   nada de ninguém. São lidos de verdade os três atributos que o laudo sabe guardar
+   (negrito, itálico, sublinhado), ligando no destino o que falta e desligando o que sobra. */
+function _rev2FmtBotoes(){
+  return { copiar:document.querySelector('#telaRev2 .fmt button[title="Copiar formatação"]'),
+           colar:document.getElementById('rv2BtColarFmt') };
+}
+/* Uma função só desenha o estado dos dois botões — com dois lugares desenhando, um deles
+   fica para trás e o médico vê um botão aceso que não faz nada. */
+function rev2FmtPintar(){
+  var b=_rev2FmtBotoes(), armado=(_rev2Fmt!==null);
+  if(b.copiar) b.copiar.classList.toggle('fmtArmado', armado);
+  if(b.colar){
+    b.colar.disabled=!armado;
+    b.colar.title=armado?'Colar formatação (pode repetir)':'Colar formatação — copie uma antes, no 🖌';
+  }
+}
+/* Esquece o que estava na mão. Chamado ao trocar de laudo: formatação copiada no laudo de
+   um paciente não pode continuar armada no do seguinte, com o botão aceso dizendo que sim. */
+function rev2FmtEsquecer(){ _rev2Fmt=null; rev2FmtPintar(); }
 function rev2CopiarFmt(){
   var s=window.getSelection();
-  var temSel=s && s.rangeCount && String(s).trim();
-  var btn=document.querySelector('#telaRev2 .fmt button[title="Copiar formatação"]');
-  if(_rev2Fmt===null){
-    if(!temSel){ log('Selecione primeiro o texto de ORIGEM (o que já está do jeito que você quer).', true); return; }
-    _rev2Fmt={ bold:document.queryCommandState('bold'),
-               italic:document.queryCommandState('italic'),
-               underline:document.queryCommandState('underline') };
-    if(btn) btn.style.background='#CDE8E4';
-    var quais=['bold','italic','underline'].filter(function(k){ return _rev2Fmt[k]; })
-      .map(function(k){ return {bold:'negrito',italic:'itálico',underline:'sublinhado'}[k]; });
-    log('Formatação copiada ('+(quais.length?quais.join(' + '):'sem formatação')+') — selecione o destino e toque de novo.');
-    return;
-  }
-  if(!temSel){ log('Selecione o texto de DESTINO e toque de novo.', true); return; }
+  if(!(s && s.rangeCount && String(s).trim())){
+    log('Selecione primeiro o texto de ORIGEM (o que já está do jeito que você quer).', true); return; }
+  _rev2Fmt={ bold:document.queryCommandState('bold'),
+             italic:document.queryCommandState('italic'),
+             underline:document.queryCommandState('underline') };
+  rev2FmtPintar();
+  var quais=['bold','italic','underline'].filter(function(k){ return _rev2Fmt[k]; })
+    .map(function(k){ return {bold:'negrito',italic:'itálico',underline:'sublinhado'}[k]; });
+  log('Formatação copiada ('+(quais.length?quais.join(' + '):'sem formatação')
+      +') — selecione o destino e toque em 🖍 colar formatação.');
+}
+function rev2ColarFmt(){
+  if(_rev2Fmt===null){ log('Não há formatação copiada — selecione a origem e toque em 🖌 primeiro.', true); return; }
+  var s=window.getSelection();
+  if(!(s && s.rangeCount && String(s).trim())){ log('Selecione o texto de DESTINO antes de colar.', true); return; }
   ['bold','italic','underline'].forEach(function(k){
     if(document.queryCommandState(k)!==_rev2Fmt[k]) document.execCommand(k);
   });
-  _rev2Fmt=null;
-  if(btn) btn.style.background='';
+  /* NÃO esquece a formatação: colar é para ser repetido. Antes, o segundo toque do pincel
+     gastava a cópia e o mesmo negrito tinha de ser copiado de novo a cada lugar. */
   // o texto mudou: devolve ao laudo sem esperar o clique fora
   var alvo=s.anchorNode&&(s.anchorNode.nodeType===1?s.anchorNode:s.anchorNode.parentElement);
   var cx=alvo&&alvo.closest?alvo.closest('#rv2Blocos .txt'):null;
   if(cx) rev2Editou(cx);
-  log('Formatação aplicada.');
+  log('Formatação aplicada — continua na mão, dá para colar em outro trecho.');
 }
 /* A lista de fundos pode chegar do agente DEPOIS de a tela de liberação já ter aberto.
    Atualizar somente este <select> preserva o laudo que o médico esteja corrigindo; chamar

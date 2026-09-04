@@ -1258,6 +1258,86 @@ const VERIFICACOES = `(async () => {
     _rev2Id = null;
     exames = exames.filter(e => e.id !== 9916);
 
+    // ---- COPIAR E COLAR FORMATACAO: DOIS BOTOES (04/09, pedido dele) ----
+    // "Existe o botao Copiar formatacao, mas nao existe o botao Colar formatacao."
+    // So o navegador prova isto: copiar e colar formatacao e queryCommandState e
+    // execCommand em cima de uma SELECAO viva. Ler o arquivo diz que as funcoes existem;
+    // nao diz que o negrito da origem chega ao destino.
+    exames.push({ id: 9931, tipo: 'abdominal', paciente: 'Pincel', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Pincel' }, titulo: MODELOS.abdominal.titulo,
+               tecnica: MODELOS.abdominal.tecnica,
+               // a ORIGEM ja nasce em negrito no proprio laudo: assim o teste nao depende
+               // de conseguir CRIAR o negrito para depois copia-lo
+               corpo: '**Figado:**' + NL + '**Origem ja em negrito.**' + NL + NL
+                    + '**Baco:**' + NL + 'Destino um sem formatacao.' + NL + NL
+                    + '**Rins:**' + NL + 'Destino dois sem formatacao.',
+               conclusao: 'Exame ecografico compativel com a normalidade.', obs: '' } });
+    _rev2Id = 9931; rev2Abrir(9931);
+    const btColar = document.getElementById('rv2BtColarFmt');
+    const btCopiar = document.querySelector('#telaRev2 .fmt button[title="Copiar formatação"]');
+    const selecionar = (frase) => {
+      /* Solta o retangulo anterior ANTES de procurar o proximo. Cada .txt tem
+         onblur="rev2Editou(this)", e rev2Editou termina em rev2Render(): a lista inteira
+         de retangulos e refeita. Procurando antes, o no encontrado seria trocado por
+         outro no meio do caminho e a selecao cairia no vazio — foi exatamente o que
+         aconteceu na 1a versao deste teste. */
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      const el = Array.prototype.find.call(document.querySelectorAll('#rv2Blocos .txt'),
+        e => (e.innerText || '').indexOf(frase) >= 0);
+      if (!el) return null;
+      el.focus();
+      /* Seleciona AS PALAVRAS, nao o no inteiro: o retangulo comeca com uma quebra de
+         linha, e arrastar o negrito por cima dela punha os asteriscos numa linha sozinha
+         no texto do laudo. E tambem nao e o que o medico faz — ele grifa a frase. */
+      let alvo = null;
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const i = (n.nodeValue || '').indexOf(frase);
+        if (i >= 0) { alvo = { no: n, i }; break; }
+      }
+      if (!alvo) return null;
+      const r = document.createRange();
+      r.setStart(alvo.no, alvo.i); r.setEnd(alvo.no, alvo.i + frase.length);
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      return el;
+    };
+    diz('"Colar formatacao" nasce apagado — nada foi copiado ainda', btColar.disabled === true);
+    const elOrigem = selecionar('Origem ja em negrito.');
+    diz('achou o retangulo de origem, ja em negrito',
+      !!elOrigem && /<(b|strong)[ >]/i.test(elOrigem.innerHTML),
+      elOrigem ? elOrigem.innerHTML.slice(0, 50) : 'sem retangulo');
+    rev2CopiarFmt();
+    diz('copiar acende o botao de colar', btColar.disabled === false);
+    diz('e marca o pincel como carregado', btCopiar.classList.contains('fmtArmado'));
+    // o que ficou NA MAO: se aqui vier "sem formatacao", colar apagaria em vez de aplicar
+    diz('e o que foi copiado e o negrito da origem, nao um pincel vazio',
+      !!(_rev2Fmt && _rev2Fmt.bold), JSON.stringify(_rev2Fmt));
+    const elDest = selecionar('Destino um sem formatacao.');
+    rev2ColarFmt();
+    const exP = exames.find(e => e.id === 9931);
+    diz('colar poe o negrito no DESTINO, na tela',
+      /<(b|strong)[ >]/i.test(elDest.innerHTML), elDest.innerHTML.slice(0, 60));
+    diz('e a mudanca chega ao laudo, nao so ao desenho',
+      exP.laudo.corpo.indexOf('**Destino um sem formatacao.**') >= 0,
+      exP.laudo.corpo.split(NL).filter(l => l.indexOf('Destino um') >= 0)[0]);
+    // ERA ISTO QUE O BOTAO UNICO NAO DEIXAVA: o 2o toque gastava a copia.
+    diz('a copia NAO se gasta — o botao segue aceso', btColar.disabled === false);
+    const elDest2 = selecionar('Destino dois sem formatacao.');
+    rev2ColarFmt();
+    diz('e da para colar de novo, noutro trecho, sem voltar a origem',
+      exP.laudo.corpo.indexOf('**Destino dois sem formatacao.**') >= 0,
+      exP.laudo.corpo.split(NL).filter(l => l.indexOf('Destino dois') >= 0)[0]);
+    // formatacao copiada num laudo nao pode seguir armada no proximo paciente
+    exames.push({ id: 9932, tipo: 'abdominal', paciente: 'Outro', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Outro' }, titulo: MODELOS.abdominal.titulo,
+               tecnica: MODELOS.abdominal.tecnica, corpo: 'Outro paciente.',
+               conclusao: 'Normal.', obs: '' } });
+    _rev2Id = 9932; rev2Abrir(9932);
+    diz('trocar de laudo esvazia o pincel',
+      document.getElementById('rv2BtColarFmt').disabled === true);
+    _rev2Id = null;
+    exames = exames.filter(e => e.id !== 9931 && e.id !== 9932);
+
     // ---- TELA "VER O LAUDO FINAL": A EDICAO SOBREVIVE, E COM FERRAMENTAS (26/08, noite) ----
     // O defeito relatado por ele: "salvar e liberar nao esta salvando". A edicao vivia
     // so na folha (DOM); o OBJETO do laudo ficava velho e reaparecia em toda remontagem.

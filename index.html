@@ -16545,7 +16545,27 @@ async function antGerar(){
           +'. O aparelho não informou a região (ou ela serve a mais de um modelo). '
           +'Escolha em "Modelo do exame", logo acima do botão, e gere de novo.', true);
       } else {
-        antAvisar('O material foi processado, mas nenhum laudo saiu pronto — confira os avisos no diário.', true);
+        /* 03/09/2026 — O SEGUNDO MOTIVO MAIS COMUM TAMBÉM PASSA A SER DITO: a IA não
+           está configurada nesta linha. Aconteceu na 3.0 recém-criada, que nasceu sem o
+           config-agente.json (de propósito: não espalhar a chave). Sem chave nenhum laudo
+           sai, e a tela dizia a frase genérica — que manda procurar num diário atrás
+           desta tela, e não diz o que fazer. Ele passou por isso em 03/09.
+           A pergunta é feita ao agente NA HORA, não a um estado guardado: a chave pode
+           ter sido posta há um minuto noutra janela. */
+        var _semIA=false;
+        try{
+          var c=new AbortController(); var t=setTimeout(function(){ c.abort(); }, 2500);
+          var r=await fetch(agenteBase()+'/ia/estado',{signal:c.signal}); clearTimeout(t);
+          var j=await r.json();
+          _semIA=!!(j && j.ok && !j.configurada);
+        }catch(_){}
+        if(_semIA){
+          antAvisar('A IA não está configurada nesta linha do programa — sem ela nenhum laudo '
+            +'pode ser escrito. Abra Configurações › Provedor de IA e ponha a chave. '
+            +'(O material que você trouxe continua aqui: é só gerar de novo depois.)', true);
+        } else {
+          antAvisar('O material foi processado, mas nenhum laudo saiu pronto — confira os avisos no diário.', true);
+        }
       }
     }
   }catch(e){

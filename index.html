@@ -3188,12 +3188,15 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
      gimpauto  · imprimir sozinho ao liberar        gconferente · segunda leitura do laudo
      gimpsep   · duas impressoras                   gsomalerta  · aviso sonoro do microfone
      gimplaudo · qual impressora imprime o laudo    grev2Fonte  · tamanho da letra na revisão
-     gimpimg   · qual imprime as imagens
+     gimpimg   · qual imprime as imagens          g20local    · o LOCAL do atendimento
+   ⚠️ `g20local` é o mais grave dos sete: é ele que diz QUAL TIMBRADO vai na folha. Perdido
+   a cada abertura, o laudo nascia em papel branco — sem uma palavra — e assim era assinado
+   e entregue. Medido em Chrome em 04/09.
    FICAM DE FORA, de propósito: `gmk` (a chave da IA — nunca sai do navegador para cá),
    `gagente` (o endereço do agente, que muda a cada abertura e chega pela URL) e `gravag`
    (gravação em curso, que é estado do momento, não escolha). */
 const DADOS_SINCRONIZADOS = ['gmodelos','gmodelos__base','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais','gpaciente',
-  'gimpauto','gimpsep','gimplaudo','gimpimg','gconferente','gsomalerta','grev2Fonte'];
+  'gimpauto','gimpsep','gimplaudo','gimpimg','gconferente','gsomalerta','grev2Fonte','g20local','g20modo'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -7718,10 +7721,35 @@ function abrirRevisao(exId, semTela){
   const L = ex.laudo; const c = L.cab||{};
   if(!ex.histKey) ex.histKey='L'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   window.__revAtual = {id:ex.histKey, exId:ex.id, paciente:(c&&c.nome)||ex.paciente||'(sem nome)', tipo:ex.tipo||'', data:(c&&c.realizado_em)||'', obs:L.obs||'', cod:ex.codPac||'', alertas:L.alertas||null};
-  var _fnd = FUNDOS[window.__fundo||'branco'] || FUNDOS.branco;
+  /* ⚠️ 04/09/2026 — FOLHA BRANCA POR ENGANO NÃO PODE SER SILENCIOSA.
+     Duas coisas faziam o laudo nascer sem timbrado sem uma palavra:
+       1. a escolha do local sumia a cada abertura (ver exLocalSalvar) — consertado lá;
+       2. a ficha do timbrado ainda não estava em FUNDOS quando a folha era montada. Ela
+          vem de `glocais` por `exAplicarLocaisExtra`, e quem vai direto para "Liberar
+          laudos" podia chegar aqui antes disso. `FUNDOS[k] || FUNDOS.branco` então caía no
+          branco calado — e a chave continuava escrita em `data-fundo`, de modo que o resto
+          do programa achava que HAVIA timbrado. Medido em Chrome: a folha saía sem a
+          classe `comFundo` e sem a imagem, com data-fundo apontando um timbrado.
+     Agora: uma segunda tentativa de trazer a ficha, e se ainda faltar, o médico OUVE. */
+  var _k = window.__fundo||'branco';
+  if(_k!=='branco' && !(FUNDOS[_k]&&FUNDOS[_k].img)){
+    try{ exAplicarLocaisExtra(); }catch(e){}
+  }
+  var _fnd = FUNDOS[_k] || FUNDOS.branco;
   var _temFundo = !!(_fnd && _fnd.img);
-  try{ aplicarMargensImpressao(window.__fundo||'branco'); }catch(e){}   // margens de TODAS as páginas — ver a função
-  var _folhaAbre = '<div class="laudoFolha'+(_temFundo?' comFundo':'')+'" data-fundo="'+esc(window.__fundo||'branco')+'"'+(_temFundo?' style="padding-top:'+(_fnd.padTopMm||34)+'mm;padding-bottom:'+(_fnd.padBottomMm||24)+'mm"':'')+'>'+(_temFundo?'<img class="fundoLaudo" src="'+_fnd.img+'" alt="">':'');
+  if(_k!=='branco' && !_temFundo){
+    /* Folha branca quando ele pediu timbrado é erro que só aparece no papel, depois de
+       assinado. Dizer aqui custa uma linha; não dizer custa o laudo. */
+    log('⚠️ O timbrado escolhido ("'+_k+'") não foi encontrado — este laudo vai sair em '
+        +'FOLHA BRANCA. Escolha o local de novo em "Realizar exames" antes de assinar.', true);
+    _k='branco';
+  }
+  /* `_k`, não `window.__fundo`: quando o timbrado não existe, a folha tem de se declarar
+     BRANCA. Marcá-la com a chave de um timbrado que não veio faria o resto do programa
+     (margens, moldura por folha, arquivo salvo) tratá-la como timbrada — uma folha que
+     mente sobre si mesma é pior que uma folha branca assumida. */
+  try{ aplicarMargensImpressao(_k); }catch(e){}   // margens de TODAS as páginas — ver a função
+  var _folhaAbre = '<div class="laudoFolha'+(_temFundo?' comFundo':'')+'" data-fundo="'+esc(_k)+'"'+(_temFundo?' style="padding-top:'+(_fnd.padTopMm||34)+'mm;padding-bottom:'+(_fnd.padBottomMm||24)+'mm"':'')+'>'+(_temFundo?'<img class="fundoLaudo" src="'+_fnd.img+'" alt="">':'');
   document.getElementById('areaImpressao').innerHTML =
   _folhaAbre
   +'<div class="laudoCab"><div contenteditable="true" oninput="revMarcarEditado()"><b>Nome do Paciente:</b>'+esc(c.nome||'')+'<br><b>Idade:</b> '+esc(c.idade||'')+'<br><b>Realizado em:</b> '+esc(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+esc(c.dados_clinicos||'')+'</div></div>'
@@ -14180,6 +14208,17 @@ function exTodosLocais(){
   return lista;
 }
 function exLocalSalvo(){ try{ return localStorage.getItem('g20local')||''; }catch(e){ return ''; } }
+/* ⚠️ 04/09/2026 — O LOCAL ESCOLHIDO É QUEM DECIDE O TIMBRADO, e ele morria a cada abertura.
+   Ele relatou: "ao clicar em Aprovar, assinar e imprimir, o laudo está vindo sem o fundo
+   timbrado." Medido em Chrome: com a memória do navegador vazia (o que acontece SEMPRE ao
+   reabrir — a porta é sorteada e aquela memória é por endereço), `exLocalSalvo()` volta
+   vazio, `window.__fundo` fica em 'branco' e a folha nasce SEM a classe `comFundo` e SEM a
+   imagem. Silenciosamente. O laudo sai, é assinado e vai para a mão do paciente em papel
+   branco.
+   Agora vai para o disco do computador, como as outras escolhas dele.
+   `rev2Fundo` já chamava esta função — mas ela NÃO EXISTIA, e o `try` engolia o erro: o
+   seletor de timbrado da tela de liberação mudava só a sessão e não guardava nada. */
+function exLocalSalvar(k){ dadoSalvar('g20local', String(k||'')); }
 function exModo(){ try{ return localStorage.getItem('g20modo')||'lista'; }catch(e){ return 'lista'; } }
 
 function exRenderLocais(){
@@ -14206,8 +14245,9 @@ function exRenderLocais(){
 }
 function exEscolherLocal(k){
   window.__fundo=k; window.__fundoPerguntado=true;
-  try{ localStorage.setItem('g20local',k); }catch(e){}
+  exLocalSalvar(k);
   exRenderLocais();
+  try{ rev2AtualizarFundos(); }catch(e){}   // o seletor da tela de liberação acompanha
 }
 
 /* ---- editar um local que já existe (31/08/2026, item 8) ----
@@ -14490,7 +14530,7 @@ function exCadSalvar(){
     : ('Local "'+nome+'" cadastrado'+(img?' com papel timbrado.':' (sem timbrado).')));
 }
 function exEscolherModo(m){
-  try{ localStorage.setItem('g20modo',m); }catch(e){}
+  dadoSalvar('g20modo', m);   // vizinho do local, e tinha o mesmo defeito: sumia ao reabrir
   exRenderModos();
 }
 function exRenderModos(){
@@ -18276,6 +18316,19 @@ window.addEventListener('DOMContentLoaded', async function(){
      substituída pela cópia mais nova do agente. Sem reaplicar aqui, quem vai direto para
      “Liberar laudos” só vê o timbrado novo depois de visitar “Realizar exames”. */
   try{ exAplicarLocaisExtra(); rev2AtualizarFundos(); }catch(e){}
+  /* ⚠️ 04/09/2026 — E O LOCAL ESCOLHIDO VOLTA AQUI, na abertura. Ele era restaurado só
+     dentro de `exAbrir` (a tela "Realizar exames"): quem fosse direto para "Liberar
+     laudos" — que é o caminho de quem chega para assinar o que ficou de ontem — montava a
+     folha com 'branco' e assinava um laudo sem timbrado. Não sobrescreve escolha feita
+     NESTA sessão (`__fundoPerguntado`). */
+  try{
+    var _loc=exLocalSalvo();
+    if(_loc && !window.__fundoPerguntado){
+      window.__fundo=_loc; window.__fundoPerguntado=true;
+      try{ rev2AtualizarFundos(); }catch(e){}
+      log('Local do atendimento: '+(((FUNDOS[_loc]||{}).nome)||_loc)+' — é dele o papel timbrado dos laudos de hoje.');
+    }
+  }catch(e){}
   if(r.enviados.length) log('Seus dados foram copiados para o computador (proteção contra perda): '+r.enviados.join(', ')+'.');
   if(el) el.innerHTML='<span class="aviso" style="color:#1f7a3d;font-weight:600">✔ Seus modelos, dizeres, aprendizados e histórico estão guardados no computador (com backup diário).</span>';
 });

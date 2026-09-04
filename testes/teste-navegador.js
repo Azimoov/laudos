@@ -1394,6 +1394,52 @@ const VERIFICACOES = `(async () => {
         await sincronizarDados();
         diz('e vale tambem para a impressora escolhida, que e texto e nao interruptor',
           impEscolhida('laudo') === 'EPSON DE TESTE', impEscolhida('laudo'));
+
+        // ---- O CASO MAIS GRAVE DOS SETE: O TIMBRADO (04/09, relatado por ele) ----
+        // "Ao clicar em Aprovar, assinar e imprimir, o laudo esta vindo sem o fundo
+        //  timbrado." Quem decide o timbrado e o LOCAL escolhido (g20local). Perdido a
+        //  cada abertura, a folha nascia branca, calada — e assim era assinada e entregue.
+        const PXT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'
+                  + 'AAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        localStorage.setItem('glocais', JSON.stringify(
+          [{ k: 'loc-prova', nome: 'Local de Prova', img: PXT, padTopMm: 50, padBottomMm: 35 }]));
+        exAplicarLocaisExtra();
+        exEscolherLocal('loc-prova');                 // ele escolhe o local, como na tela 2
+        for (let i = 0; i < 40 && !disco.g20local; i++) await new Promise(r => setTimeout(r, 25));
+        diz('escolher o local manda a escolha para o computador',
+          !!(disco.g20local && disco.g20local.valor === 'loc-prova'), JSON.stringify(disco.g20local || null));
+        // fecha e reabre noutra porta: memoria do navegador em branco e nada escolhido
+        ['g20local', 'g20local__ts'].forEach(k => localStorage.removeItem(k));
+        window.__fundo = undefined; window.__fundoPerguntado = false;
+        await sincronizarDados();
+        diz('e a abertura devolve o local guardado', exLocalSalvo() === 'loc-prova', exLocalSalvo());
+        // e agora a folha, que e o que vai para o papel
+        window.__fundo = exLocalSalvo(); window.__fundoPerguntado = true;
+        exames.push({ id: 9933, tipo: 'abdominal', paciente: 'Timbrado', imagens: [], audios: [],
+          laudo: { cab: { nome: 'Timbrado' }, titulo: 'T', tecnica: 't', corpo: 'Corpo.',
+                   conclusao: 'C.', obs: '' } });
+        _rev2Id = 9933;
+        rev2Preparar();                               // e o que "Aprovar, assinar e imprimir" faz
+        const folhaT = document.querySelector('#areaImpressao .laudoFolha');
+        diz('a folha volta a nascer COM o timbrado depois de fechar e abrir',
+          !!(folhaT && folhaT.classList.contains('comFundo') && folhaT.querySelector('.fundoLaudo')),
+          'comFundo=' + (folhaT && folhaT.classList.contains('comFundo')));
+        diz('e o pacote mandado para a impressora leva a imagem do timbrado',
+          ((impHtmlDoLaudo() || {}).fundo || '').length > 50);
+        // ---- E A FOLHA NUNCA MENTE SOBRE SI MESMA ----
+        // ficha do timbrado ausente (chegou antes de glocais): antes a folha saia branca
+        // MAS com data-fundo apontando um timbrado, e o resto do programa a tratava como
+        // timbrada — margens, moldura e arquivo salvo, todos errados de uma vez.
+        window.__fundo = 'loc-que-nao-existe'; window.__fundoPerguntado = true;
+        rev2Preparar();
+        const folhaX = document.querySelector('#areaImpressao .laudoFolha');
+        diz('timbrado que nao chegou vira folha BRANCA assumida, nao folha que mente',
+          !!folhaX && folhaX.getAttribute('data-fundo') === 'branco'
+          && !folhaX.classList.contains('comFundo'), folhaX && folhaX.getAttribute('data-fundo'));
+        _rev2Id = null;
+        exames = exames.filter(e => e.id !== 9933);
+        window.__fundo = 'branco'; window.__fundoPerguntado = false;
+        localStorage.removeItem('glocais');
       } catch (e) {
         diz('as configuracoes sobrevivem a fechar o programa', false, e.constructor.name + ': ' + e.message);
       }

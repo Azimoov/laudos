@@ -163,12 +163,28 @@ ok(/pendentes\.length\)\{ abrirRevisao\(pendentes\[0\]\.id\); \}/.test(HTML),
 ok(/m==='arquivo'/.test(HTML) && /m==='lista'/.test(HTML),
    'os tres modos de revisao estao implementados, nao so escritos na tela');
 
-console.log('\n=== as escolhas do dia ficam guardadas ===');
-// A tela promete "a escolha de ontem ja vem marcada". Antes, o local voltava
-// para 'branco' a cada abertura do programa.
-ok(/localStorage\.setItem\('g20local'/.test(HTML), 'o local de atendimento e guardado');
-ok(/localStorage\.setItem\('g20modo'/.test(HTML), 'o modo de revisao e guardado');
+console.log('\n=== as escolhas do dia ficam guardadas (NO COMPUTADOR, desde 04/09/2026) ===');
+/* A tela promete "a escolha de ontem ja vem marcada", e ate 04/09 ela nao cumpria: o local
+   era guardado so na memoria do NAVEGADOR, que e por endereco — e o programa serve o app
+   numa porta sorteada a cada abertura. Ou seja, voltava para 'branco' toda vez, e com ele
+   ia embora o TIMBRADO: o laudo nascia em folha branca, calado, e era assinado assim.
+   Foi o que ele relatou em 04/09 ("o laudo esta vindo sem o fundo timbrado").
+   Esta verificacao passou a exigir o DESTINO, nao so o gesto de guardar. */
+const SINCR = (HTML.match(/const DADOS_SINCRONIZADOS = \[[\s\S]*?\];/) || [''])[0];
+ok(/dadoSalvar\('g20local'/.test(HTML) && !/localStorage\.setItem\('g20local'/.test(HTML),
+   'o local de atendimento e guardado — e no disco, nao so no navegador');
+ok(/'g20local'/.test(SINCR), 'e por isso sobrevive a fechar e reabrir o programa');
+ok(/dadoSalvar\('g20modo'/.test(HTML) && /'g20modo'/.test(SINCR),
+   'o modo de revisao tambem');
 ok(/window\.__fundo=k/.test(HTML), 'escolher o local ja troca o timbrado que sai no laudo');
+/* E se a ficha do timbrado nao estiver em FUNDOS na hora de montar a folha, o programa
+   FALA. Antes caia em branco calado, e a chave continuava escrita em data-fundo — uma
+   folha branca que se declarava timbrada. */
+const abrirRev = HTML.slice(HTML.indexOf('function abrirRevisao('), HTML.indexOf('function abrirRevisao(') + 3000);
+ok(/FOLHA BRANCA/.test(abrirRev),
+   'e timbrado que nao chegou e AVISADO, em vez de virar folha branca silenciosa');
+ok(/data-fundo="'\+esc\(_k\)/.test(abrirRev),
+   'com a folha se declarando branca — folha que mente sobre si mesma quebra margem, moldura e arquivo salvo de uma vez');
 
 console.log('\n=== a regra do "corrigindo" chegou ao pedido feito a IA ===');
 // A tela escreve isso como orientacao ao medico. Antes, NADA no pedido a IA

@@ -3176,7 +3176,24 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
    distingue "modelo apagado de propósito" de "modelo que ainda não existia" (ver
    modelosMesclarSalvos). Guardada só no navegador ela sumiria na próxima abertura — a
    porta é sorteada e aquela memória é por endereço — e o programa voltaria a adivinhar. */
-const DADOS_SINCRONIZADOS = ['gmodelos','gmodelos__base','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais','gpaciente'];
+/* ===== 04/09/2026 — AS CONFIGURAÇÕES DELE PASSAM A VIVER NO COMPUTADOR =====
+   Queixa: "todas as vezes que eu abro o programa, mexo nas configurações de impressão e
+   fecho. Quando abro de novo, a caixa 'imprimir sem perguntar' está desmarcada."
+   E estava mesmo, e não era esquecimento do programa: essas escolhas moravam SÓ na memória
+   do navegador, que é POR ENDEREÇO — e o programa serve o app numa porta sorteada a cada
+   abertura. Endereço novo, memória nova, em branco. É a mesma armadilha que apagou a
+   sessão do dia em 17/08 e que fez a lista de modelos-base sumir em 02/09.
+   Todas as escolhas ABAIXO são de dele e valem todo dia; agora vão para o disco, como já
+   iam os modelos e a assinatura:
+     gimpauto  · imprimir sozinho ao liberar        gconferente · segunda leitura do laudo
+     gimpsep   · duas impressoras                   gsomalerta  · aviso sonoro do microfone
+     gimplaudo · qual impressora imprime o laudo    grev2Fonte  · tamanho da letra na revisão
+     gimpimg   · qual imprime as imagens
+   FICAM DE FORA, de propósito: `gmk` (a chave da IA — nunca sai do navegador para cá),
+   `gagente` (o endereço do agente, que muda a cada abertura e chega pela URL) e `gravag`
+   (gravação em curso, que é estado do momento, não escolha). */
+const DADOS_SINCRONIZADOS = ['gmodelos','gmodelos__base','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais','gpaciente',
+  'gimpauto','gimpsep','gimplaudo','gimpimg','gconferente','gsomalerta','grev2Fonte'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -8353,7 +8370,7 @@ function micSom(tipo){
     });
   }catch(e){}
 }
-function micAlternarSom(el){ try{ localStorage.setItem('gsomalerta', el.checked?'1':'0'); }catch(e){} if(el.checked) micSom('reinicio'); }
+function micAlternarSom(el){ dadoSalvar('gsomalerta', el.checked?'1':'0'); if(el.checked) micSom('reinicio'); }
 function micAgoraAgente(){ return micRelAgente + (Date.now()-micRecebidoEm)/1000; }
 function micDesenhar(){
   var c=document.getElementById('vuAgente'); if(!c) return;
@@ -10417,14 +10434,16 @@ function impLigada(){ try{ return localStorage.getItem('gimpauto')==='1'; }catch
 function impSeparadas(){ try{ return localStorage.getItem('gimpsep')==='1'; }catch(e){ return false; } }
 function impEscolhida(qual){ try{ return localStorage.getItem(qual==='imagens'?'gimpimg':'gimplaudo')||''; }catch(e){ return ''; } }
 function impAlternarAuto(el){
-  try{ localStorage.setItem('gimpauto', el.checked?'1':'0'); }catch(e){}
+  /* dadoSalvar, não localStorage: guarda no navegador E manda para o disco do computador.
+     Só no navegador, a escolha morria na próxima abertura — a porta é sorteada. */
+  dadoSalvar('gimpauto', el.checked?'1':'0');
   log(el.checked
     ? 'Impressão automática LIGADA — ao liberar, o laudo sai sozinho na impressora escolhida.'
     : 'Impressão automática DESLIGADA — liberar não imprime nada.');
   impPintarEstado();
 }
 function impAlternarSeparadas(el){
-  try{ localStorage.setItem('gimpsep', el.checked?'1':'0'); }catch(e){}
+  dadoSalvar('gimpsep', el.checked?'1':'0');
   impPintarEstado();
 }
 function impPintarEstado(){
@@ -10433,10 +10452,8 @@ function impPintarEstado(){
 }
 function impSalvarEscolhas(){
   var l=document.getElementById('cfgImpLaudo'), i=document.getElementById('cfgImpImagens');
-  try{
-    if(l) localStorage.setItem('gimplaudo', l.value||'');
-    if(i) localStorage.setItem('gimpimg', i.value||'');
-  }catch(e){}
+  if(l) dadoSalvar('gimplaudo', l.value||'');
+  if(i) dadoSalvar('gimpimg', i.value||'');
 }
 /* A lista vem do Windows, pelo agente. Relida a cada abertura das Configurações: o
    médico avisou que as impressoras não estão necessariamente instaladas nesta máquina,
@@ -10594,7 +10611,7 @@ async function impImprimirAgora(exId){
   }
 }
 function conferenteAlternar(el){
-  try{ localStorage.setItem('gconferente', el.checked?'1':'0'); }catch(e){}
+  dadoSalvar('gconferente', el.checked?'1':'0');
   log(el.checked?'Conferente LIGADO — cada laudo passa por uma segunda leitura antes de sair.'
                 :'Conferente DESLIGADO — os laudos saem sem a segunda leitura.');
 }
@@ -16811,10 +16828,12 @@ function rev2Editou(el){
   rev2Render();
 }
 /* Tamanho da letra NA TELA de revisão (não muda o laudo impresso). Fica
-   guardado: quem precisa de letra maior precisa dela todo dia. */
+   guardado: quem precisa de letra maior precisa dela todo dia — e por isso, desde
+   04/09/2026, no DISCO. Guardado só no navegador ele voltava ao 12 a cada abertura,
+   porque a porta é sorteada e aquela memória é por endereço. */
 function rev2Fonte(px){
   Array.prototype.forEach.call(document.querySelectorAll('#rv2Blocos .txt'), function(el){ el.style.fontSize=px+'px'; });
-  try{ localStorage.setItem('grev2Fonte', String(px)); }catch(e){}
+  dadoSalvar('grev2Fonte', String(px));
 }
 function rev2FonteGuardada(){
   var px; try{ px=localStorage.getItem('grev2Fonte'); }catch(e){}

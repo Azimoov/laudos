@@ -36,17 +36,28 @@ const localStorage = { getItem: k => (k in guardado ? guardado[k] : null), setIt
 const cfg = { modelo: 'gpt-5.5', modeloAux: 'gpt-5-mini' };
 const log = () => {};
 
+/* 04/09/2026 — a escolha do conferente passou a ser guardada por `dadoSalvar` (navegador
+   MAIS disco do computador), e nao mais direto no navegador: guardada so ali ela morria a
+   cada abertura, porque a porta e sorteada. O dubl entra AQUI de verdade, com o pedido ao
+   agente anotado num balde — trocar `dadoSalvar` por um stub vazio esconderia justamente a
+   metade nova. */
+const mandadoAoAgente = [];
+const fetchFalso = (url, opt) => { mandadoAoAgente.push({ url: String(url), opt }); return Promise.resolve(); };
+const agenteBase = () => 'http://127.0.0.1:8999';
+
 const src = [
   (HTML.match(/const CONFERENTE_TIPOS = \[[^\]]*\];/) || [])[0],
   (HTML.match(/const ALERTAS = \[[\s\S]*?\n\];/) || [])[0],
+  (HTML.match(/const DADOS_SINCRONIZADOS = \[[\s\S]*?\];/) || [])[0],
+  grab('dadoTs'), grab('dadoMarcar'), grab('dadoSalvar'),
   grab('conferenteLigado'), grab('conferenteAlternar'), grab('conferenteTipoValido'),
   grab('conferenteGravidade'), grab('conferenteMarca'), grab('conferentePrompt'),
   grab('conferirLaudo'), grab('alertasConferente'), grab('alertaTipoValido')
 ].join('\n');
-const A = new Function('openai', 'localStorage', 'cfg', 'log', src
+const A = new Function('openai', 'localStorage', 'cfg', 'log', 'fetch', 'agenteBase', src
   + '\nreturn {conferenteLigado, conferenteAlternar, conferenteTipoValido, conferenteGravidade,'
   + ' conferenteMarca, conferentePrompt, conferirLaudo, alertasConferente, alertaTipoValido, ALERTAS, CONFERENTE_TIPOS};'
-)(openai, localStorage, cfg, log);
+)(openai, localStorage, cfg, log, fetchFalso, agenteBase);
 const { conferenteLigado, conferenteAlternar, conferenteTipoValido, conferenteGravidade,
         conferenteMarca, conferentePrompt, conferirLaudo, alertasConferente,
         alertaTipoValido, ALERTAS, CONFERENTE_TIPOS } = A;
@@ -270,6 +281,13 @@ conferenteAlternar({ checked: true });
 ok(conferenteLigado() === true, 'religar tambem');
 ok(/id="cfgConferente"/.test(HTML) && /_ck\.checked=conferenteLigado\(\)/.test(HTML),
    'a caixa existe nas Configuracoes E e inicializada com o valor guardado');
+/* 04/09/2026 — e a escolha nao pode morrer ao fechar o programa. Guardada so no navegador
+   ela morria: a memoria do navegador e por ENDERECO e a porta e sorteada a cada abertura. */
+ok(mandadoAoAgente.some(m => m.url.indexOf('/dados/gconferente') >= 0
+                          && m.opt && m.opt.method === 'POST'),
+   'e mexer no interruptor manda a escolha para o COMPUTADOR, nao so para o navegador');
+ok(JSON.parse(mandadoAoAgente.filter(m => m.url.indexOf('/dados/gconferente') >= 0).pop().opt.body).valor === '1',
+   'com o valor certo no pacote');
 
 console.log('=== ligado no app ===');
 ok(/ex\.laudo\.conferencia = await conferirLaudo\(ex\.laudo\)/.test(HTML),

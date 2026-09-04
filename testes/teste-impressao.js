@@ -47,6 +47,39 @@ ok(/getItem\('gimpauto'\)==='1'/.test(ligada),
 ok(/catch\(e\)\{ return false/.test(ligada),
    'e se o navegador negar a memoria, o padrao continua DESLIGADO (nao imprime por engano)');
 
+console.log('\n=== E A ESCOLHA DELE SOBREVIVE A FECHAR O PROGRAMA (04/09/2026) ===');
+/* Queixa dele: "todas as vezes que eu abro o programa, mexo nas configuracoes de impressao
+   e fecho. Quando abro de novo, a caixa 'imprimir sem perguntar' esta desmarcada."
+   A CAUSA: essas escolhas moravam SO na memoria do navegador, que e POR ENDERECO — e o
+   programa serve o app numa porta SORTEADA a cada abertura. Endereco novo, memoria nova,
+   em branco. E a mesma armadilha que apagou a sessao do dia em 17/08.
+   O conserto e o mecanismo que ja existia: DADOS_SINCRONIZADOS + dadoSalvar, que guarda no
+   navegador E no disco do computador, e traz de volta o mais recente na abertura. */
+const SINC = (HTML.match(/const DADOS_SINCRONIZADOS = \[([\s\S]*?)\];/) || [])[1] || '';
+['gimpauto', 'gimpsep', 'gimplaudo', 'gimpimg'].forEach(k =>
+  ok(SINC.indexOf("'" + k + "'") >= 0, "'" + k + "' vai para o disco, nao so para o navegador"));
+/* As outras escolhas da tela de Configuracoes tinham o MESMO defeito, e ele pediu que "as
+   configuracoes tenham memoria duravel" — nao so a caixa da impressao. */
+['gconferente', 'gsomalerta', 'grev2Fonte'].forEach(k =>
+  ok(SINC.indexOf("'" + k + "'") >= 0, "'" + k + "' tambem (segunda leitura, som, tamanho da letra)"));
+/* ⚠️ E o que NAO pode entrar nessa lista, por motivos diferentes e todos serios. */
+ok(SINC.indexOf("'gmk'") < 0, "a chave da IA continua FORA — ela nunca sai do navegador");
+ok(SINC.indexOf("'gagente'") < 0,
+   'e o endereco do agente tambem: ele muda a cada abertura e chega pela URL');
+ok(SINC.indexOf("'gravag'") < 0,
+   'gravacao em curso e estado do momento, nao escolha — nao se guarda');
+/* Guardar em dois lugares com duas funcoes diferentes seria o mesmo defeito voltando pela
+   porta dos fundos: uma delas gravaria so no navegador e a escolha sumiria de novo. */
+[['impAlternarAuto', 'gimpauto'], ['impAlternarSeparadas', 'gimpsep'],
+ ['impSalvarEscolhas', 'gimplaudo'], ['conferenteAlternar', 'gconferente'],
+ ['micAlternarSom', 'gsomalerta'], ['rev2Fonte', 'grev2Fonte']].forEach(par => {
+  const f = grab(par[0]);
+  ok(/dadoSalvar\(/.test(f) && !/localStorage\.setItem/.test(f),
+     par[0] + ' grava por dadoSalvar, e nao mais direto no navegador');
+});
+ok(/preencherCamposConfig\(\)/.test(HTML.slice(HTML.indexOf('r=await sincronizarDados()'))),
+   'e a tela e repintada depois que o disco responde — senao a caixa mostraria o padrao');
+
 console.log('\n=== nenhuma foto marcada = TODAS ===');
 // Esta e a regra que ele pediu explicitamente. Tratar "nada marcado" como zero faria o
 // laudo sair sem foto nenhuma, sem aviso — o silencio dele viraria uma decisao que nao tomou.

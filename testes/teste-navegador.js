@@ -1338,6 +1338,69 @@ const VERIFICACOES = `(async () => {
     _rev2Id = null;
     exames = exames.filter(e => e.id !== 9931 && e.id !== 9932);
 
+    // ---- AS CONFIGURACOES TEM DE SOBREVIVER A FECHAR O PROGRAMA (04/09, queixa dele) ----
+    // "Mexo nas configuracoes de impressao e fecho. Quando abro de novo, a caixa
+    //  'imprimir sem perguntar' esta desmarcada."
+    // A CAUSA: a escolha morava so na memoria do navegador, que e POR ENDERECO, e o
+    // programa serve o app numa porta SORTEADA a cada abertura. Aqui o ciclo inteiro e
+    // encenado — ligar, fechar (memoria do navegador zerada), abrir de novo — contra um
+    // "computador" de mentira que guarda o que recebe.
+    {
+      const fetchAntes2 = window.fetch;
+      const disco = {};
+      // ⚠️ SEM EXPRESSAO REGULAR COM BARRA AQUI. Este arquivo injeta o teste na pagina como
+      // texto entre crases, e ali "\/" vira "/" — um /\/dados$/ chegaria como "//dados$/",
+      // que o navegador le como COMENTARIO e derruba o resto do teste. Custou uma rodada.
+      window.fetch = async (url, opt) => {
+        const u = String(url).split('?')[0];
+        if (u.slice(-6) === '/dados') {
+          const man = {};
+          Object.keys(disco).forEach(k => { man[k] = { ts: disco[k].ts }; });
+          return new Response(JSON.stringify({ ok: true, dados: man }));
+        }
+        const iCh = u.indexOf('/dados/');
+        if (iCh >= 0) {
+          const ch = u.slice(iCh + 7);
+          if (opt && opt.method === 'POST') {
+            const c = JSON.parse(opt.body);
+            disco[ch] = { valor: c.valor, ts: c.ts || Date.now() };
+            return new Response(JSON.stringify({ ok: true }));
+          }
+          if (!disco[ch]) return new Response(JSON.stringify({ ok: false }), { status: 404 });
+          return new Response(JSON.stringify({ ok: true, valor: disco[ch].valor, ts: disco[ch].ts }));
+        }
+        return fetchAntes2(url, opt);
+      };
+      try {
+        impAlternarAuto({ checked: true });          // ele liga a caixa
+        for (let i = 0; i < 40 && !disco.gimpauto; i++) await new Promise(r => setTimeout(r, 25));
+        diz('ligar "imprimir sem perguntar" manda a escolha para o COMPUTADOR',
+          !!(disco.gimpauto && disco.gimpauto.valor === '1'), JSON.stringify(disco.gimpauto || null));
+        // fecha o programa e abre noutra porta: a memoria do navegador nasce em branco
+        ['gimpauto', 'gimpauto__ts'].forEach(k => localStorage.removeItem(k));
+        diz('numa porta nova, o navegador sozinho nao sabe de nada', impLigada() === false);
+        await sincronizarDados();                    // e o que a abertura faz
+        diz('e a abertura traz a escolha de volta do computador — a queixa de 04/09',
+          impLigada() === true, 'gimpauto=' + localStorage.getItem('gimpauto'));
+        // a mesma prova para uma escolha que NAO e caixinha: o NOME da impressora,
+        // escolhido no seletor de verdade
+        const selL = document.getElementById('cfgImpLaudo');
+        selL.innerHTML = '<option value="">(nenhuma escolhida)</option>'
+                       + '<option value="EPSON DE TESTE">EPSON DE TESTE</option>';
+        selL.value = 'EPSON DE TESTE';
+        impSalvarEscolhas();
+        for (let i = 0; i < 40 && !disco.gimplaudo; i++) await new Promise(r => setTimeout(r, 25));
+        ['gimplaudo', 'gimplaudo__ts'].forEach(k => localStorage.removeItem(k));
+        await sincronizarDados();
+        diz('e vale tambem para a impressora escolhida, que e texto e nao interruptor',
+          impEscolhida('laudo') === 'EPSON DE TESTE', impEscolhida('laudo'));
+      } catch (e) {
+        diz('as configuracoes sobrevivem a fechar o programa', false, e.constructor.name + ': ' + e.message);
+      }
+      window.fetch = fetchAntes2;
+      ['gimpauto', 'gimpauto__ts', 'gimplaudo', 'gimplaudo__ts'].forEach(k => localStorage.removeItem(k));
+    }
+
     // ---- TELA "VER O LAUDO FINAL": A EDICAO SOBREVIVE, E COM FERRAMENTAS (26/08, noite) ----
     // O defeito relatado por ele: "salvar e liberar nao esta salvando". A edicao vivia
     // so na folha (DOM); o OBJETO do laudo ficava velho e reaparecia em toda remontagem.

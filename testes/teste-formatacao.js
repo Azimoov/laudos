@@ -122,7 +122,12 @@ ok(/function rev2FmtEsquecer\(\)/.test(HTML)
 
 console.log('=== o tamanho da letra fica guardado ===');
 const fonte = grab('rev2Fonte');
-ok(/localStorage\.setItem\('grev2Fonte'/.test(fonte), 'a escolha e guardada');
+/* 04/09/2026: passou a ser guardada no DISCO do computador, nao so no navegador. "Quem
+   precisa de letra maior precisa dela todo dia" — e guardada so no navegador ela voltava
+   ao 12 a cada abertura, porque a porta e sorteada e aquela memoria e por endereco. */
+ok(/dadoSalvar\('grev2Fonte'/.test(fonte), 'a escolha e guardada');
+ok(/'grev2Fonte'/.test((HTML.match(/const DADOS_SINCRONIZADOS = \[[\s\S]*?\];/) || [''])[0]),
+   'e vai junto para o computador, para sobreviver a fechar o programa');
 ok(/rev2FonteGuardada\(\)/.test(HTML) && /_fsel\.value=String\(_fpx\)/.test(HTML),
    'e volta aplicada (e no seletor) toda vez que a tela e desenhada');
 

@@ -1426,6 +1426,32 @@ const VERIFICACOES = `(async () => {
           'comFundo=' + (folhaT && folhaT.classList.contains('comFundo')));
         diz('e o pacote mandado para a impressora leva a imagem do timbrado',
           ((impHtmlDoLaudo() || {}).fundo || '').length > 50);
+        // ---- A FOTO MANDADA A IMPRESSORA VAI PAGINADA (05/09, relatado por ele) ----
+        // "Veio uma pagina antes da impressao normal com a mascara apenas, sem o texto" e
+        // "o rodape sobrepoe a mascara". A tira ia SEM quebra de pagina: o #areaImpressao
+        // esta dentro da telaRevisao, escondida, e paginarLaudoTela desiste de medir.
+        // So o navegador prova isto — e a prova e o conteudo do pacote, nao o texto do
+        // arquivo: e preciso que a folha ESCONDIDA tenha sido medida mesmo assim.
+        window.__fundo = 'loc-prova'; window.__fundoPerguntado = true;
+        const longo = [];
+        for (let i = 1; i <= 60; i++) longo.push('Paragrafo ' + i + ' do laudo, com texto suficiente para ocupar a largura da folha inteira.');
+        exames.push({ id: 9934, tipo: 'abdominal', paciente: 'Paginado', imagens: [], audios: [],
+          laudo: { cab: { nome: 'Paginado' }, titulo: 'T', tecnica: 't',
+                   corpo: longo.join(NL + NL), conclusao: 'C.', obs: '' } });
+        _rev2Id = 9934;
+        document.getElementById('telaRevisao').style.display = 'none';   // o cenario dele
+        rev2Preparar();
+        diz('o cenario e mesmo o da folha escondida',
+          document.querySelector('#areaImpressao .laudoFolha').clientWidth === 0,
+          'largura ' + document.querySelector('#areaImpressao .laudoFolha').clientWidth);
+        const pacote = impHtmlDoLaudo();
+        diz('e mesmo assim a foto mandada a impressora vai COM quebra de pagina',
+          (pacote.html || '').indexOf('quebraFolha') >= 0);
+        diz('e a tela escondida continua escondida depois da medida',
+          getComputedStyle(document.getElementById('telaRevisao')).display === 'none');
+        exames = exames.filter(e => e.id !== 9934);
+        _rev2Id = 9933;          // o bloco seguinte remonta a folha, e precisa de um laudo
+
         // ---- E A FOLHA NUNCA MENTE SOBRE SI MESMA ----
         // ficha do timbrado ausente (chegou antes de glocais): antes a folha saia branca
         // MAS com data-fundo apontando um timbrado, e o resto do programa a tratava como

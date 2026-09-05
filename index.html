@@ -10530,6 +10530,18 @@ async function impCarregarImpressoras(avisar){
 function impHtmlDoLaudo(){
   var a=document.getElementById('areaImpressao');
   if(!a || !a.innerHTML) return null;
+  /* ⚠️ 05/09/2026 — PAGINAR ANTES DE FOTOGRAFAR. Sem esta linha a foto saía SEM as quebras
+     de página, e o papel mostrava as duas coisas que ele relatou: o rodapé do laudo caindo
+     por cima do rodapé do timbrado, e uma folha a mais só com a máscara.
+     POR QUE FALTAVA: quem pagina é `paginarLaudoTela`, e ela precisa MEDIR a folha. No
+     caminho de "Aprovar, assinar e imprimir", o `#areaImpressao` está dentro da telaRevisão,
+     que está escondida — a folha mede zero e a paginação desiste em silêncio. O caminho da
+     caixa do navegador não sofria disso porque `prepararPapel` já fazia isto no beforeprint;
+     o caminho do computador nunca fez.
+     `rev2PaginarMedindo` é a mesma peça que o beforeprint usa: destrava a tela o instante
+     da medida e a devolve como estava. Medido em 05/09 no laudo de prova: sem ela, a tira
+     tinha tinta até 326,9 mm — 30 mm além do fim da folha. */
+  try{ rev2PaginarMedindo(a); }catch(e){}
   /* 25/08/2026 — A FOTO DA IMPRESSÃO É TIRADA EM "MÍDIA DE TELA": todo o CSS de
      impressão (@page, @media print) é invisível para ela POR CONSTRUÇÃO. A primeira
      versão mandava o innerHTML cru, sem estilo nenhum — o Edge fotografava o texto

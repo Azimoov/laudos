@@ -146,6 +146,24 @@ const htmlLaudo = grab('impHtmlDoLaudo');
 ok(/getElementById\('areaImpressao'\)/.test(htmlLaudo),
    'o HTML mandado e o MESMO no que a impressao do navegador ja usava');
 
+console.log('\n=== E A FOTO VAI PAGINADA (05/09/2026, relatado por ele) ===');
+/* "Veio uma pagina antes da impressao normal com a mascara apenas, sem o texto" e "o
+   rodape sobrepoe a mascara". Medido: a tira fotografada tinha tinta ate 326,9 mm — 30 mm
+   alem do fim da folha — porque ninguem tinha paginado.
+   POR QUE: quem pagina e `paginarLaudoTela`, e ela precisa MEDIR a folha. No caminho de
+   "Aprovar, assinar e imprimir" o #areaImpressao esta dentro da telaRevisao, escondida: a
+   folha mede zero e a paginacao desiste em silencio. O caminho da caixa do navegador nao
+   sofria disso porque `prepararPapel` ja fazia isto no beforeprint. */
+ok(/rev2PaginarMedindo\(a\)/.test(htmlLaudo),
+   'a folha e paginada ANTES de virar foto');
+ok(htmlLaudo.indexOf('rev2PaginarMedindo') < htmlLaudo.indexOf('cloneNode'),
+   'e antes de ser copiada — paginar depois da copia nao mudaria a foto');
+const medindo = grab('rev2PaginarMedindo');
+ok(/display==='none'/.test(medindo) && /tela\.style\.display=antes/.test(medindo),
+   'e a mesma peca do beforeprint: destrava a tela o instante da medida e a devolve como estava');
+ok(/prepararPapel/.test(HTML) && /rev2PaginarMedindo\(alvo\)/.test(grab('prepararPapel')),
+   'os dois caminhos de impressao usam a MESMA paginacao — nao duas contas diferentes');
+
 console.log('\n=== falha de impressora nunca derruba o laudo ===');
 ok(/catch\(e\)\{[\s\S]{0,200}Não consegui falar com o computador para imprimir/.test(imprimir),
    'erro de rede vira aviso, nao excecao');

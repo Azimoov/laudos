@@ -21,7 +21,22 @@ console.log('=== o arquivo vira uma folha A4 inteira ===');
 const cfg = (HTML.match(/var EX_MASCARA_A4=\{[^;]+;/) || [''])[0];
 const dist = grab('exMascaraDistorcao');
 const normalizar = grab('exMascaraParaA4');
-ok(/larg:794,alt:1123/.test(cfg), 'a grade e A4: 794 x 1123 px');
+/* 06/09/2026 — A GRADE ERA 794 x 1123, uma folha A4 a 96 pontos por polegada, e TODO
+   timbrado cadastrado era redesenhado nela: a resolucao do arquivo original morria ali,
+   para sempre. No papel isso e o logo serrilhado — e nenhum ajuste na impressora conserta,
+   porque a informacao ja nao existe no arquivo guardado. Medido em 06/09: o timbrado AME
+   da 3.0 tinha 96 dpi; o MESMO timbrado na 2.0, cadastrado antes desta funcao existir,
+   tem 300. A grade passou a ser 300 dpi, com piso nos 794 de antes. */
+ok(/larg:2480,alt:3508/.test(cfg), 'a grade e A4 em 300 pontos por polegada: 2480 x 3508 px');
+ok(/minLarg:794/.test(cfg), 'e o piso continua sendo a grade antiga, para arquivo pequeno');
+ok(/Math\.min\(EX_MASCARA_A4\.larg, *_oL\)/.test(normalizar),
+   'a tela nunca passa da resolucao DO ARQUIVO DELE — nao se inventa detalhe');
+ok(/Math\.max\(EX_MASCARA_A4\.minLarg/.test(normalizar),
+   'nem desce abaixo do piso');
+ok(/_L\*EX_MASCARA_A4\.alt\/EX_MASCARA_A4\.larg/.test(normalizar),
+   'e a altura sai da largura — a proporcao da folha A4 e o que faz a mascara casar com o papel');
+ok(/imageSmoothingQuality='high'/.test(normalizar),
+   'a reducao faz a media dos pontos, em vez de descartar e serrilhar o logo');
 ok(/drawImage\(im,0,0,c\.width,c\.height\)/.test(normalizar),
    'a imagem e desenhada do primeiro ao ultimo pixel da folha');
 ok(/fillStyle='#fff'/.test(normalizar), 'transparencia recebe fundo branco, sem surpresa no papel');

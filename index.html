@@ -14313,7 +14313,17 @@ function exCadFechar(){ _exCadEditando=null;   // cancelar sai do modo edicao: o
    ja esticava o <img> na tela, mas o arquivo continuava com suas medidas originais e
    caminhos diferentes de impressao podiam interpreta-lo de modo diferente. A copia
    normalizada elimina essa ambiguidade: 794 x 1123 px, a mesma grade usada pela IA. */
-var EX_MASCARA_A4={larg:794,alt:1123,aviso:0.05};
+/* ⚠️ 06/09/2026 — O PROGRAMA ESTAVA JOGANDO FORA A RESOLUÇÃO DO TIMBRADO.
+   Estes números eram 794 × 1123: uma folha A4 a 96 pontos por polegada. TODO timbrado
+   cadastrado era redesenhado nesse tamanho, e a resolução do arquivo original se perdia
+   ali, para sempre. No papel isso é o logo e as letras do timbrado serrilhados — e nenhum
+   ajuste na impressora conserta, porque a informação já não existe no arquivo guardado.
+   Medido em 06/09: o timbrado AME da 3.0 estava com 794×1123 (96 dpi); o mesmo timbrado
+   na 2.0, cadastrado antes deste ajuste existir, tem 2481×3508 (300 dpi).
+   Agora o alvo é 300 dpi, e a regra é: NUNCA jogar resolução fora, NUNCA inventar. A tela
+   usada é a do arquivo dele, limitada a 300 dpi e nunca abaixo dos 96 de antes — ampliar
+   um arquivo pequeno não acrescenta detalhe nenhum e só ocuparia espaço à toa. */
+var EX_MASCARA_A4={larg:2480,alt:3508,minLarg:794,aviso:0.05};
 var _exCadMascaraPreparando=false;
 function exCadMascaraOcupada(sim){
   _exCadMascaraPreparando=!!sim;
@@ -14330,8 +14340,15 @@ function exMascaraParaA4(dataUrl){
     im.onload=function(){
       try{
         var c=document.createElement('canvas');
-        c.width=EX_MASCARA_A4.larg; c.height=EX_MASCARA_A4.alt;
+        /* A tela acompanha o ARQUIVO DELE, entre o piso de 96 dpi e o teto de 300 — ver o
+           comentário de EX_MASCARA_A4. A altura sai da largura para manter a proporção da
+           folha A4 exata, que é o que faz a máscara casar com o papel. */
+        var _oL=im.naturalWidth||im.width||EX_MASCARA_A4.minLarg;
+        var _L=Math.max(EX_MASCARA_A4.minLarg, Math.min(EX_MASCARA_A4.larg, _oL));
+        c.width=_L; c.height=Math.round(_L*EX_MASCARA_A4.alt/EX_MASCARA_A4.larg);
         var x=c.getContext('2d');
+        /* redução suave: sem isto o navegador descarta pontos e serrilha o logo */
+        try{ x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high'; }catch(_){}
         x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
         /* fill, de proposito: ocupa a folha inteira. A confirmacao abaixo protege
            contra uma imagem muito larga, muito alta ou enviada deitada. */

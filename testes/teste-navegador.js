@@ -1466,6 +1466,32 @@ const VERIFICACOES = `(async () => {
         exames = exames.filter(e => e.id !== 9933);
         window.__fundo = 'branco'; window.__fundoPerguntado = false;
         localStorage.removeItem('glocais');
+
+        // ---- O TIMBRADO NAO PODE PERDER RESOLUCAO AO SER CADASTRADO (06/09) ----
+        // "A impressao esta em ma qualidade, as letras estao pixeladas." Uma das causas
+        // estava AQUI: todo timbrado cadastrado era redesenhado em 794x1123 — uma folha A4
+        // a 96 pontos por polegada — e a resolucao do arquivo original morria ali. No papel
+        // isso e o logo serrilhado, e nenhum ajuste na impressora conserta, porque a
+        // informacao ja nao existe no arquivo guardado.
+        const daUrl = (l, a) => {
+          const c = document.createElement('canvas');
+          c.width = l; c.height = a;
+          const x = c.getContext('2d');
+          x.fillStyle = '#fff'; x.fillRect(0, 0, l, a);
+          x.fillStyle = '#000'; x.fillRect(0, 0, l, Math.max(1, Math.round(a * 0.08)));
+          return c.toDataURL('image/png');
+        };
+        const medir = (d) => new Promise(r => {
+          const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = d.img;
+        });
+        const [gl] = await medir(await exMascaraParaA4(daUrl(2480, 3508)));
+        const [ml] = await medir(await exMascaraParaA4(daUrl(1055, 1491)));
+        const [pl, pa] = await medir(await exMascaraParaA4(daUrl(400, 566)));
+        diz('um timbrado de 300 dpi e guardado em 300 dpi', gl === 2480, 'largura ' + gl);
+        diz('e um de resolucao menor guarda a DELE — nao se inventa detalhe', ml === 1055, 'largura ' + ml);
+        diz('com um piso: arquivo pequeno demais sobe para os 794 de antes', pl === 794, 'largura ' + pl);
+        diz('e a proporcao continua a de uma folha A4 exata',
+          Math.abs(pa / pl - 3508 / 2480) < 0.005, pl + 'x' + pa);
       } catch (e) {
         diz('as configuracoes sobrevivem a fechar o programa', false, e.constructor.name + ': ' + e.message);
       }

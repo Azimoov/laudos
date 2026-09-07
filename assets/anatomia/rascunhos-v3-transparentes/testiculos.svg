@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-label="Anatomia bilateral dos testículos, epidídimos e cordões espermáticos">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="48%" r="70%">
+      <stop offset="0" stop-color="#71332f"/>
+      <stop offset="0.55" stop-color="#351514"/>
+      <stop offset="1" stop-color="#050303"/>
+    </radialGradient>
+    <radialGradient id="organ" cx="40%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#ffc0ac"/>
+      <stop offset="0.45" stop-color="#ee806e"/>
+      <stop offset="1" stop-color="#a83e38"/>
+    </radialGradient>
+    <linearGradient id="epi" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f9b49d"/>
+      <stop offset="0.5" stop-color="#d86e60"/>
+      <stop offset="1" stop-color="#90352f"/>
+    </linearGradient>
+    <linearGradient id="cord" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8c5b4"/>
+      <stop offset="1" stop-color="#bd7868"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="texture" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="19" result="noise"/>
+      <feColorMatrix in="noise" values="1 0 0 0 .4  0 .45 0 0 .15  0 0 .35 0 .12  0 0 0 .16 0" result="tint"/>
+      <feBlend in="SourceGraphic" in2="tint" mode="soft-light"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M295 82 C292 220 325 305 366 412" stroke="#361a1d" stroke-width="88"/>
+    <path d="M959 82 C962 220 929 305 888 412" stroke="#361a1d" stroke-width="88"/>
+    <path d="M295 82 C292 220 325 305 366 412" stroke="url(#cord)" stroke-width="76"/>
+    <path d="M959 82 C962 220 929 305 888 412" stroke="url(#cord)" stroke-width="76"/>
+    <path d="M278 88 C278 218 311 302 350 405" stroke="#b52f35" stroke-width="12"/>
+    <path d="M312 88 C307 215 340 300 378 404" stroke="#315f9a" stroke-width="13"/>
+    <path d="M976 88 C976 218 943 302 904 405" stroke="#b52f35" stroke-width="12"/>
+    <path d="M942 88 C947 215 914 300 876 404" stroke="#315f9a" stroke-width="13"/>
+    <path d="M328 98 C344 193 351 298 389 404" stroke="#f4d9c9" stroke-width="16"/>
+    <path d="M926 98 C910 193 903 298 865 404" stroke="#f4d9c9" stroke-width="16"/>
+  </g>
+
+  <g stroke="#54272a" stroke-width="9">
+    <ellipse cx="388" cy="707" rx="230" ry="310" fill="url(#organ)" filter="url(#texture)"/>
+    <ellipse cx="866" cy="707" rx="230" ry="310" fill="url(#organ)" filter="url(#texture)"/>
+  </g>
+  <g fill="none" stroke="#f8cbbb" stroke-width="12" opacity="0.8">
+    <ellipse cx="388" cy="707" rx="213" ry="293"/>
+    <ellipse cx="866" cy="707" rx="213" ry="293"/>
+  </g>
+
+  <g fill="none" stroke="url(#epi)" stroke-width="66" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M250 475 C168 557 160 718 204 850 C222 904 255 954 300 985"/>
+    <path d="M1004 475 C1086 557 1094 718 1050 850 C1032 904 999 954 954 985"/>
+  </g>
+  <g fill="url(#epi)" stroke="#54272a" stroke-width="8">
+    <ellipse cx="276" cy="430" rx="102" ry="76" transform="rotate(-16 276 430)"/>
+    <ellipse cx="978" cy="430" rx="102" ry="76" transform="rotate(16 978 430)"/>
+    <ellipse cx="304" cy="1000" rx="67" ry="49" transform="rotate(24 304 1000)"/>
+    <ellipse cx="950" cy="1000" rx="67" ry="49" transform="rotate(-24 950 1000)"/>
+  </g>
+
+  <g fill="none" stroke-linecap="round">
+    <path d="M319 487 C279 606 280 813 335 939" stroke="#8e3837" stroke-width="5" opacity="0.85"/>
+    <path d="M935 487 C975 606 974 813 919 939" stroke="#8e3837" stroke-width="5" opacity="0.85"/>
+    <path d="M426 473 C398 590 398 831 426 944" stroke="#7e342f" stroke-width="12" opacity="0.75"/>
+    <path d="M828 473 C856 590 856 831 828 944" stroke="#7e342f" stroke-width="12" opacity="0.75"/>
+    <path d="M421 505 C378 536 350 571 325 612 M421 591 C375 620 349 650 328 689 M421 682 C380 707 354 737 334 774 M421 774 C380 800 358 831 342 867" stroke="#f5aa99" stroke-width="6" opacity="0.65"/>
+    <path d="M833 505 C876 536 904 571 929 612 M833 591 C879 620 905 650 926 689 M833 682 C874 707 900 737 920 774 M833 774 C874 800 896 831 912 867" stroke="#f5aa99" stroke-width="6" opacity="0.65"/>
+  </g>
+
+  <g fill="none" stroke="#eab6a6" stroke-width="8" opacity="0.75">
+    <path d="M151 389 C88 532 82 784 142 944 C193 1081 292 1152 421 1155"/>
+    <path d="M1103 389 C1166 532 1172 784 1112 944 C1061 1081 962 1152 833 1155"/>
+    <path d="M421 1155 C505 1170 565 1158 627 1116 C689 1158 749 1170 833 1155"/>
+  </g>
+</svg>

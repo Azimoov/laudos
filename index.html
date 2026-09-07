@@ -7321,22 +7321,46 @@ function _paginarRange(tx, pontos, i){
   else r.setEndBefore(b.node);
   return r;
 }
-/* A ESCADA DE COMPACTAÇÃO (pedido do médico): quando a assinatura sobraria SOZINHA numa
-   folha, o laudo inteiro aperta um degrau — primeiro o espaço entre linhas, depois o
-   tamanho da letra — SEMPRE o mesmo padrão do início ao fim, nunca um trecho espremido e
-   outro não. Para no primeiro degrau em que a assinatura volta para a folha do texto; se
-   nem o último degrau resolver, a folha extra fica, mas a assinatura vai para o PÉ dela. */
+/* ===== A ESCADA DE APERTO — O CONTRATO (frente 3 do plano, escrito em 07/09/2026) =====
+   Quando o laudo não cabe bem, alguma coisa tem de ceder. QUAL cede primeiro é decisão
+   dele, tomada de uma vez, e está aqui — não espalhada pelo código:
+
+     1º  A ENTRELINHA. O olho não percebe meio ponto de espaço entre linhas, e ela sozinha
+         resolve a maioria dos casos. São quatro degraus (1,32 → 1,16).
+     2º  OS AVISOS DE RODAPÉ (as ressalvas depois da conclusão, as referências, o
+         "adotamos o BI-RADS…", o "esclarecemos que a datação…"). São texto de apoio, e
+         ele autorizou descerem até 6 — bem abaixo do laudo.
+     3º  O CORPO DO LAUDO, e só então. Nunca abaixo de 10: é o laudo que o paciente lê.
+     4º  SÓ DEPOIS DISSO, uma folha nova.
+
+   E dois PISOS que não se negociam, porque abaixo deles um laudo deixa de ser legível
+   para quem mais precisa lê-lo:
+     · corpo do laudo — 10
+     · avisos de rodapé — 6
+   Eles são aplicados como TRAVA, não como conta: se um dia alguém acrescentar um degrau
+   mais apertado à escada, o piso continua valendo. Hoje o degrau mais apertado dá 11,96
+   no corpo — a trava nunca dispara, e é assim que tem de ser: ela existe para o dia em
+   que alguém mexer na escada sem lembrar do piso.
+
+   O aperto é SEMPRE UNIFORME, do início ao fim do laudo — nunca um trecho espremido e
+   outro não. Para no primeiro degrau que resolve; se nem o último resolver, a folha extra
+   fica, mas a assinatura vai para o PÉ dela. */
+var PISO_CORPO_PX=10, PISO_AVISO_PX=6;
 var PAG_NIVEIS=[[1.32,1],[1.26,1],[1.21,1],[1.16,1],[1.21,0.96],[1.16,0.96],[1.16,0.92]];
-/* 26/08 (noite) — os degraus do TEXTO FINAL (.laudoExtra, as ressalvas depois da
-   conclusão): 0 = o padrão do CSS (11px); apertou, ele — e SÓ ele — desce para 10, 9 e 8.
-   A conclusão nunca desce ("a conclusão não deve ser reduzida a menos de 10" — ele). */
-var EXTRA_PX=[0,10,9,8];
+/* 26/08 (noite) — os degraus do TEXTO FINAL (.laudoExtra): 0 = o padrão do CSS (11px);
+   apertou, ele — e SÓ ele — desce.
+   07/09/2026: a escada ia até 8 e passou a ir até 6, que é o piso que ele autorizou para
+   os avisos de rodapé. Dois degraus a mais são duas chances a mais de o laudo caber sem
+   gastar uma folha — e é texto de apoio, não o laudo.
+   A CONCLUSÃO nunca desce ("a conclusão não deve ser reduzida a menos de 10" — ele). */
+var EXTRA_PX=[0,10,9,8,7,6];
 function _pagAplicarExtra(folha, px){
   Array.prototype.forEach.call(folha.querySelectorAll('.laudoExtra'), function(el){
     /* data-base = corpo de nascença do texto (mama nasce em 8, o resto em 11 via CSS).
        O degrau só APERTA: nunca devolve o texto a um corpo maior que o de nascença. */
     var base=parseFloat(el.getAttribute('data-base'))||11;
     var alvo=px?Math.min(px, base):base;
+    if(alvo<PISO_AVISO_PX) alvo=PISO_AVISO_PX;      // a trava do piso (ver o contrato acima)
     el.style.fontSize=(alvo===11)?'':(alvo+'px');
   });
 }
@@ -7404,10 +7428,17 @@ function molduraRedesenhar(raiz){
 function _pagAplicarNivel(folha, n){
   var nv=PAG_NIVEIS[Math.min(n, PAG_NIVEIS.length-1)];
   folha.style.lineHeight=String(nv[0]);
-  folha.style.fontSize=(13*nv[1])+'px';
-  /* os blocos com letra própria acompanham na MESMA proporção — padrão único */
-  [['.laudoCab',13],['.laudoTitulo',14],['.rodapeLaudo',10]].forEach(function(par){
-    var el=folha.querySelector(par[0]); if(el) el.style.fontSize=(par[1]*nv[1])+'px';
+  /* A TRAVA DO PISO (ver o contrato da escada). Hoje o degrau mais apertado dá 11,96 e ela
+     nunca dispara — e é assim que tem de ser: ela existe para o dia em que alguém
+     acrescentar um degrau mais apertado sem lembrar que 10 é o chão do laudo. */
+  var _corpo=Math.max(PISO_CORPO_PX, 13*nv[1]);
+  folha.style.fontSize=_corpo+'px';
+  /* os blocos com letra própria acompanham na MESMA proporção — padrão único.
+     O rodapé legal é aviso de rodapé: o chão dele é o dos avisos, não o do laudo. */
+  [['.laudoCab',13,PISO_CORPO_PX],['.laudoTitulo',14,PISO_CORPO_PX],
+   ['.rodapeLaudo',10,PISO_AVISO_PX]].forEach(function(par){
+    var el=folha.querySelector(par[0]);
+    if(el) el.style.fontSize=Math.max(par[2], par[1]*nv[1])+'px';
   });
   folha.setAttribute('data-nivel', String(n));
 }

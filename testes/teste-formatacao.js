@@ -120,6 +120,36 @@ ok(/function rev2FmtEsquecer\(\)/.test(HTML)
    && /rev2FmtEsquecer\(\)/.test(grab('rev2Abrir')),
    'e trocar de laudo esvazia o pincel — formatacao de um paciente nao segue armada no outro');
 
+console.log('=== A ESCADA DE APERTO: o contrato (frente 3 do plano, 07/09/2026) ===');
+/* Quando o laudo nao cabe, alguma coisa cede. QUAL cede primeiro e decisao dele, tomada
+   de uma vez: entrelinha -> avisos de rodape -> corpo do laudo -> folha nova. E dois pisos
+   que nao se negociam, porque abaixo deles o laudo deixa de ser legivel para quem mais
+   precisa le-lo: 10 no laudo, 6 nos avisos (decisao dele, 06/09). */
+ok(/var PISO_CORPO_PX=10, PISO_AVISO_PX=6;/.test(HTML),
+   'os dois pisos estao escritos como numero, num lugar so');
+const nivel = grab('_pagAplicarNivel');
+ok(/Math\.max\(PISO_CORPO_PX, 13\*nv\[1\]\)/.test(nivel),
+   'o corpo do laudo nunca desce abaixo de 10 — trava, nao conta');
+ok(/\['\.rodapeLaudo',10,PISO_AVISO_PX\]/.test(nivel),
+   'e o rodape legal e aviso: o chao dele e o dos avisos, nao o do laudo');
+const extra = grab('_pagAplicarExtra');
+ok(/if\(alvo<PISO_AVISO_PX\) alvo=PISO_AVISO_PX/.test(extra),
+   'os avisos de rodape tem a trava deles');
+/* A escada dos avisos ia ate 8; ele autorizou ate 6. Dois degraus a mais sao duas chances
+   a mais de o laudo caber sem gastar uma folha — e e texto de apoio, nao o laudo. */
+ok(/var EXTRA_PX=\[0,10,9,8,7,6\];/.test(HTML),
+   'e a escada deles vai ate o piso que ele autorizou, nao para antes');
+ok(/1º  A ENTRELINHA/.test(HTML) && /4º  SÓ DEPOIS DISSO, uma folha nova/.test(HTML),
+   'e a ordem do que cede primeiro esta escrita, nao espalhada pelo codigo');
+/* A escada mais apertada de hoje da 11,96 no corpo: a trava nunca dispara. Ela existe
+   para o dia em que alguem acrescentar um degrau sem lembrar do piso — e esta conta
+   guarda esse dia. */
+const niveis = (HTML.match(/var PAG_NIVEIS=\[[\s\S]*?\];/) || [''])[0];
+const fatores = (niveis.match(/,\s*([\d.]+)\]/g) || []).map(s => parseFloat(s.replace(/[,\]\s]/g, '')));
+const menorFator = fatores.length ? Math.min.apply(null, fatores) : 1;
+ok(13 * menorFator >= 10,
+   'nenhum degrau da escada de hoje pede menos que o piso  [' + (13 * menorFator).toFixed(2) + ']');
+
 console.log('=== o tamanho da letra fica guardado ===');
 const fonte = grab('rev2Fonte');
 /* 04/09/2026: passou a ser guardada no DISCO do computador, nao so no navegador. "Quem

@@ -200,11 +200,34 @@ const MONTAR = (n) => `(() => {
   ['.laudoCab', '.laudoTitulo', '.laudoTexto', '.laudoCorpoBox', '.assin', '.rodapeLaudo']
     .forEach((sel) => {
       const el = f.querySelector(sel); if (!el) return;
-      const r = el.getBoundingClientRect();
+      const r = el.getBoundingClientRect(), c2 = getComputedStyle(el);
       blocos[sel] = { deMm: +((r.top - fr.top) / pxmm).toFixed(1),
-                      ateMm: +((r.bottom - fr.top) / pxmm).toFixed(1) };
+                      ateMm: +((r.bottom - fr.top) / pxmm).toFixed(1),
+                      larguraPx: +r.width.toFixed(1), fonte: c2.fontSize,
+                      entrelinha: c2.lineHeight, espacoBranco: c2.whiteSpace,
+                      familia: (c2.fontFamily || '').slice(0, 22),
+                      linhas: Math.round(r.height / (parseFloat(c2.lineHeight) || 1)) };
     });
+  /* A REGUA DA LETRA. Largura, corpo e entrelinha podem bater e o texto ainda assim
+     quebrar noutro lugar — basta a FONTE resolvida ser outra. Medir uma frase conhecida e
+     o unico jeito de comparar duas paginas sem acreditar no que elas declaram. */
+  let reguaPx = -1;
+  try {
+    const alvoR = f.querySelector('.laudoTexto');
+    const sp = document.createElement('span');
+    sp.style.cssText = 'white-space:pre;position:absolute;visibility:hidden';
+    sp.textContent = 'Paragrafo 1 do laudo de bancada, com texto suficiente';
+    alvoR.appendChild(sp);
+    reguaPx = +sp.getBoundingClientRect().width.toFixed(1);
+    alvoR.removeChild(sp);
+  } catch (e) { /* medida de apoio: nao pode derrubar a bancada */ }
+  const _txEl = f.querySelector('.laudoTexto');
   const resposta = {
+    textoHtmlLen: _txEl ? _txEl.innerHTML.length : -1,
+    textoTxtLen: _txEl ? (_txEl.innerText || '').length : -1,
+    quebrasNoTexto: _txEl ? _txEl.querySelectorAll('.quebraFolha').length : -1,
+    brsNoTexto: _txEl ? _txEl.querySelectorAll('br').length : -1,
+    reguaPx: reguaPx,
     blocos: blocos,
     reservaTopoMm: +((parseFloat(cs.paddingTop) || 0) / pxmm).toFixed(1),
     reservaBaseMm: +((parseFloat(cs.paddingBottom) || 0) / pxmm).toFixed(1),
@@ -273,9 +296,15 @@ const MONTAR = (n) => `(() => {
         + ' · reserva ' + r.reservaTopoMm + '/' + r.reservaBaseMm + ' mm'
         + ' · degrau ' + (r.nivel || '0')
         + (r.vaos.length ? (' · vaos ' + r.vaos.map(v => v.deMm + '→' + v.ateMm).join(', ')) : ' · sem vao'));
+      console.log('      folha ' + r.largFolha + ' px de largura · regua da letra ' + r.reguaPx + ' px');
       console.log('      blocos: ' + Object.keys(r.blocos)
         .map(k => k.replace('.laudo', '').replace('.', '') + ' ' + r.blocos[k].deMm + '→' + r.blocos[k].ateMm)
         .join(' | '));
+      const _tx = r.blocos['.laudoTexto'];
+      if (_tx) console.log('      texto: ' + _tx.larguraPx + ' px · ' + _tx.fonte + '/'
+        + _tx.entrelinha + ' · ' + _tx.linhas + ' linhas · html ' + r.textoHtmlLen
+        + ' ch · visivel ' + r.textoTxtLen + ' ch · ' + r.quebrasNoTexto + ' vao(s), '
+        + r.brsNoTexto + ' br · white-space ' + _tx.espacoBranco);
       // REGRA 1 — a folha da assinatura tem de ter texto do laudo
       ok(r.pagAssinatura >= 0 && r.pagAssinatura === r.pagFimDoTexto,
          '   regra 1: a assinatura nao fica sozinha na folha',

@@ -156,6 +156,16 @@ console.log('\n=== E A FOTO VAI PAGINADA (05/09/2026, relatado por ele) ===');
    sofria disso porque `prepararPapel` ja fazia isto no beforeprint. */
 ok(/rev2PaginarMedindo\(a\)/.test(htmlLaudo),
    'a folha e paginada ANTES de virar foto');
+/* 07/09/2026 — DOIS PIXELS, 33 MILIMETROS. A borda da folha era APAGADA aqui
+   (`f.style.border='0'`), e como a folha tem box-sizing:border-box isso devolvia 2 px de
+   largura ao texto. Com a linha cheia, metade dos paragrafos que ocupavam duas linhas
+   passava a caber em uma: medido no laudo de bancada, 75 linhas na tela e 63 na foto.
+   As 12 linhas de diferenca davam 33 mm — e 33 mm era exatamente o quanto o texto subia na
+   folha 2, imprimindo POR CIMA do cabecalho do timbrado, porque os vaos de quebra tinham
+   sido calculados na regua de 792 px e o papel era desenhado na de 794.
+   Tirar so a COR mantem a caixa identica nas duas telas. */
+ok(/borderColor='transparent'/.test(htmlLaudo) && !/style\.border='0'/.test(htmlLaudo),
+   'e a borda da folha fica no lugar, so invisivel — tira-la mudaria a largura do texto');
 ok(htmlLaudo.indexOf('rev2PaginarMedindo') < htmlLaudo.indexOf('cloneNode'),
    'e antes de ser copiada — paginar depois da copia nao mudaria a foto');
 const medindo = grab('rev2PaginarMedindo');

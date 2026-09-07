@@ -145,10 +145,16 @@ const PREPARAR = `(() => {
 // Monta um laudo com N paragrafos, pagina, e devolve o que a CAMADA A precisa saber.
 // A folha e medida DESTRAVANDO a tela o instante da medida (rev2PaginarMedindo), que e
 // o que o proprio programa faz ao imprimir.
-const MONTAR = (n) => `(() => {
+const MONTAR = (n, comTitulos) => `(() => {
   exames = exames.filter(e => e.id !== 7700);
   const ps = [];
-  for (let i = 1; i <= ${n}; i++) ps.push('Paragrafo ' + i + ' do laudo de bancada, com texto suficiente para ocupar a largura da folha inteira e obrigar a quebra de linha.');
+  for (let i = 1; i <= ${n}; i++) {
+    /* Com titulos: um "**ORGAO N**" sozinho antes de cada paragrafo. E o caso da orfa —
+       basta um deles cair no pe da folha para o leitor virar a pagina sem saber de que
+       orgao esta lendo. */
+    if (${!!comTitulos}) ps.push('**ORGAO ' + i + '**');
+    ps.push('Paragrafo ' + i + ' do laudo de bancada, com texto suficiente para ocupar a largura da folha inteira e obrigar a quebra de linha.');
+  }
   exames.push({ id: 7700, tipo: 'abdominal', paciente: 'Bancada', imagens: [], audios: [],
     laudo: { cab: { nome: 'Bancada', idade: '60 anos', realizado_em: '06/09/2026', dados_clinicos: '' },
              titulo: 'ULTRASSONOGRAFIA DE BANCADA', tecnica: 'Tecnica do exame.',
@@ -221,8 +227,36 @@ const MONTAR = (n) => `(() => {
     reguaPx = +sp.getBoundingClientRect().width.toFixed(1);
     alvoR.removeChild(sp);
   } catch (e) { /* medida de apoio: nao pode derrubar a bancada */ }
+  /* ORFAS: um titulo ("ORGAO 7") que fica no PE de uma folha com o texto dele na
+     seguinte. Procurado no desenho, onde ainda se sabe o que e cada pedaco: no papel
+     seria so tinta. Um <b> conta como titulo quando esta sozinho na sua linha. */
+  const orfaos = [];
+  try {
+    const txO = f.querySelector('.laudoTexto');
+    Array.prototype.forEach.call(txO.querySelectorAll('b, strong'), (b) => {
+      const t = (b.innerText || '').replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 60 || /[.!?]$/.test(t)) return;
+      const rb = b.getBoundingClientRect();
+      if (!rb.height) return;
+      const pagT = Math.floor((rb.top - fr.top + 1) / pageH);
+      // o que vem logo depois deste titulo, no fluxo
+      let dep = b.nextSibling, alvo = null;
+      for (let g = 0; g < 6 && dep; g++, dep = dep.nextSibling) {
+        const rg2 = document.createRange();
+        try { rg2.selectNodeContents(dep); } catch (e) { continue; }
+        const rr = rg2.getBoundingClientRect();
+        if (rr && rr.height && (rr.top - fr.top) > (rb.bottom - fr.top) - 1) { alvo = rr.top - fr.top; break; }
+      }
+      if (alvo == null) return;
+      if (Math.floor((alvo + 1) / pageH) > pagT) {
+        orfaos.push({ titulo: t.slice(0, 24), naFolha: pagT + 1,
+                      textoNaFolha: Math.floor((alvo + 1) / pageH) + 1 });
+      }
+    });
+  } catch (e) { /* medida de apoio */ }
   const _txEl = f.querySelector('.laudoTexto');
   const resposta = {
+    orfaos: orfaos,
     textoHtmlLen: _txEl ? _txEl.innerHTML.length : -1,
     textoTxtLen: _txEl ? (_txEl.innerText || '').length : -1,
     quebrasNoTexto: _txEl ? _txEl.querySelectorAll('.quebraFolha').length : -1,
@@ -271,11 +305,18 @@ const MONTAR = (n) => `(() => {
 
     // ---- acha o ponto de virada: quantos paragrafos ainda cabem em UMA folha
     console.log('\n=== os casos-limite se ajustam sozinhos ===');
+    /* Busca em dois tempos: passo largo ate passar da virada, depois um a um para tras.
+       Passo fino desde o comeco custava ate 40 montagens; assim custa umas 10, e a
+       bancada ja e a suite mais cara da bateria. */
     let cabe = 1, virou = 0;
-    for (let n = 2; n <= 80; n += 2) {
+    for (let n = 4; n <= 80; n += 4) {
       const r = await naPagina(cdp, MONTAR(n));
       if (r.paginas > 1) { virou = n; break; }
       cabe = n;
+    }
+    for (let n = virou - 1; n > cabe; n--) {
+      const r = await naPagina(cdp, MONTAR(n));
+      if (r.paginas > 1) virou = n; else { cabe = n; break; }
     }
     ok(virou > 0, 'achei quantos paragrafos fazem o laudo virar a folha',
        'cabe ' + cabe + ', vira em ' + virou);
@@ -285,12 +326,16 @@ const MONTAR = (n) => `(() => {
       { nome: 'quase uma folha', n: cabe },
       { nome: 'uma linha alem', n: virou },
       { nome: 'duas folhas cheias', n: virou * 2 },
+      /* 07/09 — o caso das ORFAS: um titulo por paragrafo, ao longo de tres folhas.
+         Com tantos titulos, algum cai no pe de uma folha por construcao — e e ai que a
+         regra 4 tem de agir. Sem um caso assim, a regra ficaria escrita e nao provada. */
+      { nome: 'com titulos', n: Math.max(6, Math.round(virou * 1.2)), titulos: true },
     ];
 
     console.log('\n=== CAMADA A — as regras medidas no desenho ===');
     const medidos = [];
     for (const caso of CASOS) {
-      const r = await naPagina(cdp, MONTAR(caso.n));
+      const r = await naPagina(cdp, MONTAR(caso.n, !!caso.titulos));
       medidos.push({ caso, r });
       console.log('  · ' + caso.nome + ' (' + caso.n + ' paragrafos): ' + r.paginas + ' folha(s)'
         + ' · reserva ' + r.reservaTopoMm + '/' + r.reservaBaseMm + ' mm'
@@ -314,6 +359,13 @@ const MONTAR = (n) => `(() => {
          '   regra 2: nenhuma letra do laudo abaixo de ' + PISO_CORPO, 'menor ' + r.menorCorpo);
       ok(r.menorAviso === 999 || r.menorAviso >= PISO_AVISO,
          '   regra 2: nem os avisos de rodape abaixo de ' + PISO_AVISO, 'menor ' + r.menorAviso);
+      /* REGRA 4 — nenhum titulo dorme sozinho no pe da folha. "MAMA ESQUERDA" no fim de
+         uma pagina e o texto dela na seguinte faz o leitor virar a folha sem saber de que
+         lado esta lendo. Mesma familia da regra 1: o que nao pode e uma CABECA sem corpo. */
+      ok(r.orfaos.length === 0,
+         '   regra 4: nenhum titulo fica sozinho no pe da folha',
+         r.orfaos.length ? r.orfaos.map(o => '"' + o.titulo + '" na ' + o.naFolha
+           + ' com o texto na ' + o.textoNaFolha).join(' · ') : 'nenhuma orfa');
       // e a folha foi mesmo paginada antes de virar foto
       ok(r.paginas === 1 || r.temQuebra,
          '   a foto mandada a impressora vai paginada');

@@ -78,7 +78,7 @@ const SUITE = [
   { arq: 'teste-repositorio.js', o: 'repositorio unico de exames (dias que abrem, tres sinais, audio e fotos)' },
   { arq: 'teste-reabrir-exame.js', o: 'Reabrir exame nao joga o medico na interface antiga' },
   { arq: 'teste-moldura-timbrado-proprio.js', o: 'a caixa do texto nao descola do texto (timbrado proprio, medido em papel)' },
-  { arq: 'teste-bancada-impressao.js', o: 'bancada de impressao: as 4 regras de layout, na folha composta' },
+  { arq: 'teste-bancada-impressao.js', o: 'bancada de impressao: as 4 regras de layout, na folha composta', lento: true },
   { arq: 'teste-orads-diametro.js', o: 'O-RADS: o maior diametro escrito no laudo vale, e da para responder' },
   { arq: 'teste-faixa-apontada.js', o: 'a IA aponta a POSICAO no ditado (fim da caca a citacao)' },
   { arq: 'teste-tela-provedor-ia.js', o: 'tela nova do Provedor de IA (espelha os campos antigos, um salvar so)' },
@@ -137,8 +137,14 @@ for (const t of SUITE) {
   if (t.py && !temPy) { console.log('  --   ' + t.o + ' (sem Python)'); pulou++; continue; }
   if (t.agente && !temAgente) { console.log('  --   ' + t.o + ' (agente fora do ar)'); pulou++; continue; }
   try {
-    const saida = t.py ? execFileSync(PY, [caminho], { encoding: 'utf8', timeout: 120000 })
-                       : execFileSync('node', [caminho], { encoding: 'utf8', timeout: 120000 });
+    /* 07/09/2026 — SUITES LENTAS TEM PRAZO PROPRIO. A bancada de impressao compoe folhas
+       DE VERDADE (Edge fotografa, o ps1 desenha pagina a pagina) e passa dos 2 minutos.
+       Com o prazo unico ela era MORTA no meio e aparecia aqui como "X" sem uma linha de
+       explicacao — uma suite verde sendo acusada de vermelha, que e o pior tipo de alarme:
+       ensina a ignorar o alarme. */
+    const prazo = t.lento ? 900000 : 120000;
+    const saida = t.py ? execFileSync(PY, [caminho], { encoding: 'utf8', timeout: prazo })
+                       : execFileSync('node', [caminho], { encoding: 'utf8', timeout: prazo });
     const n = (saida.match(/^\s*ok\s/gm) || []).length;
     console.log('  OK   ' + t.o + (n ? '  (' + n + ' verificacoes)' : ''));
     ok++;

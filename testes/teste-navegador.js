@@ -820,17 +820,33 @@ const VERIFICACOES = `(async () => {
     diz('assinatura e rodape na MESMA folha', mLongo.juntos);
     diz('a assinatura NUNCA fica numa folha sem texto', !mLongo.orfa);
     diz('e ancora exatamente no pe da ultima folha', mLongo.naBase);
-    // o cenario que forca a ESCADA: texto terminando rente ao fim da folha
-    let pgLinhas = '';
-    for (let li = 0; li < 8; li++) pgLinhas += 'Linha de ajuste fino do comprimento do laudo, numero ' + (li + 1) + ', escrita para empurrar o texto ate muito perto do fim da folha.\\n\\n';
-    exames.push({ id: 9903, tipo: 'abdominal', paciente: 'Teste Escada',
-      laudo: { cab: { nome: 'Teste Escada' }, titulo: MODELOS.abdominal.titulo,
-               tecnica: MODELOS.abdominal.tecnica,
-               corpo: (MODELOS.abdominal.corpo + '\\n\\n') + MODELOS.abdominal.corpo + '\\n\\n' + pgLinhas,
-               conclusao: 'Exame ecográfico compatível com a normalidade.', obs: '' } });
-    abrirRevisao(9903);
-    paginarLaudoTela();
-    const mRente = pgMede();
+    /* O cenario que forca a ESCADA: texto terminando rente ao fim da folha.
+       ⚠️ 07/09/2026 — ELE PASSOU A SE AJUSTAR SOZINHO. Antes eram 8 linhas cravadas, e o
+       laudo caia "rente" por sorte da entrelinha do dia. Quando a paginacao ganhou pontos
+       de quebra novos (o titulo em negrito virou unidade propria), esse mesmo laudo
+       deixou de ficar rente: a escada nao precisava mais apertar, e a verificacao passou
+       a cobrar um aperto que nao fazia falta. Numero cravado envelhece calado — e um
+       caso-limite que deixou de ser limite cobra o programa pelo motivo errado.
+       Agora o teste PROCURA o comprimento que deixa o laudo rente. */
+    const pgMonta = (linhas) => {
+      let t = '';
+      for (let li = 0; li < linhas; li++) t += 'Linha de ajuste fino do comprimento do laudo, numero ' + (li + 1) + ', escrita para empurrar o texto ate muito perto do fim da folha.\\n\\n';
+      exames = exames.filter(e => e.id !== 9903);
+      exames.push({ id: 9903, tipo: 'abdominal', paciente: 'Teste Escada',
+        laudo: { cab: { nome: 'Teste Escada' }, titulo: MODELOS.abdominal.titulo,
+                 tecnica: MODELOS.abdominal.tecnica,
+                 corpo: (MODELOS.abdominal.corpo + '\\n\\n') + MODELOS.abdominal.corpo + '\\n\\n' + t,
+                 conclusao: 'Exame ecográfico compatível com a normalidade.', obs: '' } });
+      abrirRevisao(9903);
+      paginarLaudoTela();
+      return pgMede();
+    };
+    let mRente = null;
+    for (let linhas = 2; linhas <= 40; linhas++) {
+      const m = pgMonta(linhas);
+      if (+m.nivel > 0) { mRente = m; break; }        // achou o comprimento que aperta
+      mRente = m;
+    }
     diz('texto rente ao fim da folha: a ESCADA aperta a entrelinha (nivel ' + mRente.nivel + ')',
       +mRente.nivel > 0);
     diz('e a assinatura volta para a folha do texto, no pe dela',
@@ -943,10 +959,18 @@ const VERIFICACOES = `(async () => {
     const fimL = rdL.getBoundingClientRect().bottom - frL.top;
     const puL = Math.floor((fimL - 2) / phL);
     const utL = phL - parseFloat(csL.paddingTop) - parseFloat(csL.paddingBottom);
-    diz('laudo comprido: a escada aperta um degrau para nao gastar folha a toa',
-      +fL.getAttribute('data-nivel') > 0, 'nivel ' + fL.getAttribute('data-nivel'));
-    diz('e a ultima folha dele tambem sai aproveitada',
-      (fimL - (puL * phL + parseFloat(csL.paddingTop))) / utL >= 0.6);
+    /* ⚠️ 07/09/2026 — ESTA VERIFICACAO COBRAVA O MEIO, NAO O FIM. Ela exigia que a escada
+       APERTASSE ("data-nivel > 0"). Mas apertar e o MEIO; o fim que ele pediu e "nenhuma
+       folha desperdicada". Quando a paginacao ganhou pontos de quebra novos (o titulo em
+       negrito virou unidade propria), este mesmo laudo passou a aproveitar as folhas SEM
+       precisar apertar — e a verificacao reprovou o programa por ter melhorado.
+       Agora cobra o fim: ou a folha sai aproveitada, ou a escada apertou tentando. */
+    const usoL = (fimL - (puL * phL + parseFloat(csL.paddingTop))) / utL;
+    diz('laudo comprido: ou a folha sai aproveitada, ou a escada apertou tentando',
+      usoL >= 0.6 || +fL.getAttribute('data-nivel') > 0,
+      'uso ' + Math.round(usoL * 100) + '% · nivel ' + fL.getAttribute('data-nivel'));
+    diz('e a ultima folha dele tambem sai aproveitada', usoL >= 0.6,
+      Math.round(usoL * 100) + '%');
     // e o laudo que JA cabia nao e apertado a toa
     exames.push({ id: 9905, tipo: 'abdominal', paciente: 'Teste Curto', imagens: [], audios: [],
       laudo: { cab: { nome: 'Teste Curto' }, titulo: MODELOS.abdominal.titulo,

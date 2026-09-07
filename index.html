@@ -7227,13 +7227,24 @@ function folhaHtmlLimpo(){
    procurados TAMBÉM dentro dos nós de texto, por posição de caractere; na hora de
    inserir o vão, o nó é dividido ali (splitText). */
 function _paginarPontos(tx){
-  var pontos=[], aposBr=false, comecou=false;
+  var pontos=[], aposBr=false, comecou=false, aposNL=false;
   var kids=Array.prototype.slice.call(tx.childNodes);
   for(var i=0;i<kids.length;i++){
     var n=kids[i];
     if(n.nodeType===1 && n.tagName==='BR'){ aposBr=true; continue; }
     if(n.nodeType===3 && !n.textContent.trim() && !comecou) continue;
+    /* ⚠️ 07/09/2026 — UM TÍTULO EM NEGRITO QUE ABRE LINHA É UMA UNIDADE PRÓPRIA.
+       Sem isto, "**MAMA ESQUERDA**" ficava colado no FIM do parágrafo anterior: o
+       programa via um pedaço só, empurrava o texto de baixo para a folha seguinte e
+       deixava o título para trás — a órfã clássica, e nenhuma regra podia impedir,
+       porque o título não existia como peça separada.
+       Só quando ABRE LINHA (o nó de texto anterior termina em quebra): "**mioma**" no
+       meio de uma frase não é título e não pode virar ponto de quebra. */
+    if(n.nodeType===1 && /^(B|STRONG)$/i.test(n.tagName) && aposNL && comecou && !aposBr){
+      pontos.push({node:n, off:0});
+    }
     if(!comecou || aposBr){ pontos.push({node:n, off:0}); comecou=true; aposBr=false; }
+    aposNL=(n.nodeType===3) ? /\n[ \t]*$/.test(n.textContent) : false;
     if(n.nodeType===1 && /^(DIV|TABLE|P)$/i.test(n.tagName)){
       /* 25/08 — UM BLOCO QUE TRAZ VÁRIOS CARTÕES PODE SER DIVIDIDO. O esquema da mama
          traz um cartão por mama: sem isto ele era uma peça só, e quando não cabia no fim
@@ -7259,6 +7270,46 @@ function _paginarPontos(tx){
     }
   }
   return pontos;
+}
+/* ===== 07/09/2026 — O QUE CONTA COMO TÍTULO (frente 4 do plano) =====
+   Não há marcação de título no laudo: o médico escreve "**MAMA ESQUERDA**" ou
+   "**Fígado:**" e o negrito é a única pista. Então o reconhecimento é pela FORMA, e de
+   propósito conservador — errar para menos deixa um título órfão (feio); errar para mais
+   empurra texto de verdade para a folha seguinte (pior, gasta papel).
+   É título quando: cabe numa linha curta, NÃO termina em ponto final, e ou está todo em
+   negrito ou termina em dois-pontos. "Mama simétrica." tem ponto e não passa; "Fígado:"
+   passa; "MAMA ESQUERDA" passa. */
+function _pagTextoDaUnidade(u, tx, pontos){
+  try{
+    if(u.tipo==='el') return (u.el.innerText||u.el.textContent||'');
+    if(u.tipo==='duo') return '';
+    return String(_paginarRange(tx, pontos, u.i).toString()||'');
+  }catch(e){ return ''; }
+}
+function _pagEhTitulo(u, tx, pontos){
+  var t=_pagTextoDaUnidade(u, tx, pontos).replace(/\s+/g,' ').trim();
+  if(!t || t.length>60) return false;
+  if(/[.!?]$/.test(t)) return false;
+  if(/:$/.test(t)) return true;
+  /* todo em negrito: a unidade inteira dentro de <b>/<strong> */
+  try{
+    var no=(u.tipo==='el')?u.el:pontos[u.i].node;
+    var el=(no.nodeType===1)?no:no.parentElement;
+    if(el && el.closest && el.closest('b,strong')) return true;
+  }catch(e){}
+  return /^[^a-z]+$/.test(t) && /[A-ZÁÂÃÉÊÍÓÔÕÚÇ]/.test(t);   // TUDO EM MAIÚSCULAS
+}
+function _pagCaixaDaUnidade(u, tx, pontos, folha){
+  try{
+    var rg;
+    if(u.tipo==='el'){ rg=document.createRange(); rg.selectNode(u.el); }
+    else if(u.tipo==='duo'){ rg=document.createRange(); rg.setStartBefore(u.ini); rg.setEndAfter(u.fim); }
+    else rg=_paginarRange(tx, pontos, u.i);
+    var rc=rg.getBoundingClientRect();
+    if(!rc || !rc.height) return null;
+    var ft=folha.getBoundingClientRect().top;
+    return {topo:rc.top-ft, base:rc.bottom-ft, alt:rc.height};
+  }catch(e){ return null; }
 }
 /* Um Range do ponto i até o ponto i+1 (ou até o fim do texto) — só para MEDIR. */
 function _paginarRange(tx, pontos, i){
@@ -7592,6 +7643,26 @@ function _paginarMiolo(folha, pageH, topPx, botPx, util, mold){
     else if(pag>0 && (top-pag*pageH)<topPx+folg-1) alvo=pag*pageH+topPx+folg;
     /* unidade que atravessa o RODAPÉ da folha: desce para a próxima — só se couber lá */
     else if(bottom>limite-folg+1 && alt<=util-2*folg) alvo=(pag+1)*pageH+topPx+folg;
+    /* ===== 07/09/2026 — TÍTULO NÃO DORME SOZINHO NO PÉ DA FOLHA (frente 4 do plano) =====
+       "MAMA ESQUERDA" no fim de uma página e o texto dela na seguinte é a órfã clássica:
+       o leitor vira a folha sem saber de que lado está lendo. É a mesma família da regra 1
+       dele (a assinatura nunca sozinha) — o que não pode é uma CABEÇA sem o corpo.
+       A pergunta é só uma: o que vem DEPOIS deste título cai na mesma folha? Se não cai, o
+       título desce junto. Como as unidades seguintes fluem atrás dele, empurrar o título
+       leva o texto junto sem precisar mexer em mais nada. */
+    else if(_pagEhTitulo(u, tx, pontos) && alt<=util-2*folg){
+      /* ⚠️ A PERGUNTA É ONDE O PRÓXIMO VAI PARAR, NÃO ONDE ELE ESTÁ. Neste ponto da
+         varredura a unidade seguinte ainda não foi empurrada — ela está logo abaixo do
+         título, na mesma folha. Olhar a posição dela agora responde sempre "estão juntos",
+         e a regra nunca dispararia. Foi assim na primeira versão, em 07/09: a bancada
+         continuou achando o título órfão com a regra escrita e ligada.
+         O que se pergunta é: o que vem depois AINDA CABE nesta folha? Se não cabe, ele vai
+         descer na volta seguinte — e então o título tem de descer junto, agora.
+         Só se o seguinte for empurrável: um bloco maior que a folha inteira não desce
+         (ficaria eternamente atravessando), e aí descer o título só gastaria papel. */
+      var _px=(i+1<un.length)?_pagCaixaDaUnidade(un[i+1], tx, pontos, folha):null;
+      if(_px && _px.base>limite-folg+1 && _px.alt<=util-2*folg) alvo=(pag+1)*pageH+topPx+folg;
+    }
     if(alvo==null) continue;
     /* o ponto de inserção: elemento é direto; parágrafo no meio de um nó de texto
        divide o nó ali (splitText) e reaponta os pontos seguintes do MESMO nó */

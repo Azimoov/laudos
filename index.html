@@ -7737,6 +7737,10 @@ function abrirRevisao(exId, semTela){
   }
   var _fnd = FUNDOS[_k] || FUNDOS.branco;
   var _temFundo = !!(_fnd && _fnd.img);
+  /* 07/09/2026 — A RESERVA MENOR QUE O TIMBRADO É DITA AQUI, não descoberta no papel.
+     A reserva é a escolha dele; a medida é o desenho. Quando a primeira fica menor que a
+     segunda, o texto nasce POR CIMA do logo — e até hoje isso só aparecia impresso. */
+  if(_temFundo) try{ exAvisarReserva(_k, _fnd); }catch(e){}
   if(_k!=='branco' && !_temFundo){
     /* Folha branca quando ele pediu timbrado é erro que só aparece no papel, depois de
        assinado. Dizer aqui custa uma linha; não dizer custa o laudo. */
@@ -14179,6 +14183,57 @@ function exMargemValida(v,padrao){
   v=parseFloat(v);
   return isFinite(v) && v>=15 && v<=80 ? v : padrao;
 }
+/* ===== 07/09/2026 — A MÁSCARA PASSA A DIZER O PRÓPRIO TAMANHO (frente 2 do plano) =====
+   Até aqui o médico DIGITAVA quanto reservar em cima e embaixo — o formulário pedia, com
+   estas palavras: "meça até onde terminam o cabeçalho e o rodapé do timbrado". Número
+   digitado não acompanha o desenho: quando o timbrado muda, ele fica para trás e ninguém
+   avisa. Foi o que aconteceu em 05/09 — a máscara terminava o cabeçalho em 25,9 mm e o
+   cadastro reservava 50, deixando 24 mm de papel em branco em toda folha.
+   Agora o programa MEDE a imagem e propõe. Ele continua mandando: o campo fica editável,
+   e o que ele escrever vale. O que muda é o ponto de partida — sai da memória e passa a
+   sair do desenho.
+
+   COMO MEDE, e por que assim: procura a última linha desenhada no TERÇO DE CIMA e a
+   primeira no TERÇO DE BAIXO. Os terços não são estética: a máscara dele tem um BRASÃO
+   NO MEIO (medido: de 122 a 183 mm) que é marca d'água — o texto passa por cima, decisão
+   dele em 06/09. Uma medida que olhasse a folha inteira acharia o brasão e reservaria
+   metade da página para nada. */
+var EX_RESPIRO_MM=4;         // folga entre o fim do desenho e a primeira linha do laudo
+function exMedirMascara(dataUrl){
+  return new Promise(function(res){
+    if(!dataUrl){ res({ok:false}); return; }
+    var im=new Image();
+    im.onload=function(){
+      try{
+        /* Uma amostra de 794 de largura basta e é barata: a pergunta é "até onde vai o
+           desenho", não "que desenho é este". Medir a imagem de 300 dpi inteira custaria
+           dez vezes mais para responder o mesmo. */
+        var L=794, A=Math.round(L*EX_MASCARA_A4.alt/EX_MASCARA_A4.larg);
+        var c=document.createElement('canvas'); c.width=L; c.height=A;
+        var x=c.getContext('2d');
+        x.fillStyle='#fff'; x.fillRect(0,0,L,A);
+        x.drawImage(im,0,0,L,A);
+        var d=x.getImageData(0,0,L,A).data, mm=297/A;
+        /* três pontos escuros na linha, não um: um respingo do arquivo, ou a sombra de uma
+           borda, não é cabeçalho — e reservaria a folha inteira por causa de um pixel. */
+        function desenhada(y){
+          var n=0;
+          for(var p=0;p<L;p+=2){
+            var i=(y*L+p)*4;
+            if(d[i]<235||d[i+1]<235||d[i+2]<235){ if(++n>=3) return true; }
+          }
+          return false;
+        }
+        var terco=Math.floor(A/3), topoPx=0, basePx=0, y;
+        for(y=terco-1;y>=0;y--){ if(desenhada(y)){ topoPx=y+1; break; } }
+        for(y=A-terco;y<A;y++){ if(desenhada(y)){ basePx=A-y; break; } }
+        res({ok:true, topoMm:+(topoPx*mm).toFixed(1), baseMm:+(basePx*mm).toFixed(1)});
+      }catch(e){ res({ok:false}); }
+    };
+    im.onerror=function(){ res({ok:false}); };
+    im.src=dataUrl;
+  });
+}
 /* 02/09/2026 — DE VOLTA A 34/24, MEDIDO NA PRÓPRIA IMAGEM DA MÁSCARA.
    O commit 998d5e3 subiu esta reserva para 50/48 com a justificativa de que "a máscara
    AME/Tailandia termina o cabecalho na faixa turquesa e tem rodape alto". A imagem do
@@ -14209,8 +14264,46 @@ function exAplicarLocaisExtra(){
     var _ant=FUNDOS[l.k]||{};
     FUNDOS[l.k]={nome:l.nome||l.k, img:l.img||null,
                  padTopMm:exMargemValida(l.padTopMm,_ant.padTopMm||EX_MARGENS_NOVO_LOCAL.topo),
-                 padBottomMm:exMargemValida(l.padBottomMm,_ant.padBottomMm||EX_MARGENS_NOVO_LOCAL.base)};
+                 padBottomMm:exMargemValida(l.padBottomMm,_ant.padBottomMm||EX_MARGENS_NOVO_LOCAL.base),
+                 /* o que foi MEDIDO na imagem viaja junto da reserva ESCOLHIDA: é a
+                    comparação entre as duas que denuncia um timbrado que mudou e uma
+                    margem que não acompanhou (ver exConferirMascaras) */
+                 medidoTopoMm:(l.medidoTopoMm!=null?l.medidoTopoMm:_ant.medidoTopoMm),
+                 medidoBaseMm:(l.medidoBaseMm!=null?l.medidoBaseMm:_ant.medidoBaseMm)};
   });
+}
+/* Avisa UMA VEZ por local e por sessão: repetir a cada laudo viraria ruído, e aviso que
+   vira ruído deixa de ser lido — que é o mesmo que não existir. */
+var _exAvisouReserva={};
+function exAvisarReserva(k, fnd){
+  if(!fnd || fnd.medidoTopoMm==null || _exAvisouReserva[k]) return;
+  var faltas=[];
+  if(fnd.padTopMm < fnd.medidoTopoMm)
+    faltas.push('em cima (reserva '+fnd.padTopMm+' mm, o desenho vai até '+fnd.medidoTopoMm+' mm)');
+  if(fnd.padBottomMm < fnd.medidoBaseMm)
+    faltas.push('embaixo (reserva '+fnd.padBottomMm+' mm, o rodapé começa a '+fnd.medidoBaseMm+' mm da borda)');
+  if(!faltas.length) return;
+  _exAvisouReserva[k]=true;
+  log('⚠️ O timbrado "'+(fnd.nome||k)+'" tem desenho onde o laudo vai escrever: '
+      +faltas.join(' e ')+'. O texto vai sair por cima. Ajuste a área livre no lápis do '
+      +'local, em "Realizar exames".', true);
+}
+/* Mede os timbrados que ainda não têm medida guardada — os cadastrados antes de 07/09.
+   Roda UMA VEZ por timbrado, na abertura, e guarda o resultado: decodificar uma imagem de
+   300 dpi a cada laudo custaria caro para responder sempre a mesma coisa. */
+async function exConferirMascaras(){
+  var lista=exLocaisExtra(), mudou=false;
+  for(var i=0;i<lista.length;i++){
+    var l=lista[i];
+    if(!l || !l.img || l.medidoTopoMm!=null) continue;
+    var med=await exMedirMascara(l.img);
+    if(!med.ok) continue;
+    l.medidoTopoMm=med.topoMm; l.medidoBaseMm=med.baseMm; mudou=true;
+  }
+  if(mudou){
+    try{ dadoSalvar('glocais', JSON.stringify(lista)); }catch(e){}
+    exAplicarLocaisExtra();
+  }
 }
 /* 31/08/2026 (item 8): um local cadastrado com a MESMA CHAVE de um embutido SUBSTITUI o
    embutido, em vez de aparecer ao lado dele. É isso que permite editar "Capanema" e
@@ -14397,8 +14490,31 @@ function exCadPreview(input){
       var p=document.getElementById('exCadPrev');
       p.src=a4.img; p.style.display='block'; p.setAttribute('data-a4','1');
       rot.textContent=f.name+' — ajustada para A4';
-      av.textContent='Máscara ajustada para preencher toda a folha A4.';
-      exCadMascaraOcupada(false);
+      /* 07/09/2026 — E AGORA A MÁSCARA DIZ O PRÓPRIO TAMANHO. O formulário pedia que ELE
+         medisse o timbrado com régua; o programa passa a medir e a propor. Ele continua
+         mandando: os campos ficam editáveis e o que ele escrever vale. */
+      exMedirMascara(a4.img).then(function(med){
+        p.setAttribute('data-medido', med.ok?(med.topoMm+'/'+med.baseMm):'');
+        if(!med.ok){
+          av.textContent='Máscara ajustada para preencher toda a folha A4. '
+            +'(Não consegui medir o desenho — confira as faixas abaixo.)';
+          exCadMascaraOcupada(false); return;
+        }
+        var _t=exMargemValida(Math.round(med.topoMm+EX_RESPIRO_MM), EX_MARGENS_NOVO_LOCAL.topo);
+        var _b=exMargemValida(Math.round(med.baseMm+EX_RESPIRO_MM), EX_MARGENS_NOVO_LOCAL.base);
+        var cT=document.getElementById('exCadTopo'), cB=document.getElementById('exCadBase');
+        if(cT) cT.value=_t;
+        if(cB) cB.value=_b;
+        av.textContent='Máscara ajustada para A4. Medi o desenho: o cabeçalho termina em '
+          +med.topoMm+' mm e o rodapé começa a '+med.baseMm+' mm da borda de baixo. '
+          +'Reservei '+_t+' e '+_b+' mm (o desenho mais '+EX_RESPIRO_MM+' mm de respiro) — '
+          +'mude se quiser.';
+        exCadMascaraOcupada(false);
+      }).catch(function(){
+        av.textContent='Máscara ajustada para preencher toda a folha A4.';
+        exCadMascaraOcupada(false);
+      });
+      return;
     }).catch(function(e){
       exCadMascaraOcupada(false);
       input.value=''; rot.textContent=rotAntes;
@@ -14552,8 +14668,22 @@ function exCadSalvar(){
   var img=(prev&&prev.style.display!=='none'&&prev.getAttribute('src'))||null;
   var topo=exMargemValida(document.getElementById('exCadTopo').value,EX_MARGENS_NOVO_LOCAL.topo);
   var base=exMargemValida(document.getElementById('exCadBase').value,EX_MARGENS_NOVO_LOCAL.base);
+  /* 07/09/2026 — O QUE FOI MEDIDO NA IMAGEM VIAJA JUNTO. Não é o mesmo que a reserva: a
+     reserva é a escolha dele, a medida é o desenho. Guardar as duas é o que permite, na
+     hora de montar o laudo, perceber que a reserva ficou menor que o timbrado — e avisar
+     ANTES do papel, em vez de ele descobrir com o texto por cima do logo. */
+  var _med=(prev&&prev.getAttribute('data-medido'))||'';
+  var _mp=_med.split('/');
   var lista=exLocaisExtra().filter(function(l){ return l.k!==k; });
-  lista.push({k:k, nome:nome, img:img, padTopMm:topo, padBottomMm:base});
+  var _ant=exLocaisExtra().filter(function(l){ return l.k===k; })[0]||{};
+  var novo={k:k, nome:nome, img:img, padTopMm:topo, padBottomMm:base};
+  if(_mp.length===2 && isFinite(parseFloat(_mp[0]))){
+    novo.medidoTopoMm=parseFloat(_mp[0]); novo.medidoBaseMm=parseFloat(_mp[1]);
+  } else if(img && img===_ant.img && _ant.medidoTopoMm!=null){
+    // trocou só o nome ou as margens: a medida da imagem antiga continua valendo
+    novo.medidoTopoMm=_ant.medidoTopoMm; novo.medidoBaseMm=_ant.medidoBaseMm;
+  }
+  lista.push(novo);
   try{ dadoSalvar('glocais', JSON.stringify(lista)); }
   catch(e){ av.textContent='Não consegui guardar: '+((e&&e.message)||e); return; }
   exAplicarLocaisExtra();
@@ -18355,6 +18485,9 @@ window.addEventListener('DOMContentLoaded', async function(){
      substituída pela cópia mais nova do agente. Sem reaplicar aqui, quem vai direto para
      “Liberar laudos” só vê o timbrado novo depois de visitar “Realizar exames”. */
   try{ exAplicarLocaisExtra(); rev2AtualizarFundos(); }catch(e){}
+  /* 07/09/2026: mede os timbrados que ainda não sabem o próprio tamanho. Em segundo
+     plano e sem await — a abertura não pode esperar por decodificar imagem. */
+  try{ exConferirMascaras().catch(function(){}); }catch(e){}
   /* ⚠️ 04/09/2026 — E O LOCAL ESCOLHIDO VOLTA AQUI, na abertura. Ele era restaurado só
      dentro de `exAbrir` (a tela "Realizar exames"): quem fosse direto para "Liberar
      laudos" — que é o caminho de quem chega para assinar o que ficou de ontem — montava a

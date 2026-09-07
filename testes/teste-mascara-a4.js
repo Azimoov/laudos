@@ -48,6 +48,45 @@ vm.runInNewContext(cfg + '\n' + dist, ctx);
 ok(ctx.exMascaraDistorcao(794, 1123) < 0.001, 'uma imagem A4 nao dispara aviso');
 ok(ctx.exMascaraDistorcao(1000, 1000) > 0.40, 'uma imagem quadrada e reconhecida como muito diferente');
 
+console.log('\n=== A MASCARA DIZ O PROPRIO TAMANHO (07/09/2026, frente 2 do plano) ===');
+/* O formulario pedia, com estas palavras, que ELE medisse: "meca ate onde terminam o
+   cabecalho e o rodape do timbrado". Numero digitado nao acompanha o desenho — quando o
+   timbrado muda, ele fica para tras e ninguem avisa. Foi o que aconteceu em 05/09: a
+   mascara terminava o cabecalho em 25,9 mm e o cadastro reservava 50, deixando 24 mm de
+   papel em branco em toda folha. */
+const medir = grab('exMedirMascara');
+ok(medir.length > 0, 'ha uma funcao que MEDE o desenho da mascara');
+ok(/getImageData/.test(medir), 'e ela olha os pontos da imagem, nao um numero digitado');
+ok(/terco/.test(medir) && /A\/3/.test(medir),
+   'olha o TERCO de cima e o de baixo — a marca dagua do meio nao pode entrar na conta');
+ok(/if\(\+\+n>=3\) return true/.test(medir),
+   'e exige tres pontos escuros na linha: um respingo nao e cabecalho');
+const prev = grab('exCadPreview');
+ok(/exMedirMascara\(a4\.img\)/.test(prev), 'o cadastro mede a imagem escolhida');
+ok(/cT\.value=_t/.test(prev) && /cB\.value=_b/.test(prev),
+   'e PREENCHE as faixas com o que mediu — o campo continua editavel, ele e quem manda');
+ok(/EX_RESPIRO_MM/.test(prev) && /var EX_RESPIRO_MM=/.test(HTML),
+   'com um respiro entre o fim do desenho e a primeira linha do laudo');
+ok(/Medi o desenho/.test(prev), 'e diz na tela o que mediu e o que reservou');
+const salvar = grab('exCadSalvar');
+ok(/medidoTopoMm/.test(salvar) && /medidoBaseMm/.test(salvar),
+   'a medida da imagem e guardada junto do local — separada da reserva escolhida');
+ok(/img===_ant\.img/.test(salvar),
+   'e trocar so o nome ou as margens nao perde a medida da imagem que ficou');
+const avisar = grab('exAvisarReserva');
+ok(/padTopMm < fnd\.medidoTopoMm/.test(avisar) && /padBottomMm < fnd\.medidoBaseMm/.test(avisar),
+   'reserva menor que o desenho vira aviso');
+ok(/_exAvisouReserva\[k\]/.test(avisar),
+   'uma vez por local — aviso repetido vira ruido, e ruido deixa de ser lido');
+ok(/exAvisarReserva\(_k, _fnd\)/.test(HTML),
+   'e o aviso sai ao montar o laudo, ANTES do papel');
+const conferir = grab('exConferirMascaras');
+ok(/l\.medidoTopoMm!=null\) continue/.test(conferir),
+   'os timbrados antigos sao medidos UMA vez, e a medida fica guardada');
+ok(/dadoSalvar\('glocais'/.test(conferir), 'no computador, nao so no navegador');
+ok(/exConferirMascaras\(\)\.catch/.test(HTML),
+   'e isso roda na abertura, em segundo plano — a tela nao espera decodificar imagem');
+
 console.log('\n=== distorcao visivel exige confirmacao ===');
 const preview = grab('exCadPreview');
 ok(/aviso:0\.05/.test(cfg), 'o limite do aviso e 5%');

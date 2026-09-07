@@ -1492,6 +1492,55 @@ const VERIFICACOES = `(async () => {
         diz('com um piso: arquivo pequeno demais sobe para os 794 de antes', pl === 794, 'largura ' + pl);
         diz('e a proporcao continua a de uma folha A4 exata',
           Math.abs(pa / pl - 3508 / 2480) < 0.005, pl + 'x' + pa);
+
+        // ---- A MASCARA DIZ O PROPRIO TAMANHO (07/09, frente 2 do plano) ----
+        // O formulario pedia que ELE medisse o timbrado com regua e digitasse. Numero
+        // digitado nao acompanha o desenho: em 05/09 a mascara terminava o cabecalho em
+        // 25,9 mm e o cadastro reservava 50 — 24 mm de papel em branco por folha.
+        const mascara = (cabMm, rodDeMm, comMarcaDagua) => {
+          const c = document.createElement('canvas');
+          c.width = 794; c.height = 1123;
+          const x = c.getContext('2d');
+          const mm = c.height / 297;
+          x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+          x.fillStyle = '#176b78';
+          x.fillRect(0, 0, c.width, Math.round(cabMm * mm));
+          x.fillRect(0, Math.round(rodDeMm * mm), c.width, c.height - Math.round(rodDeMm * mm));
+          // a marca d'agua do meio: e por causa dela que a medida olha so os TERCOS
+          if (comMarcaDagua) { x.fillStyle = '#c8d8e8'; x.fillRect(200, Math.round(130 * mm), 380, Math.round(50 * mm)); }
+          return c.toDataURL('image/png');
+        };
+        const m1 = await exMedirMascara(mascara(26, 278, true));
+        diz('mede onde o cabecalho da mascara termina', m1.ok && Math.abs(m1.topoMm - 26) <= 1.5,
+          'topo ' + m1.topoMm + ' mm (desenhado 26)');
+        diz('e a que distancia da borda de baixo o rodape comeca',
+          m1.ok && Math.abs(m1.baseMm - 19) <= 1.5, 'base ' + m1.baseMm + ' mm (desenhado 297-278=19)');
+        // ⚠️ A que mais importa: o brasao do meio e marca d'agua (decisao dele, 06/09) e o
+        // texto passa por cima. Uma medida que olhasse a folha inteira o acharia e
+        // reservaria metade da pagina para nada.
+        const m2 = await exMedirMascara(mascara(26, 278, false));
+        diz("a marca d'agua do meio NAO entra na conta",
+          m2.ok && Math.abs(m2.topoMm - m1.topoMm) <= 1 && Math.abs(m2.baseMm - m1.baseMm) <= 1,
+          'com marca ' + m1.topoMm + '/' + m1.baseMm + ' · sem marca ' + m2.topoMm + '/' + m2.baseMm);
+        const m3 = await exMedirMascara(mascara(0.2, 296.8, false));
+        diz('mascara quase vazia mede quase zero — nao inventa faixa',
+          m3.ok && m3.topoMm < 3 && m3.baseMm < 3, m3.topoMm + '/' + m3.baseMm);
+
+        // e o aviso quando a reserva ficou MENOR que o desenho
+        _exAvisouReserva = {};
+        const avisosAntes = (window.__logBancada = []);
+        const logAntes = window.log;
+        window.log = (t, ruim) => { avisosAntes.push(String(t)); };
+        exAvisarReserva('loc-x', { nome: 'X', padTopMm: 20, padBottomMm: 30, medidoTopoMm: 26, medidoBaseMm: 19 });
+        diz('reserva menor que o desenho vira aviso ANTES do papel',
+          avisosAntes.some(t => t.indexOf('por cima') >= 0), avisosAntes[0] || '(nenhum)');
+        const n1 = avisosAntes.length;
+        exAvisarReserva('loc-x', { nome: 'X', padTopMm: 20, padBottomMm: 30, medidoTopoMm: 26, medidoBaseMm: 19 });
+        diz('e avisa UMA vez por local — aviso repetido vira ruido e deixa de ser lido',
+          avisosAntes.length === n1);
+        exAvisarReserva('loc-y', { nome: 'Y', padTopMm: 30, padBottomMm: 24, medidoTopoMm: 26, medidoBaseMm: 19 });
+        diz('e cala quando a reserva cobre o desenho', avisosAntes.length === n1);
+        window.log = logAntes;
       } catch (e) {
         diz('as configuracoes sobrevivem a fechar o programa', false, e.constructor.name + ': ' + e.message);
       }

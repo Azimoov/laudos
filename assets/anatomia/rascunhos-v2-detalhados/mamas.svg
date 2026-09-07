@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-label="Mapa anatômico esquemático bilateral das mamas">
+  <rect width="1200" height="720" fill="#ffffff"/>
+  <g fill="#fbd3c9" stroke="#233f60" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M222 205 C168 147 134 100 147 70 C197 77 250 112 285 168"/>
+    <path d="M978 205 C1032 147 1066 100 1053 70 C1003 77 950 112 915 168"/>
+    <circle cx="350" cy="378" r="230"/>
+    <circle cx="850" cy="378" r="230"/>
+  </g>
+
+  <g fill="none" stroke="#58718c" stroke-width="3" stroke-linecap="round" opacity="0.82">
+    <path d="M350 170 V586 M142 378 H558 M203 231 L497 525 M203 525 L497 231"/>
+    <path d="M850 170 V586 M642 378 H1058 M703 231 L997 525 M703 525 L997 231"/>
+  </g>
+
+  <g fill="#f5b6a8" stroke="#233f60" stroke-width="5">
+    <circle cx="350" cy="378" r="45"/>
+    <circle cx="850" cy="378" r="45"/>
+  </g>
+  <g fill="#233f60">
+    <circle cx="350" cy="378" r="10"/>
+    <circle cx="850" cy="378" r="10"/>
+  </g>
+
+  <g fill="none" stroke="#233f60" stroke-width="5" stroke-linecap="round">
+    <path d="M600 105 V630" opacity="0.18"/>
+    <path d="M166 103 C194 128 217 153 238 185"/>
+    <path d="M1034 103 C1006 128 983 153 962 185"/>
+  </g>
+</svg>

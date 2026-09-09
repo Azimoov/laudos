@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Preview: Corte Lateral da Mama com Limite Integrado em Degradê</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --card-bg: #f8fafc;
+      --border-color: #e2e8f0;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --primary: #6A4FB6;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: transparent;
+      color: var(--text-main);
+    }
+    .preview-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-current { background: #fee2e2; color: #991b1b; }
+    .badge-proposed { background: #ede9fe; color: #6d28d9; }
+    .badge-highlight { background: #dcfce7; color: #166534; }
+    .slider-container {
+      background: #f1f5f9;
+      padding: 12px 18px;
+      border-radius: 8px;
+      margin: 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="preview-card">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+    <div>
+      <h2 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 700; color: #1e1b4b;">
+        🔬 Comparativo: Vista Lateral da Mama — Limites em Degradê
+      </h2>
+      <p style="margin: 0; font-size: 13px; color: #64748b;">
+        Solicitação do Dr. Daniel: substituir os retângulos rígidos por uma transição em degradê contínua e integrada, evitando que achados a 0,9 cm pareçam confinados ao TCSC quando estão no parênquima mamário.
+      </p>
+    </div>
+  </div>
+
+  <!-- Controle interativo de profundidade para teste -->
+  <div class="slider-container">
+    <label for="profSlider" style="font-size: 13px; font-weight: 600; color: #334155; white-space: nowrap;">
+      Profundidade do nódulo: <span id="profVal" style="color: #6A4FB6; font-size: 15px; font-weight: 700;">0,9 cm</span> da pele
+    </label>
+    <input type="range" id="profSlider" min="2" max="35" value="9" step="1" style="flex: 1; cursor: pointer;" oninput="atualizarProfundidade(this.value)">
+    <button onclick="setProf(9)" style="padding: 4px 10px; font-size: 11px; background: #6A4FB6; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+      Resetar 0,9 cm (Caso do exame)
+    </button>
+  </div>
+
+  <!-- Grid comparativo -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
+    
+    <!-- VERSÃO ATUAL -->
+    <div style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 14px; background: #fafafa; text-align: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span class="badge badge-current">Versão Atual</span>
+        <span style="font-size: 11px; color: #ef4444; font-weight: 600;">Divisórias rígidas</span>
+      </div>
+      <div id="svgAtualContainer" style="display: inline-block;"></div>
+      <div style="margin-top: 10px; font-size: 12px; color: #64748b; text-align: left; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
+        ❌ <b>Problema clínico:</b> 4 caixas retangulares duras com linhas de borda. A 0,9 cm (seta), o nódulo cai inteiramente dentro do retângulo com rótulo <b>TCSC</b>, parecendo erro anatômico.
+      </div>
+    </div>
+
+    <!-- PROPOSTA 1: DEGRADÊ ANATÔMICO INTEGRADO (RECOMENDADA) -->
+    <div style="border: 2px solid #8b5cf6; border-radius: 10px; padding: 14px; background: #fdfcff; text-align: center; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span class="badge badge-proposed">⭐ Proposta 1 (Recomendada)</span>
+        <span class="badge badge-highlight">Transição Integrada</span>
+      </div>
+      <div id="svgProp1Container" style="display: inline-block;"></div>
+      <div style="margin-top: 10px; font-size: 12px; color: #334155; text-align: left; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #ddd6fe;">
+        ✅ <b>Solução em degradê contínuo:</b> Fundo anatômico unificado sem divisórias rígidas. A transição entre Pele, TCSC e Glândula flui suavemente. A 0,9 cm o nódulo já pousa organicamente no parênquima glandular mamário.
+      </div>
+    </div>
+
+    <!-- PROPOSTA 2: DEGRADÊ COM MARCADORES SUTIS DE PROFUNDIDADE -->
+    <div style="border: 2px solid #cbd5e1; border-radius: 10px; padding: 14px; background: #f8fafc; text-align: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span class="badge badge-proposed">Proposta 2</span>
+        <span style="font-size: 11px; color: #475569; font-weight: 600;">Com Régua Sutil</span>
+      </div>
+      <div id="svgProp2Container" style="display: inline-block;"></div>
+      <div style="margin-top: 10px; font-size: 12px; color: #334155; text-align: left; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
+        ✅ <b>Degradê integrado + marcas sutis:</b> Igual à Proposta 1, adicionando pontilhados/marcas muito discretas a cada 1 cm na margem direita para referência quantitativa direta da profundidade.
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 20px; padding: 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 13px; color: #166534;">
+    <b>📋 Aguardando sua avaliação:</b> Qual das propostas você prefere para ser adotada como padrão oficial em todos os esquemas laterais da mama? (A Proposta 1 mantém visual limpo e fluido sem ruído visual; a Proposta 2 acrescenta sutis marcadores de 1 em 1 cm).
+  </div>
+</div>
+
+<script>
+const MAMA_Y_PELE = 26;
+const MAMA_PX_MM = 1.7;
+const MAMA_RAIO_CM = 8;
+const MAMA_DIST_INDEF_CM = 4;
+const x0 = 66, x1 = 238;
+
+function cmTxt(mm){ return (mm/10).toFixed(1).replace('.',','); }
+
+function renderSvgAtual(profMm) {
+  var s = '';
+  var faixas = [
+    ['Pele', 26, 34, '#eef1f6'],
+    ['TCSC', 34, 58, '#f7f4ec'],
+    ['Glândula', 58, 132, '#fdf7fb'],
+    ['Peitoral', 132, 158, '#eef3ee']
+  ];
+  faixas.forEach(function(f){
+    s += '<rect x="'+x0+'" y="'+f[1]+'" width="'+(x1-x0)+'" height="'+(f[2]-f[1])+'" fill="'+f[3]+'" stroke="#c8d0da" stroke-width="0.7"/>'
+       + '<text x="'+(x0-5)+'" y="'+((f[1]+f[2])/2+3).toFixed(1)+'" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+f[0]+'</text>';
+  });
+  s += '<text x="'+x0+'" y="172" font-size="8" fill="#5a6478" font-family="Arial,Helvetica,sans-serif">papila</text>'
+     + '<text x="'+x1+'" y="172" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">periferia</text>';
+  
+  // Lesão a 4 cm da papila, profMm
+  var x = x0 + (4/MAMA_RAIO_CM)*(x1-x0); // 152
+  var y = Math.max(40, Math.min(150, MAMA_Y_PELE + profMm * MAMA_PX_MM));
+  var rx = 10.2, ry = 6.8;
+  var topo = y - ry;
+
+  // Linha pontilhada da pele
+  s += '<line x1="'+x.toFixed(1)+'" y1="'+MAMA_Y_PELE+'" x2="'+x.toFixed(1)+'" y2="'+topo.toFixed(1)+'" stroke="#8a5cf6" stroke-width="0.9" stroke-dasharray="2.5 2.5"/>'
+     + '<circle cx="'+x.toFixed(1)+'" cy="'+MAMA_Y_PELE+'" r="1.8" fill="#8a5cf6"/>';
+
+  // Nódulo
+  s += '<ellipse cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" rx="'+rx+'" ry="'+ry+'" fill="#6A4FB6" fill-opacity="0.85" stroke="#fff" stroke-width="1.3"/>'
+     + '<text x="'+(x+rx+4).toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#6A4FB6" font-weight="bold" font-family="Arial,Helvetica,sans-serif">1</text>';
+
+  s += '<text x="152.0" y="184" font-size="8" fill="#6A4FB6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif">Profundidade:   1 — '+cmTxt(profMm)+' cm da pele</text>'
+     + '<text x="152" y="206" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — DIREITA</text>';
+
+  return '<svg viewBox="0 0 250 214" width="250" height="214" xmlns="http://www.w3.org/2000/svg" role="img">' + s + '</svg>';
+}
+
+function renderSvgProp1(profMm) {
+  var s = '';
+  // Definição do gradiente integrado
+  s += '<defs>'
+     + '  <linearGradient id="gradMama1" x1="0" y1="0" x2="0" y2="1">'
+     + '    <stop offset="0%" stop-color="#e8ecf2"/>'          // Pele (superfície)
+     + '    <stop offset="4%" stop-color="#f2f5f8"/>'          // Derme
+     + '    <stop offset="8%" stop-color="#fbf8f0"/>'          // TCSC (tecido adiposo superficial)
+     + '    <stop offset="15%" stop-color="#fdf5f9"/>'         // Transição precoce e suave para parênquima
+     + '    <stop offset="26%" stop-color="#faf0f8"/>'         // Glândula mamária plena (fibroglandular)
+     + '    <stop offset="72%" stop-color="#faf0f8"/>'         // Fundo do parênquima
+     + '    <stop offset="82%" stop-color="#f2f4f2"/>'         // Transição fáscia retromamária
+     + '    <stop offset="100%" stop-color="#e4ece4"/>'        // Peitoral (musculatura)
+     + '  </linearGradient>'
+     + '</defs>';
+
+  // Bloco unificado com o degradê
+  s += '<rect x="'+x0+'" y="26" width="'+(x1-x0)+'" height="132" rx="3" fill="url(#gradMama1)" stroke="#cbd5e1" stroke-width="0.9"/>';
+  // Linha refinada marcando o plano da pele (superfície)
+  s += '<line x1="'+x0+'" y1="26" x2="'+x1+'" y2="26" stroke="#94a3b8" stroke-width="1.3"/>';
+
+  // Rótulos anatômicos no eixo esquerdo (sem caixas duras divisórias)
+  var rotulos = [
+    ['Pele', 31],
+    ['TCSC', 42],
+    ['Glândula', 92],
+    ['Peitoral', 146]
+  ];
+  rotulos.forEach(function(r){
+    s += '<text x="'+(x0-6)+'" y="'+r[1]+'" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+r[0]+'</text>';
+  });
+
+  // Indicador de papila e periferia
+  s += '<text x="'+x0+'" y="172" font-size="8" fill="#5a6478" font-family="Arial,Helvetica,sans-serif">papila</text>'
+     + '<text x="'+x1+'" y="172" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">periferia</text>';
+
+  // Lesão
+  var x = x0 + (4/MAMA_RAIO_CM)*(x1-x0); // 152
+  var y = Math.max(40, Math.min(150, MAMA_Y_PELE + profMm * MAMA_PX_MM));
+  var rx = 10.2, ry = 6.8;
+  var topo = y - ry;
+
+  s += '<line x1="'+x.toFixed(1)+'" y1="'+MAMA_Y_PELE+'" x2="'+x.toFixed(1)+'" y2="'+topo.toFixed(1)+'" stroke="#8a5cf6" stroke-width="0.9" stroke-dasharray="2.5 2.5"/>'
+     + '<circle cx="'+x.toFixed(1)+'" cy="'+MAMA_Y_PELE+'" r="1.8" fill="#8a5cf6"/>';
+
+  s += '<ellipse cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" rx="'+rx+'" ry="'+ry+'" fill="#6A4FB6" fill-opacity="0.88" stroke="#fff" stroke-width="1.3"/>'
+     + '<text x="'+(x+rx+4).toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#6A4FB6" font-weight="bold" font-family="Arial,Helvetica,sans-serif">1</text>';
+
+  s += '<text x="152.0" y="184" font-size="8" fill="#6A4FB6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif">Profundidade:   1 — '+cmTxt(profMm)+' cm da pele</text>'
+     + '<text x="152" y="206" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — DIREITA</text>';
+
+  return '<svg viewBox="0 0 250 214" width="250" height="214" xmlns="http://www.w3.org/2000/svg" role="img">' + s + '</svg>';
+}
+
+function renderSvgProp2(profMm) {
+  var s = '';
+  // Gradiente idêntico à proposta 1
+  s += '<defs>'
+     + '  <linearGradient id="gradMama2" x1="0" y1="0" x2="0" y2="1">'
+     + '    <stop offset="0%" stop-color="#e8ecf2"/>'
+     + '    <stop offset="4%" stop-color="#f2f5f8"/>'
+     + '    <stop offset="8%" stop-color="#fbf8f0"/>'
+     + '    <stop offset="15%" stop-color="#fdf5f9"/>'
+     + '    <stop offset="26%" stop-color="#faf0f8"/>'
+     + '    <stop offset="72%" stop-color="#faf0f8"/>'
+     + '    <stop offset="82%" stop-color="#f2f4f2"/>'
+     + '    <stop offset="100%" stop-color="#e4ece4"/>'
+     + '  </linearGradient>'
+     + '</defs>';
+
+  s += '<rect x="'+x0+'" y="26" width="'+(x1-x0)+'" height="132" rx="3" fill="url(#gradMama2)" stroke="#cbd5e1" stroke-width="0.9"/>';
+  s += '<line x1="'+x0+'" y1="26" x2="'+x1+'" y2="26" stroke="#94a3b8" stroke-width="1.3"/>';
+
+  // Rótulos anatômicos no eixo esquerdo
+  var rotulos = [
+    ['Pele', 31],
+    ['TCSC', 42],
+    ['Glândula', 92],
+    ['Peitoral', 146]
+  ];
+  rotulos.forEach(function(r){
+    s += '<text x="'+(x0-6)+'" y="'+r[1]+'" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+r[0]+'</text>';
+  });
+
+  // Marcadores sutis de profundidade (1 cm, 2 cm, 3 cm) na borda direita
+  for(var cm = 1; cm <= 4; cm++){
+    var yTick = MAMA_Y_PELE + (cm * 10 * MAMA_PX_MM);
+    if(yTick < 155){
+      s += '<line x1="'+(x1-4)+'" y1="'+yTick.toFixed(1)+'" x2="'+x1+'" y2="'+yTick.toFixed(1)+'" stroke="#94a3b8" stroke-width="0.7"/>'
+         + '<text x="'+(x1+4)+'" y="'+(yTick+2.5).toFixed(1)+'" font-size="6.5" fill="#94a3b8" font-family="Arial,Helvetica,sans-serif">'+cm+'cm</text>';
+    }
+  }
+
+  s += '<text x="'+x0+'" y="172" font-size="8" fill="#5a6478" font-family="Arial,Helvetica,sans-serif">papila</text>'
+     + '<text x="'+x1+'" y="172" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">periferia</text>';
+
+  var x = x0 + (4/MAMA_RAIO_CM)*(x1-x0);
+  var y = Math.max(40, Math.min(150, MAMA_Y_PELE + profMm * MAMA_PX_MM));
+  var rx = 10.2, ry = 6.8;
+  var topo = y - ry;
+
+  s += '<line x1="'+x.toFixed(1)+'" y1="'+MAMA_Y_PELE+'" x2="'+x.toFixed(1)+'" y2="'+topo.toFixed(1)+'" stroke="#8a5cf6" stroke-width="0.9" stroke-dasharray="2.5 2.5"/>'
+     + '<circle cx="'+x.toFixed(1)+'" cy="'+MAMA_Y_PELE+'" r="1.8" fill="#8a5cf6"/>';
+
+  s += '<ellipse cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" rx="'+rx+'" ry="'+ry+'" fill="#6A4FB6" fill-opacity="0.88" stroke="#fff" stroke-width="1.3"/>'
+     + '<text x="'+(x+rx+4).toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#6A4FB6" font-weight="bold" font-family="Arial,Helvetica,sans-serif">1</text>';
+
+  s += '<text x="152.0" y="184" font-size="8" fill="#6A4FB6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif">Profundidade:   1 — '+cmTxt(profMm)+' cm da pele</text>'
+     + '<text x="152" y="206" font-size="10.5" fill="#3F3357" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">CORTE LATERAL — DIREITA</text>';
+
+  return '<svg viewBox="0 0 258 214" width="258" height="214" xmlns="http://www.w3.org/2000/svg" role="img">' + s + '</svg>';
+}
+
+function atualizarTudo(profMm) {
+  document.getElementById('profVal').textContent = cmTxt(profMm) + ' cm';
+  document.getElementById('svgAtualContainer').innerHTML = renderSvgAtual(profMm);
+  document.getElementById('svgProp1Container').innerHTML = renderSvgProp1(profMm);
+  document.getElementById('svgProp2Container').innerHTML = renderSvgProp2(profMm);
+}
+
+function atualizarProfundidade(val) {
+  atualizarTudo(parseInt(val, 10));
+}
+
+function setProf(val) {
+  document.getElementById('profSlider').value = val;
+  atualizarTudo(val);
+}
+
+// Inicializar com 9 mm (0,9 cm)
+atualizarTudo(9);
+</script>
+
+</body>
+</html>

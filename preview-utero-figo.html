@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Demonstração: Esquema Anatômico do Útero e Classificação FIGO</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 6px; color: #38bdf8; }
+  p { font-size: 13px; color: #94a3b8; margin-top: 0; }
+  .container { display: flex; gap: 24px; flex-wrap: wrap; }
+  .card { background: #1e293b; border-radius: 12px; padding: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); border: 1px solid #334155; }
+  .painel-laudo { max-width: 480px; flex: 1; min-width: 320px; }
+  .painel-laudo h2 { font-size: 15px; color: #e2e8f0; margin-top: 0; }
+  .texto-laudo { background: #0f172a; border: 1px solid #334155; padding: 14px; border-radius: 8px; font-family: Georgia, serif; line-height: 1.6; font-size: 14px; color: #f1f5f9; }
+  .destaque { background: #3b82f6; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; transition: all 0.2s; }
+  .badge-figo { display: inline-block; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; margin-top: 10px; }
+  .figo-submucoso { background: #d97706; color: #fff; }
+  .figo-intramural { background: #0284c7; color: #fff; }
+  .figo-subseroso { background: #2563eb; color: #fff; }
+  .figo-hibrido { background: #7c3aed; color: #fff; }
+  .rotulo-vista { text-align: center; font-size: 11px; font-weight: bold; color: #94a3b8; letter-spacing: 0.05em; margin-top: 6px; }
+  .alca { cursor: grab; }
+  .alca:active { cursor: grabbing; }
+</style>
+</head>
+<body>
+
+<h1>Esquema Anatômico do Útero — Classificação FIGO de Leiomiomas</h1>
+<p>Arraste o marcador do mioma (círculo numerado) na <b>Vista Lateral (Sagital)</b> ou no <b>Corte Ortogonal (Transversal)</b> para verificar a sincronização tridimensional e a reescrita do laudo.</p>
+
+<div class="container">
+  <!-- VISTA LATERAL (SAGITAL) -->
+  <div class="card">
+    <svg id="svgSagital" width="340" height="260" viewBox="0 0 340 260">
+      <defs>
+        <linearGradient id="gradMioSag" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#b85472"/>
+          <stop offset="60%" stop-color="#a34460"/>
+          <stop offset="100%" stop-color="#8a334d"/>
+        </linearGradient>
+        <linearGradient id="gradEndoSag" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#4a1525"/>
+          <stop offset="100%" stop-color="#2c0b15"/>
+        </linearGradient>
+      </defs>
+
+      <rect width="340" height="260" rx="8" fill="#151e2e"/>
+
+      <!-- Contorno externo da serosa do útero em anteversoflexão de perfil -->
+      <path id="serosaSagital" d="M 65 85
+               C 50 35, 115 15, 175 40
+               C 230 65, 275 110, 290 145
+               C 298 165, 280 175, 260 165
+               C 235 150, 215 130, 190 120
+               C 150 105, 120 125, 80 180
+               C 55 215, 30 185, 45 150
+               C 52 130, 68 110, 65 85 Z"
+            fill="url(#gradMioSag)" stroke="#742238" stroke-width="2.5"/>
+
+      <!-- Linhas guias pontilhadas das zonas FIGO -->
+      <path d="M 72 82 C 60 45, 115 28, 168 50 C 218 72, 260 112, 275 142"
+            fill="none" stroke="rgba(255,255,255,0.25)" stroke-dasharray="3 3" stroke-width="1.2"/>
+      <path d="M 85 85 C 80 60, 120 50, 160 68 C 200 88, 235 120, 250 142"
+            fill="none" stroke="rgba(255,255,255,0.25)" stroke-dasharray="3 3" stroke-width="1.2"/>
+
+      <!-- Cavidade Endometrial -->
+      <path d="M 95 82
+               C 90 70, 115 65, 140 76
+               C 175 92, 210 125, 235 145
+               C 225 150, 205 130, 175 115
+               C 145 100, 125 105, 102 125
+               C 92 135, 86 115, 95 82 Z"
+            fill="url(#gradEndoSag)" stroke="#1a040b" stroke-width="1.5"/>
+
+      <text x="95" y="32" font-size="10" fill="#94a3b8" text-anchor="middle">Fundo</text>
+      <text x="210" y="55" font-size="10" fill="#94a3b8" text-anchor="middle">Parede Anterior</text>
+      <text x="125" y="195" font-size="10" fill="#94a3b8" text-anchor="middle">Parede Posterior</text>
+      <text x="280" y="190" font-size="10" fill="#94a3b8" text-anchor="middle">Colo</text>
+
+      <g id="marcadorSagital" class="alca" transform="translate(145, 55)">
+        <circle r="14" fill="#0284c7" stroke="#ffffff" stroke-width="2.2" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"/>
+        <text y="4" text-anchor="middle" fill="#ffffff" font-weight="bold" font-size="12">1</text>
+      </g>
+    </svg>
+    <div class="rotulo-vista">CORTE SAGITAL (VISTA LATERAL)</div>
+  </div>
+
+  <!-- VISTA ORTOGONAL (CORTE TRANSVERSAL) -->
+  <div class="card">
+    <svg id="svgTransversal" width="340" height="260" viewBox="0 0 340 260">
+      <defs>
+        <linearGradient id="gradMioTrans" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#b85472"/>
+          <stop offset="70%" stop-color="#a34460"/>
+          <stop offset="100%" stop-color="#8a334d"/>
+        </linearGradient>
+        <linearGradient id="gradEndoTrans" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#4a1525"/>
+          <stop offset="100%" stop-color="#2c0b15"/>
+        </linearGradient>
+      </defs>
+
+      <rect width="340" height="260" rx="8" fill="#151e2e"/>
+
+      <!-- Secção transversal oval do corpo uterino -->
+      <ellipse cx="170" cy="130" rx="115" ry="85" fill="url(#gradMioTrans)" stroke="#742238" stroke-width="2.5"/>
+
+      <!-- Guias concêntricas -->
+      <ellipse cx="170" cy="130" rx="98" ry="70" fill="none" stroke="rgba(255,255,255,0.25)" stroke-dasharray="3 3" stroke-width="1.2"/>
+      <ellipse cx="170" cy="130" rx="65" ry="45" fill="none" stroke="rgba(255,255,255,0.25)" stroke-dasharray="3 3" stroke-width="1.2"/>
+
+      <!-- Cavidade endometrial (fenda central) -->
+      <ellipse cx="170" cy="130" rx="35" ry="12" fill="url(#gradEndoTrans)" stroke="#1a040b" stroke-width="1.5"/>
+
+      <text x="170" y="32" font-size="10" fill="#94a3b8" text-anchor="middle">Anterior (Ventral)</text>
+      <text x="170" y="235" font-size="10" fill="#94a3b8" text-anchor="middle">Posterior (Dorsal)</text>
+      <text x="35" y="134" font-size="10" fill="#94a3b8" text-anchor="middle">Direita</text>
+      <text x="305" y="134" font-size="10" fill="#94a3b8" text-anchor="middle">Esquerda</text>
+
+      <g id="marcadorTransversal" class="alca" transform="translate(170, 75)">
+        <circle r="14" fill="#0284c7" stroke="#ffffff" stroke-width="2.2" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"/>
+        <text y="4" text-anchor="middle" fill="#ffffff" font-weight="bold" font-size="12">1</text>
+      </g>
+    </svg>
+    <div class="rotulo-vista">CORTE TRANSVERSAL (ORTO-AXIAL)</div>
+  </div>
+
+  <!-- PAINEL DO LAUDO E CLASSIFICAÇÃO FIGO EM TEMPO REAL -->
+  <div class="card painel-laudo">
+    <h2>Sincronização em Tempo Real</h2>
+    <div class="texto-laudo" id="textoLaudo">
+      <b>ÚTERO:</b> Anteversofletido, de contornos regulares e ecotextura miometrial heterogênea, à custa de imagem nodular, sólida, hipoecogênica, circunscrita, localizada <span class="destaque" id="txtLocal">na parede anterior corporal</span>, <span class="destaque" id="txtFigo">FIGO 4 (intramural puro)</span>, medindo 2,8 x 2,4 cm.
+    </div>
+
+    <div style="margin-top: 14px;">
+      <span class="badge-figo figo-intramural" id="badgeFigo">FIGO 4 — INTRAMURAL (100% NO MIOMÉTRIO)</span>
+    </div>
+
+    <div style="margin-top: 14px; font-size: 12px; color: #cbd5e1; line-height: 1.5; background: #0f172a; padding: 10px; border-radius: 6px;">
+      <b>Classificação FIGO:</b>
+      <ul style="margin: 6px 0 0 16px; padding: 0;">
+        <li><b>FIGO 0:</b> Submucoso pedunculado intracavitário</li>
+        <li><b>FIGO 1:</b> Submucoso &lt; 50% intramural</li>
+        <li><b>FIGO 2:</b> Submucoso ≥ 50% intramural</li>
+        <li><b>FIGO 3:</b> 100% intramural com contato endometrial</li>
+        <li><b>FIGO 4:</b> 100% intramural (sem contato endometrial nem seroso)</li>
+        <li><b>FIGO 5:</b> Subseroso ≥ 50% intramural</li>
+        <li><b>FIGO 6:</b> Subseroso &lt; 50% intramural</li>
+        <li><b>FIGO 7:</b> Subseroso pedunculado</li>
+        <li><b>FIGO 2-5:</b> Híbrido transmural (submucoso e subseroso)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+var estado = {
+  parede: 'anterior',
+  terco: 'medio',
+  figo: '4',
+  xSag: 145, ySag: 55,
+  xTra: 170, yTra: 75
+};
+
+var mSag = document.getElementById('marcadorSagital');
+var mTra = document.getElementById('marcadorTransversal');
+var svgSag = document.getElementById('svgSagital');
+var svgTra = document.getElementById('svgTransversal');
+var txtLocal = document.getElementById('txtLocal');
+var txtFigo = document.getElementById('txtFigo');
+var badgeFigo = document.getElementById('badgeFigo');
+
+function atualizarLaudo() {
+  var descFigo = {
+    '0': 'FIGO 0 (submucoso pedunculado intracavitário)',
+    '1': 'FIGO 1 (submucoso < 50% intramural)',
+    '2': 'FIGO 2 (submucoso ≥ 50% intramural)',
+    '3': 'FIGO 3 (intramural com contato endometrial)',
+    '4': 'FIGO 4 (intramural puro)',
+    '5': 'FIGO 5 (subseroso ≥ 50% intramural)',
+    '6': 'FIGO 6 (subseroso < 50% intramural)',
+    '7': 'FIGO 7 (subseroso pedunculado)',
+    '2-5': 'FIGO 2-5 (transmural híbrido)'
+  }[estado.figo] || ('FIGO ' + estado.figo);
+
+  var descParede = {
+    'anterior': 'na parede anterior corporal',
+    'posterior': 'na parede posterior corporal',
+    'fundo': 'no fundo uterino',
+    'colo': 'na região ístmica/cervical',
+    'lateral-direita': 'na parede lateral direita',
+    'lateral-esquerda': 'na parede lateral esquerda'
+  }[estado.parede] || ('na parede ' + estado.parede);
+
+  txtLocal.textContent = descParede;
+  txtFigo.textContent = descFigo;
+
+  badgeFigo.textContent = descFigo.toUpperCase();
+  badgeFigo.className = 'badge-figo ' + (
+    /0|1|2\b/.test(estado.figo) ? 'figo-submucoso' :
+    /3|4/.test(estado.figo) ? 'figo-intramural' :
+    /5|6|7/.test(estado.figo) ? 'figo-subseroso' : 'figo-hibrido'
+  );
+
+  var cor = /0|1|2\b/.test(estado.figo) ? '#d97706' :
+            /3|4/.test(estado.figo) ? '#0284c7' :
+            /5|6|7/.test(estado.figo) ? '#2563eb' : '#7c3aed';
+
+  mSag.querySelector('circle').setAttribute('fill', cor);
+  mTra.querySelector('circle').setAttribute('fill', cor);
+}
+
+ligarArraste(svgSag, mSag, function(pt) {
+  estado.xSag = pt.x; estado.ySag = pt.y;
+  mSag.setAttribute('transform', 'translate(' + pt.x + ',' + pt.y + ')');
+
+  if (pt.x < 110 && pt.y < 85) {
+    estado.parede = 'fundo';
+  } else if (pt.x > 250 && pt.y > 130) {
+    estado.parede = 'colo';
+  } else if (pt.y < 105) {
+    estado.parede = 'anterior';
+  } else {
+    estado.parede = 'posterior';
+  }
+
+  var distEndo = Math.hypot(pt.x - 130, pt.y - 100);
+  if (distEndo < 22) estado.figo = '0';
+  else if (distEndo < 34) estado.figo = '1';
+  else if (distEndo < 46) estado.figo = '2';
+  else if (distEndo < 58) estado.figo = '3';
+  else if (distEndo < 75) estado.figo = '4';
+  else if (distEndo < 90) estado.figo = '5';
+  else if (distEndo < 110) estado.figo = '6';
+  else estado.figo = '7';
+
+  var raioTra = (distEndo / 110) * 75;
+  if (estado.parede === 'anterior') estado.yTra = 130 - raioTra;
+  else if (estado.parede === 'posterior') estado.yTra = 130 + raioTra;
+  mTra.setAttribute('transform', 'translate(' + estado.xTra + ',' + estado.yTra + ')');
+
+  atualizarLaudo();
+});
+
+ligarArraste(svgTra, mTra, function(pt) {
+  estado.xTra = pt.x; estado.yTra = pt.y;
+  mTra.setAttribute('transform', 'translate(' + pt.x + ',' + pt.y + ')');
+
+  var dx = pt.x - 170, dy = pt.y - 130;
+  var distRaio = Math.hypot(dx * 0.74, dy);
+
+  if (Math.abs(dx) > Math.abs(dy) * 1.4) {
+    estado.parede = dx < 0 ? 'lateral-direita' : 'lateral-esquerda';
+  } else if (dy < 0) {
+    estado.parede = 'anterior';
+  } else {
+    estado.parede = 'posterior';
+  }
+
+  if (distRaio < 16) estado.figo = '0';
+  else if (distRaio < 28) estado.figo = '1';
+  else if (distRaio < 40) estado.figo = '2';
+  else if (distRaio < 52) estado.figo = '3';
+  else if (distRaio < 66) estado.figo = '4';
+  else if (distRaio < 78) estado.figo = '5';
+  else if (distRaio < 90) estado.figo = '6';
+  else estado.figo = '7';
+
+  if (estado.parede === 'anterior') {
+    estado.ySag = 100 - (distRaio * 0.6);
+  } else if (estado.parede === 'posterior') {
+    estado.ySag = 100 + (distRaio * 0.8);
+  }
+  mSag.setAttribute('transform', 'translate(' + estado.xSag + ',' + estado.ySag + ')');
+
+  atualizarLaudo();
+});
+
+function ligarArraste(svg, el, onMove) {
+  el.addEventListener('pointerdown', function(ev) {
+    ev.preventDefault();
+    function mover(e) {
+      var r = svg.getBoundingClientRect();
+      var pt = {
+        x: Math.max(20, Math.min(320, (e.clientX - r.left) * (340 / r.width))),
+        y: Math.max(20, Math.min(240, (e.clientY - r.top) * (260 / r.height)))
+      };
+      onMove(pt);
+    }
+    function soltar() {
+      window.removeEventListener('pointermove', mover);
+      window.removeEventListener('pointerup', soltar);
+    }
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', soltar);
+  });
+}
+
+atualizarLaudo();
+</script>
+</body>
+</html>

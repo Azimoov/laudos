@@ -5780,17 +5780,30 @@ async function verificarSessaoSalva(){
     if(doAgente && (!doNav || (doAgente.quando||0)>=(doNav.quando||0))){ ult=doAgente; _sessaoDoAgente=doAgente; }
     else if(doNav){ ult=doNav; _sessaoDoAgente=null; }
     if(!ult){ audsBlobLimpar(); return; }
-    if(Date.now()-ult.quando>24*3600*1000){ audsBlobLimpar(); return; }   // sessão velha: apaga também os áudios guardados
-    var n=ult.exames.length;
-    var dt=new Date(ult.quando).toLocaleString('pt-BR');
-    var b=document.createElement('div');
-    b.id='bannerRecup';
-    b.style='position:fixed;bottom:0;left:0;right:0;background:#1f5fa6;color:#fff;padding:13px 18px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:14px;box-shadow:0 -2px 10px rgba(0,0,0,.25);flex-wrap:wrap';
-    var idBtn=_sessaoDoAgente?-1:ult.id;   // -1 = veio do agente (não tem id de navegador)
-    b.innerHTML='<span>💾 Sessão anterior encontrada: <b>'+n+' laudo'+(n===1?'':'s')+'</b> gerado'+(n===1?'':'s')+' em '+dt+(_sessaoDoAgente?' (guardada no agente)':'')+'</span>'
-      +'<button onclick="restaurarSessao('+idBtn+')" style="background:#fff;color:#1f5fa6;border:0;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer">Restaurar</button>'
-      +'<button onclick="descartarSessao('+idBtn+')" style="background:transparent;color:#c9dff7;border:1px solid #6ea8d8;border-radius:6px;padding:6px 12px;cursor:pointer">Descartar</button>';
-    document.body.appendChild(b);
+    /* ⚠️ 09/09/2026 — A SESSÃO VOLTA SOZINHA. O BANNER SAIU.
+       Palavras dele: "essa questão de sessão anterior encontrada, um laudo gerado na data
+       tal — isso deve sumir. (…) Nenhum exame deve sumir mais da tela do aplicativo.
+       Então esses avisos de restaurar e tal devem ser removidos também."
+
+       O que havia aqui: uma barra azul no rodapé, com "Restaurar" e "Descartar". Ela
+       nasceu de um estrago real (17/08, laudos refeitos porque o dia inteiro sumiu ao
+       fechar a janela), e resolvia o problema — mas exigindo um toque. Enquanto o toque
+       não vinha, os exames NÃO estavam na tela: a lista de trabalho começava vazia e
+       parecia que o dia tinha se perdido. Perguntar "quer de volta?" só faz sentido se a
+       resposta pudesse ser "não" — e ela não pode: o material é dele, e não some.
+
+       DUAS COISAS QUE SAÍRAM JUNTO, e cada uma tem o seu motivo:
+       · o prazo de 24 h, que jogava fora a sessão mais velha que um dia. Era o mesmo
+         "some sozinho" com outro nome. Só existe UMA sessão guardada (cada salvamento
+         escreve por cima), então não há acúmulo a temer;
+       · o "Descartar". A função continua existindo para quem apaga tudo de propósito;
+         o que saiu foi o botão que oferecia jogar fora o dia de trabalho ao lado do
+         botão que o trazia de volta.
+
+       Restaurar NÃO destrói nada: `restaurarSessao` monta `exames` a partir do retrato
+       guardado, e ele só é escrito por `salvarSessao`. */
+    var idAuto=_sessaoDoAgente?-1:ult.id;   // -1 = veio do agente (não tem id de navegador)
+    await restaurarSessao(idAuto, {silencioso:true});
   }catch(e){}
 }
 /* Rebusca no aparelho as fotos dos exames que voltaram sem elas. Ver restaurarSessao. */
@@ -5817,7 +5830,14 @@ async function rev2RebuscarImagens(){
   if(ok) log('✔ '+ok+' foto(s) recuperadas do aparelho.'+(falhou?(' '+falhou+' não voltaram.'):''));
   else if(falhou) log('Não consegui recuperar as fotos do aparelho ('+falhou+' falha(s)) — o aparelho pode não ter mais esse exame.', true);
 }
-async function restaurarSessao(id){
+/* `opc.silencioso` — 09/09/2026. A sessão passou a voltar SOZINHA na abertura, e nesse
+   caminho ela não pode arrastar o médico para lugar nenhum: sem isto, abrir o programa o
+   jogaria direto na aba "Revisão dos laudos" da INTERFACE ANTIGA, que ele não usa e da
+   qual já custou uma tarde tirá-lo. Restaurando em silêncio, os exames simplesmente
+   estão lá quando ele abre a tela de Trabalho — que é o pedido: nada some, e nada pula
+   na frente. */
+async function restaurarSessao(id, opc){
+  var quieto=!!(opc&&opc.silencioso);
   try{
     var sess;
     if(id===-1){ sess=_sessaoDoAgente; }   // 17/08: a cópia veio do agente
@@ -5856,10 +5876,17 @@ async function restaurarSessao(id){
     }catch(e){}
     var b=document.getElementById('bannerRecup'); if(b) b.remove();
     renderExames(); renderRevisao();
-    mostrarAba('revisao');
-    var c=document.getElementById('cardRevisao'); if(c){c.scrollIntoView({behavior:'smooth'});}
+    if(!quieto){
+      mostrarAba('revisao');
+      var c=document.getElementById('cardRevisao'); if(c){c.scrollIntoView({behavior:'smooth'});}
+    }
     var nLibR=exames.filter(function(e){return e._liberado;}).length;
     log(sess.exames.length+' laudo(s) restaurado(s) ('+nLibR+' já liberado(s)) e '+audios.length+' áudio(s) ('+comSom+' com som) da sessão de '+new Date(sess.quando).toLocaleString('pt-BR')+'.');
+    /* As listas se acertam sozinhas: quem estiver com a tela de Trabalho aberta vê os
+       exames aparecerem, em vez de precisar tocar em "atualizar" para descobrir que eles
+       tinham voltado. */
+    try{ if(document.getElementById('telaTrabalho') &&
+            getComputedStyle(document.getElementById('telaTrabalho')).display!=='none') trabPintar(); }catch(e){}
   }catch(e){ log('Falha ao restaurar: '+e.message,true); }
 }
 async function descartarSessao(id){
@@ -21087,14 +21114,9 @@ function abLiberarLaudos(){
        +'Use o Histórico para escolher outro.');
     return;
   }
-  // há sessão guardada esperando um toque em "Restaurar"? é a causa mais comum
-  if(!exames.length && document.getElementById('bannerRecup')){
-    abAvisar('Há uma sessão guardada esperando: toque em “Restaurar”, na barra azul '
-            +'no rodapé desta tela, e depois em “Liberar laudos” de novo.');
-    var b=document.getElementById('bannerRecup');
-    if(b) b.scrollIntoView({behavior:'smooth', block:'center'});
-    return;
-  }
+  /* 09/09/2026: aqui havia um aviso mandando tocar em "Restaurar", na barra azul do
+     rodapé. A barra não existe mais — a sessão volta sozinha na abertura — e um aviso
+     apontando um botão que não existe é pior que aviso nenhum: manda procurar. */
   /* Nada para liberar. A mensagem diz QUAL dos casos é, porque o selo de pendentes na
      tela de abertura vem do BANCO (pelo agente) e a fila vem do que está aberto nesta
      sessão — os dois podem discordar, e "não há nada" sem explicação faria o médico achar

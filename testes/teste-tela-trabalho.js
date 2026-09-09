@@ -165,6 +165,48 @@ ok(caixa.length > 0 && /telaTrabalho/.test(caixa),
 ok(/capForcarCaixa\(\)/.test(grab('capForcarAviso')),
    'quem escreve o aviso usa essa escolha');
 
+console.log('\n=== 11. nada some: a sessao volta SOZINHA (etapa 6, 09/09/2026) ===');
+/* Palavras dele: "essa questao de sessao anterior encontrada, um laudo gerado na data tal
+   — isso deve sumir. (...) Nenhum exame deve sumir mais da tela do aplicativo. Entao esses
+   avisos de restaurar e tal devem ser removidos tambem."
+
+   ⚠️ O QUE NAO PODE SE PERDER JUNTO COM O BANNER. Aquela barra azul nasceu de um estrago
+   real (17/08/2026: o medico REFEZ laudos porque o dia inteiro sumiu ao fechar a janela).
+   Tirar o aviso e certo; tirar a RESTAURACAO seria repetir o estrago. Estas linhas
+   existem para separar as duas coisas. */
+const verificar = grab('verificarSessaoSalva');
+ok(verificar.length > 0, 'a rotina que procura a sessao guardada continua existindo');
+ok(!/bannerRecup/.test(verificar), 'e NAO cria mais a barra azul de "Sessao anterior encontrada"');
+ok(!/Restaurar</.test(HTML) || !/Sessão anterior encontrada/.test(HTML),
+   'o texto "Sessao anterior encontrada" saiu da tela');
+ok(/restaurarSessao\(idAuto, \{silencioso:true\}\)/.test(verificar),
+   'e a sessao e restaurada SOZINHA, sem esperar toque nenhum');
+/* O prazo de 24 h era "some sozinho" com outro nome. So existe UMA sessao guardada (cada
+   salvamento escreve por cima), entao nao ha acumulo a temer. */
+ok(!/24\*3600\*1000/.test(verificar),
+   'e o prazo de 24h saiu — sessao de ontem tambem volta, porque nada some');
+
+const restaurar = grab('restaurarSessao');
+ok(/opc\.silencioso/.test(restaurar) || /quieto=!!\(opc&&opc\.silencioso\)/.test(restaurar),
+   'restaurarSessao aceita o modo silencioso');
+/* ⚠️ SEM ISTO, ABRIR O PROGRAMA JOGA O MEDICO NA INTERFACE ANTIGA. A restauracao trocava
+   para a aba "Revisao dos laudos" do programa velho e rolava ate la. Fazendo isso sozinha
+   na abertura, todo dia comecaria numa tela que ele nao usa — e ja custou uma tarde
+   tira-lo de la uma vez. */
+ok(/if\(!quieto\)\{[\s\S]{0,200}mostrarAba\('revisao'\)/.test(restaurar),
+   'e no modo silencioso NAO troca de aba (senao a abertura cai na interface antiga)');
+ok(/trabPintar\(\)/.test(restaurar),
+   'e as listas se acertam sozinhas quando os exames voltam');
+/* Descartar continua existindo para quem apaga de proposito; o que saiu foi o BOTAO que
+   oferecia jogar fora o dia de trabalho ao lado do botao que o trazia de volta. */
+ok(/function descartarSessao\(/.test(HTML),
+   'a funcao de descartar continua existindo (para quem apaga de proposito)');
+ok(!/onclick="descartarSessao\(/.test(HTML),
+   'mas nao ha mais botao oferecendo jogar fora o dia de trabalho');
+/* E o aviso que mandava tocar num botao que nao existe mais. */
+ok(!/toque em “Restaurar”/.test(HTML),
+   'e nenhum texto manda tocar em "Restaurar" (mandaria procurar o que nao existe)');
+
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');
 process.exit(falhas ? 1 : 0);

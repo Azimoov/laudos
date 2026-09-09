@@ -897,14 +897,17 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
    Em janela apertada, quem cede é a LARGURA, não o arranjo: cada coluna tem um mínimo
    legível e a faixa rola de lado por dentro (`overflow-x` na faixa, nunca no corpo da
    página — página que rola de lado é o defeito clássico). */
-#telaTrabalho .duasListas{display:flex;gap:18px;align-items:flex-start;margin-top:28px;
+/* Sem o `#telaTrabalho` na frente: as mesmas duas listas passaram a aparecer também no
+   painel do dia, em "Ver os exames de outros dias" (09/09/2026). Uma definição, dois
+   lugares — copiar para lá era como as duas telas começariam a divergir sem ninguém ver. */
+.duasListas{display:flex;gap:18px;align-items:flex-start;margin-top:28px;
   flex-wrap:nowrap;overflow-x:auto}
-#telaTrabalho .duasListas>.col{flex:1 1 0;min-width:340px}
-#telaTrabalho .duasListas .cnt{font-weight:500;font-size:11.5px;color:#7d8c93;
+.duasListas>.col{flex:1 1 0;min-width:340px}
+.duasListas .cnt{font-weight:500;font-size:11.5px;color:#7d8c93;
   letter-spacing:.2px;text-transform:none;margin-left:7px}
 /* A legenda dos sinais é a MESMA nas duas colunas. Repetida lado a lado, ela vira ruído e
-   rouba a altura que os exames precisam — some da segunda. */
-#telaTrabalho #trabRepoHistorico .repoLegenda{display:none}
+   rouba a altura que os exames precisam — some da segunda, seja qual for a tela. */
+.duasListas>.col:last-child .repoLegenda{display:none}
 </style>
 <div id="telaTrabalho">
   <div class="ab-folha">
@@ -957,6 +960,11 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
           </div>
         </div>
       </div>
+
+      <!-- O mesmo lugar de aviso da tela do dia, aqui também: os botões ⤵ de trazer um
+           exame do aparelho passaram a viver nas listas abaixo, e a confirmação do que
+           aconteceu tem de aparecer NA TELA em que ele tocou o botão — não na outra. -->
+      <div id="trabAviso" style="display:none;margin-top:14px"></div>
 
       <!-- ======= AS DUAS LISTAS, SEMPRE LADO A LADO =======
            Pedido dele: "Essas listas devem ser sempre dispostas paralelamente: à
@@ -1136,32 +1144,33 @@ button.repoSelo:hover{filter:brightness(.95)}
       <div class="eb dep">EXAMES DE HOJE <span id="diaConta" class="diaConta"></span></div>
       <div id="diaLista"></div>
 
-      <!-- 03/09/2026, pedido dele: a válvula de escape da trava dos exames repetidos.
-           Exame que já estava no aparelho quando a espera ligou é tratado como ANTIGO e
-           ignorado EM SILÊNCIO — reenviar do ultrassom não adianta, é o mesmo exame com
-           o mesmo número. "Eu gosto da trava, mas gostaria de ter a possibilidade de
-           sobrepujá-la."
-           MORA AQUI, e não ao lado do "Aguardar exame do aparelho": aquele botão está na
-           telaExames, a interface ANTIGA, que ele não usa. Pus lá primeiro e ele
-           respondeu "tenho certeza que tu colocou, porque eu não estou achando". O mesmo
-           engano está registrado no comentário do contador, logo acima — é a terceira
-           vez que esta casa cobra o pedágio. Esta é a tela que ele olha o dia inteiro. -->
-      <button class="pend" onclick="capForcarAbrir()"
-              title="Traz um exame que está no aparelho mas não entrou sozinho na lista de hoje"
-              style="background:#eef3f8;color:#2b4a5e">⤵ Trazer exame do aparelho…</button>
+      <!-- ⚠️ 09/09/2026 — DOIS BOTÕES SAÍRAM DAQUI, a pedido do Dr. Daniel.
+
+           1) "⤵ Trazer exame do aparelho…" (nascido em 03/09 como válvula de escape da
+              trava dos exames repetidos). O caminho NÃO morreu: o exame que está no
+              aparelho aparece na lista de trabalho, ao lado do histórico, com os botões
+              ⤵ de sempre. Ter um segundo caminho, só nesta tela, era ter dois lugares
+              para a mesma coisa — e ele acabou de pedir que tudo isso more numa tela só.
+              A função `capForcarAbrir` continua existindo e alcançável dali.
+
+           2) "Revisar laudos pendentes". Também não morreu: o 3º botão do cartão de cada
+              exame leva à liberação, e agora o exame certo, escolhido por ele — em vez de
+              "o primeiro da fila", que era o que este botão fazia.
+
+           E o "OUTROS DIAS" mudou de conteúdo: em vez de uma lista só, abre AS DUAS —
+           lista de trabalho à esquerda, histórico à direita, as mesmas da tela de
+           Trabalho, desenhadas pela mesma peça. -->
+      <!-- ⚠️ O LUGAR DO AVISO FICA, mesmo sem o botão que o criou.
+           Ao tirar o botão eu tirei junto este `div`, e com ele o único lugar VISÍVEL
+           onde sete caminhos escrevem o que aconteceu — inclusive o "reabrir exame".
+           Sem ele a mensagem caía só no diário, que fica ATRÁS desta tela: ele tocaria e
+           não veria nada acontecer. É exatamente o defeito de 03/09, que custou a mesma
+           lição uma vez. Dois testes apanharam antes de chegar nele. -->
       <div id="capForcarLista" style="display:none;margin-top:8px"></div>
 
-      <!-- 04/09/2026, pedido dele: "mesmo na lista de exames realizados no próprio dia, vai
-           ter lá embaixo os outros dias fechados em uma linha. Mas, se você clicar, tem a
-           possibilidade de abrir para observar os exames realizados em outros dias."
-           NASCE FECHADO E SEM CUSTO: a lista do aparelho leva ~1 s com 575 exames, e o
-           painel do dia se redesenha a cada 5 s — carregá-la junto seria bater no recebedor
-           720 vezes por hora para mostrar uma linha que ele quase nunca abre. Só busca
-           quando ele toca. -->
       <div class="eb dep">OUTROS DIAS</div>
       <div id="diaOutrosDias"></div>
 
-      <button class="pend" id="diaPend" onclick="diaRevisarPendentes()">Revisar laudos pendentes</button>
       <p class="rodape">nada abre sozinho: o painel avisa (som + faixa) e você toca quando quiser</p>
     </div>
   </div>
@@ -9327,8 +9336,12 @@ async function capOrtCompletar(est){
    A trava fica. O que muda é existir uma porta: aqui ele escolhe o exame na mão e o traz,
    passando por cima de `capOrtSeen` e `capOrtFeitos`. */
 function capForcarFechar(){
-  var d=document.getElementById('capForcarLista');
-  if(d){ d.style.display='none'; d.innerHTML=''; }
+  /* Fecha as DUAS caixas: o aviso pode ter aparecido numa tela e ele fechar depois de
+     trocar para a outra, e uma caixa esquecida aberta com texto velho mente. */
+  ['capForcarLista','trabAviso'].forEach(function(id){
+    var d=document.getElementById(id);
+    if(d){ d.style.display='none'; d.innerHTML=''; }
+  });
 }
 async function capForcarAbrir(){
   var d=document.getElementById('capForcarLista'); if(!d) return;
@@ -9374,8 +9387,19 @@ async function capForcarAbrir(){
    #capOrtStatus, que está na telaExames — a interface antiga. Toda mensagem daquele
    caminho é invisível para quem trabalha no painel do dia, e foi por isso que ele clicou,
    o exame entrou, e a tela não disse absolutamente nada. */
+/* Onde o aviso aparece: na tela que estiver ABERTA. Desde 09/09 os botões ⤵ de trazer o
+   exame vivem também na tela de Trabalho, e escrever o resultado sempre no painel do dia
+   deixaria o médico tocando um botão numa tela e a resposta acontecendo em outra —
+   indistinguível de "não aconteceu nada". */
+function capForcarCaixa(){
+  var t=document.getElementById('telaTrabalho');
+  var aberta=false;
+  try{ aberta=!!(t && getComputedStyle(t).display!=='none'); }catch(e){}
+  if(aberta){ var a=document.getElementById('trabAviso'); if(a) return a; }
+  return document.getElementById('capForcarLista');
+}
 function capForcarAviso(html, cor){
-  var d=document.getElementById('capForcarLista'); if(!d) return;
+  var d=capForcarCaixa(); if(!d) return;
   d.style.display='block';
   d.innerHTML='<div style="border:1px solid '+(cor||'#c8d0da')+';border-radius:8px;padding:8px 10px;'
     +'background:#fbfcfe;font-size:13px">'+html
@@ -18198,11 +18222,21 @@ function repoOutrosDiasBotao(){
   d.innerHTML='<button type="button" class="repoBt cinza" style="width:100%;padding:12px" '
     +'onclick="repoOutrosDiasAbrir()">▶ Ver os exames de outros dias</button>';
 }
+/* 09/09/2026, pedido dele: este botão passou a abrir AS DUAS LISTAS — trabalho à
+   esquerda, histórico à direita —, as mesmas da tela de Trabalho e desenhadas pela mesma
+   peça (`duasListasHtml`/`duasListasPintar`, prefixo 'dia2').
+   ⚠️ HOJE CONTINUA DE FORA, e isso é de propósito. Cheguei a tirar essa exclusão, achando
+   que a fila de trabalho mentiria por omissão sem os exames de hoje. Um teste lembrou por
+   quê ela existe (04/09): os exames de hoje já estão desenhados AQUI EM CIMA, em "EXAMES
+   DE HOJE", e mostrá-los de novo logo abaixo poria o mesmo paciente duas vezes na mesma
+   tela. E o botão se chama "Ver os exames de OUTROS dias" — fazer diferente do que o
+   nome promete é o começo de não confiar mais no nome de nenhum botão.
+   Quem quer as duas listas COM hoje tem a tela de Trabalho, onde elas são a tela toda. */
 async function repoOutrosDiasAbrir(){
   var d=document.getElementById('diaOutrosDias'); if(!d) return;
   d.setAttribute('data-aberto','1');
-  await repoPintar('diaOutrosDias', {excluirDia:repoHojeBr(), abrirPrimeiro:true,
-                                     vazio:'Não há exames de outros dias no aparelho.'});
+  d.innerHTML=duasListasHtml('dia2');
+  await duasListasPintar('dia2', {excluirDia:repoHojeBr()});
 }
 
 function diaRenderLista(){
@@ -18291,10 +18325,16 @@ function diaRenderLista(){
     // som só quando um exame ENTRA em falta, não a cada 5 s: aviso repetido vira ruído
     if(bipar){ try{ micSom('falta'); }catch(_){} }
   }
+  /* ⚠️ 09/09/2026 — A GUARDA. O botão "Revisar laudos pendentes" saiu do painel do dia a
+     pedido dele, e estas três linhas o procuravam SEM conferir se existe. Isto roda a
+     cada 5 segundos enquanto o painel está aberto: sem a guarda, o painel do dia quebrava
+     de cinco em cinco segundos, calado, no meio do atendimento. */
   var n=lista.filter(function(x){ return x.laudo && !x._liberado; }).length;
   var b=document.getElementById('diaPend');
-  b.textContent='Revisar laudos pendentes'+(n?(' ('+n+')'):'');
-  b.disabled=!n;
+  if(b){
+    b.textContent='Revisar laudos pendentes'+(n?(' ('+n+')'):'');
+    b.disabled=!n;
+  }
 }
 // entrando pela tela 3, é para ela que "Voltar ao painel" tem de devolver
 function diaRevisar(exId){ _rev2Origem='dia'; diaFechar(); rev2Abrir(exId); }
@@ -20958,29 +20998,51 @@ function trabFechar(semVoltar){
   try{ abContarPendentes(); }catch(e){}
   window.scrollTo(0,0);
 }
-/* Desenha as duas listas. Um lugar só por onde a tela se redesenha — quem mexer num
-   exame (liberar, imprimir, apagar áudio) chama isto e as duas colunas se acertam
-   juntas, inclusive a travessia de um exame da esquerda para a direita. */
-async function trabPintar(){
+/* ===== AS DUAS LISTAS, NUM LUGAR SÓ (09/09/2026) =====
+   Elas nasceram na tela de Trabalho e passaram a aparecer TAMBÉM no painel do dia, no
+   "Ver os exames de outros dias" — pedido dele. Em vez de repetir a moldura e o desenho
+   nas duas telas, existe um `pref` (prefixo dos identificadores) e as duas usam a mesma
+   peça. Duas cópias do mesmo par de listas divergiriam no primeiro conserto feito só de
+   um lado. */
+function duasListasHtml(pref){
+  return '<div class="duasListas">'
+    +'<div class="col"><div class="eb">LISTA DE TRABALHO<span class="cnt" id="'+pref+'CntT"></span></div>'
+      +'<div id="'+pref+'RepoTrabalho"></div></div>'
+    +'<div class="col"><div class="eb">HISTÓRICO<span class="cnt" id="'+pref+'CntH"></span></div>'
+      +'<div id="'+pref+'RepoHistorico"></div></div>'
+    +'</div>';
+}
+/* `opc.excluirDia` tira um dia das duas colunas. Existe por causa do painel do dia: lá
+   os exames de HOJE já estão desenhados logo acima, em "EXAMES DE HOJE", e repeti-los
+   aqui embaixo mostraria o MESMO paciente duas vezes na mesma tela — foi a decisão de
+   04/09 e continua valendo. O botão até se chama "Ver os exames de OUTROS dias".
+   Na tela de Trabalho não se exclui nada: lá as duas listas são a tela inteira. */
+async function duasListasPintar(pref, opc){
+  var fora=(opc||{}).excluirDia;
   /* As duas em paralelo, e não uma esperando a outra: elas leem a MESMA lista já
      carregada, e serializar aqui só faria a tela aparecer em dois tempos. */
   await Promise.all([
-    repoPintar('trabRepoTrabalho', {filtro:'trabalho', abrirPrimeiro:true,
+    repoPintar(pref+'RepoTrabalho', {filtro:'trabalho', abrirPrimeiro:true, excluirDia:fora,
       vazio:'Nenhum exame esperando. Tudo que foi feito está no histórico, ao lado.'}),
-    repoPintar('trabRepoHistorico', {filtro:'historico', abrirPrimeiro:true,
+    repoPintar(pref+'RepoHistorico', {filtro:'historico', abrirPrimeiro:true, excluirDia:fora,
       vazio:'Nenhum laudo liberado ainda. Eles chegam aqui quando você assina.'})
   ]);
-  trabContar();
+  duasListasContar(pref);
 }
 /* Os dois contadores ao lado dos títulos. Saem da MESMA `repoItens()` que desenhou as
    listas, e não de uma contagem própria — duas contas do mesmo número divergem. */
-function trabContar(){
+function duasListasContar(pref){
   var itens=[]; try{ itens=repoItens(); }catch(e){ return; }
   var t=itens.filter(function(it){ return !it.liberado; }).length;
   var h=itens.length-t;
-  var et=document.getElementById('trabCntT'); if(et) et.textContent=t?(t+(t===1?' exame':' exames')):'';
-  var eh=document.getElementById('trabCntH'); if(eh) eh.textContent=h?(h+(h===1?' laudo':' laudos')):'';
+  var et=document.getElementById(pref+'CntT'); if(et) et.textContent=t?(t+(t===1?' exame':' exames')):'';
+  var eh=document.getElementById(pref+'CntH'); if(eh) eh.textContent=h?(h+(h===1?' laudo':' laudos')):'';
 }
+/* Quem mexe num exame (liberar, imprimir, apagar áudio) chama isto: as duas colunas se
+   acertam juntas, em QUALQUER tela onde estejam desenhadas — inclusive a travessia de um
+   exame da esquerda para a direita. */
+async function trabPintar(){ await duasListasPintar('trab'); }
+function trabContar(){ duasListasContar('trab'); duasListasContar('dia2'); }
 
 function abVoltarInicio(){
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';

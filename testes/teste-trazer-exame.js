@@ -40,37 +40,45 @@ ok(/nao dupliquei/.test(proc) || /não dupliquei/.test(proc),
    'com a mensagem de sempre quando a varredura o encontra');
 
 console.log('\n=== e agora ha uma porta ===');
-ok(/onclick="capForcarAbrir\(\)"/.test(HTML), 'existe o botao de trazer na mao');
-ok(/Trazer exame do aparelho/.test(HTML), 'com nome que diz o que faz');
-ok(/id="capForcarLista"/.test(HTML), 'e um lugar na tela para a lista aparecer');
+/* ⚠️ 09/09/2026 — A PORTA MUDOU DE LUGAR, E O TESTE FOI ATRAS DELA.
+   Ate hoje esta secao cobrava o BOTAO "⤵ Trazer exame do aparelho…" dentro do painel do
+   dia. Ele nasceu em 03/09 como valvula de escape da trava de exames repetidos, e havia
+   ate uma secao inteira aqui embaixo conferindo em QUAL tela ele morava — porque na 1a
+   tentativa eu o pus na interface antiga e ele respondeu "tenho certeza que tu colocou,
+   porque eu nao estou achando".
 
-console.log('\n=== e ele esta na tela que ELE USA ===');
-// 03/09/2026 — ESTA VERIFICACAO NASCEU DE UM ERRO MEU. Pus o botao ao lado do "Aguardar
-// exame do aparelho", que vive na telaExames — a interface ANTIGA, que ele nao abre. O
-// codigo compilou, a suite passou inteira, e ele respondeu: "tenho certeza que tu
-// colocou aqui, porque eu nao estou achando".
-// O index.html tem DUAS interfaces vivas: a nova (telaAbertura/telaDia/telaRev2) e a
-// velha (telaExames/telaRevisao/telaAntigos), e a velha continua no arquivo inteira. Um
-// comentario de 31/08 no proprio codigo registra o MESMO engano com o contador do dia.
-// Testar que o botao existe nao basta: tem de estar na tela certa.
+   Em 09/09 o Dr. Daniel pediu a reconstrucao do layout e, com todas as palavras: "o
+   botao 'Trazer exame do aparelho' deve ser removido". Nao e descuido, e decisao — e
+   remover um botao a pedido nao pode deixar a suite vermelha para sempre.
+
+   O QUE NAO PODE MUDAR, e e o que se cobra agora: a CAPACIDADE continua alcancavel. O
+   exame que esta no aparelho aparece na lista de trabalho com os botoes ⤵, e eles chamam
+   `capForcarTrazer` -- a MESMA funcao que o botao removido usava. Se alguem cortar esse
+   fio, o medico perde o unico jeito de passar por cima da trava, e cai aqui. */
+ok(/function capForcarTrazer\(/.test(HTML),
+   'a valvula de escape continua existindo (capForcarTrazer)');
+ok(/function capForcarAbrir\(/.test(HTML),
+   'e a lista de escolha tambem, para quem quiser religar o botao');
+const acoes = grab('repoAcoesHtml');
+ok(/repoTrazer\(/.test(acoes),
+   'o cartao do exame na lista oferece os botoes ⤵ de trazer');
+ok(/para hoje/.test(acoes) && /para antigos/.test(acoes),
+   'com os dois destinos: para hoje e para a tela de antigos');
+const trazerDoCartao = grab('repoTrazer');
+ok(/capForcarTrazer\(/.test(trazerDoCartao),
+   'e eles chamam a MESMA valvula de escape — a capacidade nao se perdeu com o botao');
+
+/* Em que tela mora um trecho do arquivo. Nasceu em 03/09 de um erro meu: pus o botao na
+   interface ANTIGA (telaExames), tudo compilou, a suite passou inteira, e ele respondeu
+   "tenho certeza que tu colocou, porque eu nao estou achando". O index.html tem duas
+   interfaces vivas e a velha continua no arquivo inteira — dizer que algo "existe" nao
+   basta, tem de existir na tela que ele abre. Continua sendo usado mais abaixo. */
 function telaDe(marca) {
   const i = HTML.indexOf(marca);
   if (i < 0) return 'NAO ACHEI';
   const m = [...HTML.slice(0, i).matchAll(/<div id="(tela[A-Za-z0-9]+)"/g)];
   return m.length ? m[m.length - 1][1] : '(fora de tela)';
 }
-const NOVAS = ['telaDia', 'telaAbertura', 'telaRev2'];
-const telaBotao = telaDe('onclick="capForcarAbrir()"');
-ok(NOVAS.indexOf(telaBotao) >= 0,
-   'o botao vive numa tela da interface NOVA  [' + telaBotao + ']');
-ok(telaBotao === 'telaDia',
-   'e especificamente no painel do dia, que e o que ele olha enquanto atende');
-ok(telaDe('id="capForcarLista"') === telaBotao,
-   'a lista abre na MESMA tela do botao  [' + telaDe('id="capForcarLista"') + ']');
-ok((HTML.match(/id="capForcarLista"/g) || []).length === 1,
-   'e ha um so lugar com esse id — dois iguais fariam a lista abrir na tela errada');
-ok(/function capForcarAbrir\(/.test(HTML) && /function capForcarTrazer\(/.test(HTML),
-   'as duas funcoes existem');
 
 console.log('\n=== forcar NUNCA duplica em silencio ===');
 // Ele pediu para poder sobrepujar a trava, nao para a trava sumir: dois exames iguais na

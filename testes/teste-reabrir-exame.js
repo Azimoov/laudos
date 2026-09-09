@@ -153,7 +153,17 @@ const chamadas = [...marcacaoDia.matchAll(/onclick="([a-zA-Z0-9_]+)\(/g)].map(m 
 const gerados = [...semComentarios(grab('diaRenderLista'))
   .matchAll(/onclick="([a-zA-Z0-9_]+)\(/g)].map(m => m[1]);
 const todos = [...new Set(chamadas.concat(gerados))];
-ok(todos.length >= 6, 'achei os botoes do painel do dia  [' + todos.join(', ') + ']');
+/* ⚠️ 09/09/2026 — ERA `>= 6`, UM NUMERO MAGICO. Ele existia so para a varredura nao
+   passar verde estando CEGA (se o recorte da tela mudasse e ela achasse zero botoes,
+   nao teria o que reprovar). Mas 6 era a contagem daquele dia: em 09/09 o Dr. Daniel
+   mandou tirar dois botoes do painel — "Trazer exame do aparelho" e "Revisar laudos
+   pendentes" — e a linha passou a acusar defeito por o programa ter OBEDECIDO.
+   Troca-se a contagem pelos NOMES que precisam estar la. Nome nao envelhece quando a
+   tela enxuga, e diz mais: se `diaRevisar` sumir, isso e defeito de verdade. */
+ok(todos.length > 0, 'a varredura enxerga os botoes do painel do dia  [' + todos.join(', ') + ']');
+['diaRevisar', 'diaReabrir'].forEach(function (n) {
+  ok(todos.indexOf(n) >= 0, '  e achou o caminho que importa: ' + n);
+});
 ok(todos.indexOf('diaReabrir') >= 0 && todos.indexOf('diaRevisar') >= 0,
    'incluindo os do cartao, que sao gerados em JS');
 /* A pergunta certa nao e "chama mostrarAba?" e sim "deixa o medico sem tela?". Uma tela

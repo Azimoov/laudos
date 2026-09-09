@@ -131,6 +131,40 @@ ok(/#telaAntigos \.solta,#telaTrabalho \.solta\{/.test(HTML),
    'a caixa pontilhada tem UMA definicao, citando as duas telas');
 ok(/#telaAntigos \.cx,#telaTrabalho \.cx\{/.test(HTML), 'idem para a moldura das colunas');
 
+console.log('\n=== 9. os TRES ajustes no painel do dia (etapa 5, 09/09/2026) ===');
+/* Palavras dele: "o botao 'Trazer exame do aparelho' deve ser removido; o botao 'Ver os
+   exames de outros dias' deve abrir justamente as duas listas; o botao 'Revisar laudos
+   pendentes' tambem deve ser removido." */
+const DIA = corpoDa('telaDia');
+ok(!/onclick="capForcarAbrir\(\)"/.test(DIA), 'saiu: "Trazer exame do aparelho"');
+ok(!/id="diaPend"/.test(DIA), 'saiu: "Revisar laudos pendentes"');
+ok(/id="diaOutrosDias"/.test(DIA), 'e "OUTROS DIAS" continua la');
+const outros = grab('repoOutrosDiasAbrir');
+ok(/duasListasHtml\('dia2'\)/.test(outros) && /duasListasPintar\('dia2'/.test(outros),
+   'que agora abre AS DUAS listas, pela mesma peca da tela de Trabalho');
+ok(/excluirDia:repoHojeBr\(\)/.test(outros),
+   'sem repetir HOJE, que ja esta desenhado logo acima na mesma tela');
+
+console.log('\n=== 10. o que foi removido nao levou junto a capacidade ===');
+/* Remover um botao a pedido e uma coisa; remover o unico caminho para algo e outra. */
+ok(/function capForcarTrazer\(/.test(HTML),
+   'a valvula de escape da trava de repetidos continua existindo');
+ok(/capForcarTrazer\(/.test(grab('repoTrazer')),
+   'e os botoes ⤵ do cartao a chamam — o exame do aparelho continua alcancavel');
+ok(/repoLiberar\(/.test(grab('repoSelosHtml')),
+   'e liberar laudo tem caminho pelo 3o botao do cartao, exame a exame');
+/* ⚠️ A CAIXA DE AVISO FICOU, mesmo sem o botao que a criou. Ao tirar o botao eu tirei
+   junto este div, e com ele o unico lugar VISIVEL onde sete caminhos escrevem o que
+   aconteceu -- inclusive o "reabrir exame". A mensagem cairia so no diario, que fica
+   ATRAS da tela: tocar e nao ver nada acontecer e o defeito de 03/09, de novo. */
+ok(/id="capForcarLista"/.test(DIA), 'o lugar do aviso continua no painel do dia');
+ok(/id="trabAviso"/.test(TRAB), 'e a tela de Trabalho tem o seu');
+const caixa = grab('capForcarCaixa');
+ok(caixa.length > 0 && /telaTrabalho/.test(caixa),
+   'e o aviso aparece na tela ABERTA, nao sempre na mesma');
+ok(/capForcarCaixa\(\)/.test(grab('capForcarAviso')),
+   'quem escreve o aviso usa essa escolha');
+
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');
 process.exit(falhas ? 1 : 0);

@@ -76,6 +76,7 @@ const SUITE = [
   { arq: 'teste-moldura-protegida.js', o: '"DESCRIÇÃO:" nao pode ser apagado por acidente (caso Jacilene, 26/08)' },
   { arq: 'teste-audio-patologia.js', o: 'recorte curto por achado (o que o botao VOZ toca)' },
   { arq: 'teste-ouvir-audio.js', o: 'ouvir o audio: o exame inteiro, sem os silencios' },
+  { arq: 'teste-audio-bloco.js', o: 'áudio por bloco: o trecho do órgão, sem os silêncios' },
   { arq: 'teste-trazer-exame.js', o: 'trazer na mao um exame que o aparelho ja tem' },
   { arq: 'teste-fotos-nao-somem.js', o: 'as fotos do exame nao somem num recarregamento' },
   { arq: 'teste-repositorio.js', o: 'repositorio unico de exames (dias que abrem, tres sinais, audio e fotos)' },

@@ -664,7 +664,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
      (paddings), os vãos têm altura real, as máscaras são imagens posicionadas uma por
      folha. O navegador só fatia a cada 297 mm. O que a tela mostra é o que sai. */
   body{margin:0!important;}
-  .laudoFolha{border:0;max-width:none;}
+  .laudoFolha{border-color:transparent!important;max-width:none;}
   .pacienteFolha{border:0!important;box-shadow:none!important;max-width:none;}
   /* 02/09/2026 — ESTA LINHA PUNHA A ASSINATURA DENTRO DA MOLDURA. A caixa do corpo tem
      altura mínima de 620px na TELA; aqui ela era anulada, e no papel a caixa encolhia. Só
@@ -1121,8 +1121,10 @@ button.repoSelo:hover{filter:brightness(.95)}
 #telaRev2 .selo{margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0}
 #telaRev2 .selo button{border:0;border-radius:10px;padding:3px 10px;font-size:10px;font-weight:700;
   color:#fff;cursor:pointer;font-family:inherit}
-#telaRev2 .selo .voz{background:#0E6E6B}
+#telaRev2 .selo .voz,#telaRev2 .selo .audio{background:#0E6E6B}
+#telaRev2 .selo .audio:hover{background:#0A5250}
 #telaRev2 .selo .img{background:#3D6FB4}
+#telaRev2 .selo .img:hover{background:#2E568E}
 #telaRev2 .selo .hora{font-size:11px;color:#0E6E6B}
 /* --- a caixinha âmbar dentro do retângulo: conflito e descritor em falta --- */
 /* caixas de dentro do retângulo — cores cheias (17/08/2026) */
@@ -1302,7 +1304,7 @@ button.repoSelo:hover{filter:brightness(.95)}
         <div class="dir">
           <div class="eb">IMAGENS (<span id="rv2NImg">0</span>)</div>
           <div id="rv2Imgs"></div>
-          <div class="tocador" id="rv2Tocador">nenhum trecho selecionado — toque em <b>VOZ</b> num trecho do laudo</div>
+          <div class="tocador" id="rv2Tocador">nenhum trecho selecionado — ouça o áudio do exame</div>
           <!-- 02/09/2026, pedido dele: UM botão no lugar de dois. Saíram "Ouvir o ditado
                inteiro" (19/08) e "Ouvir o áudio editado — só as patologias" (28/08). O que
                ele quer ouvir é o exame do início ao fim, tirando só as partes caladas —
@@ -7201,7 +7203,7 @@ function _estiloPaginaTexto(topo, base, lado, temFundo){
     return '@media print{'
       +'@page{size:A4;margin:0;}'
       +'body{margin:0!important;}'
-      +'.laudoFolha{border:0!important;max-width:none;margin:0 auto;height:auto!important;}'
+      +'.laudoFolha{border-color:transparent!important;max-width:none;margin:0 auto;height:auto!important;}'
       +'}';
   }
   /* 01/09/2026 — MARGEM DE PÁGINA ZERO TAMBÉM NO LAUDO SEM TIMBRADO, e o respiro passa a
@@ -7220,7 +7222,7 @@ function _estiloPaginaTexto(topo, base, lado, temFundo){
   return '@media print{'
     +'@page{size:A4;margin:0;}'
     +'body{margin:0!important;}'
-    +'.laudoFolha{border:0!important;padding:'+topo+'mm '+lado+'mm '+base+'mm '+lado+'mm!important;'
+    +'.laudoFolha{border-color:transparent!important;padding:'+topo+'mm '+lado+'mm '+base+'mm '+lado+'mm!important;'
       +'min-height:0!important;height:auto!important;}'
     +'.fundoLaudo{display:none;}'
     +'}';
@@ -7868,10 +7870,14 @@ function _paginarMiolo(folha, pageH, topPx, botPx, util, mold){
   var tx=folha.querySelector('.laudoTexto');
   /* 26/08 (noite) — com a moldura fechando em cada folha, o texto do CORPO guarda um
      respiro (FRISO) nas fronteiras: sem ele, a primeira linha da folha seguinte nascia
-     em cima da linha do retângulo, e a última encostava na de baixo. É o mesmo 12px que
-     o padding da caixa dá na folha 1. Só vale para o que mora DENTRO da caixa —
-     assinatura e rodapé (fora dela) seguem nas margens de sempre. */
-  var FRISO=12;
+     em cima da linha do retângulo, e a última encostava na de baixo.
+     09/09/2026 — RESPIRO AMPLIADO PARA 22px (~5.8mm). Os 12px originais eram menores
+     que a entrelinha (17.16px) e faziam a linha superior da moldura cortar ou colar na
+     primeira linha de texto da folha seguinte (ex.: "CONCLUSÃO:") na impressão física.
+     Com 22px, o espaçamento interno fica confortável e seguro contra qualquer microvariação
+     no papel. Só vale para o que mora DENTRO da caixa — assinatura e rodapé seguem nas
+     margens de sempre. */
+  var FRISO=22;
   var caixa=folha.querySelector('.laudoCorpoBox');
   var pontos=tx?_paginarPontos(tx):[];
   var un=[];
@@ -11825,14 +11831,29 @@ function tireoideAlternar(estrutura){
 function mamaLadoTitulo(titulo){
   var t=norm(titulo||'');
   if(!/\bmama\b/.test(t)) return null;
-  if(/\bdireit[ao]\b/.test(t)) return 'D';
-  if(/\besquerd[ao]\b/.test(t)) return 'E';
+  if(/\b(?:direit[ao]|d)\b/.test(t)) return 'D';
+  if(/\b(?:esquerd[ao]|e)\b/.test(t)) return 'E';
   return null;
 }
 function mamaCaixaHTML(ex,b){
   if(!MAMA_DESENHOS||!ex||ex.tipo!=='mama'||!imagensRevisaoLigadas()) return '';
   var lado=mamaLadoTitulo(b&&b.titulo);
-  if(!lado||!rev2TemAchado(ex,b)) return '';
+  if(!lado) return '';
+  var temAchado=rev2TemAchado(ex,b);
+  if(!temAchado){
+    var txt=String((b&&b.texto)||'');
+    var reAchado=/\b(?:cistos?|n[oó]dulos?|massas?|les[aã]o|les[oõ]es|linfonodos?|microcistos?|fibroadenoma[s]?|achados?\s+\d+)\b/i;
+    if(reAchado.test(txt)){
+      var frases=txt.split(/[.\n;]+/);
+      for(var fi=0;fi<frases.length;fi++){
+        var f=frases[fi];
+        if(reAchado.test(f) && !/\b(?:sem|aus[eê]ncia\s+de|livres?\s+de|n[aã]o\s+(?:h[aá]|se\s+observ|se\s+caracteriz|se\s+visualiz|identific))\b/i.test(f)){
+          temAchado=true; break;
+        }
+      }
+    }
+  }
+  if(!temAchado) return '';
   var r=mamaLesoes(ex.laudo), plot=r.plot.filter(function(x){return x.lado===lado;});
   var incompletas=r.semPos.filter(function(x){return x.lado===lado;});
   /* Como na tireoide, dado ausente é perguntado AQUI. A imagem não é montada pela metade
@@ -11888,7 +11909,15 @@ function mamaInformarHora(id,hora,lado){
   if((lado!=='D'&&lado!=='E')||!isFinite(hora)||hora<1||hora>12) return;
   var ex=rev2Ex(); if(!ex||ex.tipo!=='mama'||!ex.laudo) return;
   var L=ex.laudo, lista=Array.isArray(L.birads)?L.birads:(((L._classifBruto||{}).birads)||[]);
-  var idx=parseInt(String(id||'').replace(/\D/g,''),10)-1, d=lista[idx]; if(!d) return;
+  if(!Array.isArray(L.birads) && (!L._classifBruto || !Array.isArray(L._classifBruto.birads))){
+    L.birads = lista.slice();
+    lista = L.birads;
+  }
+  var idx=parseInt(String(id||'').replace(/\D/g,''),10)-1;
+  if(!lista[idx]){
+    lista[idx]={ localizacao: 'mama '+(lado==='D'?'direita':'esquerda') };
+  }
+  var d=lista[idx];
   var base=String(d.localizacao||'').replace(/[.,;:\s]+$/,'').trim();
   if(!base) base='mama '+(lado==='D'?'direita':'esquerda');
   var nova=base+', às '+hora+' h';
@@ -12218,7 +12247,7 @@ function _mamaFraseDo(corpo, rotulo, quantosAchados, lesaoId){
      primeira linha desse lado. */
   var _num=parseInt(String(lesaoId||'').replace(/\D/g,''),10);
   if(_num>0){
-    var _reN=new RegExp('(?:^|\\n)[^\\n]*\\bAchado\\s+'+_num+'\\s*[\\u2014\\u2013:-][^\\n]*','i');
+    var _reN=new RegExp('(?:^|\\n)[^\\n]*\\bAchado\\s+'+_num+'\\b[^\\n]*','i');
     var _mN=_reN.exec(texto);
     if(_mN){
       var _tN=_mN[0], _avan=(_tN.charAt(0)==='\n'?1:0);
@@ -12369,7 +12398,7 @@ function mamaLesoes(L){
   var estr=(((L.dados_estruturados||{}).achados)||[]);
   var corpo=String(L.corpo||'');
   // cada achado do BI-RADS casa com o trecho do corpo que fala dele, pela localização
-  var plot=[], semPos=[], _fraseVezes={};
+  var plot=[], semPos=[], _fraseVezes={}, _frasesUsadas=[];
   bir.forEach(function(d,i){
     d=d||{};
     var rotulo=String(d.localizacao||'').trim();
@@ -12378,6 +12407,7 @@ function mamaLesoes(L){
     var _id='L'+(i+1);
     var _f=_mamaFraseDo(corpo, rotulo, bir.length, _id);
     var frase=_f.texto;
+    if(frase && frase!==corpo) _frasesUsadas.push(frase);
     var loc=mamaLocalDoTexto(frase||rotulo);
     /* 24/08/2026 — O RÓTULO TAMBÉM É FONTE, e era jogado fora quando havia frase.
        Defeito visto em atendimento: a IA devolveu o achado com localizacao "mama direita,
@@ -12481,6 +12511,72 @@ function mamaLesoes(L){
     else semPos.push({id:item.id, lado:item.lado, rotulo:rotulo||('achado '+(i+1)), porque: item.incoerencia ||
         (!item.lado?'lado não identificado':'hora do relógio não informada')});
   });
+
+  // Suplementa achados descritos no corpo que a IA não anotou em birads[]
+  if(corpo){
+    var _linhasCorpo=String(corpo||'').split('\n'), _blocosMama=[], _blocoAtual=null;
+    _linhasCorpo.forEach(function(ln,i){
+      var m=/^(?:\*\*\s*)?MAMA\s+(DIREITA|ESQUERDA)(?:\s*:?\s*\*\*|\s*:?)/i.exec(ln.trim());
+      if(m){ _blocoAtual={lado:(/D/i.test(m[1][0])?'D':'E'), ini:i, fim:i}; _blocosMama.push(_blocoAtual); return; }
+      if(_blocoAtual) _blocoAtual.fim=i;
+    });
+    _blocosMama.forEach(function(bl){
+      for(var j=bl.ini+1; j<=bl.fim; j++){
+        var ln=_linhasCorpo[j];
+        var ce=mamaCasoEspecialDoTexto(ln);
+        var ehCisto=(ce==='cistoSimples'||ce==='microcistos'||/\b(?:cistos?|microcistos?|forma[çc](?:[ãa]o|[õo]es)\s+c[ií]stic\w*)\b/i.test(ln));
+        var ehNodulo=(/\b(?:n[óo]dulos?|massas?|linfonodos?|image[mn]s?\s+nodular\w*|les(?:[ãa]o|[õo]es))\b/i.test(ln));
+        if(!ehCisto && !ehNodulo && !/às?\s*\d{1,2}\s*(?:h\b|horas?\b)/i.test(ln)) continue;
+        if(/\b(?:sem|aus[êe]ncia\s+de|livres?\s+de|n[ãa]o\s+h[áa]|desprovid[ao]s?)\b[^.]*?\b(?:cistos?|n[óo]dulos?|massas?|les(?:[ãa]o|[õo]es))\b/i.test(ln)) continue;
+        if(/^\s*(?:pele|tecido\s+celular|par[êe]nquima|planos?|m[úu]scul|regi[ãa]o)\b/i.test(ln) && !/às?\s*\d{1,2}\s*(?:h\b|horas?\b)/i.test(ln)) continue;
+
+        var jaFrase = _frasesUsadas.some(function(f){
+          return f && (f.indexOf(ln.trim()) >= 0 || ln.indexOf(f.trim()) >= 0);
+        });
+        if(jaFrase) continue;
+
+        var loc=mamaLocalDoTexto(ln);
+        var lado=loc.lado||bl.lado;
+        var hora=loc.hora;
+        var jaExiste=plot.some(function(p){
+          return p.lado===lado && (hora!=null ? p.hora===hora : (p.rotulo&&p.rotulo.indexOf(ln.trim())>=0));
+        }) || semPos.some(function(s){
+          return s.lado===lado && (hora!=null ? s.hora===hora : (s.rotulo&&s.rotulo.indexOf(ln.trim())>=0));
+        });
+        if(jaExiste) continue;
+
+        var _idNovo='L'+(plot.length+semPos.length+1);
+        var marcador=ehCisto?'cisto-simples':(/irregular|indistint|angular|microlobul|espicul/i.test(ln)?'nodulo-irregular':'nodulo-regular');
+        var itemNovo={
+          id:_idNovo,
+          lado:lado,
+          hora:hora,
+          distCm:loc.distCm,
+          prof:loc.prof||'media',
+          profMm:loc.profMm,
+          forma:ehCisto?'':(/oval/i.test(ln)?'oval':(/redond/i.test(ln)?'redonda':'irregular')),
+          orientacao:/paralel/i.test(ln)?'paralela':'',
+          marcador:marcador,
+          mm:loc.mm||[],
+          birads:ehCisto?'2':'3',
+          rotulo:'mama '+(lado==='D'?'direita':'esquerda')+(hora!=null?(', às '+hora+' h'):''),
+          incoerencia:''
+        };
+        if(itemNovo.lado && itemNovo.hora!=null){
+          if(itemNovo.distCm==null) itemNovo.distIgnorada=true;
+          itemNovo.n=plot.length+semPos.length+1;
+          plot.push(itemNovo);
+        } else {
+          semPos.push({
+            id:_idNovo,
+            lado:itemNovo.lado,
+            rotulo:itemNovo.rotulo||ln.trim(),
+            porque:(!itemNovo.lado?'lado não identificado':'hora do relógio não informada')
+          });
+        }
+      }
+    });
+  }
   return {plot:plot, semPos:semPos};
 }
 /* ---- o desenho ---- */
@@ -13499,9 +13595,9 @@ function mamaNumerarAchados(corpo,birads){
       candidatos.push({i:i,lado:bl.lado,hora:loc.hora,usado:false});
     }
   });
-  if(candidatos.length<2) return {corpo:corpo,mudou:false,n:0};
+  if(candidatos.length<1) return {corpo:corpo,mudou:false,n:0};
   var pares=[];
-  if(bir.length>=2){
+  if(bir.length>=1){
     bir.forEach(function(d,idx){
       var rot=String((d||{}).localizacao||''), loc=mamaLocalDoTexto(rot);
       var lado=loc.lado;
@@ -13521,26 +13617,74 @@ function mamaNumerarAchados(corpo,birads){
       c.usado=true;
     }
   });
-  if(pares.length<2) return {corpo:corpo,mudou:false,n:0};
+  if(pares.length<1) return {corpo:corpo,mudou:false,n:0};
   var linhas=B.linhas.slice(), mudou=0;
+  function _ehCisto(txt){
+    if(!txt) return false;
+    var ce=mamaCasoEspecialDoTexto(txt);
+    if(ce==='cistoSimples'||ce==='microcistos') return true;
+    if(/\bn[ãa]o[\s-]+simples\b/i.test(txt)) return false;
+    if(/\b(?:irregular(?:es)?|espiculad\w*|microlobulad\w*|indistint\w*|angular(?:es)?|s[óo]lid\w*|vegeta[çc]\w*|sept\w*|heterog[êe]ne\w*)\b/i.test(txt)) return false;
+    return /\b(?:cistos?|microcistos?|forma[çc](?:[ãa]o|[õo]es)\s+c[ií]stic[ao]s?)\b/i.test(txt);
+  }
+  var totalCistos=0;
+  pares.forEach(function(p){
+    var l=linhas[p.i];
+    if(_ehCisto(l) || /^\s*[\u2022*-]\s*mama\s+(?:direita|esquerda)/i.test(l)){
+      totalCistos++;
+    }
+  });
   pares.forEach(function(p){
     var ln=linhas[p.i], numero=p.idx+1;
-    if(new RegExp('\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]','i').test(ln)){
-      var lnL=ln.replace(new RegExp('(\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]\\s*)\\*+\\s*','i'),'$1');
-      lnL=lnL.replace(/\s*\*+([.,;:!?]?)\s*$/,'$1');
-      lnL=lnL.replace(new RegExp('(\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]\\s*)\\*\\*([^*]+)\\*\\*','i'),'$1$2');
-      if(lnL!==ln){ linhas[p.i]=lnL; mudou++; }
-      return;
-    }
+    var isCisto=(_ehCisto(ln) || /^\s*[\u2022*-]\s*mama\s+(?:direita|esquerda)/i.test(ln));
     var m=/^(\s*)(?:([\u2022]|-(?!\s*-)|\*(?!\*))\s+)?/.exec(ln);
     var ini=m?m[0]:'', esp=m?m[1]:'';
-    var bala=(m&&m[2])?(m[2]+' '):'', resto=ln.slice(ini.length).trim();
-    resto=resto.replace(/^(?:\*+)?\s*(?:Localiza[çc][ãa]o\s+do\s+)?Achado\s+\d+\s*(?::|\*+:?|[\u2014\u2013-]|—)?\s*(?:\*+)?\s*(?:[\u2014\u2013-]|—)?\s*/i,'');
-    resto=resto.replace(/^\*+\s*/,'');
-    resto=resto.replace(/\s*\*+([.,;:!?]?)\s*$/,'$1').trim();
-    resto=resto.replace(/^\*\*([^*]+)\*\*/,'$1');
-    linhas[p.i]=esp+bala+'Achado '+numero+' \u2014 '+resto;
-    mudou++;
+    var temBullet=!!(m&&m[2]);
+    var isListaCisto=isCisto && (totalCistos>=2) && (temBullet || /^\s*(?:cisto\s+simples|mama\s+(?:direita|esquerda))\b/i.test(ln));
+    if(isListaCisto){
+      if(new RegExp('\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]','i').test(ln)){
+        var lnL=ln.replace(new RegExp('(\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]\\s*)\\*+\\s*','i'),'$1');
+        lnL=lnL.replace(/\s*\*+([.,;:!?]?)\s*$/,'$1');
+        lnL=lnL.replace(new RegExp('(\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]\\s*)\\*\\*([^*]+)\\*\\*','i'),'$1$2');
+        if(lnL!==ln){ linhas[p.i]=lnL; mudou++; }
+        return;
+      }
+      var bala=temBullet?(m[2]+' '):'';
+      var resto=ln.slice(ini.length).trim();
+      resto=resto.replace(/\s*\(Achado\s+\d+\)\s*/i,' ');
+      resto=resto.replace(/^(?:\*+)?\s*(?:Localiza[çc][ãa]o\s+do\s+)?Achado\s+\d+\s*(?::|\*+:?|[\u2014\u2013-]|—)?\s*(?:\*+)?\s*(?:[\u2014\u2013-]|—)?\s*/i,'');
+      resto=resto.replace(/^\*+\s*/,'');
+      resto=resto.replace(/\s*\*+([.,;:!?]?)\s*$/,'$1').trim();
+      resto=resto.replace(/^\*\*([^*]+)\*\*/,'$1');
+      var novaLinha=esp+bala+'Achado '+numero+' \u2014 '+resto;
+      if(novaLinha!==ln){
+        linhas[p.i]=novaLinha;
+        mudou++;
+      }
+      return;
+    }
+    // Modo corrido: texto corrido natural, com (Achado N) entre parênteses ao final
+    var t=ln;
+    t=t.replace(/^(\s*)(?:[\u2022*-]\s+)?(?:\*+)?\s*(?:Localiza[çc][ãa]o\s+do\s+)?Achado\s+\d+\s*(?::|\*+:?|[\u2014\u2013-]|—)?\s*(?:\*+)?\s*(?:[\u2014\u2013-]|—)?\s*/i,'$1');
+    t=t.replace(/^(\s*)\*+([^*]+)/,'$1$2');
+    t=t.replace(/\s*\*+([.,;:!?]?)\s*$/,'$1');
+    if(/\(Achado\s+\d+\)/i.test(t)){
+      var tMod=t.replace(/\(Achado\s+\d+\)/i,'(Achado '+numero+')');
+      if(tMod!==ln){ linhas[p.i]=tMod; mudou++; }
+      return;
+    }
+    var nova=t;
+    if(/\*\*\s*\.?\s*$/.test(nova)){
+      nova=nova.replace(/\s*\*\*\s*\.?\s*$/,' (Achado '+numero+')**.');
+    } else if(/([.,;:!?])\s*$/.test(nova)){
+      nova=nova.replace(/\s*([.,;:!?])\s*$/,' (Achado '+numero+')$1');
+    } else {
+      nova=nova.trim()+' (Achado '+numero+').';
+    }
+    if(nova!==ln){
+      linhas[p.i]=nova;
+      mudou++;
+    }
   });
   return {corpo:mudou?linhas.join('\n'):corpo,mudou:!!mudou,n:mudou};
 }
@@ -18082,18 +18226,11 @@ function rev2Render(){
     var est=rev2Estado(ex,b), pr=rev2Proc(ex,b.titulo), selo='';
     if(pr && pr.imagem_n>0 && (ex.imagens||[]).length>=pr.imagem_n)
       selo+='<button class="img" onclick="rev2VerImagem('+pr.imagem_n+')" title="mostrar a imagem de onde saiu esta medida">IMG</button>';
-    /* 31/08/2026: sem chave nenhuma não havia botão VOZ, mesmo com o ditado inteiro
-       guardado e a hora de cada palavra disponível.
-       01/09/2026: a faixa apontada pela IA vem primeiro (exata); na busca por trás,
-       rev2TrechoDoBloco tenta o achado em negrito antes da citação — ver o porquê lá. */
+    /* 09/09/2026: Etapa 2 (Dr. Daniel) — Botão ÁUDIO: toca o áudio recortado do bloco sem os silêncios. */
+    var _clips=rev2ClipesDoBloco(ex, b);
+    if(_clips && _clips.length)
+      selo+='<button class="audio" onclick="rev2TocarAudioBloco('+i+')" title="ouvir o que você ditou sobre este bloco (sem silêncios)">ÁUDIO</button>';
     var _fx=rev2RecortePorFaixa(ex,b);
-    var tr=_fx?((L.trechos||[])[_fx.trecho]):null;
-    if(!tr){ var _td=rev2TrechoDoBloco(ex,b); tr=_td?_td.tr:null; }
-    var trI=tr?((L.trechos||[]).indexOf(tr)):-1;
-    /* 28/08: o índice do BLOCO vai junto — é por ele que rev2Tocar acha a citação deste
-       retângulo e recorta só a frase da patologia, em vez do pedaço inteiro de fala. */
-    if(tr && trI>=0) selo+='<button class="voz" onclick="rev2Tocar('+trI+','+i+')" title="ouvir só a frase deste achado no ditado">VOZ</button>'
-                +'<span class="hora">'+rev2Rel(tr.inicio)+'</span>';
     /* Corta o título do começo do texto SÓ quando ele É o título deste retângulo, e nunca
        a ponto de esvaziar o corpo (ver rev2CorpoVisivel). Antes cortava qualquer negrito
        inicial de até 70 caracteres, e isso causava dois estragos:
@@ -18576,7 +18713,7 @@ function rev2Parar(){
   var el=document.getElementById('rv2Audio'); if(el){ try{ el.pause(); }catch(e){} }
   rev2PararEditado();
   var cx=document.getElementById('rv2Tocador');
-  if(cx) cx.innerHTML='parado — toque <b>VOZ</b> num trecho, ou ouça o áudio do exame.';
+  if(cx) cx.innerHTML='parado — ouça o áudio do exame.';
 }
 /* ============ OUVIR O ÁUDIO: O EXAME INTEIRO, SEM OS SILÊNCIOS ============
    02/09/2026, pedido dele: os dois botões antigos ("ouvir o ditado inteiro" e "ouvir o
@@ -19057,6 +19194,145 @@ function rev2Tocar(i, bi){
 function rev2PararEditado(){
   if(window.__rv2Ed){ window.__rv2Ed.vivo=false; window.__rv2Ed=null; }
   clearTimeout(window.__rv2EdPar);
+}
+
+/* ============ ETAPA 2 (PREPARADA): ÁUDIO RECORTADO POR BLOCO SEM SILÊNCIO ============
+   O antigo botão VOZ foi desativado a pedido do Dr. Daniel por falhas na heurística
+   de recorte fino de frases. Aqui fica preparada a infraestrutura para a Etapa 2:
+   extrair os trechos de fala correspondentes a este bloco/órgão e tocá-los pulando
+   os silêncios com a mesma precisão de rev2ClipesSemSilencio. */
+function rev2ClipesDoBloco(ex, b){
+  if(!ex || !ex.laudo || !b) return [];
+  var todos=(ex.laudo.trechos||[]).filter(function(t){
+    return t && typeof t.inicio==='number' && typeof t.fim==='number' && t.fim>t.inicio;
+  });
+  if(!todos.length) return [];
+  var meus=audios.filter(function(x){ return x.exameId===ex.id; });
+  var cand=[];
+  var _fx=rev2RecortePorFaixa(ex,b);
+  if(_fx && _fx.trecho!=null && todos[_fx.trecho]) cand.push(todos[_fx.trecho]);
+  var _td=rev2TrechoDoBloco(ex,b);
+  if(_td && _td.tr && cand.indexOf(_td.tr)<0) cand.push(_td.tr);
+
+  var ALIAS_ORGAO = {
+    'figado': ['figado', 'hepat'],
+    'vesicula': ['vesicul', 'biliar', 'coledoc'],
+    'rim': ['rim', 'rins', 'renal'],
+    'baco': ['baco', 'esplen'],
+    'pancreas': ['pancrea'],
+    'bexiga': ['bexiga', 'vesical'],
+    'prostata': ['prostat'],
+    'utero': ['utero', 'uterin', 'endometr', 'miometr'],
+    'ovario': ['ovari', 'anex'],
+    'mama': ['mama', 'mamari', 'axil'],
+    'tireoide': ['tireoid', 'istmo'],
+    'testiculo': ['testic', 'escrot', 'epididim']
+  };
+
+  var chaves=[];
+  var titN=norm((b&&b.titulo)||'');
+  if(titN){
+    chaves.push(titN);
+    for(var k in ALIAS_ORGAO){
+      var lista=ALIAS_ORGAO[k];
+      if(lista.some(function(rad){ return titN.indexOf(rad)>=0; })){
+        lista.forEach(function(rad){ if(chaves.indexOf(rad)<0) chaves.push(rad); });
+      }
+    }
+  }
+  var palBloco=norm((b&&b.texto)||'').split(' ').filter(function(w){ return w.length>4; });
+
+  todos.forEach(function(t){
+    var tt=norm(t.texto||'');
+    if(!tt) return;
+    var match=false;
+    if(chaves.length && chaves.some(function(ch){ return tt.indexOf(ch)>=0; })){
+      match=true;
+    } else if(palBloco.length>=3){
+      var batidas=palBloco.filter(function(p){ return tt.indexOf(p)>=0; }).length;
+      if(batidas>=2) match=true;
+    }
+    if(match && cand.indexOf(t)<0) cand.push(t);
+  });
+
+  if(cand.length){
+    for(var ci=0; ci<cand.length; ci++){
+      var tIdx=todos.indexOf(cand[ci]);
+      if(tIdx>=0 && tIdx+1<todos.length){
+        var prox=todos[tIdx+1];
+        if(cand.indexOf(prox)<0 && (prox.inicio - cand[ci].fim)<=RV2_PAUSA_MAX){
+          var proxTxt=norm(prox.texto||'');
+          var outroOrgao=false;
+          for(var kOrg in ALIAS_ORGAO){
+            if(chaves.indexOf(kOrg)>=0) continue;
+            if(ALIAS_ORGAO[kOrg].some(function(rad){ return proxTxt.indexOf(rad)>=0; })){
+              outroOrgao=true; break;
+            }
+          }
+          if(!outroOrgao) cand.push(prox);
+        }
+      }
+    }
+  }
+
+  if(!cand.length && todos.length===1) cand.push(todos[0]);
+  if(!cand.length) return [];
+  cand.sort(function(x,y){ return x.inicio-y.inicio; });
+  var blocos=[];
+  cand.forEach(function(t){
+    var url=(rev2AudioDoTrecho(meus, t)||{}).url||'';
+    if(!url) return;
+    var ult=blocos[blocos.length-1];
+    if(ult && ult.url===url && (t.inicio-ult.fim)<=RV2_PAUSA_MAX){
+      ult.fim=Math.max(ult.fim, t.fim);
+    } else {
+      blocos.push({ini:t.inicio, fim:t.fim, url:url});
+    }
+  });
+  for(var j=0;j<blocos.length;j++){
+    var blk=blocos[j], ant=blocos[j-1], prox=blocos[j+1];
+    var antes=(ant && ant.url===blk.url) ? (blk.ini-ant.fim)/2 : blk.ini;
+    var depois=(prox && prox.url===blk.url) ? (prox.ini-blk.fim)/2 : RV2_FOLGA_FALA;
+    blk.ini=Math.max(0, blk.ini-Math.min(RV2_FOLGA_FALA, Math.max(0,antes)));
+    blk.fim=blk.fim+Math.min(RV2_FOLGA_FALA, Math.max(0,depois));
+  }
+  return blocos;
+}
+
+function rev2TocarAudioBloco(i){
+  var ex=rev2Ex(); if(!ex||!ex.laudo) return;
+  var bl=(i!=null ? rev2BlocosDaTela(ex.laudo)[i] : null);
+  var el=document.getElementById('rv2Audio'), cx=document.getElementById('rv2Tocador');
+  if(!el) return;
+  var clips=rev2ClipesDoBloco(ex, bl);
+  if(!clips.length){
+    if(cx) cx.textContent='não há trecho de áudio identificado para este bloco.';
+    return;
+  }
+  clearTimeout(window.__rv2Par);
+  rev2PararEditado();
+  var sessao={vivo:true}; window.__rv2Ed=sessao;
+  var idx=0;
+  var soma=clips.reduce(function(s,b){ return s+(b.fim-b.ini); },0);
+  var tocarClip=function(){
+    if(!sessao.vivo) return;
+    if(idx>=clips.length){
+      try{ el.pause(); }catch(e){}
+      if(cx) cx.innerHTML='fim do áudio '+(bl&&bl.titulo?('— <b>'+esc(bl.titulo)+'</b>'):'')+' · <b>'+rev2Rel(soma)+'</b> ouvidos'
+        +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">fechar</button>';
+      return;
+    }
+    var c=clips[idx];
+    if(el.src!==c.url) el.src=c.url;
+    el.currentTime=c.ini;
+    el.play().catch(function(){});
+    if(cx) cx.innerHTML='▶ áudio '+(bl&&bl.titulo?('— <b>'+esc(bl.titulo)+'</b>'):'')
+      +' (<b>'+rev2Rel(soma)+'</b> sem silêncios)'
+      +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
+    var dur=Math.max(200, (c.fim-c.ini)*1000);
+    window.__rv2EdPar=setTimeout(function(){ idx++; tocarClip(); }, dur);
+  };
+  tocarClip();
 }
 
 

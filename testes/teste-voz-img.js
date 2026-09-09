@@ -147,12 +147,13 @@ ok(HTML.indexOf('REGRA DURA') >= 0 && HTML.indexOf('imagem_n = 0') >= 0,
 ok(/audioUrl:a\.url/.test(HTML), 'cada trecho leva a URL do proprio audio ao ser guardado no laudo');
 ok(/\(ex\.imagens\|\|\[\]\)\.length>=pr\.imagem_n/.test(HTML),
    'ficha IMG so nasce quando a foto citada existe de verdade');
-// 28/08/2026: a ficha VOZ passou a levar TAMBEM o indice do BLOCO — e por ele que
-// rev2Tocar acha a citacao daquele retangulo e recorta so a frase da patologia, em vez
-// do pedaco inteiro de fala (46% passavam de 10 s; o maior tinha 4 min). A intencao
-// original deste teste continua de pe: aponta por INDICE, nunca por horas soltas.
-ok(HTML.indexOf("rev2Tocar('+trI+','+i+')") >= 0,
-   'a ficha VOZ aponta o trecho (indice) e o bloco, nao horas soltas');
+// 09/09/2026: o antigo botao VOZ foi retirado das caixas de texto estruturado a pedido
+// do Dr. Daniel por inconsistencias de recorte. O botao IMG continua preservado e a
+// infraestrutura para a reproducao limpa do bloco (rev2ClipesDoBloco) foi preparada.
+ok(!/<button class="voz"[^>]*>VOZ<\/button>/.test(HTML),
+   'o antigo botao VOZ foi removido das caixas de texto do laudo');
+ok(/rev2ClipesDoBloco/.test(HTML) && /rev2TocarAudioBloco/.test(HTML),
+   'e o terreno para o audio do bloco sem silencios ficou preparado');
 const editouSrc = grab('rev2Editou');
 ok(!/procedencia/.test(editouSrc),
    'a edicao do medico NAO reescreve a procedencia — congelada na geracao (decisao de 17/08)');

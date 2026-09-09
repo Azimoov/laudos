@@ -87,8 +87,10 @@ ok(/id="rv2BtAudio"[^>]*onclick="rev2OuvirAudio\(\)"/.test(HTML),
    'a tela tem UM botao de audio, chamando rev2OuvirAudio');
 ok(!/id="rv2BtEditado"/.test(HTML) && !/id="rv2BtInteiro"/.test(HTML),
    'e os dois botoes antigos sairam');
-ok(/onclick="rev2Tocar\('\+trI\+','\+i\+'\)"/.test(HTML),
-   'o botao VOZ manda o indice do BLOCO junto — e assim que acha a citacao daquele retangulo');
+// 09/09/2026: o botao VOZ saiu da tela da revisao a pedido do Dr. Daniel para
+// dar lugar ao audio recortado sem silencios por bloco (Etapa 2).
+ok(!/onclick="rev2Tocar\('\+trI\+','\+i\+'\)"/.test(HTML),
+   'o antigo botao VOZ foi retirado da tela da revisao');
 
 // ===================================================================================
 // 31/08/2026 — O RECORTE DEIXOU DE SER CHUTE

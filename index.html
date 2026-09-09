@@ -15342,23 +15342,48 @@ function uteroTerco(v){
   return 'medio';
 }
 
+/* Lê o tipo FIGO do mioma A PARTIR DA FRASE do laudo. Devolve '' quando a frase não
+   determina o tipo — e '' NÃO é falha: é a resposta honesta.
+
+   ⚠️ 09/09/2026 — ANTES ELA CHUTAVA. Terminava em `return '4'`, então frase nenhuma
+   ("nódulo miometrial de 3 cm", "cisto de Naboth", texto vazio) saía classificada como
+   FIGO 4, intramural puro. E FIGO 4 não é um palpite prudente: é uma afirmação clínica
+   tão específica quanto qualquer outra da escala. Esse número entra no TEXTO do laudo e
+   na legenda impressa do esquema — documento assinado.
+
+   O tipo decide a via cirúrgica (0–2 costumam ir para ressecção histeroscópica; 3–7 para
+   laparoscopia ou laparotomia), e errar custa caro nos dois sentidos: cirurgia invasiva
+   desnecessária de um lado, ressecção incompleta do outro. No mesmo estudo, com
+   RESSONÂNCIA no protocolo de uso corrente — superior ao ultrassom para isso —, dois
+   radiologistas treinados acertaram 58,9% dos tipos contra a cirurgia. Uma função que lê
+   palavras de uma frase não faz melhor; a diferença é que ela nunca hesita.
+   Fonte e números em conhecimento\mioma-figo.md (Liu et al., Abdom Radiol 2025,
+   doi 10.1007/s00261-024-04776-w, acesso aberto — texto completo lido).
+
+   REGRA: só afirma o tipo quando a frase CONTÉM o que o tipo exige. "submucoso" sozinho
+   não diz se é <50% ou ≥50% intramural — e é justamente a fronteira 1/2 que muda a
+   conduta. Sem a proporção, fica sem tipo, o marcador sai cinza e a legenda diz
+   "FIGO não classificado". O médico arrasta o marcador para a profundidade certa e AÍ o
+   tipo é escrito no laudo — decisão dele, não chute do programa. */
 function uteroFigo(v){
   var t=uteroNorm(v);
   var m=/\bfigo\s*(2\s*[-– ]\s*5|[0-8])\b/i.exec(t);
-  if(m) return m[1].replace(/[\s–]+/g,'-');
+  if(m) return m[1].replace(/[\s–]+/g,'-');   // o médico já escreveu o tipo: vale o dele
   if(/pedunculado.*(?:intra|cavit)|intracavit/i.test(t)) return '0';
   if(/submucoso.*<\s*50/i.test(t)) return '1';
   if(/submucoso.*(?:>=|≥|mais|maior).*50/i.test(t)) return '2';
-  if(/submucoso/i.test(t)) return '1';
   if(/transmural/i.test(t)) return '2-5';
   if(/subseroso.*(?:>=|≥|mais|maior).*50/i.test(t)) return '5';
   if(/subseroso.*<\s*50/i.test(t)) return '6';
   if(/subseroso.*pedunculado|pedunculado.*subseroso/i.test(t)) return '7';
-  if(/subseroso/i.test(t)) return '6';
   if(/intramural.*contato.*endo|contat.*endo/i.test(t)) return '3';
+  /* "intramural" sozinho CONTINUA valendo 4. Aqui a ausência é informação: o laudo diz
+     "com contato endometrial" quando há contato (é o caso 3, logo acima), então
+     "intramural" sem essa ressalva descreve o tipo 4. Não é o caso de "submucoso" e
+     "subseroso" sozinhos, onde falta um número que o laudo sempre traz quando existe. */
   if(/intramural/i.test(t)) return '4';
   if(/cervical|colo/i.test(t)) return '8';
-  return '4';
+  return '';   // a frase não diz. O programa também não diz.
 }
 
 function uteroMedidasMm(txt){

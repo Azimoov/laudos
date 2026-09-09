@@ -35,6 +35,41 @@ ok(api.uteroFigo('subseroso com mais de 50% intramural') === '5', 'infere FIGO 5
 ok(api.uteroFigo('subseroso < 50% intramural') === '6', 'infere FIGO 6 de subseroso < 50%');
 ok(api.uteroFigo('subseroso pedunculado') === '7', 'infere FIGO 7 de subseroso pedunculado');
 
+console.log('\n=== E QUANDO A FRASE NAO DIZ, ELA NAO INVENTA (09/09/2026) ===');
+/* Ate 09/09 esta funcao terminava em `return '4'`: frase nenhuma saia classificada como
+   FIGO 4 (intramural puro), e esse numero entra no TEXTO do laudo e na legenda impressa.
+   FIGO 4 nao e palpite prudente — e afirmacao clinica, e o tipo decide a via cirurgica.
+   Medido no artigo de referencia (Liu et al., Abdom Radiol 2025, acesso aberto, texto
+   completo lido — ver conhecimento\mioma-figo.md): com RESSONANCIA no protocolo comum,
+   dois radiologistas treinados acertaram 58,9% dos tipos contra a cirurgia.
+   Estas linhas existem para que ninguem devolva o chute achando que corrige um "vazio". */
+ok(api.uteroFigo('nódulo miometrial de 3,0 cm') === '',
+   'nodulo sem descritor nenhum fica SEM tipo (antes virava FIGO 4)');
+ok(api.uteroFigo('formação nodular sólida hipoecogênica') === '',
+   'descricao generica fica sem tipo');
+ok(api.uteroFigo('') === '', 'frase vazia nao classifica nada');
+ok(api.uteroFigo('cisto de Naboth') === '', 'texto que nem fala de mioma nao classifica');
+/* As duas mais importantes: submucoso e subseroso SOZINHOS. O que separa 0/1/2 e 5/6/7 e
+   a proporcao intramural, e e exatamente a fronteira 1-2 que decide entre ressecao
+   histeroscopica e cirurgia aberta. Sem o numero na frase, nao ha tipo. */
+ok(api.uteroFigo('nódulo submucoso') === '',
+   'submucoso SEM a proporcao nao vira FIGO 1 — a fronteira 1/2 muda a conduta');
+ok(api.uteroFigo('nódulo subseroso') === '',
+   'subseroso SEM a proporcao nao vira FIGO 6');
+/* O caso em que a ausencia E informacao: o laudo diz "com contato endometrial" quando ha
+   contato (tipo 3). "Intramural" sem essa ressalva descreve o tipo 4 — continua valendo. */
+ok(api.uteroFigo('nódulo intramural') === '4',
+   'mas "intramural" sozinho continua 4: aqui a ausencia da ressalva E informacao');
+
+console.log('\n=== e o resto do programa aguenta o "sem tipo" ===');
+ok(api.uteroFigoDesc('') === 'FIGO não classificado',
+   'a legenda diz "nao classificado", nao um numero');
+ok(api.uteroFigoGrupo('') === 'outro', 'o grupo cai em "outro", sem erro');
+ok(api.uteroFigoCor('') === '#475569', 'e o marcador sai cinza, nao com a cor de um tipo');
+const semTipo = api.uteroSagitalXY({ parede: 'anterior', figo: '', terco: 'medio' });
+ok(Array.isArray(semTipo) && semTipo.length === 2 && semTipo.every(n => isFinite(n)),
+   'o marcador ainda e desenhado (coordenadas validas), so que sem afirmar profundidade');
+
 console.log('\n=== localização de parede e terço ===');
 ok(api.uteroParede('parede anterior corporal') === 'anterior', 'parede anterior');
 ok(api.uteroParede('parede posterior') === 'posterior', 'parede posterior');

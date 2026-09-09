@@ -105,6 +105,36 @@ ok(lesoes.plot[0].parede === 'anterior', 'parede anterior identificada');
 ok(lesoes.plot[0].figo === '4', 'FIGO 4 identificado');
 ok(lesoes.plot[0].terco === 'medio', 'terço médio identificado');
 
+console.log('\n=== LAUDO NORMAL NAO GANHA MIOMA DE PRESENTE (09/09/2026) ===');
+/* Ate 09/09, se o laudo NAO falasse de mioma e o medico ligasse a ilustracao, o programa
+   inseria a frase fixa 'Mioma intramural na parede anterior FIGO 4'. Era para dar algo
+   para arrastar. O efeito real: um laudo de utero normal, com conclusao "dentro dos
+   limites da normalidade", saia IMPRESSO com a legenda
+      • Mioma 1: FIGO 4 (intramural puro) — parede anterior
+   Achado inventado em documento assinado, contradizendo a conclusao do proprio laudo.
+   E nao servia nem para o que foi feito: arrasta-lo chamava uteroReescreverLocal, que
+   procura a frase DENTRO do laudo; a frase nao estava la, a reescrita falhava e o
+   marcador ficava preso, desenhando um mioma que ninguem conseguia corrigir nem apagar. */
+const laudoNormal = {
+  corpo: '**ÚTERO:** Anteversofletido, contornos regulares, medindo 7,1 x 3,9 x 4,4 cm.\n' +
+         'Miométrio de ecotextura homogênea.\n\n' +
+         '**Endométrio:** Espessura de 5,0 mm, regular.\n\n' +
+         '**Ovários:** Tópicos, com dimensões preservadas.\n\n' +
+         'CONCLUSÃO: Exame ecográfico dentro dos limites da normalidade.',
+  _uteroIlustracoes: { ativo: true }   // o medico LIGOU a ilustracao
+};
+const semMioma = api.uteroLesoes(laudoNormal);
+ok(semMioma.plot.length === 0,
+   'laudo sem mioma continua sem mioma, mesmo com a ilustracao ligada');
+const hostNormal = api.uteroHostHTML(laudoNormal);
+ok(!/Mioma \d/.test(hostNormal),
+   'e NADA de "Mioma 1" na legenda que vai para o papel');
+ok(hostNormal === '',
+   'sem achado, nao se desenha figura nenhuma (o botao e quem avisa o medico)');
+/* A contraprova: com mioma no texto, tudo continua funcionando como antes. */
+ok(/Mioma 1/.test(api.uteroHostHTML(laudoExemplo)),
+   'contraprova: com mioma descrito, a legenda continua saindo');
+
 console.log('\n=== coordenadas e ortogonalidade das duas vistas ===');
 const xySag = api.uteroSagitalXY(lesoes.plot[0]);
 const xyTra = api.uteroTransversalXY(lesoes.plot[0]);

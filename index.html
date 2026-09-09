@@ -15464,9 +15464,21 @@ function uteroLesoes(L){
   var desc = (L._descritores) || {};
   var escolhas = (L._uteroIlustracoes) || {};
 
-  if(miomaLinhas.length === 0 && escolhas.ativo){
-    miomaLinhas.push({ linha: 'Mioma intramural na parede anterior FIGO 4', idx: 0 });
-  }
+  /* ⚠️ 09/09/2026 — AQUI NASCIA UM MIOMA QUE NÃO EXISTIA.
+     Quando o laudo não falava de mioma nenhum e o médico ligava a ilustração, o programa
+     inseria a frase fixa 'Mioma intramural na parede anterior FIGO 4'. Era para dar algo
+     ao médico para arrastar — mas o efeito era outro: um laudo de útero normal, com
+     conclusão "dentro dos limites da normalidade", saía IMPRESSO com a legenda
+     "• Mioma 1: FIGO 4 (intramural puro) — parede anterior". Achado inventado num
+     documento assinado, contradizendo a conclusão do próprio laudo.
+
+     E ele nem servia para o que foi feito: arrastá-lo chamava uteroReescreverLocal, que
+     procura a frase DENTRO do laudo para reescrever. A frase não estava lá, então a
+     reescrita falhava e o marcador ficava preso, desenhando um mioma que ninguém
+     conseguia corrigir nem apagar.
+
+     Agora: sem mioma no texto, sem marcador. O esquema do útero continua sendo desenhado
+     — os dois cortes, a cavidade, o colo —, que é o que faz sentido num exame normal. */
 
   miomaLinhas.forEach(function(item, i){
     var txt = item.linha;
@@ -15749,9 +15761,20 @@ function uteroAlternar(){
   es.ativo = !antes;
   try{ agendarSalvarSessao(); }catch(e){}
   rev2Render();
-  log(es.ativo
-    ? 'Ilustração anatômica do útero (vistas sagital e transversal) adicionada ao laudo.'
-    : 'Ilustração do útero removida deste laudo.');
+  if(!es.ativo){ log('Ilustração do útero removida deste laudo.'); return; }
+  /* 09/09/2026 — O BOTÃO PRECISA DIZER A VERDADE. O esquema só existe para mostrar
+     mioma: sem mioma descrito no texto, ele não desenha nada. Antes disso, o programa
+     resolvia o silêncio INVENTANDO um mioma ("intramural na parede anterior FIGO 4"),
+     que ia impresso na legenda de um laudo de útero normal. Tirado o mioma inventado,
+     sobrava o outro extremo: o botão dizia "adicionada ao laudo" e não aparecia nada.
+     Agora ele avisa o que falta, em vez de mentir para os dois lados. */
+  if(uteroLesoes(ex.laudo).plot.length){
+    log('Ilustração anatômica do útero (vistas sagital e transversal) adicionada ao laudo.');
+  } else {
+    log('Ilustração do útero ligada, mas ainda não há figura: o texto do laudo não descreve '
+      + 'nenhum mioma. Descreva o achado (parede, terço e, se souber, o tipo FIGO) e a figura '
+      + 'aparece sozinha.', true);
+  }
 }
 
 function uteroLayoutLigar(raiz, ex){

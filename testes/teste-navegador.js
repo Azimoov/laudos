@@ -1716,9 +1716,20 @@ const VERIFICACOES = `(async () => {
       !!lAntigo && !!lAntigo.querySelector('.repoSelo.lib'));
 
     const lSem = document.getElementById('repoL' + 'E' + 'R-SEMAUDIO');
-    diz('sem audio guardado, o selo e cinza e NAO e botao',
-      !!lSem && !!lSem.querySelector('span.repoSelo.vazio')
-      && !lSem.querySelector('button.repoSelo.aud'));
+    /* ⚠️ 09/09/2026 — ESTA LINHA MUDOU DE LADO, e vale registrar por que.
+       Ela cobrava: "sem audio guardado, o selo e cinza e NAO e botao". Era a regra certa
+       enquanto o selo so servia para TOCAR o audio -- botao que nao faz nada ensina a
+       nao confiar nos outros botoes.
+       O pedido dele de 09/09 mudou o que o selo faz: agora ele tambem GRAVA um audio novo
+       e TRAZ um arquivo de fora. E "sem audio" e exatamente quando essas duas acoes fazem
+       mais falta. Manter o selo apagado ali seria fechar a porta na hora do uso.
+       O que continua valendo -- e o que se cobra agora -- e que ele PARECA vazio (cinza,
+       para o olho distinguir de longe o que tem do que nao tem) e que abra algo de
+       verdade. Nenhum dos quatro sinais e enfeite. */
+    diz('sem audio guardado, o selo continua CINZA (o olho distingue de longe)',
+      !!lSem && !!lSem.querySelector('.repoSelo.aud.vazio'));
+    diz('mas agora e BOTAO: e dali que se grava o audio que falta',
+      !!lSem && !!lSem.querySelector('button.repoSelo.aud'));
     diz('e o exame sem laudo assinado mostra "a liberar"',
       !!lSem && !!lSem.querySelector('.repoSelo.falta'));
     // <audio src=""> nao fica mudo: aponta para a PROPRIA PAGINA e o navegador tenta
@@ -2019,6 +2030,109 @@ const VERIFICACOES = `(async () => {
     trabFechar();
   } catch (e) {
     diz('as duas listas da tela de trabalho', false, e.constructor.name + ': ' + e.message);
+  }
+
+  /* ===== OS QUATRO BOTOES DO CARTAO (09/09/2026) =====
+     Ele descreveu botao por botao o que cada um tem de abrir. O que se confere aqui e
+     que os quatro EXISTEM, que os quatro ABREM alguma coisa (nenhum e enfeite) e que
+     cada painel oferece as acoes que ele pediu -- inclusive quando NAO ha conteudo, que
+     e justamente quando incluir imagem e gravar audio fazem mais falta. */
+  try {
+    exames = [
+      { id: 7001, paciente: 'Com Tudo', tipo: 'transvaginal', _quando: Date.now(),
+        laudo: { corpo: 'texto' }, _liberado: false, imagens: ['data:image/png;base64,iVBORw0KGgo='], _instIds: [''] },
+      { id: 7002, paciente: 'Sem Nada', tipo: 'abdome', _quando: Date.now(),
+        _liberado: false, imagens: [] }
+    ];
+    _repo.estudos = [];
+    trabAbrir();
+    await new Promise(r => setTimeout(r, 250));
+    await trabPintar();
+
+    const linha = (id) => document.getElementById('repoLS' + id);
+    const selos = (id) => Array.from(linha(id).querySelectorAll('.repoSelo'));
+
+    const s1 = selos(7001);
+    diz('o cartao tem QUATRO sinais', s1.length === 4, s1.length + ': ' + s1.map(b => b.textContent.trim()).join(' | '));
+    diz('e os quatro sao BOTAO (nenhum e enfeite)',
+      s1.every(b => b.tagName === 'BUTTON'), s1.map(b => b.tagName).join(','));
+    diz('o quarto diz se ja saiu no papel',
+      /a imprimir|impresso/.test(s1[3].textContent), s1[3].textContent.trim());
+
+    /* Sem imagem e sem audio, os dois primeiros CONTINUAM sendo botao: e ali que ele vai
+       incluir a imagem e gravar o audio que faltam. */
+    const s2 = selos(7002);
+    diz('exame sem nada tambem tem quatro botoes',
+      s2.length === 4 && s2.every(b => b.tagName === 'BUTTON'),
+      s2.map(b => b.textContent.trim()).join(' | '));
+
+    // --- botao 1: imagens ---
+    repoVerFotos('S7001');
+    await new Promise(r => setTimeout(r, 400));
+    const pImg = document.getElementById('repoPS7001').textContent;
+    diz('botao 1 abre e oferece INCLUIR imagens', /incluir imagens/.test(pImg));
+    diz('e oferece EXCLUIR as que tem', /excluir todas/.test(pImg));
+    diz('e cada foto tem o seu proprio X',
+      document.querySelectorAll('#repoPS7001 .repoTirar').length === 1,
+      document.querySelectorAll('#repoPS7001 .repoTirar').length + ' X para 1 foto');
+    // excluir de verdade: a foto sai do exame E o selo muda
+    window.confirm = () => true;
+    repoImgTirar('S7001', 0);
+    diz('o X tira a foto do exame', exames[0].imagens.length === 0, 'sobraram ' + exames[0].imagens.length);
+    diz('e o mapa de instancias acompanha (senao a foto vai parar em outro exame)',
+      exames[0]._instIds.length === 0, 'instIds: ' + exames[0]._instIds.length);
+    diz('e o selo passa a dizer "sem imagens"',
+      /sem imagens/.test(selos(7001)[0].textContent), selos(7001)[0].textContent.trim());
+
+    // --- botao 2: audio ---
+    repoOuvir('S7002');
+    await new Promise(r => setTimeout(r, 300));
+    const pAud = document.getElementById('repoPS7002').textContent;
+    diz('botao 2 ABRE mesmo sem audio (e quando gravar faz mais falta)', pAud.length > 0);
+    diz('  e oferece GRAVAR novo', /gravar novo/.test(pAud));
+    diz('  e oferece TRAZER arquivo', /trazer arquivo/.test(pAud));
+    diz('  e sem audio nao oferece apagar (nao ha o que apagar)', !/apagar/.test(pAud));
+
+    // --- botao 3: liberacao ---
+    repoLiberar('S7002');   // sem laudo: explica, nao abre tela vazia
+    await new Promise(r => setTimeout(r, 200));
+    diz('botao 3 sem laudo EXPLICA em vez de abrir revisao vazia',
+      /ainda não tem laudo para liberar/.test(document.getElementById('repoPS7002').textContent));
+    diz('  e nao trocou de tela', document.getElementById('telaTrabalho').style.display === 'block');
+
+    // ja liberado: pergunta antes, e a pergunta e a que ele ditou
+    exames[0]._liberado = true;
+    await trabPintar();
+    let perguntou = '';
+    const confAntes2 = window.confirm;
+    window.confirm = (m) => { perguntou = m; return false; };   // ele cancela
+    repoLiberar('S7001');
+    diz('botao 3 com laudo JA LIBERADO avisa antes', /JÁ FOI LIBERADO/.test(perguntou));
+    diz('  e o aviso diz que ele volta a fazer o laudo', /FAZER O LAUDO/.test(perguntou));
+    diz('  e que o exame volta para a lista de trabalho', /lista de trabalho/.test(perguntou));
+    diz('  cancelar NAO mexe no exame', exames[0]._liberado === true);
+    diz('  e nao troca de tela', document.getElementById('telaTrabalho').style.display === 'block');
+    window.confirm = confAntes2;
+
+    // --- botao 4: impressao ---
+    repoImprimir('S7001');
+    await new Promise(r => setTimeout(r, 250));
+    const pImp = document.getElementById('repoPS7001').textContent;
+    diz('botao 4 abre as TRES opcoes que ele pediu',
+      /só o laudo/.test(pImp) && /laudo e fotos/.test(pImp) && /só as fotos/.test(pImp), pImp.trim().slice(0, 70));
+    /* Este exame ficou sem fotos (o X de cima tirou a unica). Os botoes que dependem de
+       foto tem de estar apagados -- e a tela tem de DIZER por que, senao botao apagado
+       sem explicacao ensina a desconfiar dos outros botoes. */
+    const bts = Array.from(document.querySelectorAll('#repoPS7001 .repoBt'));
+    diz('  "so o laudo" fica disponivel', !bts[0].disabled);
+    diz('  "laudo e fotos" e "so as fotos" ficam apagados (nao ha foto)',
+      bts[1].disabled && bts[2].disabled);
+    diz('  e a tela diz POR QUE estao apagados',
+      /não tem imagens/.test(pImp), pImp.trim().slice(-60));
+    trabFechar();
+    exames = [];
+  } catch (e) {
+    diz('os quatro botoes do cartao', false, e.constructor.name + ': ' + e.message);
   }
 
   return R;

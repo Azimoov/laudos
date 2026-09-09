@@ -1077,6 +1077,13 @@ button.repoSelo:hover{filter:brightness(.95)}
 .repoSelo.aud{background:#E7EFF9;color:#24507F;border-color:#AEC6E4}
 .repoSelo.lib{background:#E5F4EC;color:#1B7048;border-color:#A6D4BC}
 .repoSelo.falta{background:#FBF3E1;color:#8A6210;border-color:#DDBE72}
+/* 09/09/2026 — o QUARTO sinal: já saiu no papel? Roxo, uma cor que não é usada por
+   nenhum dos outros três: quem olha a linha de longe precisa distinguir os quatro sem
+   ler. */
+.repoSelo.imp{background:#EFEAF7;color:#553C8B;border-color:#C4B5E0}
+/* `vazio` vem DEPOIS das cores, de propósito: um sinal sem conteúdo ("sem áudio",
+   "a imprimir") fica cinza mesmo tendo a classe da cor, e a regra que vem por último
+   é a que ganha entre seletores de mesma força. */
 .repoSelo.vazio{background:#F1F3F5;color:#8A93A0;border-color:#DDE2E7;font-weight:500}
 .repoSelo.on{box-shadow:inset 0 0 0 2px rgba(14,110,107,.35)}
 .repoAcoes{display:flex;gap:6px;flex-wrap:wrap}
@@ -1089,6 +1096,18 @@ button.repoSelo:hover{filter:brightness(.95)}
 .repoPainel:empty{display:none}
 .repoMinis{display:flex;gap:6px;flex-wrap:wrap}
 .repoMinis img{width:96px;height:96px;object-fit:cover;border:1px solid #C8D0DA;border-radius:6px;cursor:pointer}
+/* 09/09/2026 — o ✕ que tira UMA foto. Fica no canto da miniatura, e não numa lista de
+   nomes ao lado: a pergunta "qual eu apago?" se responde olhando a foto, não lendo
+   "imagem 3 de 7". */
+.repoMini{position:relative;display:inline-block;line-height:0}
+.repoTirar{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;
+  border:1px solid #C0392B;background:rgba(255,255,255,.92);color:#C0392B;font-size:12px;
+  font-weight:700;cursor:pointer;line-height:1;padding:0;font-family:inherit}
+.repoTirar:hover{background:#C0392B;color:#fff}
+/* A barra de ações do painel aberto (incluir, excluir, gravar, imprimir…). */
+.repoBarra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.repoBt.perigo{border-color:#C0392B;color:#C0392B}
+.repoBt.perigo:hover{background:#FBECEA}
 .repoNota{font-size:11.5px;color:#8A93A0;margin-top:5px;display:block}
 .repoLegenda{font-size:11.5px;color:#7d8c93;margin:0 2px 10px;display:flex;gap:14px;flex-wrap:wrap}
 .repoLegenda b{font-weight:700}
@@ -4542,14 +4561,23 @@ document.getElementById('inpCameraExame').addEventListener('change', async funct
   e.target.value='';
 });
 function novaFotoExame(id){ abrirCamera('exame', id); }
+/* O NÚCLEO de tirar uma foto do exame. Vive sozinho desde 09/09/2026 porque agora tem
+   DOIS chamadores — a tela antiga e o cartão do exame na lista de trabalho — e a regra
+   do mapa de instâncias não pode ser reescrita à mão em cada um deles.
+   ⚠️ O MAPA DAS INSTÂNCIAS ACOMPANHA (19/08/2026): sem isto ele ficava desalinhado com
+   as fotos — a apagada nunca mais voltava pelo botão de buscar ("nenhuma foto nova") e o
+   completamento seguinte casava id com a foto ERRADA, ou seja, a foto de um exame ia
+   parar em outro. */
+function exameTirarImagem(ex, i){
+  if(!ex || !Array.isArray(ex.imagens) || i<0 || i>=ex.imagens.length) return false;
+  ex.imagens.splice(i,1);
+  if(Array.isArray(ex._instIds) && i<ex._instIds.length) ex._instIds.splice(i,1);
+  return true;
+}
 function removerFotoExame(id, i){
   const ex = exames.find(function(x){return x.id===id;}); if(!ex) return;
   if(!confirm('Apagar esta foto do exame?')) return;
-  /* O mapa das instâncias tem de acompanhar (19/08/2026): sem isto ele ficava desalinhado
-     com as fotos — a apagada nunca mais voltava pelo botão de buscar ("nenhuma foto nova")
-     e o completamento seguinte casava id com a foto ERRADA. */
-  ex.imagens.splice(i,1);
-  if(Array.isArray(ex._instIds) && i<ex._instIds.length) ex._instIds.splice(i,1);
+  if(!exameTirarImagem(ex, i)) return;
   renderExames();
   const d=document.getElementById('det'+id); if(d) d.style.display='block';
 }
@@ -11187,17 +11215,30 @@ async function imprimirLaudoAtual(){
   }
   window.print();
 }
-async function impImprimirAgora(exId){
+/* `opc.oQue` — 09/09/2026, pedido dele: "é importante que tenha a opção de imprimir apenas
+   o laudo, o laudo e as fotos, ou apenas as fotos." Sem o parâmetro, vale 'ambos', que é
+   o que esta função sempre fez: os chamadores antigos não mudam de comportamento. */
+async function impImprimirAgora(exId, opc){
+  var oQue=((opc&&opc.oQue)||'ambos');
   try{
     if(document.querySelector('#areaImpressao .laudoTireoideImg')){
       await tireoideImagensCarregar(); tireoideAplicarDataImgs(document.getElementById('areaImpressao'));
     }
   }catch(e){ log('Não consegui preparar a ilustração anatômica para impressão: '+e.message,true); }
-  var pacote=impHtmlDoLaudo();
+  var pacote = (oQue==='fotos') ? null : impHtmlDoLaudo();
   var imagens=[];
-  try{ imagens=await impFolhasDeImagens(exId); }
-  catch(e){
-    log('🖨 Não consegui montar o arquivo único das imagens: '+e.message+'. As fotos separadas NÃO foram impressas.', true);
+  if(oQue!=='laudo'){
+    try{ imagens=await impFolhasDeImagens(exId); }
+    catch(e){
+      log('🖨 Não consegui montar o arquivo único das imagens: '+e.message+'. As fotos separadas NÃO foram impressas.', true);
+    }
+    /* Pedir SÓ AS FOTOS e não haver foto nenhuma é recusa, não impressão vazia: mandar
+       um trabalho sem conteúdo para a impressora sai como papel em branco, e papel em
+       branco parece defeito da impressora — o médico vai procurar no lugar errado. */
+    if(oQue==='fotos' && !imagens.length){
+      log('🖨 Este exame não tem imagens para imprimir.', true);
+      return {ok:false, erro:'sem imagens'};
+    }
   }
   var impLaudo=impEscolhida('laudo');
   var impImgs=impSeparadas()?impEscolhida('imagens'):impLaudo;
@@ -11219,7 +11260,9 @@ async function impImprimirAgora(exId){
        sair, ele precisa saber exatamente o que faltou — "deu erro" mandaria conferir
        as duas coisas. */
     if(j&&j.ok){
-      log('🖨 Enviado para impressão'+(impSeparadas()?' (laudo e imagens em impressoras separadas)':'')+'.');
+      log('🖨 Enviado para impressão'
+         +(oQue==='laudo'?' (só o laudo)':oQue==='fotos'?' (só as fotos)':'')
+         +(impSeparadas()&&oQue!=='laudo'&&oQue!=='fotos'?' (laudo e imagens em impressoras separadas)':'')+'.');
       /* avisos vêm MESMO com ok: imprimiu, mas confira (laudo cortado, foto pulada) */
       if(j.laudo&&j.laudo.aviso) log('🖨 '+j.laudo.aviso, true);
       if(j.imagens&&j.imagens.aviso) log('🖨 '+j.imagens.aviso, true);
@@ -17601,34 +17644,49 @@ function repoAgrupar(itens){
 /* OS TRÊS SINAIS. Cada um diz o que existe e, quando há o que abrir, abre.
    Sinal que não abre nada é <span>, não <button>: botão que não faz nada ensina a não
    confiar nos outros botões. */
+/* ⚠️ 09/09/2026 — OS QUATRO SINAIS, E TODOS ABREM.
+   Antes eram três, e cada um só virava botão quando havia o que mostrar: "sem imagens" e
+   "sem áudio" eram texto morto. A regra de então ("sinal que não abre nada é <span>, não
+   <button>") estava certa para o que a tela fazia — mas o pedido dele mudou o que ela
+   faz: agora o botão de imagem INCLUI imagens e o de áudio GRAVA áudio. E é justamente
+   quando não há nada que essas duas ações fazem mais falta. Um sinal apagado ali fechava
+   a porta na hora do uso.
+   Continua valendo o espírito da regra antiga: nenhum destes quatro é enfeite — cada um
+   abre alguma coisa, sempre. */
 function repoSelosHtml(it){
-  var s=[], ab=_repoPainel[it.chave]||'';
-  if(it.nImagens>0)
-    s.push('<button type="button" class="repoSelo img'+(ab==='fotos'?' on':'')+'" '
-      +'onclick="repoVerFotos(\''+esc(it.chave)+'\')" title="ver as imagens deste exame">'
-      +'🖼 '+it.nImagens+(it.nImagens===1?' imagem':' imagens')+'</button>');
-  else
-    s.push('<span class="repoSelo vazio" title="o aparelho não tem imagem deste exame">🖼 sem imagens</span>');
+  var s=[], ab=_repoPainel[it.chave]||'', k=esc(it.chave);
 
-  if(it.audio.tem)
-    s.push('<button type="button" class="repoSelo aud'+(ab==='audio'?' on':'')+'" '
-      +'onclick="repoOuvir(\''+esc(it.chave)+'\')" title="ouvir o ditado deste exame">'
-      +'🎧 áudio</button>');
-  else
-    s.push('<span class="repoSelo vazio" title="o áudio guardado se apaga aos '
-      +_repo.retAudio+' dias — este já não existe">🎧 sem áudio</span>');
+  s.push('<button type="button" class="repoSelo img'+(it.nImagens?'':' vazio')+(ab==='fotos'?' on':'')+'" '
+    +'onclick="repoVerFotos(\''+k+'\')" title="ver, incluir ou excluir as imagens deste exame">'
+    +'🖼 '+(it.nImagens ? (it.nImagens+(it.nImagens===1?' imagem':' imagens')) : 'sem imagens')+'</button>');
 
-  if(it.liberado){
-    if(it.ex && it.ex.laudo)
-      s.push('<button type="button" class="repoSelo lib" onclick="diaRevisar('+it.ex.id+')" '
-        +'title="abrir o laudo assinado">✓ liberado</button>');
-    else s.push('<span class="repoSelo lib" title="laudo já assinado">✓ liberado</span>');
-  }else{
-    if(it.ex && it.ex.laudo)
-      s.push('<button type="button" class="repoSelo falta" onclick="diaRevisar('+it.ex.id+')" '
-        +'title="revisar e assinar">○ a liberar</button>');
-    else s.push('<span class="repoSelo falta" title="ainda não há laudo assinado deste exame">○ a liberar</span>');
-  }
+  /* O aviso dos 90 dias FICA. Ele explica por que um exame antigo aparece sem áudio —
+     não é defeito, é a retenção que o próprio médico escolheu. Perdi essa frase na
+     primeira versão deste botão e um teste a cobrou de volta: sem ela, "sem áudio" num
+     exame de três meses parece coisa quebrada, e ele iria procurar um erro que não há. */
+  s.push('<button type="button" class="repoSelo aud'+(it.audio.tem?'':' vazio')+(ab==='audio'?' on':'')+'" '
+    +'onclick="repoOuvir(\''+k+'\')" title="'+(it.audio.tem
+      ?'ouvir, trocar ou apagar o ditado deste exame'
+      :'o áudio guardado se apaga aos '+_repo.retAudio+' dias — este já não existe. '
+       +'Grave um novo ou traga um arquivo')+'">'
+    +'🎧 '+(it.audio.tem?'áudio':'sem áudio')+'</button>');
+
+  s.push('<button type="button" class="repoSelo '+(it.liberado?'lib':'falta')+'" '
+    +'onclick="repoLiberar(\''+k+'\')" title="'+(it.liberado
+      ?'abrir de novo na tela de liberação (o laudo já está assinado)'
+      :'revisar e assinar este laudo')+'">'
+    +(it.liberado?'✓ liberado':'○ a liberar')+'</button>');
+
+  /* O QUARTO SINAL (09/09/2026): já saiu no papel? O dado vem do banco, pelo agente —
+     ver a coluna impresso_em, criada na etapa 1. Sem ele guardado em disco o sinal
+     mentiria a cada abertura, e mentiria para os dois lados: reimprimir o que já saiu,
+     ou não imprimir achando que já saiu. Num consultório o segundo é o caro. */
+  s.push('<button type="button" class="repoSelo '+(it.impresso?'imp':'imp vazio')+(ab==='imprimir'?' on':'')+'" '
+    +'onclick="repoImprimir(\''+k+'\')" title="'+(it.impresso
+      ?'este laudo já foi impresso — toque para imprimir de novo'
+      :'imprimir este laudo, as fotos, ou os dois')+'">'
+    +(it.impresso?'🖨 impresso':'🖨 a imprimir')+'</button>');
+
   return '<span class="repoSelos">'+s.join('')+'</span>';
 }
 /* Os botões de AÇÃO da linha. Exame desta sessão já tem os seus no cartão do dia; aqui
@@ -17670,9 +17728,15 @@ function repoDiasHtml(opc){
     .sort(function(a,b){ return repoOrdemDia(b).localeCompare(repoOrdemDia(a)); });
   if(!dias.length) return '<div class="repoVazio">'+esc(opc.vazio||'Nenhum exame guardado.')+'</div>';
   var hoje=repoHojeBr();
+  /* 09/09/2026 — a legenda acompanhou os quatro sinais. E o cinza mudou de sentido junto
+     com eles: era "já não existe" (o áudio que passou dos 90 dias), e passou a ser
+     "ainda não há" — porque agora o sinal cinza ABRE, e é dali que se inclui a imagem,
+     se grava o áudio e se manda imprimir. Legenda que descreve a tela de ontem é pior
+     que legenda nenhuma: ela ensina errado com ar de autoridade. */
   return '<p class="repoLegenda"><span>🖼 <b>imagens</b></span><span>🎧 <b>áudio</b> '
     +'(guardado por '+_repo.retAudio+' dias)</span><span>✓ <b>liberado</b></span>'
-    +'<span>○ <b>a liberar</b></span><span style="color:#98a2ac">cinza = já não existe</span></p>'
+    +'<span>○ <b>a liberar</b></span><span>🖨 <b>impresso</b></span>'
+    +'<span style="color:#98a2ac">cinza = ainda não há — toque para incluir</span></p>'
     + dias.map(function(dia, i){
     var regs=por[dia];
     var aberto = _repoAberto[dia]!=null ? _repoAberto[dia] : (opc.abrirPrimeiro && i===0);
@@ -17715,35 +17779,381 @@ async function repoVerFotos(chave){
     _repoFotos[it.estudoId]=fotos;
   }
   if(_repoPainel[chave]!=='fotos') return;      // ele fechou enquanto baixava
-  p.innerHTML = fotos.length
-    ? '<div class="repoMinis">'+fotos.map(function(u){
-        return '<img src="'+u+'" onclick="ampliarImg(this)">'; }).join('')+'</div>'
-      +'<span class="repoNota">toque numa foto para ver em tamanho cheio</span>'
-    : '<span class="repoNota">não consegui ler as imagens deste exame no aparelho.</span>';
+  repoFotosPintar(chave, fotos);
 }
+/* ---------- BOTÃO 1 DO CARTÃO: AS IMAGENS (09/09/2026) ----------
+   Pedido dele: "o primeiro botão de imagem, ao ser clicado, além de abrir as imagens,
+   deve ter uma opção de incluir imagens ou excluir as imagens que tem nele."
+
+   ⚠️ INCLUIR E EXCLUIR SÓ APARECEM QUANDO HÁ EXAME NA SESSÃO. Um estudo que só existe no
+   aparelho não tem onde guardar a mudança: as fotos moram lá, e apagá-las daqui ou seria
+   mentira (some da tela e volta no próximo toque) ou seria apagar do APARELHO, que é o
+   arquivo do serviço e não se mexe por um botão de lista. Nesse caso o painel diz o que
+   fazer — trazer o exame primeiro — em vez de oferecer um botão que não cumpre. */
+function repoFotosPintar(chave, fotos){
+  var it=_repoIndice[chave]; var p=document.getElementById('repoP'+chave);
+  if(!it || !p) return;
+  var podeMexer=!!it.ex;
+  var h='';
+  if(fotos && fotos.length){
+    h+='<div class="repoMinis">'+fotos.map(function(u,i){
+      return '<span class="repoMini"><img src="'+u+'" onclick="ampliarImg(this)">'
+        +(podeMexer?('<button type="button" class="repoTirar" title="tirar esta imagem do exame" '
+          +'onclick="repoImgTirar(\''+esc(chave)+'\','+i+')">✕</button>'):'')
+        +'</span>'; }).join('')+'</div>'
+      +'<span class="repoNota">toque numa foto para ver em tamanho cheio'
+      +(podeMexer?' · o ✕ tira a foto deste exame':'')+'</span>';
+  } else {
+    h+='<span class="repoNota">'+(it.instancias.length
+      ? 'não consegui ler as imagens deste exame no aparelho.'
+      : 'este exame ainda não tem imagem nenhuma.')+'</span>';
+  }
+  h+='<div class="repoBarra">';
+  if(podeMexer){
+    h+='<button type="button" class="repoBt" onclick="repoImgIncluir(\''+esc(chave)+'\')">'
+      +'＋ incluir imagens</button>';
+    if(fotos && fotos.length)
+      h+='<button type="button" class="repoBt perigo" onclick="repoImgTirarTodas(\''+esc(chave)+'\')">'
+        +'✕ excluir todas</button>';
+  } else {
+    h+='<span class="repoNota">as imagens estão no aparelho. Para incluir ou excluir, '
+      +'traga o exame para o trabalho primeiro (botões ⤵ ao lado).</span>';
+  }
+  h+='</div>';
+  p.innerHTML=h;
+}
+function repoImgTirar(chave, i){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  if(!confirm('Tirar esta imagem do exame?')) return;
+  if(!exameTirarImagem(it.ex, i)) return;
+  /* O cache do que já foi baixado do aparelho tem de esquecer este exame: sem isso, o
+     painel se redesenha com a lista ANTIGA e a foto "apagada" reaparece no próximo
+     toque — o pior tipo de conserto, o que parece ter funcionado. */
+  delete _repoFotos[it.estudoId];
+  repoFotosPintar(chave, it.ex.imagens||[]);
+  repoAtualizarSelos(chave);
+}
+function repoImgTirarTodas(chave){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var n=(it.ex.imagens||[]).length;
+  if(!n) return;
+  if(!confirm('Tirar as '+n+' imagens deste exame? O laudo e o áudio não são tocados.')) return;
+  it.ex.imagens=[];
+  if(Array.isArray(it.ex._instIds)) it.ex._instIds=[];
+  delete _repoFotos[it.estudoId];
+  repoFotosPintar(chave, []);
+  repoAtualizarSelos(chave);
+}
+async function repoImgIncluir(chave){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var inp=document.createElement('input');
+  inp.type='file'; inp.accept='application/pdf,image/*'; inp.multiple=true;
+  inp.onchange=async function(){
+    var arqs=Array.prototype.slice.call(inp.files||[]);
+    if(!arqs.length) return;
+    var p=document.getElementById('repoP'+chave);
+    if(p) p.innerHTML='<span class="repoNota">lendo '+arqs.length+' arquivo(s)…</span>';
+    var novas=0;
+    for(var i=0;i<arqs.length;i++){
+      try{
+        var imgs=await arquivoParaImagens(arqs[i]);
+        it.ex.imagens=(it.ex.imagens||[]).concat(imgs);
+        /* O mapa de instâncias cresce junto, com marca vazia: foto que veio do computador
+           não tem id no aparelho, e deixar o mapa mais CURTO que as fotos desalinha os
+           dois — é o mesmo estrago de 19/08, pelo outro lado. */
+        if(Array.isArray(it.ex._instIds))
+          imgs.forEach(function(){ it.ex._instIds.push(''); });
+        novas+=imgs.length;
+      }catch(e){
+        log('Não consegui ler "'+(arqs[i].name||'arquivo')+'": '+e.message, true);
+      }
+    }
+    delete _repoFotos[it.estudoId];
+    repoFotosPintar(chave, it.ex.imagens||[]);
+    repoAtualizarSelos(chave);
+    if(novas) log(novas+(novas===1?' imagem incluída':' imagens incluídas')+' no exame de '+(it.paciente||'')+'.');
+  };
+  inp.click();
+}
+/* Redesenha SÓ os sinais daquela linha, sem refazer a lista inteira: refazer fecharia o
+   painel que ele está usando e o rolamento voltaria ao topo, no meio do trabalho. */
+function repoAtualizarSelos(chave){
+  var it=_repoIndice[chave]; if(!it) return;
+  if(it.ex) it.nImagens=(it.ex.imagens||[]).length;
+  var l=document.getElementById('repoL'+chave); if(!l) return;
+  var alvo=l.querySelector('.repoSelos'); if(!alvo) return;
+  var novo=document.createElement('div'); novo.innerHTML=repoSelosHtml(it);
+  var pronto=novo.firstChild;
+  /* O painel aberto continua aberto: o selo correspondente volta aceso. */
+  var ab=_repoPainel[chave]||'';
+  if(ab){ var s=pronto.querySelector('.repoSelo.'+(ab==='fotos'?'img':ab==='audio'?'aud':ab==='imprimir'?'imp':'')); if(s) s.classList.add('on'); }
+  alvo.parentNode.replaceChild(pronto, alvo);
+  try{ trabContar(); }catch(e){}
+}
+/* ---------- BOTÃO 2 DO CARTÃO: O ÁUDIO (09/09/2026) ----------
+   Pedido dele, com as quatro ações por escrito: "ouvir o áudio · gravar um novo áudio ·
+   trazer um arquivo de fora para substituir ou adicionar o áudio que já tem · apagar um
+   áudio que já existe."
+
+   ⚠️ O BOTÃO ABRE MESMO SEM ÁUDIO. Antes ele só respondia quando havia o que tocar, e
+   escrevia "este exame não tem áudio guardado". Agora "sem áudio" é justamente quando
+   GRAVAR e TRAZER fazem mais falta — fechar a porta ali era fechá-la na hora do uso. */
 function repoOuvir(chave){
   var it=_repoIndice[chave]; if(!it) return;
   var p=document.getElementById('repoP'+chave); if(!p) return;
-  /* Sem endereço não há o que tocar. Um <audio src=""> não fica mudo: ele aponta para a
-     PRÓPRIA PÁGINA e o navegador tenta tocar o programa como se fosse som. */
-  if(!it.audio.tem || !it.audio.url){
-    p.innerHTML='<span class="repoNota">este exame não tem áudio guardado para tocar.</span>';
-    return;
-  }
   if(_repoPainel[chave]==='audio'){ repoFecharPainel(chave); return; }
   repoFecharPainel(chave);
   _repoPainel[chave]='audio';
   var sel=document.querySelector('#repoL'+chave+' .repoSelo.aud'); if(sel) sel.classList.add('on');
-  var de = it.audio.fonte==='ditado' ? 'ditado guardado pelo agente'
-         : it.audio.fonte==='arquivo' ? 'áudio do exame, da pasta de consulta'
-         : 'gravação desta sessão';
-  /* Quando a gravação está guardada num dia diferente do exame (exame que fechou no dia
-     seguinte), a tela DIZ. Ele precisa ver de onde veio o áudio que está ouvindo. */
-  if(it.audio.dia && it.audio.dia!==it.diaIso) de+=' — guardado em '+it.audio.dia;
-  p.innerHTML='<audio controls autoplay preload="none" style="width:100%;max-width:420px" '
-    +'src="'+esc(it.audio.url)+'"></audio>'
-    +'<span class="repoNota">'+esc(de)+' · o áudio mora no computador: com o agente '
-    +'desligado não há o que tocar</span>';
+  repoAudioPintar(chave);
+}
+function repoAudioPintar(chave){
+  var it=_repoIndice[chave]; var p=document.getElementById('repoP'+chave);
+  if(!it || !p) return;
+  var h='';
+  /* Sem endereço não há o que tocar. Um <audio src=""> NÃO fica mudo: ele aponta para a
+     PRÓPRIA PÁGINA e o navegador tenta tocar o programa como se fosse som. */
+  if(it.audio.tem && it.audio.url){
+    var de = it.audio.fonte==='ditado' ? 'ditado guardado pelo agente'
+           : it.audio.fonte==='arquivo' ? 'áudio do exame, da pasta de consulta'
+           : 'gravação desta sessão';
+    /* Quando a gravação está guardada num dia diferente do exame (exame que fechou no dia
+       seguinte), a tela DIZ. Ele precisa ver de onde veio o áudio que está ouvindo. */
+    if(it.audio.dia && it.audio.dia!==it.diaIso) de+=' — guardado em '+it.audio.dia;
+    h+='<audio controls preload="none" style="width:100%;max-width:420px" '
+      +'src="'+esc(it.audio.url)+'"></audio>'
+      +'<span class="repoNota">'+esc(de)+' · o áudio mora no computador: com o agente '
+      +'desligado não há o que tocar</span>';
+  } else {
+    h+='<span class="repoNota">este exame não tem áudio guardado. '
+      +'Grave agora, ou traga um arquivo do computador.</span>';
+  }
+  h+='<div class="repoBarra">';
+  if(it.ex){
+    var gravando=(_repoGravando===chave);
+    h+='<button type="button" class="repoBt'+(gravando?' perigo':'')+'" '
+      +'onclick="repoAudioGravar(\''+esc(chave)+'\')">'
+      +(gravando?'⏹ parar e transcrever':'🎙 gravar novo')+'</button>';
+    h+='<button type="button" class="repoBt cinza" onclick="repoAudioArquivo(\''+esc(chave)+'\')">'
+      +'📁 trazer arquivo</button>';
+  } else {
+    h+='<span class="repoNota">para gravar ou trazer um arquivo, traga o exame para o '
+      +'trabalho primeiro (botões ⤵ ao lado).</span>';
+  }
+  if(it.audio.tem)
+    h+='<button type="button" class="repoBt perigo" onclick="repoAudioApagar(\''+esc(chave)+'\')">'
+      +'🗑 apagar áudio</button>';
+  h+='</div>';
+  if(_repoGravando===chave)
+    h+='<span class="repoNota" id="repoRel'+esc(chave)+'">gravando… toque em parar quando terminar</span>';
+  p.innerHTML=h;
+}
+var _repoGravando='', _repoMr=null, _repoPedacos=[];
+/* GRAVAR NOVO — usa o microfone do navegador, como a tela de antigos. O trecho fica preso
+   a ESTE exame (adicionarAudioArquivo recebe o id), e não solto para o programa adivinhar
+   de quem é: dar o áudio de um exame a outro é o erro mais caro que este programa comete. */
+async function repoAudioGravar(chave){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  if(_repoGravando===chave){                       // segundo toque: para e transcreve
+    try{ _repoMr && _repoMr.state!=='inactive' && _repoMr.stop(); }catch(e){}
+    return;
+  }
+  if(_repoGravando){ log('Já há uma gravação em andamento em outro exame — pare aquela primeiro.', true); return; }
+  try{
+    var fluxo=await navigator.mediaDevices.getUserMedia({audio:true});
+    _repoPedacos=[];
+    _repoMr=new MediaRecorder(fluxo);
+    _repoMr.ondataavailable=function(e){ if(e.data && e.data.size) _repoPedacos.push(e.data); };
+    _repoMr.onstop=async function(){
+      /* O microfone FECHA aqui, sempre. Deixá-lo aberto depois de parar é o oposto do
+         desenho deste programa, onde o microfone fica fechado fora do modo exame. */
+      try{ fluxo.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+      var chaveG=_repoGravando; _repoGravando=''; _repoMr=null;
+      var bl=new Blob(_repoPedacos, {type:'audio/webm'}); _repoPedacos=[];
+      if(!bl.size){ log('A gravação saiu vazia — nada foi adicionado.', true); repoAudioPintar(chaveG); return; }
+      var arq=new File([bl], 'ditado-'+Date.now()+'.webm', {type:'audio/webm'});
+      await repoAudioAnexar(chaveG, arq);
+    };
+    _repoMr.start();
+    _repoGravando=chave;
+    repoAudioPintar(chave);
+  }catch(e){
+    log('Não consegui abrir o microfone: '+e.message, true);
+  }
+}
+function repoAudioArquivo(chave){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var inp=document.createElement('input');
+  inp.type='file'; inp.accept='audio/*,.m4a,.mp3,.wav';
+  inp.onchange=function(){ var f=inp.files&&inp.files[0]; if(f) repoAudioAnexar(chave, f); };
+  inp.click();
+}
+/* Substituir ou adicionar — ele pediu os dois. A pergunta só aparece quando JÁ HÁ áudio;
+   sem áudio anterior não há escolha a fazer, e perguntar seria só um passo a mais. */
+async function repoAudioAnexar(chave, arq){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  if(it.audio.tem){
+    var trocar=confirm('Este exame já tem áudio.\n\nOK = SUBSTITUIR (o áudio de agora entra '
+      +'no lugar do anterior)\nCancelar = ADICIONAR (os dois ficam)');
+    if(trocar){
+      var r=await repoAudioApagar(chave, true);     // true = sem perguntar de novo
+      if(r===false){ log('Não consegui tirar o áudio anterior — nada foi trocado.', true); return; }
+    }
+  }
+  var p=document.getElementById('repoP'+chave);
+  if(p) p.innerHTML='<span class="repoNota">transcrevendo o áudio…</span>';
+  await adicionarAudioArquivo(it.ex.id, arq);
+  await repoCarregarLeve(true);                     // o agente já sabe do áudio novo
+  repoAudioRecalcular(chave);
+  repoAudioPintar(chave);
+  repoAtualizarSelos(chave);
+}
+/* APAGAR — no agente é RENOMEAR, não destruir (ver apagar_audio, em agente-laudos.py):
+   material clínico de paciente não se apaga por um toque que não se desfaz. */
+async function repoAudioApagar(chave, semPerguntar){
+  var it=_repoIndice[chave]; if(!it) return false;
+  if(!it.audio.tem){ return true; }
+  if(!semPerguntar && !confirm('Apagar o áudio deste exame?\n\nEle sai da tela e das listas, '
+      +'mas continua no computador com outro nome até a limpeza dos '+_repo.retAudio+' dias.')) return false;
+  var corpo = it.audio.fonte==='arquivo'
+    ? {dia:it.audio.dia, arq:(it.audio.url.split('arq=')[1]||'').split('&')[0]}
+    : {eid:it.estudoId};
+  if(corpo.arq) corpo.arq=decodeURIComponent(corpo.arq);
+  /* Gravação só desta sessão não está no computador: ela mora na memória da janela, e o
+     que a desfaz é soltar o vínculo com o exame, não uma rota do agente. */
+  if(it.audio.fonte==='sessao'){
+    if(it.ex) it.ex.audios=[];
+    if(typeof audios!=='undefined')
+      for(var i=audios.length-1;i>=0;i--) if(audios[i].exameId===(it.ex&&it.ex.id)) audios.splice(i,1);
+    repoAudioRecalcular(chave); repoAudioPintar(chave); repoAtualizarSelos(chave);
+    return true;
+  }
+  try{
+    var r=await (await fetch(agenteBase()+'/exame/audio/apagar',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(corpo)})).json();
+    if(!r || r.ok===false){ log('Não consegui apagar o áudio: '+((r&&r.erro)||'sem resposta'), true); return false; }
+    await repoCarregarLeve(true);
+    repoAudioRecalcular(chave); repoAudioPintar(chave); repoAtualizarSelos(chave);
+    if(r.apagado) log('Áudio retirado do exame de '+(it.paciente||'')+'.');
+    return true;
+  }catch(e){
+    log('Não consegui falar com o agente para apagar o áudio: '+e.message, true);
+    return false;
+  }
+}
+/* Depois de mexer no áudio, o item precisa reconsultar de onde ele vem — senão a tela
+   continua mostrando o estado velho e o selo mente. */
+function repoAudioRecalcular(chave){
+  var it=_repoIndice[chave]; if(!it) return;
+  it.audio=repoAudioDe(it.est, it.ex, it.diaIso, it.paciente);
+}
+
+/* ---------- BOTÃO 3 DO CARTÃO: LIBERADO OU NÃO (09/09/2026) ----------
+   Pedido dele: "ao ser clicado, deve ser possível ir para a tela de liberação. Se o exame
+   não tiver sido liberado, é um caminho direto. Se o exame já tiver sido liberado, deve
+   aparecer na tela um aviso: ao entrar na tela de liberação, você vai estar fazendo o
+   laudo, voltar para a lista de trabalho." */
+function repoLiberar(chave){
+  var it=_repoIndice[chave]; if(!it) return;
+  /* Sem laudo não há o que liberar, e o cartão precisa dizer o que falta em vez de abrir
+     uma tela de revisão vazia — tela vazia parece defeito, e ele iria procurar o erro. */
+  if(!it.ex || !it.ex.laudo){
+    var p=document.getElementById('repoP'+chave);
+    repoFecharPainel(chave);
+    if(p) p.innerHTML='<span class="repoNota">este exame ainda não tem laudo para liberar. '
+      +(it.ex ? 'Gere o laudo primeiro (imagem e/ou áudio ao lado).'
+              : 'Traga o exame para o trabalho (botões ⤵ ao lado) e gere o laudo.')+'</span>';
+    return;
+  }
+  if(it.liberado &&
+     !confirm('Este laudo JÁ FOI LIBERADO.\n\n'
+       +'Ao entrar na tela de liberação você volta a FAZER O LAUDO: ele sai do histórico e '
+       +'volta para a lista de trabalho, esperando ser liberado de novo.\n\n'
+       +'Continuar?')) return;
+  /* Ao reabrir um laudo assinado ele DEIXA de estar liberado — senão o cartão diria
+     "✓ liberado" enquanto o laudo está aberto em edição, e a lista o mostraria no
+     histórico com uma revisão em curso por cima. O aviso acima é o que torna isso
+     honesto: ele foi avisado do que ia acontecer antes de acontecer. */
+  if(it.liberado) it.ex._liberado=false;
+  _rev2Origem='trabalho';
+  trabFechar(true);
+  rev2Abrir(it.ex.id);
+}
+
+/* ---------- BOTÃO 4 DO CARTÃO: IMPRESSO OU NÃO (09/09/2026) ----------
+   Pedido dele: "se o exame já foi ou não impresso; ao ser clicado abre a opção para
+   imprimi-lo. É importante que tenha a opção de imprimir apenas o laudo, o laudo e as
+   fotos, ou apenas as fotos." */
+function repoImprimir(chave){
+  var it=_repoIndice[chave]; if(!it) return;
+  var p=document.getElementById('repoP'+chave); if(!p) return;
+  if(_repoPainel[chave]==='imprimir'){ repoFecharPainel(chave); return; }
+  repoFecharPainel(chave);
+  _repoPainel[chave]='imprimir';
+  var sel=document.querySelector('#repoL'+chave+' .repoSelo.imp'); if(sel) sel.classList.add('on');
+  var temLaudo=!!(it.ex && it.ex.laudo), temFotos=it.nImagens>0, k=esc(chave);
+  var h='';
+  if(it.impresso) h+='<span class="repoNota">este laudo já saiu no papel — imprimir de novo é permitido.</span>';
+  h+='<div class="repoBarra">'
+    +'<button type="button" class="repoBt'+(temLaudo?'':' cinza')+'" '+(temLaudo?'':'disabled ')
+      +'onclick="repoImprimirAgora(\''+k+'\',\'laudo\')">🖨 só o laudo</button>'
+    +'<button type="button" class="repoBt'+(temLaudo&&temFotos?'':' cinza')+'" '+(temLaudo&&temFotos?'':'disabled ')
+      +'onclick="repoImprimirAgora(\''+k+'\',\'ambos\')">🖨 laudo e fotos</button>'
+    +'<button type="button" class="repoBt'+(temFotos?'':' cinza')+'" '+(temFotos?'':'disabled ')
+      +'onclick="repoImprimirAgora(\''+k+'\',\'fotos\')">🖨 só as fotos</button>'
+    +'</div>';
+  /* Botão apagado sem explicação ensina a desconfiar dos outros botões. Quando falta
+     laudo ou falta foto, a tela DIZ qual das duas falta. */
+  if(!temLaudo || !temFotos)
+    h+='<span class="repoNota">'
+      +(!temLaudo && !temFotos ? 'este exame ainda não tem laudo nem imagens.'
+        : !temLaudo ? 'este exame ainda não tem laudo — só as fotos podem sair.'
+        : 'este exame não tem imagens — só o laudo pode sair.')+'</span>';
+  p.innerHTML=h;
+}
+async function repoImprimirAgora(chave, oQue){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var p=document.getElementById('repoP'+chave);
+  if(p) p.innerHTML='<span class="repoNota">preparando a impressão…</span>';
+  try{
+    /* O laudo precisa estar MONTADO na área de impressão antes de ser fotografado —
+       `impHtmlDoLaudo` lê de lá. `abrirRevisao(id, true)` monta sem trocar de tela: o
+       médico continua na lista, que é onde ele tocou o botão. */
+    if(oQue!=='fotos') abrirRevisao(it.ex.id, true);
+    var r=await impImprimirAgora(it.ex.id, {oQue:oQue});
+    if(r && r.ok){
+      /* SÓ CARIMBA SE IMPRIMIU. Marcar antes da resposta faria o cartão dizer "impresso"
+         com a impressora sem papel — e é essa mentira que faz o paciente ir embora sem o
+         laudo. E só o que INCLUI o laudo conta: mandar as fotos não é o laudo no papel. */
+      if(oQue!=='fotos') await repoMarcarImpresso(chave);
+      else log('🖨 Fotos enviadas — o sinal de "impresso" segue valendo para o laudo.');
+    }
+  }catch(e){
+    log('🖨 Não consegui imprimir: '+e.message, true);
+  }
+  /* Redesenha o painel com o estado novo. `repoImprimir` alterna (abre se fechado, fecha
+     se aberto), então zerar a marca antes é o que garante que ele ABRA — chamar duas
+     vezes "para alternar de volta" funcionaria hoje e quebraria no dia em que a função
+     ganhasse mais um passo. */
+  _repoPainel[chave]='';
+  repoImprimir(chave);
+}
+async function repoMarcarImpresso(chave){
+  var it=_repoIndice[chave]; if(!it) return;
+  if(it.ex) it.ex._impresso=true;             // a sessão já sabe, mesmo se o agente falhar
+  it.impresso=true;
+  try{
+    await fetch(agenteBase()+'/exames/impresso',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(it.estudoId ? {studyUid:it.estudoId} : {exameId:(it.ex&&it.ex.id)})});
+    await repoCarregarLeve(true);
+  }catch(e){
+    /* Falhar aqui não desfaz a impressão: o papel saiu. O que se perde é a MEMÓRIA disso
+       depois de fechar o programa — e é melhor dizer isso do que ficar calado. */
+    log('O laudo foi impresso, mas não consegui registrar isso no computador ('+e.message
+      +'). Ao reabrir o programa, ele pode aparecer como "a imprimir".', true);
+  }
+  repoAtualizarSelos(chave);
 }
 /* Trazer daqui é o MESMO caminho do botão "Trazer exame do aparelho" (03/09), com as
    mesmas travas — inclusive a pergunta antes de criar um segundo exame igual. */

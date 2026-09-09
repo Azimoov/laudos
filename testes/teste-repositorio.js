@@ -80,13 +80,18 @@ ok(/excluirDia:repoHojeBr\(\)/.test(outros),
 ok(/regs\.length\+' exame'/.test(dias), 'a linha do dia diz quantos exames tem');
 ok(/class="hoje"/.test(dias), 'e o dia de hoje vem marcado');
 
-console.log('\n=== os TRES sinais, com cor, como ele pediu ===');
+console.log('\n=== os QUATRO sinais, com cor, como ele pediu ===');
 const selos = grab('repoSelosHtml');
 ok(/repoSelo img/.test(selos), 'sinal de IMAGENS');
 ok(/repoSelo aud/.test(selos), 'sinal de AUDIO');
-ok(/repoSelo lib/.test(selos) && /repoSelo falta/.test(selos),
+/* 09/09: a classe do 3o sinal passou a ser ESCOLHIDA na hora (lib ou falta), entao as
+   duas nao aparecem mais como texto colado no HTML. Cobra-se que as duas continuem
+   sendo produzidas — que e o que importa: os dois estados existem e tem cor propria. */
+ok(/it\.liberado\?'lib':'falta'/.test(selos),
    'sinal de LIBERADO, com o estado contrario (a liberar)');
-ok(/repoSelo vazio/.test(selos), 'e o sinal de que aquilo NAO existe');
+ok(/'imp'/.test(selos) || /repoSelo '\+\(it\.impresso\?'imp'/.test(selos) || /imp vazio/.test(selos),
+   'e o QUARTO sinal, de impressao (09/09/2026)');
+ok(/' vazio'/.test(selos), 'e a marca cinza de que aquilo ainda NAO existe');
 // cada um com a sua cor: sao a legenda, nao enfeite
 for (const [cls, cor] of [['img', '#0B5A57'], ['aud', '#24507F'], ['lib', '#1B7048'],
                           ['falta', '#8A6210'], ['vazio', '#8A93A0']]) {
@@ -96,18 +101,36 @@ for (const [cls, cor] of [['img', '#0B5A57'], ['aud', '#24507F'], ['lib', '#1B70
 ok(/it\.nImagens\+\(it\.nImagens===1\?' imagem':' imagens'\)/.test(selos),
    'o sinal das imagens diz QUANTAS sao');
 
-console.log('\n=== sinal que abre e botao; sinal que nao abre, nao e ===');
-// Botao que nao faz nada ensina a nao confiar nos outros botoes.
-ok(/<button type="button" class="repoSelo img/.test(selos),
-   'com imagens: e botao, e abre as fotos');
-ok(/repoVerFotos\(/.test(selos), 'que chama quem mostra as fotos');
-ok(/<button type="button" class="repoSelo aud/.test(selos), 'com audio: e botao');
-ok(/repoOuvir\(/.test(selos), 'que chama o tocador');
-ok(/<span class="repoSelo vazio"/.test(selos),
-   'sem imagens / sem audio: e SINAL, nao botao — nao ha o que abrir');
-ok(/<span class="repoSelo lib"/.test(selos),
-   'liberado sem laudo aberto nesta sessao tambem e sinal');
-ok(/title="o áudio guardado se apaga aos '\s*\+_repo\.retAudio/.test(selos),
+console.log('\n=== os QUATRO sinais, e nenhum deles e enfeite ===');
+/* ⚠️ 09/09/2026 — ESTA SECAO MUDOU DE LADO. Ela cobrava a regra de entao: "sinal que
+   abre e botao; sinal que nao abre, nao e" -- e por isso exigia <span> para "sem
+   imagens", "sem audio" e para o liberado sem laudo na sessao. A regra estava certa
+   enquanto os sinais so serviam para MOSTRAR o que ja existia: botao que nao faz nada
+   ensina a nao confiar nos outros botoes.
+   O pedido do Dr. Daniel de 09/09 mudou o que os sinais fazem. Agora o de imagem INCLUI
+   e EXCLUI imagens, o de audio GRAVA e TRAZ arquivo, o de liberado LEVA a tela de
+   liberacao e nasceu um quarto, de impressao. E "sem imagem"/"sem audio" e exatamente
+   quando incluir e gravar fazem mais falta -- deixar apagado ali fechava a porta na hora
+   do uso.
+   O espirito da regra antiga continua sendo o que se cobra: NENHUM dos quatro e enfeite,
+   todos abrem alguma coisa. O que mudou e que agora todos os quatro cumprem isso. */
+ok(/<button type="button" class="repoSelo img/.test(selos), 'o de imagens e botao');
+ok(/repoVerFotos\(/.test(selos), 'e abre o painel das fotos');
+ok(/<button type="button" class="repoSelo aud/.test(selos), 'o de audio e botao');
+ok(/repoOuvir\(/.test(selos), 'e abre o painel do audio');
+ok(/repoLiberar\(/.test(selos), 'o de liberado leva a tela de liberacao');
+ok(/repoImprimir\(/.test(selos), 'e o quarto, novo, abre as opcoes de impressao');
+/* Cuidado com a regex: o invólucro da linha se chama `repoSelos` (com S), e um
+   /<span class="repoSelo/ solto casa com ELE — a linha acusaria defeito para sempre.
+   Por isso o espaço e as aspas: só casa a classe `repoSelo` sozinha ou seguida de outra. */
+ok(!/<span class="repoSelo[ "]/.test(selos),
+   'nenhum dos quatro nasce como <span> apagado — todos abrem algo');
+ok(/<span class="repoSelos">/.test(selos), '(e o invólucro da linha continua sendo um span)');
+/* O cinza NAO acabou: ele deixou de significar "nao clique" e passa a significar "aqui
+   nao ha nada ainda". O olho continua distinguindo de longe o que tem do que falta. */
+ok(/it\.nImagens\?'':' vazio'/.test(selos), 'sem imagens, o sinal fica cinza');
+ok(/it\.audio\.tem\?'':' vazio'/.test(selos), 'sem audio, idem');
+ok(/title="'\+\(it\.audio\.tem[\s\S]{0,220}se apaga aos '\+_repo\.retAudio/.test(selos),
    'e o sinal cinza do audio DIZ POR QUE nao existe mais (os 90 dias)');
 
 console.log('\n=== as fotos e o audio abrem na propria linha ===');
@@ -122,15 +145,35 @@ ok(/dicomBaixarImagem/.test(fotos), 'as demais vem do aparelho, uma a uma');
 ok(/catch\(e\)\{[^}]*\}/.test(fotos), 'foto ilegivel nao esconde as outras');
 ok(/if\(_repoPainel\[chave\]!=='fotos'\) return;/.test(fotos),
    'e se ele fechar enquanto baixava, nao escreve por cima do que ele abriu depois');
-ok(/ampliarImg/.test(fotos), 'da para ver em tamanho cheio');
+/* 09/09/2026: quem DESENHA o painel virou funcao propria (repoFotosPintar), porque agora
+   ele e redesenhado tambem depois de incluir e de excluir imagem -- e nao so ao abrir.
+   As linhas abaixo seguiram o desenho para la; o que se cobra e o mesmo. */
+const pintaFotos = grab('repoFotosPintar');
+ok(/ampliarImg/.test(pintaFotos), 'da para ver em tamanho cheio');
+ok(/repoImgIncluir/.test(pintaFotos), 'da para INCLUIR imagens (pedido de 09/09)');
+ok(/repoImgTirar/.test(pintaFotos), 'e da para EXCLUIR as que tem');
+/* Estudo que so existe no aparelho nao pode oferecer incluir/excluir: as fotos moram la,
+   e apagar dali seria mexer no arquivo do servico por um botao de lista. */
+ok(/podeMexer=!!it\.ex/.test(pintaFotos),
+   'mas so quando o exame esta no trabalho — nao se mexe no arquivo do aparelho');
 
-const ouvir = grab('repoOuvir');
-ok(/<audio controls/.test(ouvir), 'o audio abre num tocador de verdade');
+const ouvir = grab('repoOuvir'), pintaAudio = grab('repoAudioPintar');
+ok(/<audio controls/.test(pintaAudio), 'o audio abre num tocador de verdade');
 ok(/_repoPainel\[chave\]==='audio'/.test(ouvir), 'e o mesmo sinal fecha');
-ok(/it\.audio\.dia\s*&&\s*it\.audio\.dia!==it\.diaIso/.test(ouvir),
+ok(/it\.audio\.dia\s*&&\s*it\.audio\.dia!==it\.diaIso/.test(pintaAudio),
    'quando a gravacao esta guardada em outro dia, a tela DIZ de onde veio');
-ok(/agente[\s\S]{0,40}desligado/.test(ouvir),
+ok(/agente[\s\S]{0,40}desligado/.test(pintaAudio),
    'e explica que o audio mora no computador, nao na janela');
+/* As outras tres acoes que ele pediu no botao de audio. */
+ok(/repoAudioGravar/.test(pintaAudio), 'da para GRAVAR um audio novo');
+ok(/repoAudioArquivo/.test(pintaAudio), 'da para TRAZER um arquivo de fora');
+ok(/repoAudioApagar/.test(pintaAudio), 'e da para APAGAR o audio que existe');
+/* Apagar audio de paciente e irreversivel se for apagar mesmo. No agente e RENOMEAR, e a
+   tela DIZ isso -- senao ele nao sabe que da para desfazer. */
+const apagar = grab('repoAudioApagar');
+ok(/continua no computador com outro nome/.test(apagar),
+   'e o aviso diz que o arquivo continua no computador (da para desfazer)');
+ok(/exame\/audio\/apagar/.test(apagar), 'quem apaga de verdade e o agente, nao a tela');
 
 console.log('\n=== de onde vem o audio: a ordem, e a guarda ===');
 const audioDe = grab('repoAudioDe');

@@ -1953,6 +1953,74 @@ const VERIFICACOES = `(async () => {
     diz('reabrir exame nao prende o medico numa tela antiga', false, e.constructor.name + ': ' + e.message);
   }
 
+  /* ===== AS DUAS LISTAS DA TELA DE TRABALHO (09/09/2026) =====
+     Pedido dele: "a lista de trabalho e o historico (...) sempre dispostas
+     paralelamente: a esquerda, a lista de trabalho, e a direita, o historico."
+     Isto so se confere com a tela MONTADA. O corte entre as duas colunas e o mesmo
+     dado que o cartao mostra no 3o sinal, e o defeito que importa e a contradicao
+     entre os dois: um cartao dizendo "liberado" dentro da lista de trabalho. Lendo o
+     codigo isso nao aparece. */
+  try {
+    trabAbrir();
+    await new Promise(r => setTimeout(r, 300));
+    diz('a tela de trabalho abre', document.getElementById('telaTrabalho').style.display === 'block');
+
+    const cE = document.getElementById('trabRepoTrabalho');
+    const cD = document.getElementById('trabRepoHistorico');
+    diz('as duas colunas existem', !!cE && !!cD);
+    const a = cE.getBoundingClientRect(), b = cD.getBoundingClientRect();
+    /* Nao basta a ordem no HTML: um flex-direction:row-reverse esquecido inverteria as
+       duas colunas sem mudar uma linha do HTML. Quem decide e a posicao na tela. */
+    diz('a lista de trabalho fica A ESQUERDA do historico', a.left < b.left,
+      Math.round(a.left) + ' < ' + Math.round(b.left));
+    diz('e as duas comecam na mesma altura (lado a lado, nao empilhadas)',
+      Math.abs(a.top - b.top) < 60, 'dif ' + Math.round(Math.abs(a.top - b.top)) + 'px');
+    diz('cada coluna tem largura util', a.width > 300, Math.round(a.width) + 'px');
+
+    exames = [
+      { id: 9001, paciente: 'Paciente Esperando', tipo: 'transvaginal', _quando: Date.now(),
+        laudo: { corpo: 'texto' }, _liberado: false, imagens: [] },
+      { id: 9002, paciente: 'Paciente Pronto', tipo: 'transvaginal', _quando: Date.now(),
+        laudo: { corpo: 'texto' }, _liberado: true, imagens: [] },
+      { id: 9003, paciente: 'So Imagem', tipo: 'transvaginal', _quando: Date.now(),
+        imagens: ['x'], _liberado: false }
+    ];
+    await trabPintar();
+    const esq = () => document.getElementById('trabRepoTrabalho').textContent;
+    const dir = () => document.getElementById('trabRepoHistorico').textContent;
+    diz('exame com laudo NAO liberado fica na esquerda', esq().indexOf('Paciente Esperando') >= 0);
+    diz('  e nao aparece na direita', dir().indexOf('Paciente Esperando') < 0);
+    diz('exame ja liberado fica na direita', dir().indexOf('Paciente Pronto') >= 0);
+    diz('  e nao aparece na esquerda', esq().indexOf('Paciente Pronto') < 0);
+    /* O caso que ele citou por escrito: "exames que tem so a imagem". Sem laudo nenhum
+       o exame existe e tem de estar na fila de trabalho -- nao pode sumir da tela. */
+    diz('exame que so tem imagem fica na esquerda (nao some da tela)',
+      esq().indexOf('So Imagem') >= 0);
+
+    const libNaEsq = cE.querySelectorAll('.repoSelo.lib').length;
+    const faltaNaDir = cD.querySelectorAll('.repoSelo.falta').length;
+    diz('nenhum cartao "liberado" dentro da lista de trabalho', libNaEsq === 0, 'achei ' + libNaEsq);
+    diz('nenhum cartao "a liberar" dentro do historico', faltaNaDir === 0, 'achei ' + faltaNaDir);
+
+    // a travessia: liberar move o exame de lado sozinho
+    exames.filter(e => e.id === 9001)[0]._liberado = true;
+    await trabPintar();
+    diz('liberar tira o exame da lista de trabalho', esq().indexOf('Paciente Esperando') < 0);
+    diz('e o poe no historico', dir().indexOf('Paciente Esperando') >= 0);
+
+    diz('as datas continuam em pastas que abrem e fecham (ele pediu para nao mudar)',
+      cE.querySelectorAll('details.repoDia').length + cD.querySelectorAll('details.repoDia').length > 0);
+
+    exames = [];
+    _repo.estudos = [];
+    await trabPintar();
+    diz('historico vazio explica em vez de ficar mudo',
+      /Nenhum laudo liberado ainda/.test(dir()), dir().trim().slice(0, 46));
+    trabFechar();
+  } catch (e) {
+    diz('as duas listas da tela de trabalho', false, e.constructor.name + ': ' + e.message);
+  }
+
   return R;
 })()`;
 

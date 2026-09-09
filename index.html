@@ -875,14 +875,36 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 /* O cartão "Realizar exames": ocupa a coluna inteira e é o caminho do dia de atendimento.
    Ele é ALTO de propósito — é o botão que ele toca de manhã, e não deve competir de igual
    para igual com as caixas de arrastar, que são o caminho de exceção. */
+/* ⚠️ O cartão NÃO estica até a altura da coluna vizinha. A 1ª versão tinha `height:100%`
+   com o texto em `flex:1`, e o resultado foi um vão vazio de uns 200 px entre a
+   explicação e o botão — visto na foto da tela. Espaço em branco assim não é respiro: é
+   a tela dizendo que falta alguma coisa ali. O cartão passa a ter a altura do que ele
+   tem dentro, e o botão fica logo abaixo do texto, onde a mão vai. */
 #telaTrabalho .cartaoEx{background:#fff;border:1px solid #E2E5EA;border-radius:10px;
-  padding:22px 24px;display:flex;flex-direction:column;height:100%;box-sizing:border-box}
+  padding:22px 24px;box-sizing:border-box}
 #telaTrabalho .cartaoEx .n{font-size:17px;font-weight:700;color:#1C2430;display:flex;align-items:center;gap:11px}
-#telaTrabalho .cartaoEx .s{font-size:12.5px;color:#6B7480;margin-top:9px;line-height:1.55;flex:1}
+#telaTrabalho .cartaoEx .s{font-size:12.5px;color:#6B7480;margin-top:9px;line-height:1.55}
 #telaTrabalho .cartaoEx button{margin-top:16px;background:#0E6E6B;border:0;color:#fff;
   border-radius:9px;padding:13px 20px;font-size:14.5px;font-weight:600;cursor:pointer;
   font-family:inherit;width:100%}
 #telaTrabalho .cartaoEx button:hover{background:#0B5A57}
+/* AS DUAS LISTAS, LADO A LADO — e "SEMPRE", palavra dele.
+   ⚠️ A primeira versão empilhava as colunas abaixo de 900 px de janela, achando que
+   protegia a leitura. Empilhar é justamente o que ele NÃO quer: a graça de ver a fila de
+   trabalho e o histórico juntos é poder comparar sem trocar de tela, e isso se perde no
+   instante em que uma vai para baixo da outra. Foi apanhado no navegador, onde a janela
+   do teste é estreita e as duas apareceram uma sobre a outra.
+   Em janela apertada, quem cede é a LARGURA, não o arranjo: cada coluna tem um mínimo
+   legível e a faixa rola de lado por dentro (`overflow-x` na faixa, nunca no corpo da
+   página — página que rola de lado é o defeito clássico). */
+#telaTrabalho .duasListas{display:flex;gap:18px;align-items:flex-start;margin-top:28px;
+  flex-wrap:nowrap;overflow-x:auto}
+#telaTrabalho .duasListas>.col{flex:1 1 0;min-width:340px}
+#telaTrabalho .duasListas .cnt{font-weight:500;font-size:11.5px;color:#7d8c93;
+  letter-spacing:.2px;text-transform:none;margin-left:7px}
+/* A legenda dos sinais é a MESMA nas duas colunas. Repetida lado a lado, ela vira ruído e
+   rouba a altura que os exames precisam — some da segunda. */
+#telaTrabalho #trabRepoHistorico .repoLegenda{display:none}
 </style>
 <div id="telaTrabalho">
   <div class="ab-folha">
@@ -936,8 +958,23 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
         </div>
       </div>
 
-      <!-- As duas listas (trabalho e histórico) entram aqui na etapa seguinte. -->
-      <div id="trabListas"></div>
+      <!-- ======= AS DUAS LISTAS, SEMPRE LADO A LADO =======
+           Pedido dele: "Essas listas devem ser sempre dispostas paralelamente: à
+           esquerda, a lista de trabalho, e à direita, o histórico."
+           O corte entre elas é um só — o exame já foi liberado? — e é o MESMO que o
+           cartão mostra no 3º sinal. Assim a lista em que o exame está e o sinal que ele
+           exibe nunca se contradizem: se o cartão diz "○ a liberar", ele está à esquerda;
+           quando vira "✓ liberado", ele atravessa para a direita sozinho. -->
+      <div class="duasListas">
+        <div class="col">
+          <div class="eb">LISTA DE TRABALHO<span class="cnt" id="trabCntT"></span></div>
+          <div id="trabRepoTrabalho"></div>
+        </div>
+        <div class="col">
+          <div class="eb">HISTÓRICO<span class="cnt" id="trabCntH"></span></div>
+          <div id="trabRepoHistorico"></div>
+        </div>
+      </div>
 
     </div>
   </div>
@@ -17379,7 +17416,7 @@ function diaAtualizarContador(lista){
 
    O QUE ELE NÃO SABE E É DITO NA TELA, não escondido: exame antigo pode ter perdido o
    áudio (90 dias) sem ter perdido as imagens, e o selo cinza é essa notícia. */
-var _repo={estudos:null, ditados:{}, capturas:{}, liberados:{},
+var _repo={estudos:null, ditados:{}, capturas:{}, liberados:{}, impressos:{},
            quando:0, erro:'', carregando:false, retAudio:90};
 var _repoIndice={};      // chave da linha -> item, para os botões acharem o exame
 var _repoFotos={};       // estudo -> imagens já baixadas (não rebaixa a cada toque)
@@ -17412,6 +17449,12 @@ async function repoCarregarLeve(forcar){
        _repo.capturas=(c&&c.dias)||{}; if(c&&c.retencaoDias) _repo.retAudio=c.retencaoDias; veio++; }catch(_){}
   try{ var l=await (await fetch(agenteBase()+'/exames/liberados')).json();
        var m={}; ((l&&l.uids)||[]).forEach(function(u){ m[u]=true; }); _repo.liberados=m; veio++; }catch(_){}
+  /* 09/09/2026 — o quarto sinal do cartão: já saiu no papel? Vem do banco pela mesma
+     porta que os liberados. Se o agente for antigo e não conhecer a rota, o `catch`
+     deixa `_repo.impressos` como estava — e o cartão mostra "a imprimir", que é a
+     verdade conhecida, em vez de inventar um "impresso" sem base. */
+  try{ var ip=await (await fetch(agenteBase()+'/exames/impressos')).json();
+       var mi={}; ((ip&&ip.uids)||[]).forEach(function(u){ mi[u]=true; }); _repo.impressos=mi; veio++; }catch(_){}
   /* SÓ MARCA A HORA SE ALGO VEIO. Com o agente subindo (ou fora do ar), as três falham —
      e marcar a hora aqui prenderia a tela por um minuto inteiro em "sem áudio, nada
      liberado", com tudo intacto no disco. Falhar não é ter feito. */
@@ -17523,7 +17566,12 @@ function repoItem(est, ex){
          punha "○ a liberar" num exame já assinado, que é a mesma mentira ao contrário;
        · exame que não está na sessão: o banco, que é a única fonte. */
     liberado: (ex && ex.laudo) ? !!ex._liberado
-                               : !!((ex && ex._liberado) || (eid && _repo.liberados[eid]))
+                               : !!((ex && ex._liberado) || (eid && _repo.liberados[eid])),
+    /* IMPRESSO — 09/09/2026, o quarto sinal. Mesma fonte de verdade dos liberados: o
+       BANCO, pelo agente. A sessão manda quando ela sabe (imprimiu agora, nesta janela);
+       fora isso vale o banco, que é o único que sobrevive a fechar o programa. */
+    impresso: (ex && ex._impresso) ? true
+                                   : !!(eid && _repo.impressos && _repo.impressos[eid])
   };
 }
 function repoItens(){
@@ -17609,7 +17657,15 @@ function repoLinhaHtml(it){
    `opc.abrirPrimeiro` deixa o dia mais recente aberto. */
 function repoDiasHtml(opc){
   opc=opc||{};
-  var por=repoAgrupar(repoItens());
+  /* 09/09/2026 — O MESMO DESENHO, DUAS LISTAS. Pedido dele: a tela de Trabalho mostra a
+     LISTA DE TRABALHO à esquerda (o que ainda não foi liberado) e o HISTÓRICO à direita
+     (o que já foi). O corte é `liberado`, e é o mesmo que o cartão mostra no 3º sinal —
+     assim a lista em que o exame aparece e o sinal que ele exibe nunca se contradizem.
+     Sem `opc.filtro`, desenha tudo: é como o painel do dia e a tela de antigos a usam. */
+  var itens=repoItens();
+  if(opc.filtro==='trabalho')  itens=itens.filter(function(it){ return !it.liberado; });
+  if(opc.filtro==='historico') itens=itens.filter(function(it){ return  it.liberado; });
+  var por=repoAgrupar(itens);
   var dias=Object.keys(por).filter(function(d){ return d!==opc.excluirDia; })
     .sort(function(a,b){ return repoOrdemDia(b).localeCompare(repoOrdemDia(a)); });
   if(!dias.length) return '<div class="repoVazio">'+esc(opc.vazio||'Nenhum exame guardado.')+'</div>';
@@ -17706,11 +17762,23 @@ async function repoPintar(idAlvo, opc){
       +'Os exames antigos moram no computador — ligue o agente e toque de novo.</div>';
     return;
   }
+  /* 09/09/2026 — AS OPÇÕES FICAM GUARDADAS, NÃO REMONTADAS NO BOTÃO.
+     O "↻ atualizar" tinha as opções coladas dentro do próprio `onclick`, em pedaços de
+     texto. Cada opção nova (agora o `filtro`) pedia mais um pedaço, e o dia em que uma
+     delas trouxer uma aspa a tela quebra sem aviso. Agora a tela lembra com o que foi
+     desenhada, e o botão só diz "de novo, buscando do zero". */
+  _repoOpc[idAlvo]=opc||{};
   d.innerHTML=repoDiasHtml(opc)
     +'<p class="repoNota" style="text-align:right">'
-    +'<button type="button" class="repoBt cinza" onclick="repoPintar(\''+esc(idAlvo)
-    +'\',{forcar:true'+((opc&&opc.excluirDia)?(',excluirDia:'+JSON.stringify(opc.excluirDia)):'')
-    +((opc&&opc.abrirPrimeiro)?',abrirPrimeiro:true':'')+'})">↻ atualizar</button></p>';
+    +'<button type="button" class="repoBt cinza" onclick="repoRedesenhar(\''+esc(idAlvo)+'\')">'
+    +'↻ atualizar</button></p>';
+}
+var _repoOpc={};          // idAlvo -> as opções com que aquela lista foi desenhada
+function repoRedesenhar(idAlvo){
+  var o={}, g=_repoOpc[idAlvo]||{};
+  for(var k in g){ if(Object.prototype.hasOwnProperty.call(g,k)) o[k]=g[k]; }
+  o.forcar=true;
+  return repoPintar(idAlvo, o);
 }
 /* No painel do dia a lista nasce FECHADA e só busca quando ele toca: com 575 exames no
    recebedor a busca leva ~1 s, e esta tela se redesenha a cada 5 s. */
@@ -20459,7 +20527,16 @@ function trabReceber(lista, guardar){
 function trabAbrir(){
   telasEsconder('telaTrabalho');    // some com qualquer outra que esteja de pé
   var w=document.getElementById('telaTrabalho'); if(w) w.style.display='block';
-  try{ trabPintar(); }catch(e){}
+  /* `trabPintar` é assíncrona (as listas vêm do agente). Um try/catch em volta da chamada
+     NÃO apanharia a falha — ela chega depois, como promessa recusada, e sumiria no
+     console com a tela vazia e sem explicação. O `.catch` apanha e escreve na tela. */
+  Promise.resolve().then(trabPintar).catch(function(e){
+    ['trabRepoTrabalho','trabRepoHistorico'].forEach(function(id){
+      var d=document.getElementById(id);
+      if(d) d.innerHTML='<div class="repoVazio">não consegui montar a lista ('
+        +esc(e&&e.message||e)+'). Toque em ↻ atualizar.</div>';
+    });
+  });
   window.scrollTo(0,0);
 }
 /* `semVoltar` existe para o caso em que outra tela vai assumir logo em seguida: sem ele,
@@ -20471,10 +20548,29 @@ function trabFechar(semVoltar){
   try{ abContarPendentes(); }catch(e){}
   window.scrollTo(0,0);
 }
-/* Desenha o miolo da tela. Na etapa 2 ainda não há listas — a função existe desde já
-   para o `trabAbrir` ter um lugar só por onde redesenhar, e não nascer com o
-   redesenho espalhado quando as listas chegarem. */
-function trabPintar(){}
+/* Desenha as duas listas. Um lugar só por onde a tela se redesenha — quem mexer num
+   exame (liberar, imprimir, apagar áudio) chama isto e as duas colunas se acertam
+   juntas, inclusive a travessia de um exame da esquerda para a direita. */
+async function trabPintar(){
+  /* As duas em paralelo, e não uma esperando a outra: elas leem a MESMA lista já
+     carregada, e serializar aqui só faria a tela aparecer em dois tempos. */
+  await Promise.all([
+    repoPintar('trabRepoTrabalho', {filtro:'trabalho', abrirPrimeiro:true,
+      vazio:'Nenhum exame esperando. Tudo que foi feito está no histórico, ao lado.'}),
+    repoPintar('trabRepoHistorico', {filtro:'historico', abrirPrimeiro:true,
+      vazio:'Nenhum laudo liberado ainda. Eles chegam aqui quando você assina.'})
+  ]);
+  trabContar();
+}
+/* Os dois contadores ao lado dos títulos. Saem da MESMA `repoItens()` que desenhou as
+   listas, e não de uma contagem própria — duas contas do mesmo número divergem. */
+function trabContar(){
+  var itens=[]; try{ itens=repoItens(); }catch(e){ return; }
+  var t=itens.filter(function(it){ return !it.liberado; }).length;
+  var h=itens.length-t;
+  var et=document.getElementById('trabCntT'); if(et) et.textContent=t?(t+(t===1?' exame':' exames')):'';
+  var eh=document.getElementById('trabCntH'); if(eh) eh.textContent=h?(h+(h===1?' laudo':' laudos')):'';
+}
 
 function abVoltarInicio(){
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';

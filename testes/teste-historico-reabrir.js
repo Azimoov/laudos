@@ -43,7 +43,14 @@ console.log('\n=== a tela de leitura sai da frente ao reabrir ===');
 // Ela vive em z-index 9100, ACIMA das outras. Sem entrar nesta lista, a revisão abriria por
 // baixo dela e o botão pareceria não funcionar — o mesmo defeito que custou a tarde de ontem.
 const abrirRev = HTML.slice(HTML.indexOf('function rev2Abrir(exId)'), HTML.indexOf('function rev2AbrirOpcoes'));
-ok(/'telaVerLaudo'/.test(abrirRev), 'telaVerLaudo está na lista de telas que rev2Abrir esconde');
+/* 09/09/2026: a linha cobrava o nome 'telaVerLaudo' escrito DENTRO de rev2Abrir. As seis
+   copias da lista de telas viraram uma so (TELAS_DO_APP), e rev2Abrir passou a chamar
+   telasEsconder('telaRev2') — que esconde todas as outras, telaVerLaudo entre elas. A
+   regra continua valendo; mudou onde ela esta escrita. Cobra-se o fim, em duas partes. */
+ok(/telasEsconder\('telaRev2'\)/.test(abrirRev),
+   'rev2Abrir esconde todas as outras telas de uma vez');
+ok(/'telaVerLaudo'/.test((HTML.match(/var TELAS_DO_APP = \[[\s\S]*?\];/) || [''])[0]),
+   'e telaVerLaudo esta na lista — entao sai da frente, que era o ponto');
 const reab = pegar('hisReabrir');
 ok(/hisFecharLaudo\(\)/.test(reab), 'e hisReabrir também a fecha explicitamente');
 ok(/rev2Abrir\(/.test(reab), 'antes de abrir a tela de liberação');

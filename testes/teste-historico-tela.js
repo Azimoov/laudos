@@ -33,14 +33,20 @@ ok(/Use o Histórico para escolher outro/.test(LIB), 'e aponta o caminho para os
 ok(/Para reabrir um deles, use o Histórico/.test(LIB),
    'a mensagem de "todos assinados" deixou de ser um beco sem saida');
 
-console.log('=== o botao e a tela existem e estao ligados ===');
-ok(/onclick="hisAbrir\(\)"/.test(HTML), 'o botao Historico chama hisAbrir');
-ok(/<span class="ab-nome">Histórico<\/span>/.test(HTML), 'o botao se chama "Histórico"');
-ok(HTML.indexOf('onclick="abLiberarLaudos()"') < HTML.indexOf('onclick="hisAbrir()"'),
-   'o botao fica ABAIXO de "Liberar laudos", como pedido');
+console.log('=== a tela existe e continua alcancavel ===');
+/* ⚠️ 09/09/2026 — ESTAS LINHAS FORAM REAPONTADAS. Elas cobravam o BOTAO "Historico" na
+   tela de abertura e a posicao dele ("abaixo de Liberar laudos"). O Dr. Daniel pediu que
+   a abertura ficasse com DOIS botoes — Trabalho e Configuracao —, e o historico passou a
+   morar dentro da tela de Trabalho, ao lado da lista de trabalho.
+   O teste estava certo no que queria (o historico tem de ser alcancavel) e errado no que
+   media (um botao especifico, num lugar especifico). Repreender o programa por obedecer
+   ao medico e o pior tipo de teste: ensina a ignorar o vermelho. Agora cobra o FIM. */
 ok(/<div id="telaHistorico">/.test(HTML), 'a tela existe');
-ok(/TELAS_CHEIAS = \[[^\]]*'telaHistorico'/.test(HTML),
-   'a tela entrou em TELAS_CHEIAS — senao voltariam as duas barras de rolagem');
+ok(/function hisAbrir\(/.test(HTML), 'e a funcao que a abre continua existindo');
+ok(/'telaHistorico'/.test((HTML.match(/var TELAS_DO_APP = \[[\s\S]*?\];/) || [''])[0]),
+   'a tela esta na lista unica de telas do app — senao voltariam as duas barras de rolagem');
+ok(/TELAS_CHEIAS = TELAS_DO_APP/.test(HTML),
+   'e a trava de rolagem sai dessa mesma lista, sem uma copia para envelhecer sozinha');
 ok(/#telaHistorico\{position:fixed;inset:0/.test(HTML), 'tem o CSS de tela cheia');
 // ⚠️ regra PROPRIA, nao "#telaA,#telaB{...}": o teste ponta a ponta varre o CSS e tira o
 // "#" do seletor; um seletor com duas telas viraria "telaAntigos, #telaHistorico" e a tela
@@ -92,7 +98,14 @@ const VOLTAR = corpoDe('rev2Voltar');
 ok(/_rev2Origem==='historico'/.test(VOLTAR), 'quem veio do Historico volta para o Historico');
 ok(VOLTAR.indexOf("==='historico'") < VOLTAR.indexOf('diaAbrir()'),
    'e NAO cai no painel do dia, que ligaria a gravacao sem paciente');
-ok(/telaHistorico/.test(corpoDe('rev2Abrir')), 'abrir a revisao esconde a tela do Historico');
+/* 09/09/2026: era `/telaHistorico/.test(corpoDe('rev2Abrir'))` — o nome da tela escrito
+   dentro da funcao. Ela passou a chamar telasEsconder('telaRev2'), que esconde TODAS as
+   telas do app menos a que esta sendo aberta: faz mais, nao menos. O que importa e o
+   fim (o historico nao fica de pe por baixo da revisao), e e isso que se cobra agora. */
+ok(/telasEsconder\('telaRev2'\)/.test(corpoDe('rev2Abrir')),
+   'abrir a revisao esconde todas as outras telas, o Historico entre elas');
+ok(/'telaHistorico'/.test((HTML.match(/var TELAS_DO_APP = \[[\s\S]*?\];/) || [''])[0]),
+   'e o Historico esta na lista, entao esta entre as escondidas');
 
 console.log('=== o titulo nao mente sobre laudo ja assinado ===');
 ok(/Relendo laudo JÁ ASSINADO/.test(HTML), 'laudo reaberto diz que ja foi assinado');

@@ -56,13 +56,34 @@ ok(/addEventListener\('beforeprint', *hisSincronizarVerHist\)/.test(HTML),
    'a plaquinha é conferida no instante em que o papel vai sair (beforeprint)');
 
 console.log('\n=== TODO caminho que esconde #telaVerLaudo acerta a plaquinha ===');
-// O guardião de verdade. Varre o arquivo atrás de cada lista de telas que é escondida em
-// massa e que inclui 'telaVerLaudo'; cada uma tem de acertar a plaquinha logo em seguida.
-// Um caminho novo criado amanhã cai aqui antes de chegar ao papel do médico.
+/* ⚠️ 09/09/2026 — ESTA SECAO FICOU MAIS FORTE, e a historia vale a pena.
+   Ate hoje ela VARRIA o arquivo atras de cada lista de telas escondida em massa que
+   incluisse 'telaVerLaudo', e cobrava de cada uma a chamada de hisSincronizarVerHist()
+   logo depois. Era o guardiao possivel enquanto a lista de telas vivia copiada em seis
+   lugares.
+
+   Em 09/09 as seis copias viraram UMA (TELAS_DO_APP + telasEsconder). A varredura passou
+   a achar zero listas -- e a acusar "0 caminhos", ficando CEGA em vez de vermelha. Mas o
+   defeito que ela vigiava aconteceu de verdade no mesmo minuto: com a lista unica,
+   `diaAbrir` e `trabAbrir` passaram a esconder a telaVerLaudo (que agora esta na lista)
+   sem acertar a plaquinha. A marca ficaria presa no corpo da pagina e imprimir devolveria
+   FOLHA EM BRANCO. Foi este teste que apanhou.
+
+   O conserto nao foi remendar o chamador: foi por a chamada DENTRO de telasEsconder, para
+   que quem esconde acerte, sempre, sem depender de alguem lembrar. Entao o que se cobra
+   agora e a regra, e nao a contagem de copias dela. */
+const esconder = pegar('telasEsconder');
+ok(esconder.length > 0, 'existe uma funcao unica que esconde as telas');
+ok(/hisSincronizarVerHist\(\)/.test(esconder),
+   'e ELA acerta a plaquinha — quem esconde, acerta, sem depender de lembrar');
+ok(/'telaVerLaudo'/.test((HTML.match(/var TELAS_DO_APP = \[[\s\S]*?\];/) || [''])[0]),
+   'telaVerLaudo esta na lista unica, entao passa por essa regra');
+/* E a garantia de que nao voltem copias soltas: se alguem escrever de novo um forEach
+   proprio escondendo telaVerLaudo, ele escapa da regra acima -- e cai aqui. */
 const RE_LISTA = /\[[^\]]*'telaVerLaudo'[^\]]*\]\s*\n?\s*\.?forEach\(function\(id\)\s*\{[^}]*display\s*=\s*'none'[^}]*\}\s*\)\s*;/g;
-let m, achadas = 0;
+let m, soltas = 0;
 while ((m = RE_LISTA.exec(HTML))) {
-  achadas++;
+  soltas++;
   const depois = HTML.slice(m.index + m[0].length, m.index + m[0].length + 400);
   const nome = (function () {
     const antes = HTML.slice(0, m.index);
@@ -70,9 +91,10 @@ while ((m = RE_LISTA.exec(HTML))) {
     return f < 0 ? '(?)' : antes.slice(f + 9, antes.indexOf('(', f)).trim();
   })();
   ok(/hisSincronizarVerHist\(\)/.test(depois),
-     'quem esconde telaVerLaudo acerta a plaquinha: ' + nome);
+     'lista solta que escapou da funcao unica tambem acerta a plaquinha: ' + nome);
 }
-ok(achadas >= 3, 'a varredura encontrou os caminhos em massa (achou ' + achadas + ', esperado 3 ou mais)');
+ok(soltas === 0,
+   'e nao ha nenhuma lista solta escondendo telaVerLaudo por fora (achei ' + soltas + ')');
 
 console.log('\n=== o caminho antigo continua correto ===');
 const fechar = pegar('hisFecharLaudo');

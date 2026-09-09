@@ -794,43 +794,36 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 
       <h2 class="ab-titulo">Qual a atividade de hoje?</h2>
 
-      <button class="ab-botao" onclick="antAbrir()">
+      <!-- ⚠️ 09/09/2026 — DE QUATRO BOTÕES PARA DOIS, pedido do Dr. Daniel.
+           Saíram daqui: "Fazer laudos com fotos e áudios antigos", "Realizar exames",
+           "Liberar laudos" e "Histórico". Nenhum deles morreu — os quatro caminhos
+           passaram a morar DENTRO da tela de Trabalho, que é onde ele trabalha:
+             · material antigo  -> as duas caixas pontilhadas, no alto à esquerda;
+             · realizar exames  -> o cartão à direita, que chama a mesma `exAbrir()`;
+             · liberar laudos   -> o 3º botão do cartão de cada exame, na lista;
+             · histórico        -> a lista da direita, sempre visível ao lado da de
+                                   trabalho, em vez de ser uma tela separada.
+           O que se ganha: a pergunta "onde está aquele exame?" deixa de depender de
+           lembrar em qual dos quatro botões ele foi parar. Tudo numa tela só, e nada
+           some dela. As etiquetas `abPendentes` e `hisSelo` viviam nestes botões e
+           continuam existindo no código; quem as escreve confere se elas estão na tela
+           antes de escrever, então a contagem não quebra por elas terem saído daqui. -->
+      <button class="ab-botao" onclick="trabAbrir()">
         <span class="ab-icone">🗂</span>
         <span style="flex:1">
-          <span class="ab-nome">Fazer laudos com fotos e áudios antigos</span>
-          <span class="ab-sub" style="display:block">processa material já gravado e monta os laudos para revisão</span>
-        </span>
-        <span class="ab-seta">›</span>
-      </button>
-
-      <button class="ab-botao" onclick="exAbrir()">
-        <span class="ab-icone">🎙</span>
-        <span style="flex:1">
-          <span class="ab-nome">Realizar exames</span>
-          <span class="ab-sub" style="display:block">liga a gravação contínua — o dia inteiro guiado pela voz</span>
-        </span>
-        <span class="ab-seta">›</span>
-      </button>
-
-      <button class="ab-botao" onclick="abLiberarLaudos()">
-        <span class="ab-icone">📄</span>
-        <span style="flex:1">
-          <span class="ab-nome">Liberar laudos</span>
-          <span class="ab-sub" style="display:block">revisar, assinar e entregar os laudos prontos</span>
+          <span class="ab-nome">Trabalho</span>
+          <span class="ab-sub" style="display:block">os exames do dia e de todos os dias — fazer, liberar e imprimir</span>
         </span>
         <span class="ab-selo" id="abPendentes" style="display:none"></span>
         <span class="ab-seta">›</span>
       </button>
 
-      <!-- 19/08/2026: o médico quis um lugar para VOLTAR a um laudo já assinado —
-           por dia, e podendo revisar como se o exame tivesse acabado de sair. -->
-      <button class="ab-botao" onclick="hisAbrir()">
-        <span class="ab-icone">🗂</span>
+      <button class="ab-botao" onclick="abEscolher(null); modCfgAbrir();">
+        <span class="ab-icone">⚙︎</span>
         <span style="flex:1">
-          <span class="ab-nome">Histórico</span>
-          <span class="ab-sub" style="display:block">todos os laudos já liberados, separados por dia — abra e revise de novo</span>
+          <span class="ab-nome">Configuração</span>
+          <span class="ab-sub" style="display:block">locais de atendimento, modelos, impressão, provedor de IA e backup</span>
         </span>
-        <span class="ab-selo" id="hisSelo" style="display:none"></span>
         <span class="ab-seta">›</span>
       </button>
       <!-- 17/08/2026: sem isto, tocar "Liberar laudos" com a sessão vazia
@@ -840,9 +833,112 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
         background:#FBF3E1;border:1px solid #C99B2E;border-radius:8px;
         font-size:13px;color:#6B5416;line-height:1.5"></p>
 
-      <div class="ab-rodape">
-        <button class="ab-cfg" onclick="abEscolher(null); modCfgAbrir();">⚙︎ Configurações</button>
+      <!-- 09/09/2026: a engrenagem do rodapé saiu. "Configuração" virou um dos dois
+           botões desta tela, e o pedido foi DOIS botões — a engrenagem seria um
+           terceiro caminho para o mesmo lugar, no canto, onde ele nunca a procurou. -->
+    </div>
+  </div>
+</div>
+
+<!-- ======================= TELA DE TRABALHO (09/09/2026) =======================
+     Pedido do Dr. Daniel: a tela de abertura passou a ter DOIS botões — Trabalho e
+     Configurações — e tudo o que é trabalho mora aqui dentro.
+
+     O desenho que ele ditou:
+       · em cima, à ESQUERDA, as duas caixas pontilhadas (imagens e áudios), que é por
+         onde nasce um laudo feito com material já gravado;
+       · em cima, à DIREITA, "Realizar exames", que leva à tela de sempre;
+       · embaixo, DUAS listas lado a lado — a de trabalho à esquerda, o histórico à
+         direita (essas entram na etapa seguinte).
+
+     ⚠️ AS CAIXAS DAQUI ENCHEM AS MESMAS GAVETAS DA TELA DE ANTIGOS (`_antImgs` e
+     `_antAuds`) e depois abrem aquela tela com o material já dentro. Não é atalho
+     preguiçoso: a esteira que transforma foto e ditado em laudo é toda de lá, está
+     testada e funciona. Duplicá-la aqui criaria um segundo caminho para o mesmo lugar —
+     e dois caminhos para o mesmo lugar divergem no dia em que alguém conserta um só. -->
+<style>
+#telaTrabalho{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
+#telaTrabalho .ab-folha{max-width:1180px;margin:20px auto;background:#FAFBFC;
+  border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
+#telaTrabalho .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;
+  display:flex;align-items:center;gap:14px}
+#telaTrabalho .ab-topo .tit{flex:1;font-size:15px;font-weight:600}
+#telaTrabalho .lnk{background:none;border:1px solid #7FA8A5;color:#DCEBEA;border-radius:16px;
+  padding:7px 16px;font-size:12.5px;cursor:pointer;font-family:inherit}
+#telaTrabalho .lnk:hover{background:rgba(255,255,255,.08)}
+#telaTrabalho .ab-corpo{padding:22px 26px 26px}
+#telaTrabalho .eb{font-size:11.5px;font-weight:700;color:#0E6E6B;letter-spacing:1.2px;margin:0 0 12px 2px}
+#telaTrabalho .eb.dep{margin-top:26px}
+#telaTrabalho .topo2{display:flex;gap:18px;flex-wrap:wrap;align-items:stretch}
+#telaTrabalho .topo2>*{flex:1 1 420px;min-width:300px}
+/* O cartão "Realizar exames": ocupa a coluna inteira e é o caminho do dia de atendimento.
+   Ele é ALTO de propósito — é o botão que ele toca de manhã, e não deve competir de igual
+   para igual com as caixas de arrastar, que são o caminho de exceção. */
+#telaTrabalho .cartaoEx{background:#fff;border:1px solid #E2E5EA;border-radius:10px;
+  padding:22px 24px;display:flex;flex-direction:column;height:100%;box-sizing:border-box}
+#telaTrabalho .cartaoEx .n{font-size:17px;font-weight:700;color:#1C2430;display:flex;align-items:center;gap:11px}
+#telaTrabalho .cartaoEx .s{font-size:12.5px;color:#6B7480;margin-top:9px;line-height:1.55;flex:1}
+#telaTrabalho .cartaoEx button{margin-top:16px;background:#0E6E6B;border:0;color:#fff;
+  border-radius:9px;padding:13px 20px;font-size:14.5px;font-weight:600;cursor:pointer;
+  font-family:inherit;width:100%}
+#telaTrabalho .cartaoEx button:hover{background:#0B5A57}
+</style>
+<div id="telaTrabalho">
+  <div class="ab-folha">
+    <div class="ab-topo">
+      <button class="lnk" onclick="trabFechar()">‹ Início</button>
+      <span class="tit">Trabalho</span>
+      <span style="width:64px"></span>
+    </div>
+    <div class="ab-corpo">
+
+      <div class="topo2">
+        <!-- ESQUERDA: material já gravado -->
+        <div class="cx">
+          <div class="lb">LAUDO A PARTIR DE MATERIAL JÁ GRAVADO</div>
+          <div class="solta" id="trabSoltaImg" onclick="document.getElementById('trabImgs').click()">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9AA5B1"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+            <div class="t">arraste as imagens de ultrassom aqui</div>
+            <div class="t2">ou toque para escolher — JPG · PNG · DICOM</div>
+          </div>
+          <input type="file" id="trabImgs" accept="application/pdf,image/*,.dcm" multiple style="display:none">
+
+          <div class="lb" style="margin-top:18px">ÁUDIO DO DITADO</div>
+          <div class="solta" id="trabSoltaAud" onclick="document.getElementById('trabAudio').click()">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9AA5B1"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"></path>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><path d="M12 18v4"></path></svg>
+            <div class="t">arraste os áudios do ditado aqui</div>
+            <div class="t2">ou toque para escolher — MP3 · M4A · WAV · WEBM</div>
+          </div>
+          <input type="file" id="trabAudio" accept="audio/*,.m4a" multiple style="display:none">
+
+          <div style="margin-top:14px">
+            <button class="lnk" style="border-color:#C3CCD6;color:#3C4753"
+                    onclick="antAbrir()">abrir a tela de material antigo ›</button>
+          </div>
+        </div>
+
+        <!-- DIREITA: o dia de atendimento -->
+        <div>
+          <div class="cartaoEx">
+            <div class="n"><span>🎙</span><span>Realizar exames</span></div>
+            <div class="s">Liga a gravação contínua e acompanha o dia inteiro: escolha o
+              local de atendimento, onde salvar os laudos, e toque em <b>Iniciar</b>.
+              Os exames chegam do aparelho sozinhos.</div>
+            <button type="button" onclick="exAbrir()">Iniciar o dia de exames</button>
+          </div>
+        </div>
       </div>
+
+      <!-- As duas listas (trabalho e histórico) entram aqui na etapa seguinte. -->
+      <div id="trabListas"></div>
+
     </div>
   </div>
 </div>
@@ -1439,13 +1535,19 @@ button.repoSelo:hover{filter:brightness(.95)}
   color:#6B5010;border-radius:14px;padding:4px 13px;font-size:12px;font-weight:600}
 #telaAntigos .fonte.on{background:#0E6E6B;border-color:#0E6E6B;color:#fff}
 #telaAntigos .fonte.on .s{color:#CFE7E5}
-#telaAntigos .cx{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:18px 20px}
-#telaAntigos .cx .lb{font-size:11.5px;font-weight:700;color:#5A6472;letter-spacing:1.1px;margin-bottom:12px}
-#telaAntigos .solta{border:2px dashed #C3CCD6;border-radius:10px;padding:26px 16px;text-align:center;
+/* 09/09/2026 — AS CAIXAS PONTILHADAS VALEM PARA AS DUAS TELAS.
+   A tela de Trabalho recebe as mesmas caixas de arrastar imagem e áudio. Em vez de
+   copiar o desenho para lá — que é como duas telas irmãs começam a ficar diferentes
+   sem ninguém perceber —, o seletor passa a citar as duas. Uma definição, dois lugares:
+   mexeu numa, mexeu na outra, sempre. */
+#telaAntigos .cx,#telaTrabalho .cx{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:18px 20px}
+#telaAntigos .cx .lb,#telaTrabalho .cx .lb{font-size:11.5px;font-weight:700;color:#5A6472;letter-spacing:1.1px;margin-bottom:12px}
+#telaAntigos .solta,#telaTrabalho .solta{border:2px dashed #C3CCD6;border-radius:10px;padding:26px 16px;text-align:center;
   cursor:pointer;transition:border-color .12s ease, background .12s ease}
-#telaAntigos .solta:hover,#telaAntigos .solta.sobre{border-color:#0E6E6B;background:#F2F9F8}
-#telaAntigos .solta .t{font-size:13.5px;color:#3C4753;margin-top:10px}
-#telaAntigos .solta .t2{font-size:12px;color:#8A93A0;margin-top:5px}
+#telaAntigos .solta:hover,#telaAntigos .solta.sobre,
+#telaTrabalho .solta:hover,#telaTrabalho .solta.sobre{border-color:#0E6E6B;background:#F2F9F8}
+#telaAntigos .solta .t,#telaTrabalho .solta .t{font-size:13.5px;color:#3C4753;margin-top:10px}
+#telaAntigos .solta .t2,#telaTrabalho .solta .t2{font-size:12px;color:#8A93A0;margin-top:5px}
 #telaAntigos .minis{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
 #telaAntigos .minis img{width:84px;height:52px;object-fit:cover;border-radius:6px;border:1px solid #CBD3DB}
 #telaAntigos .minis .cnt{font-size:12.5px;color:#5A6472}
@@ -14504,10 +14606,37 @@ function modCfgIr(pane){
             el.style.background='#fff6d6'; setTimeout(function(){ el.style.background=b; },1800); }
   }, 120);
 }
+/* ⚠️ 09/09/2026 — A LISTA DAS TELAS MORA NUM LUGAR SÓ.
+   Ela estava copiada em CINCO lugares: aqui, no modCfgAbrirBizus, no modCfgLembrarTela,
+   no rev2Abrir e na trava de rolagem do fundo. Ao criar a tela de Trabalho eu acrescentei
+   em quatro e esqueci a quinta — e o defeito que isso gera é dos silenciosos: a tela abre
+   normalmente e o fundo continua rolando por baixo, com duas barras de rolagem. Só um
+   teste que compara a lista com o CSS pegou.
+   Cinco cópias não são cinco decisões: são uma decisão escrita cinco vezes, e a sexta
+   tela nova vai esquecer outra. Agora é uma só, e quem abre uma tela diz apenas QUAL
+   fica de pé. */
+var TELAS_DO_APP = ['telaAbertura','telaTrabalho','telaExames','telaDia','telaRevisao',
+                    'telaHistorico','telaAntigos','telaVerLaudo','telaRev2'];
+function telasEsconder(exceto){
+  TELAS_DO_APP.forEach(function(id){
+    if(id===exceto) return;
+    var e=document.getElementById(id); if(e) e.style.display='none';
+  });
+  /* ⚠️ A PLAQUINHA DO "VER LAUDO" SE ACERTA AQUI, e não em cada chamador.
+     `telaVerLaudo` deixa uma marca no corpo da página (classe `verHist`) enquanto está
+     aberta — é ela que faz a impressão sair com o laudo, e não folhas em branco. Antes
+     desta função, cada caminho que escondia aquela tela tinha de lembrar de chamar
+     `hisSincronizarVerHist()` logo depois, e havia um teste inteiro só para vigiar isso.
+     Ao unificar as listas em 09/09 eu criei o defeito na hora: `diaAbrir` e `trabAbrir`
+     passaram a esconder a telaVerLaudo (ela entrou na lista única) sem acertar a
+     plaquinha — a marca ficaria presa, e imprimir devolveria papel em branco. O teste
+     apanhou no mesmo minuto.
+     Pondo aqui, a regra deixa de depender de alguém lembrar: quem esconde, acerta. */
+  try{ hisSincronizarVerHist(); }catch(e){}
+}
 function modCfgAbrir(){
   modCfgLembrarTela();   // para o "Voltar ao programa" saber para onde voltar
-  ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo','telaRev2']
-    .forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  telasEsconder();
   hisSincronizarVerHist();   // esconder telaVerLaudo aqui NAO removia a plaquinha (ver a funcao)
   var t=document.getElementById('telaModelos'); if(t) t.style.display='block';
   /* Entrar nas Configurações começa na lista, nunca dentro do modelo que ficou aberto da
@@ -14519,8 +14648,7 @@ function modCfgAbrir(){
 /* Mesma tela, já aberta na aba "Textos de achado" — usado pelo atalho do painel antigo. */
 function modCfgAbrirBizus(){
   modCfgLembrarTela();
-  ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo','telaRev2']
-    .forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  telasEsconder();
   hisSincronizarVerHist();   // idem modCfgAbrir
   var t=document.getElementById('telaModelos'); if(t) t.style.display='block';
   modCfgIr('bizus');
@@ -14540,8 +14668,7 @@ function modCfgAbrirBizus(){
    ABERTURA, que é a porta da 2.0 — nunca para o programa antigo. */
 var _modCfgVolta = null;
 function modCfgLembrarTela(){
-  var telas=['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico',
-             'telaAntigos','telaVerLaudo','telaRev2'];
+  var telas=TELAS_DO_APP;
   _modCfgVolta=null;
   /* ⚠️ NADA de offsetParent aqui: TODAS estas telas são position:fixed, e para elemento
      fixo o offsetParent é NULO mesmo com a tela à vista. A 1ª versão usava offsetParent,
@@ -17130,9 +17257,10 @@ function ondaDesenhar(){
 function diaAbrir(){
   _diaDesde=_diaDesde||Date.now();
   var t=document.getElementById('telaDia'); if(t) t.style.display='block';
-  ['telaAbertura','telaExames','telaRev2'].forEach(function(id){
-    var e=document.getElementById(id); if(e) e.style.display='none';
-  });
+  /* 09/09/2026: era uma lista curta e propria ('telaAbertura','telaExames','telaRev2'),
+     que deixava DE PÉ qualquer outra tela aberta — inclusive a de Trabalho, que agora é
+     de onde se chega aqui. Passa pela lista única, como as demais. */
+  telasEsconder('telaDia');
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
   diaAtualizar();
   if(!_diaTimer) _diaTimer=setInterval(diaAtualizar, 5000);
@@ -17745,9 +17873,7 @@ function rev2Abrir(exId){
      em z-index 9100, ACIMA das outras. Sem estar aqui, reabrir um laudo pelo histórico
      mostrava a revisão por baixo dela — o botão pareceria não funcionar, que é exatamente
      o defeito que essa mesma tela custou a tarde de ontem. */
-  ['telaAbertura','telaExames','telaDia','telaRevisao','telaHistorico','telaAntigos','telaVerLaudo'].forEach(function(id){
-    var e=document.getElementById(id); if(e) e.style.display='none';
-  });
+  telasEsconder('telaRev2');   // esconde todas menos a que estamos abrindo
   hisSincronizarVerHist();   // reabrir pelo historico escondia telaVerLaudo e deixava a plaquinha
   var t=document.getElementById('telaRev2'); if(t) t.style.display='block';
   rev2Render();
@@ -20306,8 +20432,49 @@ function antLigarArrastar(){
   if(i && !i._ligado){ i.addEventListener('change', function(){ antAddImgs(i.files); i.value=''; }); i._ligado=true; }
   var a=document.getElementById('antAudio');
   if(a && !a._ligado){ a.addEventListener('change', function(){ antAddAuds(a.files); a.value=''; }); a._ligado=true; }
+  /* 09/09/2026 — AS CAIXAS DA TELA DE TRABALHO. Enchem as MESMAS gavetas (`_antImgs` e
+     `_antAuds`) e depois abrem a tela de antigos com o material já dentro. O material
+     não fica preso aqui: quem transforma foto e ditado em laudo é a esteira de lá, que
+     está testada. Um segundo caminho para o mesmo lugar divergiria no dia em que alguém
+     consertasse só um dos dois. */
+  _antLigarSolta('trabSoltaImg', function(fs){ trabReceber(fs, antAddImgs); });
+  _antLigarSolta('trabSoltaAud', function(fs){ trabReceber(fs, antAddAuds); });
+  var ti=document.getElementById('trabImgs');
+  if(ti && !ti._ligado){ ti.addEventListener('change', function(){ trabReceber(ti.files, antAddImgs); ti.value=''; }); ti._ligado=true; }
+  var ta=document.getElementById('trabAudio');
+  if(ta && !ta._ligado){ ta.addEventListener('change', function(){ trabReceber(ta.files, antAddAuds); ta.value=''; }); ta._ligado=true; }
 }
 window.addEventListener('DOMContentLoaded', antLigarArrastar);
+
+/* ===================== TELA DE TRABALHO (09/09/2026) =====================
+   A casa de tudo que é trabalho. Chega pelo botão "Trabalho" da abertura. */
+function trabReceber(lista, guardar){
+  var n=(lista&&lista.length)||0;
+  if(!n) return;                       // arrastou e não veio nada: não muda de tela à toa
+  guardar(lista);
+  trabFechar(true);                    // sem voltar ao Início: vamos direto para antigos
+  antAbrir();
+  log(n+(n===1?' arquivo adicionado':' arquivos adicionados')+' — monte o laudo aqui.');
+}
+function trabAbrir(){
+  telasEsconder('telaTrabalho');    // some com qualquer outra que esteja de pé
+  var w=document.getElementById('telaTrabalho'); if(w) w.style.display='block';
+  try{ trabPintar(); }catch(e){}
+  window.scrollTo(0,0);
+}
+/* `semVoltar` existe para o caso em que outra tela vai assumir logo em seguida: sem ele,
+   a abertura pisca no meio do caminho, e piscar dá a impressão de que algo deu errado. */
+function trabFechar(semVoltar){
+  var w=document.getElementById('telaTrabalho'); if(w) w.style.display='none';
+  if(semVoltar) return;
+  var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';
+  try{ abContarPendentes(); }catch(e){}
+  window.scrollTo(0,0);
+}
+/* Desenha o miolo da tela. Na etapa 2 ainda não há listas — a função existe desde já
+   para o `trabAbrir` ter um lugar só por onde redesenhar, e não nascer com o
+   redesenho espalhado quando as listas chegarem. */
+function trabPintar(){}
 
 function abVoltarInicio(){
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';
@@ -20761,8 +20928,13 @@ window.addEventListener('DOMContentLoaded', function(){
      que confere se TODA tela de tela cheia do CSS está nesta lista — a primeira escapava
      dele só porque tem o position:fixed inline, e não no CSS. Estar aqui é o que impede a
      segunda barra de rolagem de voltar. */
-  var TELAS_CHEIAS = ['telaAbertura','telaExames','telaDia','telaRev2','telaAntigos',
-                      'telaHistorico','telaVerLaudo','telaModelos'];
+  /* 09/09/2026: sai de TELAS_DO_APP em vez de ser uma sexta cópia da mesma lista.
+     `telaRevisao` é a interface ANTIGA, que não é de tela cheia e nunca esteve aqui;
+     `telaModelos` (Configurações) é de tela cheia mas não entra na troca de telas, então
+     entra só aqui. O resto acompanha sozinho — tela nova no app já nasce travando o
+     fundo, sem ninguém precisar lembrar de um segundo lugar. */
+  var TELAS_CHEIAS = TELAS_DO_APP.filter(function(id){ return id!=='telaRevisao'; })
+                                 .concat(['telaModelos']);
   /* Exposta de propósito: o teste que confere se toda tela cheia está aqui guardava uma
      CÓPIA desta lista, e cópia não vigia nada — ela envelhece junto e as duas divergem em
      silêncio. Foi o que aconteceu com telaModelos em 22/08: acrescentei aqui e o teste

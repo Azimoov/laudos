@@ -36,7 +36,10 @@ const SUITE = [
   { arq: 'teste-conferente.js', o: 'conferente: segunda leitura do laudo antes de entregar' },
   { arq: 'teste-birads-cat.js', o: 'categoria BI-RADS: rotulo, probabilidade e conduta (tabela local)' },
   { arq: 'teste-ref-volume.js', o: 'asterisco e fonte no julgamento de tamanho' },
+  { arq: 'teste-tireoide-esquema.js', o: 'tireoide: duas vistas junto ao lobo/istmo, sem posição inventada' },
+  { arq: 'teste-mama-reativacao.js', o: 'mama: recurso reativado, opcional por laudo e por lado' },
   { arq: 'teste-mama-esquema.js', o: 'esquema anatomico da mama (bloco 2)' },
+  { arq: 'teste-utero-figo.js', o: 'útero: esquema anatômico bidirecional e classificação FIGO de miomas' },
   { arq: 'teste-historico-reabrir.js', o: 'reabrir laudo antigo na tela de liberacao' },
   { arq: 'teste-historico-abrir.js', o: 'abrir laudo antigo do historico (sem window.open)' },
   { arq: 'teste-dicom-importar.js', o: 'buscar exame no aparelho (caminho religado)' },
@@ -118,17 +121,36 @@ const SUITE = [
 let ok = 0, falhou = 0, pulou = 0;
 const problemas = [];
 
-function agenteNoAr() {
-  try { execFileSync('node', ['-e', "require('http').get('http://127.0.0.1:8977/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"], { timeout: 5000 }); return true; }
-  catch (e) { return false; }
+/* 09/09/2026 — PROCURA O AGENTE EM TODAS AS LINHAS VIVAS, NAO SO NUMA PORTA.
+   Ate hoje a bateria batia so na 8977. Essa porta e da linha estavel, DESATIVADA em
+   02/09 — ninguem mais atende ali. O resultado: as duas suites que precisam do agente
+   apareciam "puladas" todo dia, e ninguem mais rodou nenhuma delas por uma semana.
+   Teste pulado todo dia deixa de ser teste; vira enfeite.
+   Agora procura na ordem: o que mandarem por AGENTE_URL, depois a 3.0 (reforma, banco
+   vazio — o lugar certo para um teste escrever), depois a 2.0. A porta encontrada e
+   REPASSADA as suites, para elas conversarem com o mesmo agente que a bateria achou. */
+function acharAgente() {
+  const tentativas = [process.env.AGENTE_URL, 'http://127.0.0.1:8999', 'http://127.0.0.1:8988']
+    .filter(Boolean);
+  for (const url of tentativas) {
+    try {
+      execFileSync('node', ['-e',
+        "require('http').get(" + JSON.stringify(url + '/health') +
+        ",r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"],
+        { timeout: 5000 });
+      return url;
+    } catch (e) { /* essa linha nao esta no ar; tenta a proxima */ }
+  }
+  return '';
 }
 const temPy = fs.existsSync(PY);
-const temAgente = agenteNoAr();
+const urlAgente = acharAgente();
+const temAgente = !!urlAgente;
 
 console.log('='.repeat(64));
 console.log('  BATERIA DE TESTES — Laudos USG');
 console.log('  Python do ditado-local: ' + (temPy ? 'ok' : 'AUSENTE (testes do agente serao pulados)'));
-console.log('  Agente no ar: ' + (temAgente ? 'sim' : 'nao (teste de backup sera pulado)'));
+console.log('  Agente no ar: ' + (temAgente ? urlAgente : 'nao (teste de backup sera pulado)'));
 console.log('='.repeat(64));
 
 for (const t of SUITE) {
@@ -143,8 +165,10 @@ for (const t of SUITE) {
        explicacao — uma suite verde sendo acusada de vermelha, que e o pior tipo de alarme:
        ensina a ignorar o alarme. */
     const prazo = t.lento ? 900000 : 120000;
-    const saida = t.py ? execFileSync(PY, [caminho], { encoding: 'utf8', timeout: prazo })
-                       : execFileSync('node', [caminho], { encoding: 'utf8', timeout: prazo });
+    // A suite fala com o MESMO agente que a bateria encontrou — nunca com um escrito nela.
+    const amb = urlAgente ? Object.assign({}, process.env, { AGENTE_URL: urlAgente }) : process.env;
+    const saida = t.py ? execFileSync(PY, [caminho], { encoding: 'utf8', timeout: prazo, env: amb })
+                       : execFileSync('node', [caminho], { encoding: 'utf8', timeout: prazo, env: amb });
     const n = (saida.match(/^\s*ok\s/gm) || []).length;
     console.log('  OK   ' + t.o + (n ? '  (' + n + ' verificacoes)' : ''));
     ok++;

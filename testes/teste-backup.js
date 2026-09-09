@@ -2,19 +2,20 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-/* 02/09/2026 — a porta sai da variavel de ambiente, mas o PADRAO continua 8977.
-   A linha estavel foi desativada a pedido do medico, e estas duas suites passaram a ser
-   PULADAS (o agente que elas procuram nao esta no ar). Apontar para a 2.0 nao resolve: as
-   expectativas daqui foram escritas para o ambiente da estavel — medido em 02/09, contra
-   a 2.0 dao 3 falhas que NAO sao defeito (ela tem 15 arquivos de dados, o teste espera
-   10). Falha falsa e pior que teste pulado: ensina a ignorar falha.
-   Ajustar estas suites para a 2.0 e tarefa propria, ainda EM ABERTO. Ate la:
-     AGENTE_URL=http://127.0.0.1:8988 node testes/teste-backup.js
-   roda contra a linha que atende, para quem for fazer esse ajuste. */
-const AG = process.env.AGENTE_URL || 'http://127.0.0.1:8977';
+/* 09/09/2026 — A PASTA VEM DO AGENTE, NAO DE UM CAMINHO ESCRITO AQUI.
+   Ate hoje o ENDERECO do agente era configuravel (AGENTE_URL) mas a PASTA era fixa na
+   linha estavel. Quem apontasse a suite para outra linha ficava com o teste conversando
+   com um agente e conferindo a pasta de OUTRO: tres falhas que nao eram defeito nenhum
+   (contagem de arquivos, tamanho do glaudos.json, historico). E a saida escolhida em
+   02/09 foi deixar as duas suites PULADAS — o que custou uma semana sem elas.
+   Agora a pasta e perguntada ao proprio agente (rota /dados devolve "pasta"), entao
+   endereco e pasta nao tem como discordar: e sempre a mesma linha, seja ela qual for.
+   Sem AGENTE_URL, procura a 3.0 (reforma) e depois a 2.0 (atendimento). A 8977 saiu:
+   a linha estavel foi desativada em 02/09 e nao volta sozinha. */
+const AG = process.env.AGENTE_URL || 'http://127.0.0.1:8999';
 // 10/08/2026: a pasta do agente saiu do cache do app Claude, onde uma
 // reinstalacao levaria o banco de pacientes junto. Ver README do laudos-programa.
-const DADOS = String(process.env.USERPROFILE || '').replace(/\\/g, '/') + '/Laudos USG/agente/dados';
+let DADOS = '';
 
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FALHA ') + m); if (!c) falhas++; };
@@ -22,6 +23,17 @@ const post = (r, b) => fetch(AG + r, { method: 'POST', headers: { 'Content-Type'
 const get = r => fetch(AG + r).then(x => x.json());
 
 (async () => {
+  /* Primeira coisa: qual linha atendeu o telefone. Sem isto o teste nao sabe de quem e a
+     pasta que ele vai conferir — e conferir a pasta errada e o defeito que esta suite teve
+     por uma semana. Imprime a pasta para quem le a saida saber, sem adivinhar. */
+  const man = await get('/dados');
+  DADOS = String(man.pasta || '').replace(/\\/g, '/');
+  ok(!!DADOS && fs.existsSync(DADOS), 'o agente disse onde mora: ' + (DADOS || '(nao disse)'));
+  if (!DADOS || !fs.existsSync(DADOS)) {
+    console.log('\n  sem a pasta do agente nao da para conferir nada. Parando aqui.');
+    process.exit(1);
+  }
+
   console.log('=== 1. pasta que nao existe: recusa ===');
   let j = await post('/backup/pasta', { pasta: 'Z:\\nao\\existe\\mesmo' });
   ok(j.ok === false && /nao encontrada/i.test(j.erro || ''), 'recusou com motivo claro: ' + (j.erro || '').slice(0, 50));
@@ -51,7 +63,20 @@ const get = r => fetch(AG + r).then(x => x.json());
   const hist = path.join(dest, 'historico');
   const dias = fs.readdirSync(hist);
   ok(dias.length === 1, 'criou 1 pasta de historico (' + dias[0] + ')');
-  ok(fs.readdirSync(path.join(hist, dias[0])).length === copiados.length, 'historico tem todos os arquivos');
+  /* 09/09/2026 — O HISTORICO GUARDA TUDO, NAO SO OS .json.
+     Esta linha comparava a pasta do dia (contada inteira) com `copiados`, que conta SO os
+     .json. Enquanto a pasta de dados da linha estavel tinha so .json, os dois numeros
+     batiam por coincidencia. Na 3.0 ha um arquivo `glocais.json.antes-de-05-09-2026`
+     (uma copia de seguranca guardada antes de uma mudanca) e a conta passou a acusar
+     defeito onde o agente estava certo: ele copia todo arquivo solto da pasta.
+     Agora a comparacao e com o que existe DE FATO no destino — que e o que o historico
+     promete espelhar. */
+  const noDestino = fs.readdirSync(dest).filter(f => fs.statSync(path.join(dest, f)).isFile());
+  const noHistorico = fs.readdirSync(path.join(hist, dias[0]));
+  ok(noHistorico.length === noDestino.length,
+    'historico espelha o destino (' + noHistorico.length + ' de ' + noDestino.length + ')');
+  ok(noDestino.every(f => noHistorico.includes(f)),
+    'e nao falta nenhum arquivo pelo nome, nao so pela contagem');
 
   console.log('=== 5. 2a copia no mesmo dia: pula o que nao mudou ===');
   j = await post('/backup/agora', {});

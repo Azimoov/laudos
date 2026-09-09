@@ -273,6 +273,101 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 .laudoTitulo{text-align:center;font-weight:600;margin:2px 0 12px;font-size:14px;}
 .laudoTexto{white-space:pre-wrap;text-align:justify;outline:none;}
 .laudoTexto:focus{background:#fffbe8;}
+/* A explicacao para a paciente e uma FOLHA propria, sempre antes do documento tecnico.
+   Altura exata de A4: a impressao automatica fatia a imagem a cada 297 mm, portanto
+   qualquer margem externa aqui deslocaria todas as paginas seguintes. O fundo e opaco
+   para o timbrado do laudo, aplicado por baixo na impressao, nao aparecer nesta folha. */
+.pacienteFolha{position:relative;box-sizing:border-box;width:210mm;max-width:210mm;
+  height:297mm;min-height:297mm;margin:0 auto;padding:31mm 23mm;overflow:hidden;
+  display:flex;align-items:center;background:#F4FAF9!important;color:#24343A!important;
+  border:1px solid #C8D9D7;break-after:page;page-break-after:always;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif!important;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.pacienteFolha::before{content:"";position:absolute;width:118mm;height:118mm;border-radius:50%;
+  right:-47mm;top:-53mm;background:#DCEFEB!important;}
+.pacienteFolha::after{content:"";position:absolute;width:84mm;height:84mm;border-radius:50%;
+  left:-35mm;bottom:-39mm;background:#EEE8F7!important;}
+.pacienteFolhaConteudo{position:relative;z-index:1;width:100%;}
+.pacienteFolha .pacBox{box-sizing:border-box;margin:0!important;padding:15mm 14mm!important;
+  border:1px solid #C8DEDA!important;border-top:3mm solid #2F7D75!important;
+  border-radius:5mm!important;background:#FFFFFF!important;color:#24343A!important;
+  box-shadow:0 5mm 14mm rgba(42,78,74,.12);font-size:14px!important;line-height:1.55!important;}
+.pacienteFolha .pacTitulo{margin:0 0 8mm;color:#315F68!important;font-size:18px;
+  line-height:1.25;font-weight:750;letter-spacing:.01em;}
+.pacienteFolha .pacLinha{margin:0 0 5mm!important;padding:0 0 0 6mm;border-left:1.2mm solid #D7EAE7;
+  color:#2A3940!important;}
+.pacienteFolha .pacLinha b{display:block;margin-bottom:1mm;color:#245F59!important;font-size:14px;}
+.pacienteFolha .pacNota{margin:8mm 0 0!important;padding-top:5mm;border-top:1px solid #DDE8E6;
+  color:#596C72!important;font-size:11px!important;line-height:1.45!important;}
+/* Mama e Tireoide: cada estrutura tem ancoragem no corpo. Destravada, pode flutuar à esquerda ou à direita
+   (com o texto ao redor), ou ficar centralizada abaixo. Os controles e alças de redimensionamento existem só
+   na revisão e somem no papel. */
+.laudoMamaSecao, .laudoTireoideSecao{display:block;clear:both;}
+.laudoMamaSecao::after, .laudoTireoideSecao::after{content:"";display:block;clear:both;}
+.laudoMamaEsqHost{display:block;clear:both;position:relative;width:100%;}
+.laudoMamaEsqHost.flutua{clear:none;position:relative;}
+.laudoMamaEsqHost.flutua.esquerda{float:left;margin-right:7mm;margin-bottom:3mm;}
+.laudoMamaEsqHost.flutua.direita{float:right;margin-left:7mm;margin-bottom:3mm;}
+.laudoMamaEsqHost.flutua .mamaEsq{margin-top:4px!important;margin-bottom:4px!important;clear:none!important;}
+.laudoMamaEsqHost.flutua.formato-vertical{width:220px;max-width:55%;}
+.laudoMamaEsqHost.flutua.formato-horizontal{width:360px;max-width:100%;}
+.laudoMamaEsqHost.formato-vertical svg{max-width:170px;height:auto;}
+.laudoMamaEsqHost.formato-horizontal svg{max-width:150px;height:auto;}
+.laudoMamaEsqHost.formato-vertical .mamaEsqVistas{flex-direction:column!important;align-items:center!important;gap:10px;}
+.laudoMamaEsqHost.formato-horizontal .mamaEsqVistas{flex-direction:row!important;justify-content:center!important;gap:22px;}
+
+.laudoTireoideEsq{display:block;margin:10px 0 13px;padding:8px 8px 7px;border:1px solid #d6dbe4;
+  border-radius:8px;background:#fff;clear:both;break-inside:avoid;page-break-inside:avoid;text-align:center;position:relative;width:100%;box-sizing:border-box;}
+.laudoTireoideEsq.flutua{clear:none;}
+.laudoTireoideEsq.flutua.esquerda{float:left;margin-right:7mm;margin-bottom:3mm;}
+.laudoTireoideEsq.flutua.direita{float:right;margin-left:7mm;margin-bottom:3mm;}
+.laudoTireoideEsq.flutua.formato-vertical{width:210px;max-width:55%;}
+.laudoTireoideEsq.flutua.formato-horizontal{width:360px;max-width:100%;}
+.laudoTireoideVistas{display:flex;gap:8mm;justify-content:center;align-items:flex-start;flex-wrap:nowrap;}
+.laudoTireoideVistas.formato-vertical{flex-direction:column;align-items:center;gap:4mm;}
+.laudoTireoideVistas.formato-horizontal{flex-direction:row;justify-content:center;gap:8mm;}
+.laudoTireoideVistas.formato-vertical .laudoTireoideFigura{width:38mm;height:57mm;flex:0 0 38mm;}
+.laudoTireoideFigura{position:relative;width:42.7mm;height:64mm;flex:0 0 42.7mm;overflow:hidden;}
+.laudoTireoideImg{display:block;width:100%;height:100%;object-fit:contain;}
+.laudoTireoideImg.espelhada{transform:scaleX(-1);}
+.laudoTireoideMarca{position:absolute;transform:translate(-50%,-50%);border-radius:50%;
+  background:#6A4FB6;border:1.4px solid #fff;box-shadow:0 0 0 1px #4b347f;color:#fff;
+  font:bold 9px/1 Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;
+  min-width:9px;min-height:9px;cursor:grab;touch-action:none;z-index:2;}
+.laudoTireoideMarca:active{cursor:grabbing;}
+.laudoTireoideRot{font-size:9.5px;line-height:1.2;color:#3F3357;font-weight:700;margin-top:2px;text-align:center;}
+.laudoTireoideLegenda{font-size:9.5px;line-height:1.35;color:#3F3357;margin-top:5px;text-align:left;}
+.laudoTireoideNota{font-size:8.5px;line-height:1.25;color:#6b7385;margin-top:4px;font-style:italic;text-align:left;}
+
+.laudoMamaLayoutControles,.laudoUteroLayoutControles{display:flex;justify-content:flex-end;align-items:center;gap:5px;
+  margin:0 0 4px;font:600 10px/1.2 Arial,Helvetica,sans-serif;color:#4f5d70;}
+.laudoMamaLayoutBt,.laudoUteroLayoutBt{border:1px solid #8c98a8;border-radius:6px;background:#f7f9fc;color:#344154;
+  padding:3px 7px;cursor:pointer;font:inherit;}
+.laudoMamaLayoutMover,.laudoUteroLayoutMover{cursor:grab;touch-action:none;background:#fff8d9;border-color:#b2912f;}
+.laudoMamaLayoutMover:active,.laudoUteroLayoutMover:active{cursor:grabbing;}
+
+.laudoUteroHost{display:block;margin:10px 0 13px;padding:8px 8px 7px;border:1px solid #d6dbe4;
+  border-radius:8px;background:#fff;clear:both;break-inside:avoid;page-break-inside:avoid;position:relative;width:100%;box-sizing:border-box;}
+.laudoUteroHost.flutua{clear:none;}
+.laudoUteroHost.flutua.esquerda{float:left;margin-right:7mm;margin-bottom:3mm;}
+.laudoUteroHost.flutua.direita{float:right;margin-left:7mm;margin-bottom:3mm;}
+.laudoUteroHost.flutua.formato-vertical{width:260px;max-width:55%;}
+.laudoUteroHost.flutua.formato-horizontal{width:480px;max-width:100%;}
+.laudoUteroVistas{display:flex;gap:12px;justify-content:center;align-items:flex-start;flex-wrap:wrap;}
+.laudoUteroHost.formato-vertical .laudoUteroVistas{flex-direction:column;align-items:center;gap:10px;}
+.laudoUteroHost.formato-horizontal .laudoUteroVistas{flex-direction:row;justify-content:center;gap:16px;}
+.laudoUteroHost svg{max-width:215px;height:auto;display:block;}
+.laudoUteroHost.formato-vertical svg{max-width:230px;}
+.laudoUteroRot{font-size:9.5px;line-height:1.2;color:#334155;font-weight:700;margin-top:4px;text-align:center;letter-spacing:0.04em;}
+.laudoUteroLegenda{font-size:10px;line-height:1.35;color:#334155;margin-top:5px;text-align:left;border-top:1px solid #e2e8f0;padding-top:4px;}
+.laudoUteroNota{font-size:8.5px;line-height:1.25;color:#6b7385;margin-top:3px;font-style:italic;text-align:left;}
+
+.laudoLayoutResizeHandle{position:absolute;right:3px;bottom:3px;width:18px;height:18px;
+  cursor:nwse-resize;touch-action:none;display:flex;align-items:center;justify-content:center;
+  font:bold 14px/1 monospace;color:#66768d;background:#f0f4f9;border:1px solid #b4c2d3;
+  border-radius:3px;user-select:none;z-index:9;}
+.laudoLayoutResizeHandle:hover{background:#e1e9f4;color:#1e293b;border-color:#7f97b4;}
+.laudoLayoutResizeHandle:active{background:#d0ddec;color:#0f172a;}
 /* 26/08/2026 (noite, pedido dele) — o TEXTO FINAL (as ressalvas depois da conclusão) tem
    corpo próprio: 11px de série, e pode descer degraus (10/9/8 — ver EXTRA_PX) quando o
    bloco conclusão+texto final não couber. A CONCLUSÃO nunca desce — regra dele. O nome
@@ -549,6 +644,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
   body{background:#fff;}
   body *{visibility:hidden;}
   #barraFormato{display:none;}
+  .laudoMamaLayoutControles,.laudoTireoideLayoutControles,.laudoLayoutResizeHandle{display:none!important;}
   #areaImpressao,#areaImpressao *{visibility:visible;}
   #areaImpressao{position:absolute;left:0;top:0;width:100%;}
   /* Laudo antigo aberto do histórico: mesma regra, container próprio. E quando ELE está
@@ -569,6 +665,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
      folha. O navegador só fatia a cada 297 mm. O que a tela mostra é o que sai. */
   body{margin:0!important;}
   .laudoFolha{border:0;max-width:none;}
+  .pacienteFolha{border:0!important;box-shadow:none!important;max-width:none;}
   /* 02/09/2026 — ESTA LINHA PUNHA A ASSINATURA DENTRO DA MOLDURA. A caixa do corpo tem
      altura mínima de 620px na TELA; aqui ela era anulada, e no papel a caixa encolhia. Só
      que a moldura de cada folha (_molduraPorFolha) é desenhada MEDINDO A TELA, em pixels
@@ -1048,6 +1145,17 @@ button.repoSelo:hover{filter:brightness(.95)}
 #telaRev2 .caixa .ficha.mic:hover{background:#0B5F5C;color:#fff}
 #telaRev2 .caixa .abrir{background:none;border:1px solid currentColor;border-radius:11px;
   padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;color:inherit;margin-left:8px}
+#telaRev2 .caixa.tireoide{background:#EEF7F6;border:1px solid #4D8F8B;border-left-color:#0E6E6B;
+  color:#0B5F5C;font-weight:500}
+#telaRev2 .caixa.tireoide .ficha{border-color:#0E6E6B;color:#0E6E6B}
+#telaRev2 .caixa.tireoide .ficha:hover,#telaRev2 .caixa.tireoide .ficha.on{background:#0E6E6B;color:#fff}
+#telaRev2 .caixa.tireoide.incompleta{background:#FBEACB;border-color:#B0851C;border-left-color:#B0851C;color:#6B5010}
+#telaRev2 .caixa.tireoide.incompleta .ficha{border-color:#B0851C;color:#6B5010}
+#telaRev2 .caixa.tireoide.incompleta .ficha:hover,#telaRev2 .caixa.tireoide.incompleta .ficha.on{background:#B0851C;color:#fff}
+#telaRev2 .tireoidePergunta{margin-top:9px;padding-top:8px;border-top:1px solid rgba(176,133,28,.35)}
+#telaRev2 .tireoidePergunta:first-of-type{margin-top:7px}
+#telaRev2 .tireoidePergunta .rot{display:block;font-size:11.5px;font-weight:700;margin-bottom:5px}
+#telaRev2 .tireoidePergunta .fichas{margin-top:0}
 /* --- coluna da direita --- */
 /* espaço em volta para a foto poder CRESCER sem ser cortada pela rolagem */
 #telaRev2 .grade{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:300px;overflow:auto;
@@ -1615,6 +1723,15 @@ button.repoSelo:hover{filter:brightness(.95)}
       <div id="paneRevisao" style="display:none">
         <div class="head"><h1>Alertas de revisão</h1></div>
         <p class="sub">O que o programa confere e oferece enquanto você revisa um laudo.</p>
+        <section class="iaSec">
+          <div class="iaSecTop"><h2>Ilustrações anatômicas</h2></div>
+          <label class="iaCheck">
+            <input type="checkbox" id="cfgImagensRevisao" onchange="imagensRevisaoAlternar(this)">
+            <span>Mostrar o botão “Adicionar ilustração” durante a revisão</span>
+          </label>
+          <p class="iaHint">O botão apenas deixa a ferramenta disponível. Nenhuma imagem
+            entra no laudo sozinha: você escolhe, em cada caso, se quer adicionar.</p>
+        </section>
         <section class="iaSec">
           <div class="iaSecTop"><h2>Explicação para a paciente</h2></div>
           <div class="cfgHost" id="hostPaciente"></div>
@@ -3196,7 +3313,7 @@ const PROMPT_TRANSCRICAO_USG = "Ditado de laudo de ultrassonografia em portuguê
    `gagente` (o endereço do agente, que muda a cada abertura e chega pela URL) e `gravag`
    (gravação em curso, que é estado do momento, não escolha). */
 const DADOS_SINCRONIZADOS = ['gmodelos','gmodelos__base','gbizus','gregras','glaudos','gass','gmedico','gcrm','gmodelo','gmodaux','guso','gpacid','glocais','gpaciente',
-  'gimpauto','gimpsep','gimplaudo','gimpimg','gconferente','gsomalerta','grev2Fonte','g20local','g20modo'];
+  'gimpauto','gimpsep','gimplaudo','gimpimg','gconferente','gsomalerta','grev2Fonte','g20local','g20modo','grev2imagens'];
 function dadoTs(chave){ var t=parseFloat(localStorage.getItem(chave+'__ts')); return isFinite(t)?t:0; }
 function dadoMarcar(chave){ try{ localStorage.setItem(chave+'__ts', String(Date.now())); }catch(e){} }
 /* Salva no navegador E manda para o agente (se estiver no ar). Use no lugar de localStorage.setItem. */
@@ -4436,9 +4553,17 @@ function laudoCssText(){
      do pacote porque o filtro abaixo leva apenas seletores do laudo. Resultado: no
      agente, os 210 mm da folha recebiam o padding POR FORA e ultrapassavam o A4; no
      visualizador, os mesmos 210 mm ja incluiam o padding. A regra viaja explicitamente
-     para os dois caminhos terem a mesma regua. */
+     para os dois caminhos terem a mesma regua.
+     09/09/2026: seletores da folha da paciente (.pacienteFolha, .pacBox, etc.) entram no pacote.
+     Sem eles, a folha da paciente colapsava sem altura (150px) na foto do agente e deslocava
+     toda a paginacao do laudo subsequente, alem de permitir que o timbrado vazasse pelo cartao.
+     Tambem escondemos explicitamente os controles de tela (.laudoMamaLayoutControles, etc.). */
   let css='*,*:before,*:after{box-sizing:border-box;}\n';
-  try{ const sh=document.styleSheets; for(let i=0;i<sh.length;i++){ let rules; try{ rules=sh[i].cssRules; }catch(e){ continue; } for(let j=0;j<rules.length;j++){ const r=rules[j]; if(r.selectorText && /laudo|assin|linha|rodape/i.test(r.selectorText)) css+=r.cssText+'\n'; } } }catch(e){} return css;
+  try{ const sh=document.styleSheets; for(let i=0;i<sh.length;i++){ let rules; try{ rules=sh[i].cssRules; }catch(e){ continue; } for(let j=0;j<rules.length;j++){ const r=rules[j]; if(r.selectorText && /laudo|assin|linha|rodape|paciente|pacBox|pacTitulo|pacNota/i.test(r.selectorText)) css+=r.cssText+'\n'; } } }catch(e){}
+  css+='.laudoMamaLayoutControles,.laudoTireoideLayoutControles,.laudoUteroLayoutControles,.laudoLayoutResizeHandle{display:none!important;}\n';
+  css+='.pacienteFolha{border-color:transparent!important;box-shadow:none!important;}\n';
+  css+='.pacienteFolha .pacBox{background:#F2F7F6!important;box-shadow:none!important;}\n';
+  return css;
 }
 function dataURLtoBlob(d){ const p=d.split(','); const mime=(p[0].match(/:(.*?);/)||[])[1]||'image/jpeg'; const bin=atob(p[1]); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:mime}); }
 async function pastaLivre(parent, base){
@@ -4557,6 +4682,11 @@ async function salvarLaudoPasta(){
      endereço 127.0.0.1) ao arquivo salvo — o defeito voltando pela porta dos fundos. */
   var _estPag='@media print{@page{size:A4;margin:0;}.laudoFolha:not(.comFundo){padding:15mm 12mm!important;}}';
   try{ var _M=margensDaFolha(); _estPag=_estiloPaginaTexto(_M.topo,_M.base,_M.lado,_M.temFundo); }catch(e){}
+  try{
+    if(document.querySelector('#areaImpressao .laudoTireoideImg')){
+      await tireoideImagensCarregar(); tireoideAplicarDataImgs(document.getElementById('areaImpressao'));
+    }
+  }catch(e){ log('Não consegui embutir a ilustração anatômica no arquivo: '+e.message,true); }
   const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laudo - '+pac+'</title><style>body{font-family:-apple-system,Helvetica Neue,Arial,sans-serif;margin:16px;color:#000;background:#fff;}'+laudoCssText()+_estPag+'</style></head><body>'+folhaHtmlLimpo()+_JS_MOLDURA_ARQUIVO+'</body></html>';
   const laudoBlob=new Blob([html],{type:'text/html'});
   const ex=(window.__revAtual&&window.__revAtual.exId!=null)?exames.find(function(e){return e.id===window.__revAtual.exId;}):null;
@@ -4903,7 +5033,7 @@ async function gerarLaudo(exId, opts){
 (regrasSeg ? "PACIENTE JÁ EXAMINADO NESTE SERVIÇO — REGRAS DE SEGUIMENTO (este bloco só aparece quando existe exame anterior do mesmo paciente e do mesmo tipo; use-o APENAS para comparar com o exame prévio, e só se o ditado ou as imagens trouxerem o achado correspondente):\n"+regrasSeg+"\n"+(anteriorTxt ? "O laudo anterior completo está no bloco EXAME ANTERIOR, acima — use-o como fonte da comparação, respeitando as travas daquele bloco." : "Exame anterior encontrado no histórico: "+(anterior.data||'data não registrada')+" — mas o CONTEÚDO dele não está disponível. NÃO invente o conteúdo desse exame: se o ditado não disser como a lesão estava antes, não afirme estabilidade nem crescimento.")+"\n\n" : "")+
 (EX_OBST_SEQ[ex.tipo] ? "OBSTÉTRICO SEQUENCIAL (2º/3º trimestre) — preencha o campo 'obstetrico'. Você SÓ COPIA os valores; quem escolhe qual entra na conclusão é o aplicativo:\n- trouxe_usg_primeiro_trimestre: true se o médico disse que a paciente trouxe/apresentou a ultrassonografia INICIAL (de primeiro trimestre), ou se ele informou a idade gestacional daquele exame; false se ele disse que ela não trouxe, ou se nada foi dito.\n- ig_primeiro_usg_semanas: a idade gestacional EM SEMANAS que a paciente tinha NAQUELE primeiro exame (número; 0 se não foi ditada).\n- aua: leia da worksheet do aparelho o campo AUA — a idade gestacional média estimada pela biometria de HOJE — copiada exatamente como está, ex.: \"34w2d\". Vazio se não estiver legível.\n- ga: leia da worksheet o campo GA — a idade gestacional já estabelecida para a paciente — copiada exatamente como está, ex.: \"35w3d\". Vazio se não estiver legível.\n- edd_aua: a data que está em EDD(AUA), no formato dia/mês/ano. Vazio se não estiver legível.\n- edd_ga: a data que está em EDD(EDD), no formato dia/mês/ano. Vazio se não estiver legível.\nNUNCA invente nenhum desses valores: copie da imagem ou deixe vazio. ATENÇÃO — AUA e GA são campos DIFERENTES da worksheet e costumam ter valores diferentes: não troque um pelo outro nem repita o mesmo nos dois.\nNA CONCLUSÃO: NÃO escreva a idade gestacional, NÃO escreva a data provável do parto e NÃO escreva a variação em dias — deixe os pontilhados do modelo como estão. O aplicativo preenche os três, e escolhe a frase certa conforme a paciente ter trazido ou não o exame inicial.\n\n" : "")+
 (ex.tipo==='obst23' ? "OBSTÉTRICO — SITUAÇÃO FETAL: apresentação cefálica ou pélvica implica, por definição, situação longitudinal. Se o ditado disser 'cefálico(a)' ou 'pélvico(a)', preencha a situação com 'longitudinal' e a apresentação com 'cefálica' ou 'pélvica' (concordando com a palavra 'apresentação') — NUNCA deixe os pontilhados da situação nesse caso. Mantenha os pontilhados da situação apenas se a apresentação não for ditada; se o médico ditar situação transversa ou oblíqua, use o que ele ditou e NÃO infira a apresentação.\n\n" : "")+
-(ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
+(ex.tipo==='tireoide' ? "TI-RADS AUTOMÁTICO (somente tireoide): para CADA nódulo tireoidiano descrito no ditado, inclua um item no campo 'tirads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado: composicao (cística, espongiforme, mista ou sólida) | ecogenicidade (anecoica, hiperecogênica, isoecogênica, hipoecogênica ou muito hipoecogênica) | forma (mais larga que alta ou mais alta que larga) | margem (lisa, mal definida, lobulada, irregular ou extensão extratireoidiana) | focos (lista, pode ser vazia: cauda de cometa, macrocalcificações, calcificação periférica, focos puntiformes) | tamanho_cm (maior medida do nódulo em cm; 0 se não ditada nem legível). Para a ilustração, copie também a localização SEM COMPLETAR LACUNAS: localizacao (frase original), estrutura (lobo-direito | lobo-esquerdo | istmo), nivel (superior | juncao-superior-medio | medio | juncao-medio-inferior | inferior), transversal (nos lobos: medial | central | lateral; no istmo: direita | central | esquerda) e profundidade (anterior | central | posterior). Qualquer parte não dita ou não legível deve ser \"\". Esses campos de localização NÃO alteram a pontuação TI-RADS. Descritor não citado: \"\" (string vazia). NÃO calcule nem escreva a categoria TI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir desses descritores e insere no laudo. Se nenhum nódulo for descrito: \"tirads\":[].\n\n" : "")+
 (classifVale('birads', ex.tipo) ? "BI-RADS AUTOMÁTICO (somente mama): para CADA massa/nódulo mamário descrito no ditado, inclua um item no campo 'birads' com os descritores exatamente como DITADOS pelo médico (ou claramente legíveis nas imagens) — NUNCA infira um descritor que não foi mencionado. Responda com o CÓDIGO, não com a frase:\n- localizacao: onde está, como o médico disse (ex.: \"mama direita, QSE\").\n- tipo: massa | naoMassa — use naoMassa SÓ quando o médico disser explicitamente que o achado é lesão não-massa (non-mass, não forma massa); na dúvida, massa. Para naoMassa os descritores de massa podem vir vazios.\n- forma: oval | lobulada | redonda | irregular\n- orientacao: paralela (paralela à pele) | nao (não paralela)\n- margem: circ (circunscrita) | indistinta | angular | microlobulada | espiculada\n- eco: anecoico | hiperecoico | isoecoico | hipoecoico | heterogeneo | misto (misto sólido e cístico)\n- posterior: nenhum (sem alteração) | reforco | sombra\n- halo: sim | nao — halo ecogênico (echogenic rind)\n- vasc: avascular | interna (vascularização interna) | periferica (hipervascularização periférica) — SÓ se o Doppler/vascularização foi mencionado no ditado.\n- elasto: macia | intermediaria | dura — SÓ se a elastografia foi mencionada.\n- pseudocapsula: sim | nao — pseudocápsula ecogênica (achado distinto do halo).\n- distribuicao (só quando tipo=naoMassa): regional | focal | linear | segmentar\n- padrao (só quando tipo=naoMassa): hiperecoico | heterogeneo | hipoecoico\n- tamanho_cm: maior medida em cm; 0 se não ditada nem legível.\n- caso_especial: SÓ quando o médico ditar explicitamente um destes, e aí os outros descritores podem vir vazios: cistoSimples | cistoComplicado | microcistos | linfonodo | cat0a | cat0b | cat6. Senão: \"\".\nDescritor não citado: \"\" (string vazia). Este é o léxico do ACR BI-RADS v2025 — NÃO use \"cístico complexo e sólido\" nem \"padrão combinado\": saíram nesta versão. NÃO calcule nem escreva a categoria BI-RADS no corpo ou na conclusão — o aplicativo calcula localmente a partir destes descritores e insere no laudo. Se nenhuma massa for descrita: \"birads\":[].\n\n" : "")+
 (classifVale('orads', ex.tipo) ? "O-RADS AUTOMÁTICO (somente transvaginal e pélvica): para CADA lesão ovariana ou anexial descrita no ditado, inclua um item no campo 'orads' com o que foi DITADO — NUNCA infira. Responda com o CÓDIGO:\n- localizacao: ex.: \"ovário esquerdo\".\n- tipo: fisio (folículo ou corpo lúteo ≤ 3 cm) | uniSimples (cisto unilocular simples, anecoico, parede lisa) | uniNaoSimples (unilocular não simples, parede lisa) | uniIrreg (unilocular com parede interna irregular < 0,3 cm) | classica (dermoide, endometrioma ou cisto hemorrágico típicos) | multiLisa (multilocular de paredes e septos lisos) | multiIrreg (multilocular com parede ou septo irregular) | solido (com componente sólido ou projeção papilar) | solidoLiso (sólida ≥ 80% de contorno liso) | solidoIrreg (sólida ≥ 80% de contorno irregular)\n- escore_cor: 1 | 2 | 3 | 4 — escore de cor ao Doppler; \"\" se não ditado.\n- tamanho_cm: maior diâmetro em cm; 0 se não ditado.\n- papilas: número de projeções papilares; 0 se não ditado.\n- ascite: sim | nao — ascite e/ou nódulos peritoneais.\nNÃO calcule nem escreva a categoria O-RADS — o aplicativo calcula. Nenhuma lesão descrita: \"orads\":[].\n\n" : "")+
 "AVISOS SEPARADOS POR ASSUNTO (campo 'avisos'): além de 'observacoes_para_o_medico', devolva CADA aviso como um item próprio, com 'tipo' sendo EXATAMENTE uma destas palavras:\n- identificacao: nome, idade ou data que não conferem entre o ditado, as imagens e o cadastro.\n- divergencia: o ditado diz uma coisa e as imagens mostram outra.\n- faltando: medida, dado ou legenda ausente/ilegível que deixou pontilhados no laudo.\n- iacriou: você escreveu a descrição de uma patologia a partir do seu conhecimento, por não haver dizer padrão do médico (diga qual patologia).\n- outros: aviso que não caiba em nenhum acima.\nUm assunto por item, 'texto' curto e direto. Nada a avisar: \"avisos\":[]. NUNCA use os tipos 'anterior' nem 'calculo' — esses o aplicativo preenche sozinho.\n\n"+
@@ -4922,7 +5052,7 @@ regraDeUnidade()+
    O que fica: os bullets (decisão de 26/08), a hora e as medidas. */
 "CISTOS SIMPLES MÚLTIPLOS (regra do médico, 26/08/2026, só mama): quando houver MAIS DE UM cisto simples na mesma mama, escreva-os em BULLET POINTS — uma frase introdutória única com os descritores comuns terminando em dois-pontos, e depois UMA linha por cisto no formato '• às X h, medindo A x B x C cm;'. NUNCA em frase corrida com 'respectivamente'. Um cisto só: frase normal, sem bullet.\nCISTO SIMPLES NÃO LEVA DISTÂNCIA DA PAPILA (regra do médico, 24/08/2026, reafirmada em 31/08): nem quando é um só, nem nos bullets. NÃO escreva 'a X cm da papila' nem 'distando X cm da papila' em cisto simples, mesmo que a imagem traga o valor. Isso vale SÓ para o cisto simples — nódulo, microcistos agrupados e massa sólido-cística continuam obrigados a informar a distância.\n\n"+
 "DADOS ESTRUTURADOS (campo 'dados_estruturados'): além do laudo, devolva os achados campo a campo, para o arquivo longitudinal do paciente. Regras:\n- Preencha APENAS com informação presente no ditado ou legível nas imagens. Campo sem informação = null (ou \"\" em texto). NUNCA invente medida, órgão ou classificação.\n- indicacao_clinica: os dados clínicos ditados, se houver.\n- conclusao_codigo: UMA palavra que resuma a conclusão — normal | benigno | provavelmente-benigno | suspeito | indeterminado | outro.\n- achados: um item por achado DESCRITO no laudo. orgao (ex.: 'mama-direita', 'figado', 'lobo-tireoidiano-esquerdo'), localizacao (ex.: 'QSE', 'terco medio'), tipo (ex.: 'nodulo', 'cisto', 'calculo', 'esteatose'), medidas em MILÍMETROS (medida_1_mm a medida_3_mm; converta de cm; null se não medida), caracteristicas (objeto livre: ecogenicidade, margens, sombra...), classificacao (ex.: 'BI-RADS 3'; \"\" se não se aplica), descricao (a frase do achado como está no laudo).\n- Exame normal, sem achados: \"achados\":[].\n\n"+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\""+(fitaNum?",\\\"palavra_ini\\\":0,\\\"palavra_fim\\\":0":"")+"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0}]":"")
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\""+(fitaNum?",\\\"palavra_ini\\\":0,\\\"palavra_fim\\\":0":"")+"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0,\"localizacao\":\"\",\"estrutura\":\"\",\"nivel\":\"\",\"transversal\":\"\",\"profundidade\":\"\"}]":"")
 +(classifVale('birads', ex.tipo)?",\"birads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"forma\":\"\",\"orientacao\":\"\",\"margem\":\"\",\"eco\":\"\",\"posterior\":\"\",\"halo\":\"\",\"vasc\":\"\",\"elasto\":\"\",\"pseudocapsula\":\"\",\"distribuicao\":\"\",\"padrao\":\"\",\"tamanho_cm\":0,\"caso_especial\":\"\"}]":"")
 +(classifVale('orads', ex.tipo)?",\"orads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"escore_cor\":\"\",\"tamanho_cm\":0,\"papilas\":0,\"ascite\":\"\"}]":"")
 +(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0,\"aua\":\"\",\"ga\":\"\",\"edd_aua\":\"\",\"edd_ga\":\"\"}":"")+"}"
@@ -4950,6 +5080,13 @@ regraDeUnidade()+
        regeneração (17/08/2026): o ditado continua sem eles, então sem isto
        ele perderia o trabalho toda vez que tocasse "Regenerar". */
     var _escAntes=(ex.laudo&&ex.laudo._descritores)||null;
+    /* A escolha editorial de ilustrar este laudo também sobrevive ao Regenerar. Sem isto,
+       um novo texto apagaria um desenho que o médico já decidiu incluir. */
+    var _tirImgAntes=(ex.laudo&&ex.laudo._tireoideIlustracoes)||null;
+    var _tirLayoutAntes=(ex.laudo&&ex.laudo._tireoideLayout)||null;
+    var _mamaImgAntes=(ex.laudo&&ex.laudo._mamaIlustracoes)||null;
+    var _mamaLayoutAntes=(ex.laudo&&ex.laudo._mamaLayout)||null;
+    var _mamaAncorasAntes=(ex.laudo&&ex.laudo._mamaAncoras)||null;
     if(_escAntes){
       ['tirads','birads','orads'].forEach(function(sis){
         if(!Array.isArray(resp[sis])) return;
@@ -5043,6 +5180,11 @@ regraDeUnidade()+
         /* Especificação 08, mecanismo 2: termo fora do léxico vira o termo do léxico. A
            troca é registrada AQUI, na revisão, e nunca no laudo entregue — mesma regra de
            sempre: nenhuma menção a correção automática no documento final. */
+        var _numsMama=mamaNumerarAchados(_corpoFinal,(resp.birads||[]));
+        if(_numsMama.mudou){
+          _corpoFinal=_numsMama.corpo;
+          log(_numsMama.n+' achados numerados no corpo para manter texto e figura vinculados.');
+        }
         var _lex=lexSubstituir(_corpoFinal);
         if(_lex.trocas.length){
           _corpoFinal=_lex.texto;
@@ -5093,6 +5235,11 @@ regraDeUnidade()+
          aqui, a frase voltaria no primeiro toque numa opção de descritor. */
       _conclusaoBase:tirarProbabilidade(resp.conclusao||mod.conclusao||''),
       _descritores:_escAntes||undefined,
+      _tireoideIlustracoes:_tirImgAntes||undefined,
+      _tireoideLayout:_tirLayoutAntes||undefined,
+      _mamaIlustracoes:_mamaImgAntes||undefined,
+      _mamaLayout:_mamaLayoutAntes||undefined,
+      _mamaAncoras:_mamaAncorasAntes||(mod&&mod._mamaAncoras)||undefined,
       /* EXAMES ANTERIORES, já lidos em achados (21/08/2026, especificação 04). O texto do
          anterior é buscado AQUI, na geração, de forma assíncrona — e a tela de revisão é
          síncrona. Guardar os achados extraídos agora é o que permite ao gráfico de evolução
@@ -6153,11 +6300,13 @@ function textoClinicoLaudo(L){
 function textoEditadoLaudo(soClinico){
   var cab=soClinico?null:document.querySelector('#areaImpressao .laudoCab');
   var corpo=document.querySelector('#areaImpressao .laudoTexto');
-  /* os vãos da paginação de tela virariam linhas em branco fantasmas no texto lido —
-     e o aprendizado compararia o laudo com uma versão que o médico nunca escreveu */
-  if(corpo && corpo.querySelector('.quebraFolha')){
+  /* Os vãos da paginação e os desenhos não são texto clínico. A legenda anatômica é
+     visível no papel, mas não pode voltar para o corpo do laudo nem contaminar o
+     aprendizado de estilo. */
+  if(corpo && corpo.querySelector('.quebraFolha,[contenteditable="false"],.laudoTireoideEsq')){
     corpo=corpo.cloneNode(true);
     Array.prototype.forEach.call(corpo.querySelectorAll('.quebraFolha'), function(n){ n.parentNode.removeChild(n); });
+    Array.prototype.forEach.call(corpo.querySelectorAll('[contenteditable="false"],.laudoTireoideEsq'), function(n){ if(n.parentNode)n.parentNode.removeChild(n); });
   }
   var t1=cab?(cab.innerText||cab.textContent||''):'';
   var t2=corpo?(corpo.innerText||corpo.textContent||''):'';
@@ -6465,6 +6614,48 @@ function restaurarBizus(){
 }
 
 /* ============ Editor de MODELOS de laudo (estruturados) — salvo no navegador ============ */
+function modeloMamaParece(m){
+  var s=norm([m&&m.nome,m&&m.titulo,m&&m.corpo].join(' '));
+  return /\bmamas?\b/.test(s);
+}
+function modeloMamaAncorasLocais(corpo){
+  var s=String(corpo||''), out={}, re=/\*\*\s*MAMA\s+(DIREITA|ESQUERDA)\s*:?\s*\*\*/gi,m;
+  while((m=re.exec(s))){ var lado=/direita/i.test(m[1])?'D':'E'; if(!out[lado]) out[lado]=m[0]; }
+  return out;
+}
+function modeloMamaAncoraExata(corpo,trecho){
+  var s=String(corpo||''), t=String(trecho||'').trim(); if(!t) return '';
+  var i=s.toLocaleLowerCase('pt-BR').indexOf(t.toLocaleLowerCase('pt-BR')); if(i<0) return '';
+  var a=s.lastIndexOf('\n',i)+1, b=s.indexOf('\n',i+t.length); if(b<0)b=s.length;
+  var linha=s.slice(a,b).trim();
+  return linha.length<=100?linha:t;
+}
+/* Um modelo personalizado pode chamar as seções como quiser. Ao salvá-lo, a IA lê apenas
+   o MODELO (nenhum dado de paciente) e devolve as duas âncoras literais. Se estiver fora
+   do ar, a leitura local conserva o formato clássico; nunca se inventa uma caixa. */
+async function modeloMamaMapear(m,anterior){
+  if(!modeloMamaParece(m)) return m;
+  if(anterior&&anterior.corpo===m.corpo&&anterior._mamaAncoras&&
+     anterior._mamaAncoras.D&&anterior._mamaAncoras.E){
+    m._mamaAncoras=anterior._mamaAncoras; return m;
+  }
+  var local=modeloMamaAncorasLocais(m.corpo), marcou=null;
+  try{
+    if(await temIA()){
+      var p='Leia o corpo deste MODELO de laudo mamário e identifique o título ou trecho EXATO que abre '
+        +'a caixa de texto da mama direita e o que abre a caixa da mama esquerda. Não reescreva o modelo. '
+        +'Copie literalmente os dois trechos; se um lado não existir, use string vazia.\n\nCORPO DO MODELO:\n'
+        +m.corpo+'\n\nResponda somente em JSON: {"direita":"","esquerda":""}';
+      var r=await openai([{type:'text',text:p}],true,{rotulo:'mapear seções do modelo de mama'});
+      marcou={D:modeloMamaAncoraExata(m.corpo,r&&r.direita),E:modeloMamaAncoraExata(m.corpo,r&&r.esquerda)};
+    }
+  }catch(e){ log('Não consegui pedir à IA as âncoras do modelo de mama; usei a leitura local: '+e.message,true); }
+  m._mamaAncoras={D:(marcou&&marcou.D)||local.D||'',E:(marcou&&marcou.E)||local.E||''};
+  if(!m._mamaAncoras.D||!m._mamaAncoras.E)
+    log('Modelo de mama salvo, mas não foi possível marcar com segurança os dois lados. A ilustração só será oferecida no lado identificado.',true);
+  else log('IA marcou no modelo onde ficam os textos da mama direita e da mama esquerda.');
+  return m;
+}
 function modeloBoxHtml(key, m, locked){
   m=m||{};
   var ro=locked?' readonly':''; var bg=locked?'#eef2f6':'#fffdf5';
@@ -6513,7 +6704,7 @@ function abrirEditorModelos(){
   cont.innerHTML=html;
   cont.__aberto=true;
 }
-function salvarModelos(){
+async function salvarModelos(){
   var cont=document.getElementById('modelosEditor'); if(!cont) return;
   var novo={};
   Array.prototype.forEach.call(cont.querySelectorAll('.modeloBox'), function(box){
@@ -6526,6 +6717,10 @@ function salvarModelos(){
     novo[key]=m;
   });
   if(!Object.keys(novo).length){ log('Nenhum modelo para salvar.', true); return; }
+  var _mk=Object.keys(novo);
+  for(var _mi=0;_mi<_mk.length;_mi++){
+    var _ch=_mk[_mi]; novo[_ch]=await modeloMamaMapear(novo[_ch],MODELOS[_ch]);
+  }
   try{ dadoSalvar('gmodelos', JSON.stringify(novo)); }catch(e){ log('Não consegui salvar os modelos (armazenamento cheio?): '+e.message, true); return; }
   modelosMarcarBase();   // guarda o que o PROGRAMA tinha agora — ver modelosMesclarSalvos
   Object.keys(MODELOS).forEach(function(k){ delete MODELOS[k]; }); Object.assign(MODELOS, novo);
@@ -6744,6 +6939,10 @@ function salvarLaudoHistorico(meta){
   // NÃO guardar imagens base64 embutidas — é o que estoura a cota do localStorage:
   // timbrado (~300KB) e ASSINATURA (~50-200KB POR LAUDO). Ambos reinjetados ao abrir.
   html = html.replace(/<img class="fundoLaudo"[^>]*>/g, '');
+  /* As imagens anatômicas também foram embutidas para o arquivo/ impressão não dependerem
+     do endereço do programa. No histórico, porém, voltam ao caminho local: guardar três
+     PNGs em base64 por laudo esgotaria a cota do navegador em poucos exames. */
+  html = tireoideReporSrcNoHistorico(html);
   html = html.replace(/<img[^>]*src="data:image[^"]*"[^>]*>/g, '<!--IMG-ASSINATURA-->');
   /* 25/08 (ciclo 2): o fundo gravado é o da FOLHA salva, não o da sessão — a mesma
      classe do defeito das margens. Hoje os dois coincidem em todo caminho vivo; a
@@ -7181,6 +7380,14 @@ function folhaHtmlLimpo(){
   var a=document.getElementById('areaImpressao');
   if(!a || !a.innerHTML) return '';
   var c=a.cloneNode(true);
+  /* Cadeado e alça são ferramentas da revisão. A posição escolhida permanece pelo CSS da
+     caixa, mas os botões não aparecem no arquivo salvo nem podem chegar à impressão. */
+  Array.prototype.forEach.call(c.querySelectorAll('.laudoMamaLayoutControles'), function(n){
+    if(n.parentNode) n.parentNode.removeChild(n);
+  });
+  Array.prototype.forEach.call(c.querySelectorAll('.laudoTireoideLayoutControles, .laudoLayoutResizeHandle'), function(n){
+    if(n.parentNode) n.parentNode.removeChild(n);
+  });
   /* 25/08 (2ª leva): os VÃOS FICAM — no papel eles são as próprias quebras de página, e
      o do pé é o que segura a assinatura no fim da última folha. O que sai é só o que
      não faz sentido fora da tela: as máscaras repetidas (o timbrado original fica) e a
@@ -7256,6 +7463,36 @@ function _paginarPontos(tx){
         aposBr=true;
         continue;
       }
+      /* 09/09/2026: Seção anatômica ancorada (.laudoMamaSecao, .laudoTireoideSecao ou .laudoUteroSecao).
+         Registra a seção em si (satisfazendo quebras antes dela e testes de unidade) e
+         decompõe seus elementos internos (figura e parágrafos) para que a figura salte
+         de forma independente e nunca se localize na faixa morta entre as páginas. */
+      if(n.classList && (n.classList.contains('laudoMamaSecao') || n.classList.contains('laudoTireoideSecao') || n.classList.contains('laudoUteroSecao'))){
+        var ultS=pontos[pontos.length-1];
+        if(!(ultS && ultS.node===n && ultS.off===0)) pontos.push({node:n, off:0});
+        var filhas=Array.prototype.slice.call(n.childNodes);
+        for(var fi=0;fi<filhas.length;fi++){
+          var fn=filhas[fi];
+          if(fn.nodeType===1){
+            if(fn.classList && (fn.classList.contains('laudoMamaEsqHost') || fn.classList.contains('laudoTireoideEsq') || fn.classList.contains('laudoUteroHost'))){
+              pontos.push({node:fn, off:0});
+              aposBr=true;
+            } else if(/^(B|STRONG)$/i.test(fn.tagName) || (fn.querySelector && fn.querySelector('b,strong'))){
+              pontos.push({node:fn, off:0});
+              aposBr=true;
+            }
+          } else if(fn.nodeType===3 && fn.textContent.trim()){
+            var mf, ref=/\n[ \t]*\n\s*/g;
+            while((mf=ref.exec(fn.textContent))){
+              var offF=mf.index+mf[0].length;
+              if(offF<fn.textContent.length) pontos.push({node:fn, off:offF});
+            }
+            aposBr=true;
+          }
+        }
+        aposBr=true;
+        continue;
+      }
       var ult=pontos[pontos.length-1];
       if(!(ult && ult.node===n && ult.off===0)) pontos.push({node:n, off:0});
       aposBr=true;               // o que vier depois do bloco é parágrafo novo
@@ -7301,11 +7538,17 @@ function _pagEhTitulo(u, tx, pontos){
 }
 function _pagCaixaDaUnidade(u, tx, pontos, folha){
   try{
-    var rg;
-    if(u.tipo==='el'){ rg=document.createRange(); rg.selectNode(u.el); }
-    else if(u.tipo==='duo'){ rg=document.createRange(); rg.setStartBefore(u.ini); rg.setEndAfter(u.fim); }
-    else rg=_paginarRange(tx, pontos, u.i);
-    var rc=rg.getBoundingClientRect();
+    var elU=(u.tipo==='par' && pontos[u.i].node.nodeType===1)?pontos[u.i].node:(u.tipo==='el'?u.el:null);
+    var rc=null;
+    if(elU && elU.classList && (elU.classList.contains('laudoMamaEsqHost') || elU.classList.contains('laudoTireoideEsq') || elU.classList.contains('laudoUteroHost'))){
+      rc=elU.getBoundingClientRect();
+    } else {
+      var rg;
+      if(u.tipo==='el'){ rg=document.createRange(); rg.selectNode(u.el); }
+      else if(u.tipo==='duo'){ rg=document.createRange(); rg.setStartBefore(u.ini); rg.setEndAfter(u.fim); }
+      else rg=_paginarRange(tx, pontos, u.i);
+      rc=rg.getBoundingClientRect();
+    }
     if(!rc || !rc.height) return null;
     var ft=folha.getBoundingClientRect().top;
     return {topo:rc.top-ft, base:rc.bottom-ft, alt:rc.height};
@@ -7525,7 +7768,10 @@ function paginarLaudoTela(raiz){
   folha.removeAttribute('data-moldura');
   var _mold=null;
   (function(){
-    var cs2=folha.querySelectorAll('#mamaEsqBox .mamaEsq');
+    /* Só o HTML ANTIGO tinha os cartões como filhos diretos deste bloco e precisava da
+       moldura forçada D-no-pé/E-no-topo. No formato ancorado cada cartão viaja com o texto
+       do próprio lado; forçá-lo sozinho para outra folha quebraria essa proximidade. */
+    var cs2=folha.querySelectorAll('#mamaEsqBox > .mamaEsq');
     if(cs2.length!==2) return;
     var D=null,E=null;
     Array.prototype.forEach.call(cs2, function(c){
@@ -7642,20 +7888,25 @@ function _paginarMiolo(folha, pageH, topPx, botPx, util, mold){
   else { bloco(_duoA); bloco(_duoR); }
   var postos=0;
   for(var i=0;i<un.length && postos<300;i++){
-    var u=un[i], rg=null;
-    try{
-      if(u.tipo==='el'){ rg=document.createRange(); rg.selectNode(u.el); }
-      else if(u.tipo==='duo'){ rg=document.createRange(); rg.setStartBefore(u.ini); rg.setEndAfter(u.fim); }
-      else rg=_paginarRange(tx, pontos, u.i);
-    }catch(e){ continue; }
-    var rc=rg.getBoundingClientRect();
+    var u=un[i];
+    var elU=(u.tipo==='par' && pontos[u.i].node.nodeType===1)?pontos[u.i].node:(u.tipo==='el'?u.el:null);
+    var rc=null, rg=null;
+    if(elU && elU.classList && (elU.classList.contains('laudoMamaEsqHost') || elU.classList.contains('laudoTireoideEsq') || elU.classList.contains('laudoUteroHost'))){
+      rc=elU.getBoundingClientRect();
+    } else {
+      try{
+        if(u.tipo==='el'){ rg=document.createRange(); rg.selectNode(u.el); }
+        else if(u.tipo==='duo'){ rg=document.createRange(); rg.setStartBefore(u.ini); rg.setEndAfter(u.fim); }
+        else rg=_paginarRange(tx, pontos, u.i);
+        rc=rg.getBoundingClientRect();
+      }catch(e){ continue; }
+    }
     if(!rc || !rc.height) continue;
     var fr=folha.getBoundingClientRect();
     var top=rc.top-fr.top, bottom=rc.bottom-fr.top, alt=bottom-top;
     var pag=Math.floor(top/pageH);
     var limite=(pag+1)*pageH-botPx;
     var alvo=null;
-    var elU=(u.tipo==='par' && pontos[u.i].node.nodeType===1)?pontos[u.i].node:(u.tipo==='el'?u.el:null);
     /* o respiro da moldura: só para quem mora dentro da caixa do corpo */
     var folg=((u.tipo==='par')||(u.tipo==='el'&&caixa&&caixa.contains(u.el)))?FRISO:0;
     if(mold && elU===mold.D){
@@ -7719,6 +7970,11 @@ function _paginarMiolo(folha, pageH, topPx, botPx, util, mold){
     esp.setAttribute('contenteditable','false');
     esp.style.height=(alvo-top)+'px';
     paiIns.insertBefore(esp, antes);
+    if(antes.classList && (antes.classList.contains('laudoMamaEsqHost') || antes.classList.contains('laudoTireoideEsq'))){
+      if(antes.style && antes.style.marginTop && parseFloat(antes.style.marginTop)>0){
+        antes.style.marginTop='0px';
+      }
+    }
     postos++;
   }
   return ok;
@@ -7750,6 +8006,7 @@ function revAplicarModelo(){
   ex.tipo=novo; ex._liberado=false;
   var L=ex.laudo;
   L.titulo=mod.titulo; L.tecnica=mod.tecnica; L.corpo=mod.corpo; L.conclusao=mod.conclusao; L.extra=mod.extra||''; L.obs='';
+  L._mamaAncoras=mod._mamaAncoras||undefined; L._mamaLayout=undefined; L._mamaIlustracoes=undefined;
   ex.laudoBaseTexto=textoBaseLaudo(L);
   abrirRevisao(exId);
   var st=document.getElementById('revChatStatus'); if(st) st.textContent='📄 Modelo '+(MODELOS[novo].nome||novo)+' aplicado — edite os pontilhados ou use "Regerar com IA" p/ preencher pelo ditado.';
@@ -7856,11 +8113,20 @@ function abrirRevisao(exId, semTela){
      mente sobre si mesma é pior que uma folha branca assumida. */
   try{ aplicarMargensImpressao(_k); }catch(e){}   // margens de TODAS as páginas — ver a função
   var _folhaAbre = '<div class="laudoFolha'+(_temFundo?' comFundo':'')+'" data-fundo="'+esc(_k)+'"'+(_temFundo?' style="padding-top:'+(_fnd.padTopMm||34)+'mm;padding-bottom:'+(_fnd.padBottomMm||24)+'mm"':'')+'>'+(_temFundo?'<img class="fundoLaudo" src="'+_fnd.img+'" alt="">':'');
+  /* Quando habilitada, a explicacao ocupa a pagina 1 inteira. A folha tecnica e montada
+     depois e continua sendo paginada pelas regras proprias, agora a partir da pagina 2. */
+  var _folhaPaciente='';
+  try{ _folhaPaciente=pacienteFolhaHTML(ex)||''; }catch(e){ _folhaPaciente=''; }
   document.getElementById('areaImpressao').innerHTML =
-  _folhaAbre
+  _folhaPaciente+_folhaAbre
   +'<div class="laudoCab"><div contenteditable="true" oninput="revMarcarEditado()"><b>Nome do Paciente:</b>'+esc(c.nome||'')+'<br><b>Idade:</b> '+esc(c.idade||'')+'<br><b>Realizado em:</b> '+esc(c.realizado_em||'')+'<br><b>Dados Clínicos:</b> '+esc(c.dados_clinicos||'')+'</div></div>'
   +'<div class="laudoCorpoBox"><div class="laudoTitulo" contenteditable="true" oninput="revMarcarEditado()">'+esc(L.titulo)+'</div>'
-  +'<div class="laudoTexto" contenteditable="true" oninput="revMarcarEditado()">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'+negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n'))
+  +'<div class="laudoTexto"'+(ex.tipo==='mama'&&mamaTemSelecao(L)?' id="mamaEsqBox"':'')+' contenteditable="true" oninput="revMarcarEditado()">'+negrito(L.tecnica)+'<br><br><b><u>DESCRIÇÃO:</u></b><br><br>'
+  +(ex.tipo==='tireoide'?tireoideCorpoHTML(L):(ex.tipo==='mama'
+    ?mamaCorpoHTML(L)
+    :((ex.tipo==='transvaginal'||ex.tipo==='pelvica')
+      ?uteroCorpoHTML(L)
+      :negrito((L.corpo||'').replace(/\n{3,}/g,'\n\n')))))
   /* O esquema entra AQUI, e o lugar não é livre: BI-RADS §16.4 fixa a ordem do laudo de
      mama, e o desenho pertence ao bloco ACHADOS — depois da descrição textual e ANTES da
      conclusão e da categoria. Não no rodapé, não no fim. Contenteditable="false" porque o
@@ -7872,11 +8138,10 @@ function abrirRevisao(exId, semTela){
      resultado era um buraco embaixo do texto e o desenho colado no parágrafo de cima.
      Agora: cada bloco só existe se tiver conteúdo, e o espaço em volta é do CSS do próprio
      bloco (.mamaEsq), um lugar só — em vez de <br> soltos disputando com a margem. */
-  +((ex.tipo==='mama' && MAMA_DESENHOS) ? (function(){
-      var _esq=mamaEsquemaHTML(L), _evo='';
+  +((ex.tipo==='mama' && MAMA_DESENHOS && mamaTemSelecao(L)) ? (function(){
+      var _evo='';
       try{ _evo=mamaEvolucaoHTML(ex)||''; }catch(e){ _evo=''; }
-      return (_esq?'<div id="mamaEsqBox" contenteditable="false">'+_esq+'</div>':'')
-           + (_evo?'<div class="mamaEvoBox" contenteditable="false">'+_evo+'</div>':'');
+      return _evo?'<div class="mamaEvoBox" contenteditable="false">'+_evo+'</div>':'';
     })() : '')
   /* 26/08/2026 (noite) — pedido dele: a conclusão e o texto final ficam NO MESMO BLOCO,
      sempre na mesma folha. O embrulho (.laudoFecho) é UMA unidade para a paginação — ou
@@ -7892,21 +8157,29 @@ function abrirRevisao(exId, semTela){
   +(L.extra?'<br><br><span class="laudoExtra"'+(ex.tipo==='mama'?' data-base="8" style="font-size:8px"':'')+'>'
     +(ex.tipo==='mama'?negrito(L.extra).replace(/\n{2,}/g,'\n'):negrito(L.extra)).replace(/\n/g,'<br>')+'</span>':'')
   +'</div>'
-  /* A seção da paciente entra por ÚLTIMO, depois do texto técnico e das ressalvas.
-     contenteditable="false": ela é montada de frases fixas, e editá-la à mão aqui faria
-     justamente o que o desenho dela evita — divergir do texto técnico logo acima. */
-  /* Só sai quando existe: com a seção desligada (o padrão) `pacienteHTML` devolve '' e
-     este div ficava vazio no fim do laudo, ocupando espaço à toa — mesmo defeito do
-     bloco de evolução acima. */
-  +(function(){ var _p=''; try{ _p=pacienteHTML(ex)||''; }catch(e){ _p=''; }
-                return _p?('<div contenteditable="false">'+_p+'</div>'):''; })()
   +'</div></div>'
   +'<div class="assin">'+(cfg.assinatura?'<img src="'+cfg.assinatura+'" style="height:62px;display:block;margin:0 auto -16px">':'')+'<span class="linha">'+cfg.medico+'<br>'+cfg.crm+'</span></div>'
   +'<div class="rodapeLaudo">Esclarecemos que a impressão diagnóstica em exames de imagem não é absoluta, devendo ser feita a correlação clínico laboratorial, além de outros exames de imagem. Somente o seu médico tem condições de interpretar corretamente o conjunto de todas essas informações.</div>'
   +'</div>';
   // arraste do marcador do esquema (só mama). Ligado DEPOIS de o HTML existir, e uma vez
   // só por caixa — a própria função se protege de ligar duas vezes.
-  if(ex.tipo==='mama'){ try{ mamaArrasteLigar(document.getElementById('mamaEsqBox'), ex); }catch(e){} }
+  if(ex.tipo==='mama'){
+    try{ mamaArrasteLigar(document.getElementById('mamaEsqBox'), ex); }catch(e){}
+    try{ mamaLayoutLigar(document.getElementById('mamaEsqBox'), ex); }catch(e){}
+  }
+  if(ex.tipo==='tireoide'){
+    try{ tireoideArrasteLigar(document.getElementById('areaImpressao'),ex); }catch(e){}
+    try{ tireoideLayoutLigar(document.getElementById('areaImpressao'),ex); }catch(e){}
+    /* A folha aparece já com os arquivos locais. Em paralelo, eles viram data URL para
+       continuarem dentro do HTML salvo e do pacote isolado da impressão automática. */
+    try{ tireoideImagensCarregar().then(function(){
+      tireoideAplicarDataImgs(document.getElementById('areaImpressao'));
+      try{ paginarLaudoTela(); }catch(e){}
+    }).catch(function(e){log('Não consegui preparar as ilustrações da tireoide para impressão: '+e.message,true);}); }catch(e){}
+  }
+  if(ex.tipo==='transvaginal'||ex.tipo==='pelvica'){
+    try{ uteroLayoutLigar(document.getElementById('areaImpressao'), ex); }catch(e){}
+  }
   try{ paginarLaudoTela(); }catch(e){}   // a tela mostra folhas de verdade — ver a função
   // F2e e conferente: avisos CALCULADOS AGORA, não guardados — assim nenhum deles
   // sobrevive apontando um trecho que o médico já corrigiu.
@@ -10636,6 +10909,9 @@ async function impCarregarImpressoras(avisar){
 function impHtmlDoLaudo(){
   var a=document.getElementById('areaImpressao');
   if(!a || !a.innerHTML) return null;
+  /* O agente abre este HTML fora do endereço do aplicativo. A cópia precisa levar os
+     PNGs anatômicos dentro dela; o carregamento começa assim que o laudo é montado. */
+  try{ tireoideAplicarDataImgs(a); }catch(e){}
   /* ⚠️ 05/09/2026 — PAGINAR ANTES DE FOTOGRAFAR. Sem esta linha a foto saía SEM as quebras
      de página, e o papel mostrava as duas coisas que ele relatou: o rodapé do laudo caindo
      por cima do rodapé do timbrado, e uma folha a mais só com a máscara.
@@ -10660,8 +10936,27 @@ function impHtmlDoLaudo(){
   /* 25/08 (2ª leva) — A FOTO É A PRÓPRIA TELA. Os vãos e os espaços do timbrado FICAM
      na foto: a tira sai já com a grade de folhas (297 mm cada), e o computador só
      fatia nas fronteiras e põe o timbrado atrás de cada folha. O que sai da foto são
-     as imagens da máscara (vão à parte, para o fundo de cada página) e a borda da tela. */
-  Array.prototype.forEach.call(clone.querySelectorAll('.fundoLaudo,.fundoFolhaTela'), function(n){ n.parentNode.removeChild(n); });
+     as imagens da máscara (vão à parte, para o fundo de cada página) e a borda da tela.
+     09/09/2026: Controles da interface (botão 'Travada', alça de redimensionamento)
+     também saem do clone — eles são ferramentas de tela e nunca devem ser fotografados. */
+  Array.prototype.forEach.call(clone.querySelectorAll('.fundoLaudo,.fundoFolhaTela,.laudoMamaLayoutControles,.laudoTireoideLayoutControles,.laudoUteroLayoutControles,.laudoLayoutResizeHandle'), function(n){
+    if(n.parentNode) n.parentNode.removeChild(n);
+  });
+  /* 09/09/2026 — Folha da paciente: dimensões exatas de A4 e fundo opaco anti-transparência GDI+.
+     Sem isso a folha colapsava e o timbrado vazava no SetColorKey da impressora. */
+  var pf=clone.querySelector('.pacienteFolha');
+  if(pf){
+    pf.style.borderColor='transparent';
+    pf.style.boxShadow='none';
+    pf.style.height='297mm';
+    pf.style.minHeight='297mm';
+    pf.style.maxHeight='297mm';
+    var pb=pf.querySelector('.pacBox');
+    if(pb){
+      pb.style.setProperty('background-color', '#F2F7F6', 'important');
+      pb.style.boxShadow='none';
+    }
+  }
   var f=clone.querySelector('.laudoFolha');
   /* ⚠️ 07/09/2026 — A BORDA FICA, INVISÍVEL. Ela era APAGADA aqui (`border:0`), e isso
      custava DOIS PIXELS de largura — a folha tem `box-sizing:border-box`, então tirar a
@@ -10705,6 +11000,21 @@ function impImagensDoExame(exId){
   if(!marcadas||!marcadas.length) return todas.slice();
   return todas.filter(function(_,i){ return marcadas.indexOf(i)>=0; });
 }
+/* A impressora recebe a MONTAGEM pronta, nunca as fotografias soltas.
+   `gerarPdfImagens` e a mesma peca que cria o arquivo unico salvo ao lado do laudo.
+   O Windows desta maquina nao imprime PDF silenciosamente (nao ha leitor com `printto`),
+   entao abrimos esse PDF no proprio navegador e mandamos suas PAGINAS como imagens A4.
+   Para o medico e para o arquivo continua sendo uma unica montagem; a conversao e apenas
+   o adaptador entre esse arquivo e a impressora. */
+async function impFolhasDeImagens(exId){
+  var imagens=impImagensDoExame(exId);
+  if(!imagens.length) return [];
+  var ex=exames.find(function(e){ return e.id===exId; });
+  var paciente=(ex&&ex.paciente)||(window.__revAtual&&window.__revAtual.paciente)||'';
+  var pdf=await gerarPdfImagens(imagens, paciente);
+  var arq=new File([pdf], 'Imagens organizadas.pdf', {type:'application/pdf'});
+  return await arquivoParaImagens(arq);
+}
 /* Manda imprimir. NUNCA lança: quando esta função roda, o laudo já foi salvo e
    registrado no histórico — falha de impressora é aviso, não perda. Devolve o que
    aconteceu, para quem chamou poder contar na tela. */
@@ -10717,6 +11027,12 @@ function impImagensDoExame(exId){
    com o agente fora do ar), cai na caixa de impressão do navegador, como sempre. */
 async function imprimirLaudoAtual(){
   var exId = (window.__revAtual && window.__revAtual.exId!=null) ? window.__revAtual.exId : null;
+  try{
+    if(document.querySelector('#areaImpressao .laudoTireoideImg')){
+      await tireoideImagensCarregar(); tireoideAplicarDataImgs(document.getElementById('areaImpressao'));
+      try{ rev2PaginarMedindo(document.getElementById('areaImpressao')); }catch(_e){}
+    }
+  }catch(e){ log('Não consegui preparar a ilustração anatômica para impressão: '+e.message,true); }
   if(impEscolhida('laudo')){
     try{
       var r=await impImprimirAgora(exId);
@@ -10727,8 +11043,17 @@ async function imprimirLaudoAtual(){
   window.print();
 }
 async function impImprimirAgora(exId){
+  try{
+    if(document.querySelector('#areaImpressao .laudoTireoideImg')){
+      await tireoideImagensCarregar(); tireoideAplicarDataImgs(document.getElementById('areaImpressao'));
+    }
+  }catch(e){ log('Não consegui preparar a ilustração anatômica para impressão: '+e.message,true); }
   var pacote=impHtmlDoLaudo();
-  var imagens=impImagensDoExame(exId);
+  var imagens=[];
+  try{ imagens=await impFolhasDeImagens(exId); }
+  catch(e){
+    log('🖨 Não consegui montar o arquivo único das imagens: '+e.message+'. As fotos separadas NÃO foram impressas.', true);
+  }
   var impLaudo=impEscolhida('laudo');
   var impImgs=impSeparadas()?impEscolhida('imagens'):impLaudo;
   if(!impLaudo){
@@ -10742,7 +11067,7 @@ async function impImprimirAgora(exId){
                            margensMm:(pacote?{topo:pacote.topoMm, base:pacote.baseMm, lado:pacote.ladoMm}:null),
                            alinhar:!!(pacote&&pacote.alinhar),
                            fundoLaudo:(pacote&&pacote.fundo)||'',
-                           imagens:imagens,
+                           imagens:imagens, imagensOrganizadas:true,
                            impressoraLaudo:impLaudo, impressoraImagens:impImgs})});
     var j=await resp.json();
     /* Cada metade é relatada SEPARADA de propósito: se as imagens falharem e o laudo
@@ -11093,6 +11418,569 @@ const BIRADS_ESPECIAIS = {
   linfonodo:['2','Linfonodo intramamário típico — benigno. Rotina.'],
   cat6:['6','Malignidade comprovada por biópsia. Seguimento clínico e terapia local definitiva, conforme a conduta oncológica adotada.']
 };
+/* ============ ESQUEMA ANATÔMICO DA TIREOIDE (08/09/2026) ============
+   Duas vistas por estrutura com nódulo: anterior + lateral. O lobo direito e o esquerdo
+   reutilizam a mesma lateral, como decidido pelo médico; o istmo tem um corte próprio,
+   pequeno e inteiramente anterior à traqueia. Localização ausente nunca vira posição
+   presumida: nesse caso a tela explica o que falta e não oferece um desenho enganoso. */
+var TIREOIDE_ARQS={
+  anterior:'assets/anatomia/rascunhos-v3-transparentes/tireoide.png',
+  lobo:'assets/anatomia/rascunhos-v3-transparentes/tireoide-lateral-lobo.png',
+  istmo:'assets/anatomia/rascunhos-v3-transparentes/tireoide-lateral-istmo.png'
+};
+var _tireoideImgData={}, _tireoideImgPromessa=null;
+function tireoideNorm(s){
+  var t=String(s||'').toLowerCase();
+  try{ t=t.normalize('NFD').replace(/[\u0300-\u036f]/g,''); }catch(e){}
+  return t.replace(/[_–—-]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function tireoideEstrutura(v){
+  var t=tireoideNorm(v);
+  if(/istmo/.test(t)) return 'istmo';
+  if(/lobo.*direit|direit.*lobo/.test(t)) return 'lobo-direito';
+  if(/lobo.*esquerd|esquerd.*lobo/.test(t)) return 'lobo-esquerdo';
+  return '';
+}
+function tireoideNivel(v){
+  var t=tireoideNorm(v);
+  if(/juncao.*superior.*medi|transicao.*superior.*medi|supero.?medi/.test(t)) return 'juncao-superior-medio';
+  if(/juncao.*medi.*inferior|transicao.*medi.*inferior|medio.?inferior/.test(t)) return 'juncao-medio-inferior';
+  if(/superior/.test(t)) return 'superior';
+  if(/inferior/.test(t)) return 'inferior';
+  if(/medio|media/.test(t)) return 'medio';
+  return '';
+}
+function tireoideTransversal(v, estrutura){
+  var t=tireoideNorm(v);
+  if(estrutura==='istmo'){
+    if(/direit/.test(t)) return 'direita';
+    if(/esquerd/.test(t)) return 'esquerda';
+  }
+  if(/medial/.test(t)) return 'medial';
+  if(/lateral/.test(t)) return 'lateral';
+  if(/central|centro/.test(t)) return 'central';
+  return '';
+}
+function tireoideProfundidade(v, campoDireto){
+  var t=tireoideNorm(v);
+  if(/anterior|ventral|superficial/.test(t)) return 'anterior';
+  if(/posterior|dorsal|profund/.test(t)) return 'posterior';
+  /* "terço médio" é altura, NÃO profundidade. Central só vale solto no campo próprio
+     ou explicitamente preso a plano/profundidade no texto corrido. */
+  if((campoDireto && /^(central|centro|media|medio)$/.test(t)) ||
+     /(?:plano|profundidade|eixo\s+anteroposterior)\s+(?:central|medio|media)/.test(t)) return 'central';
+  return '';
+}
+function tireoideDadosComEscolhas(L, d, i){
+  var n={}, k; for(k in (d||{})) n[k]=d[k];
+  var e=((L&&L._descritores)||{})['tirads|'+i]||{}; for(k in e) n[k]=e[k];
+  return n;
+}
+function tireoideLesoes(L){
+  var bruto=(L&&L._classifBruto&&L._classifBruto.tirads)||[];
+  return bruto.map(function(orig,i){
+    var d=tireoideDadosComEscolhas(L,orig,i), loc=String(d.localizacao||'');
+    var estrutura=tireoideEstrutura(d.estrutura)||tireoideEstrutura(loc);
+    var nivel=tireoideNivel(d.nivel)||tireoideNivel(loc);
+    var transversal=tireoideTransversal(d.transversal,estrutura)||tireoideTransversal(loc,estrutura);
+    var profundidade=tireoideProfundidade(d.profundidade,true)||tireoideProfundidade(loc,false);
+    var tam=parseFloat(String(d.tamanho_cm==null?'':d.tamanho_cm).replace(',','.'));
+    return {id:i, n:i+1, d:orig, dados:d, localizacao:loc, estrutura:estrutura,
+            nivel:nivel, transversal:transversal, profundidade:profundidade,
+            tamanho_cm:isFinite(tam)&&tam>0?tam:0,
+            completa:!!(estrutura&&nivel&&transversal&&profundidade)};
+  });
+}
+function tireoideEstruturaTitulo(t){ return tireoideEstrutura(t); }
+function tireoideLocalTxt(L){
+  var nv={superior:'terço superior','juncao-superior-medio':'junção dos terços superior e médio',
+          medio:'terço médio','juncao-medio-inferior':'junção dos terços médio e inferior',
+          inferior:'terço inferior'}[L.nivel]||'';
+  var tr=L.transversal||'', pr=L.profundidade||'';
+  var est={ 'lobo-direito':'lobo direito','lobo-esquerdo':'lobo esquerdo',istmo:'istmo'}[L.estrutura]||'';
+  if(L.estrutura==='istmo') tr={direita:'à direita',central:'central',esquerda:'à esquerda'}[tr]||tr;
+  else tr=tr?('porção '+tr):'';
+  pr=pr?('plano '+pr):'';
+  return [est,nv,tr,pr].filter(function(x){return x;}).join(', ');
+}
+function tireoideXY(L, vista){
+  var yL={superior:31,'juncao-superior-medio':40,medio:51,'juncao-medio-inferior':61,inferior:71};
+  if(vista==='anterior'){
+    if(L.estrutura==='istmo') return [{direita:46,central:50,esquerda:54}[L.transversal]||50,
+                                      {superior:53,'juncao-superior-medio':55,medio:57,'juncao-medio-inferior':59,inferior:61}[L.nivel]||57];
+    var dir=L.estrutura==='lobo-direito';
+    var xD={lateral:16,central:27,medial:37}, xE={medial:63,central:73,lateral:84};
+    return [(dir?xD:xE)[L.transversal]||(dir?27:73), yL[L.nivel]||51];
+  }
+  if(L.estrutura==='istmo') return [{anterior:51.0,central:48.5,posterior:45.8}[L.profundidade]||48.5,
+                                    {superior:54,'juncao-superior-medio':55.5,medio:57,'juncao-medio-inferior':58.5,inferior:60}[L.nivel]||57];
+  return [{anterior:53,central:42,posterior:31}[L.profundidade]||42, yL[L.nivel]||51];
+}
+function tireoideLateralEspelhada(estrutura,vista){
+  return vista==='lateral'&&estrutura==='lobo-esquerdo';
+}
+/* Espelhar horizontalmente e desfazer o espelho usam a mesma conta. Assim a imagem do
+   lobo esquerdo muda de lado sem trocar a anatomia do marcador nem o sentido do arraste. */
+function tireoideXEspelho(estrutura,vista,x){
+  return tireoideLateralEspelhada(estrutura,vista)?100-x:x;
+}
+function tireoideMarcaHTML(L,vista){
+  var p=tireoideXY(L,vista), diam=Math.max(9,Math.min(21,L.tamanho_cm?L.tamanho_cm*7:10));
+  p[0]=tireoideXEspelho(L.estrutura,vista,p[0]);
+  return '<span class="laudoTireoideMarca" data-lesao="'+L.id+'" data-vista="'+vista+'" '
+    +'title="'+esc(tireoideLocalTxt(L))+'" style="left:'+p[0]+'%;top:'+p[1]+'%;width:'+diam+'px;height:'+diam+'px">'+L.n+'</span>';
+}
+function tireoideFiguraHTML(lesoes,vista,estrutura){
+  var chave=vista==='anterior'?'anterior':(estrutura==='istmo'?'istmo':'lobo');
+  var esp=tireoideLateralEspelhada(estrutura,vista);
+  var rot=vista==='anterior'?'VISTA ANTERIOR':(estrutura==='istmo'?'CORTE LATERAL DO ISTMO':
+    (estrutura==='lobo-esquerdo'?'VISTA LATERAL DO LOBO ESQUERDO':'VISTA LATERAL DO LOBO DIREITO'));
+  return '<div><div class="laudoTireoideFigura">'
+    +'<img class="laudoTireoideImg'+(esp?' espelhada':'')+'" data-tireoide-src="'+TIREOIDE_ARQS[chave]+'" src="'+TIREOIDE_ARQS[chave]+'" alt="'+rot.toLowerCase()+'">'
+    +lesoes.map(function(L){return tireoideMarcaHTML(L,vista);}).join('')+'</div>'
+    +'<div class="laudoTireoideRot">'+rot+'</div></div>';
+}
+function tireoideLayoutDo(L,estrutura){
+  var x=(((L||{})._tireoideLayout||{})[estrutura])||{};
+  var modo=/^(esquerda|direita)$/.test(x.modo||'')?x.modo:'abaixo';
+  var topo=parseFloat(x.topo); if(!isFinite(topo)||topo<0) topo=0;
+  var largura=parseFloat(x.largura); if(!isFinite(largura)||largura<160) largura=null;
+  var formato=/^(horizontal|vertical)$/.test(x.formato||'')?x.formato:'horizontal';
+  return {travado:x.travado!==false,modo:modo,topo:Math.min(topo,600),largura:largura,formato:formato};
+}
+function tireoideLayoutControlesHTML(L,estrutura){
+  var p=tireoideLayoutDo(L,estrutura);
+  var rot=estrutura==='istmo'?'istmo':(estrutura==='lobo-direito'?'lobo direito':'lobo esquerdo');
+  return '<div class="laudoMamaLayoutControles laudoTireoideLayoutControles">'
+    +(!p.travado?'<button type="button" class="laudoMamaLayoutBt laudoMamaLayoutMover" data-tireoide-mover="'+estrutura+'" '
+      +'title="Arraste para posicionar à esquerda, à direita ou abaixo do texto">✥ Mover figura</button>':'')
+    +'<button type="button" class="laudoMamaLayoutBt" onclick="tireoideLayoutAlternarTrava(event,\''+estrutura+'\')" '
+      +'title="'+(p.travado?'Destravar':'Travar')+' a figura da tireoide ('+rot+')">'
+      +(p.travado?'🔒 Travada':'🔓 Destravada')+'</button></div>';
+}
+function tireoideLayoutAlternarTrava(ev,estrutura){
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='tireoide'||!ex.laudo) return;
+  var all=ex.laudo._tireoideLayout=ex.laudo._tireoideLayout||{}, p=tireoideLayoutDo(ex.laudo,estrutura);
+  all[estrutura]={travado:!p.travado,modo:p.modo,topo:p.topo,largura:p.largura,formato:p.formato};
+  try{agendarSalvarSessao();}catch(e){}
+  abrirRevisao(ex.id,true);
+  log(all[estrutura].travado?'Figura travada nesta posição.':'Figura destravada — use as alças para mover ou redimensionar.');
+}
+function tireoideLayoutAlternarFormato(ev,estrutura){
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='tireoide'||!ex.laudo) return;
+  var all=ex.laudo._tireoideLayout=ex.laudo._tireoideLayout||{}, p=tireoideLayoutDo(ex.laudo,estrutura);
+  var novoFormato=(p.formato==='vertical'?'horizontal':'vertical');
+  var novaLargura=(novoFormato==='vertical'?210:360);
+  all[estrutura]={travado:false,modo:p.modo,topo:p.topo,largura:novaLargura,formato:novoFormato};
+  try{agendarSalvarSessao();}catch(e){}
+  abrirRevisao(ex.id,true);
+  log('Formato da tireoide alterado para '+(novoFormato==='horizontal'?'horizontal (lado a lado)':'vertical (empilhado)')+'.');
+}
+function tireoideEsquemaHTML(L,estrutura){
+  var les=tireoideLesoes(L).filter(function(x){return x.estrutura===estrutura&&x.completa;});
+  if(!les.length) return '';
+  var p=tireoideLayoutDo(L,estrutura);
+  var cls='laudoTireoideEsq';
+  if(p.modo!=='abaixo') cls+=' flutua '+p.modo;
+  if(p.formato==='vertical') cls+=' formato-vertical';
+  else cls+=' formato-horizontal';
+  var st='';
+  if(p.modo!=='abaixo') st+='margin-top:'+Math.round(p.topo)+'px;';
+  if(p.largura) st+='width:'+Math.round(p.largura)+'px;max-width:100%;';
+  var stAttr=st?(' style="'+st+'"'):'';
+
+  var h='<div class="'+cls+'" data-estrutura="'+estrutura+'" contenteditable="false"'+stAttr+'>'
+    +tireoideLayoutControlesHTML(L,estrutura)
+    +'<div class="laudoTireoideVistas '+(p.formato==='vertical'?'formato-vertical':'formato-horizontal')+'">'
+    +tireoideFiguraHTML(les,'anterior',estrutura)
+    +tireoideFiguraHTML(les,'lateral',estrutura)+'</div><div class="laudoTireoideLegenda">';
+  les.forEach(function(x){ h+='<div><b>'+x.n+'</b> — '+esc(tireoideLocalTxt(x))+(x.tamanho_cm?(' · '+String(x.tamanho_cm).replace('.',',')+' cm'):'')+'</div>'; });
+  h+='</div><div class="laudoTireoideNota">Representação esquemática, sem escala anatômica real. A posição segue a descrição do exame.</div>';
+  if(!p.travado) h+='<div class="laudoLayoutResizeHandle" data-tireoide-resize="'+estrutura+'" title="Arraste para redimensionar tamanho e formato">⌟</div>';
+  return h+'</div>';
+}
+function tireoideLayoutLigar(raiz,ex){
+  if(!raiz) return; raiz._tireoideLayoutEx=ex;
+  if(raiz._tireoideLayoutLigado) return; raiz._tireoideLayoutLigado=true;
+  raiz.addEventListener('pointerdown',function(ev){
+    var btMover=ev.target.closest&&ev.target.closest('[data-tireoide-mover]');
+    var btResize=ev.target.closest&&ev.target.closest('[data-tireoide-resize]');
+    if(!btMover && !btResize) return;
+    var atual=raiz._tireoideLayoutEx;
+    if(!atual||!atual.laudo) return;
+
+    if(btMover){
+      var est=btMover.getAttribute('data-tireoide-mover');
+      var host=btMover.closest('.laudoTireoideEsq'), sec=btMover.closest('.laudoTireoideSecao');
+      if(!host||!sec||tireoideLayoutDo(atual.laudo,est).travado) return;
+      ev.preventDefault(); var x0=ev.clientX,y0=ev.clientY,moveu=false;
+      function mover(e){ moveu=true; host.style.transform='translate('+(e.clientX-x0)+'px,'+(e.clientY-y0)+'px)'; host.style.zIndex='10'; e.preventDefault(); }
+      function soltar(e){
+        window.removeEventListener('pointermove',mover);window.removeEventListener('pointerup',soltar);
+        host.style.transform='';host.style.zIndex=''; if(!moveu) return;
+        var r=sec.getBoundingClientRect(), rel=(e.clientX-r.left)/Math.max(r.width,1);
+        var modo=rel<0.35?'esquerda':(rel>0.65?'direita':'abaixo');
+        var folha=sec.closest('.laudoFolha');
+        var pxmm=folha?(folha.clientWidth/210):3.7795;
+        var pageH=297*pxmm;
+        var cs=folha?getComputedStyle(folha):{};
+        var botPx=parseFloat(cs.paddingBottom)||0;
+        var FRISO=12;
+        var fr=folha?folha.getBoundingClientRect():{top:0};
+        var secTop=r.top-fr.top;
+        var pag=Math.max(0,Math.floor(secTop/pageH));
+        var limPag=(pag+1)*pageH-botPx-FRISO;
+        var hH=host.offsetHeight||240;
+        var maxTopo=Math.max(0, limPag-secTop-hH);
+        var topoBruto=Math.max(0, e.clientY-r.top-28);
+        var topo=modo==='abaixo'?0:Math.min(maxTopo, topoBruto);
+        var all=atual.laudo._tireoideLayout=atual.laudo._tireoideLayout||{};
+        var formato=(modo==='abaixo')?'horizontal':'vertical';
+        var larg=(modo==='abaixo')?null:(formato==='vertical'?210:360);
+        all[est]={travado:false,modo:modo,topo:topo,largura:larg,formato:formato};
+        try{agendarSalvarSessao();}catch(_e){}
+        abrirRevisao(atual.id,true);
+        log('Figura da tireoide ('+(est==='istmo'?'istmo':(est==='lobo-direito'?'lobo direito':'lobo esquerdo'))+') posicionada '+
+          (modo==='abaixo'?'abaixo do texto':('à '+modo+', com o texto ao redor'))+'.');
+      }
+      window.addEventListener('pointermove',mover,{passive:false});window.addEventListener('pointerup',soltar);
+    } else if(btResize){
+      var estR=btResize.getAttribute('data-tireoide-resize');
+      var hostR=btResize.closest('.laudoTireoideEsq'), secR=btResize.closest('.laudoTireoideSecao');
+      if(!hostR||!secR||tireoideLayoutDo(atual.laudo,estR).travado) return;
+      ev.preventDefault(); var x0R=ev.clientX,y0R=ev.clientY,w0=hostR.getBoundingClientRect().width,h0=hostR.getBoundingClientRect().height;
+      var pR=tireoideLayoutDo(atual.laudo,estR), moveuR=false, wFinal=w0, formatoFinal=pR.formato;
+      var secW=secR.getBoundingClientRect().width;
+      function moverR(e){
+        moveuR=true; var dw=e.clientX-x0R, dh=e.clientY-y0R;
+        var wNovo=Math.max(180,Math.min(secW,w0+dw));
+        var hNovo=Math.max(120,h0+dh);
+        wFinal=wNovo; hostR.style.width=Math.round(wNovo)+'px';
+        formatoFinal=(wNovo>=280||(wNovo/Math.max(hNovo,1))>=1.02)?'horizontal':'vertical';
+        hostR.classList.toggle('formato-vertical',formatoFinal==='vertical');
+        hostR.classList.toggle('formato-horizontal',formatoFinal==='horizontal');
+        var vistas=hostR.querySelector('.laudoTireoideVistas');
+        if(vistas){
+          vistas.classList.toggle('formato-vertical',formatoFinal==='vertical');
+          vistas.classList.toggle('formato-horizontal',formatoFinal==='horizontal');
+        }
+        e.preventDefault();
+      }
+      function soltarR(e){
+        window.removeEventListener('pointermove',moverR);window.removeEventListener('pointerup',soltarR);
+        if(!moveuR) return;
+        var folha=secR.closest('.laudoFolha');
+        var pxmm=folha?(folha.clientWidth/210):3.7795;
+        var pageH=297*pxmm;
+        var cs=folha?getComputedStyle(folha):{};
+        var botPx=parseFloat(cs.paddingBottom)||0;
+        var FRISO=12;
+        var fr=folha?folha.getBoundingClientRect():{top:0};
+        var secTop=secR.getBoundingClientRect().top-fr.top;
+        var pag=Math.max(0,Math.floor(secTop/pageH));
+        var limPag=(pag+1)*pageH-botPx-FRISO;
+        var hH=hostR.offsetHeight||240;
+        var maxTopo=Math.max(0, limPag-secTop-hH);
+        var topoAjustado=pR.modo==='abaixo'?0:Math.min(maxTopo, pR.topo);
+        var allR=atual.laudo._tireoideLayout=atual.laudo._tireoideLayout||{};
+        allR[estR]={travado:false,modo:pR.modo,topo:topoAjustado,largura:Math.round(wFinal),formato:formatoFinal};
+        try{agendarSalvarSessao();}catch(_e){}
+        abrirRevisao(atual.id,true);
+        log('Figura da tireoide redimensionada ('+(formatoFinal==='horizontal'?'formato horizontal, lado a lado':'formato vertical, empilhado')+').');
+      }
+      window.addEventListener('pointermove',moverR,{passive:false});window.addEventListener('pointerup',soltarR);
+    }
+  });
+}
+/* Insere cada desenho imediatamente sob o texto do lobo/istmo correspondente. O DIV
+   externo torna texto+figuras uma peça única para o paginador, evitando título órfão ou
+   imagem separada da descrição. */
+function tireoideCorpoHTML(L){
+  var corpo=String((L&&L.corpo)||''), escolhas=(L&&L._tireoideIlustracoes)||{};
+  if(!Object.keys(escolhas).some(function(k){return escolhas[k];})) return negrito(corpo.replace(/\n{3,}/g,'\n\n'));
+  var re=/\*\*(Lobo\s+direito|Lobo\s+esquerdo|Istmo)\s*:?\*\*/gi, ms=[], m;
+  while((m=re.exec(corpo))) ms.push({ini:m.index, tam:m[0].length, estrutura:tireoideEstruturaTitulo(m[1])});
+  if(!ms.length) return negrito(corpo.replace(/\n{3,}/g,'\n\n'));
+  var out='', pos=0;
+  for(var i=0;i<ms.length;i++){
+    var fim=(i+1<ms.length)?ms[i+1].ini:corpo.length;
+    if(i===ms.length-1){ var iv=corpo.slice(ms[i].ini).search(/\n\s*\*\*Volume\s+total/i); if(iv>=0) fim=ms[i].ini+iv; }
+    out+=negrito(corpo.slice(pos,ms[i].ini));
+    var parte=corpo.slice(ms[i].ini,fim), esq=escolhas[ms[i].estrutura]?tireoideEsquemaHTML(L,ms[i].estrutura):'';
+    if(esq){
+      var p=tireoideLayoutDo(L,ms[i].estrutura);
+      if(p.modo==='abaixo'){
+        out+='<div class="laudoTireoideSecao" data-estrutura="'+ms[i].estrutura+'">'+negrito(parte)+esq+'</div>';
+      }else{
+        out+='<div class="laudoTireoideSecao" data-estrutura="'+ms[i].estrutura+'">'
+          +negrito(parte.slice(0,ms[i].tam))+esq+negrito(parte.slice(ms[i].tam))+'</div>';
+      }
+    }else{
+      out+=negrito(parte);
+    }
+    pos=fim;
+  }
+  out+=negrito(corpo.slice(pos));
+  return out;
+}
+function tireoideCaixaHTML(ex,b){
+  if(!ex||ex.tipo!=='tireoide'||!imagensRevisaoLigadas()) return '';
+  var estrutura=tireoideEstruturaTitulo(b&&b.titulo); if(!estrutura||!rev2TemAchado(ex,b)) return '';
+  var todas=tireoideLesoes(ex.laudo).filter(function(x){return x.estrutura===estrutura;});
+  if(!todas.length) return '';
+  var completas=todas.filter(function(x){return x.completa;});
+  /* Se UM de vários nódulos estiver incompleto, não se desenha só o restante em silêncio.
+     A própria caixa pergunta o que falta, por nódulo, e a última resposta inclui a imagem. */
+  if(completas.length!==todas.length){
+    var h='<div class="caixa tireoide incompleta"><b>Para adicionar a ilustração, complete a localização:</b>';
+    todas.forEach(function(x){
+      if(x.completa) return;
+      h+='<div style="margin-top:7px;font-weight:700">Nódulo '+x.n+'</div>'
+        +tireoidePerguntaHTML(x,'nivel','Nível',[['superior','Superior'],['juncao-superior-medio','Superior–médio'],['medio','Médio'],['juncao-medio-inferior','Médio–inferior'],['inferior','Inferior']])
+        +tireoidePerguntaHTML(x,'transversal','Posição transversal',estrutura==='istmo'
+          ?[['direita','Direita'],['central','Central'],['esquerda','Esquerda']]
+          :[['medial','Medial'],['central','Central'],['lateral','Lateral']])
+        +tireoidePerguntaHTML(x,'profundidade','Profundidade',[['anterior','Anterior'],['central','Central'],['posterior','Posterior']]);
+    });
+    return h+'<div style="margin-top:8px;font-size:11px;font-weight:500">Ao responder o último item, a ilustração será incluída automaticamente — sem gerar o laudo novamente.</div></div>';
+  }
+  var on=!!((ex.laudo._tireoideIlustracoes||{})[estrutura]);
+  return '<div class="caixa tireoide">'+(on?'Ilustração adicionada ao laudo.':'Duas vistas anatômicas disponíveis para este achado.')
+    +'<button class="ficha'+(on?' on':'')+'" onclick="tireoideAlternar(\''+estrutura+'\')">'+(on?'Remover ilustração':'Adicionar ilustração')+'</button></div>';
+}
+function tireoidePerguntaHTML(x,campo,rotulo,opcoes){
+  var atual=String(x[campo]||'');
+  return '<div class="tireoidePergunta"><span class="rot">'+rotulo+(atual?' — informado':' — falta informar')+'</span><div class="fichas">'
+    +opcoes.map(function(o){return '<button class="ficha'+(atual===o[0]?' on':'')+'" onclick="tireoideInformarLocal('+x.id+',\''+campo+'\',\''+o[0]+'\',\''+x.estrutura+'\')">'+o[1]+'</button>';}).join('')
+    +'</div></div>';
+}
+/* Acrescenta a localização escolhida pelo médico ao corpo do laudo. Quando a frase
+   original de localização é específica o bastante, ela é substituída. Quando veio só
+   "lobo direito", substituir poderia acertar o TÍTULO em vez do nódulo; nesse caso uma
+   linha explícita é acrescentada ao fim da seção correspondente. */
+function tireoideRegistrarLocalNoCorpo(L,lesao){
+  if(!L||!lesao) return false;
+  var novo=tireoideLocalTxt(lesao), antiga=String(lesao.localizacao||'').trim();
+  if(antiga && tireoideNivel(antiga)){
+    var tro=tireoideSubstituirLocal(L.corpo,antiga,novo);
+    if(tro.ok){ L.corpo=tro.corpo; return true; }
+  }
+  var corpo=String(L.corpo||''), nomes={
+    'lobo-direito':'Lobo\\s+direito','lobo-esquerdo':'Lobo\\s+esquerdo',istmo:'Istmo'
+  }, nome=nomes[lesao.estrutura];
+  if(!nome) return false;
+  var re=new RegExp('\\*\\*'+nome+'\\s*:?\\*\\*','i'), m=re.exec(corpo);
+  if(!m) return false;
+  var ini=m.index, resto=corpo.slice(ini+m[0].length);
+  var prox=/\n\s*\*\*(?:Lobo\s+direito|Lobo\s+esquerdo|Istmo|Volume\s+total)/i.exec(resto);
+  var fim=prox?(ini+m[0].length+prox.index):corpo.length;
+  var pares=tireoideLesoes(L).filter(function(x){return x.estrutura===lesao.estrutura;});
+  var ordem=pares.map(function(x){return x.id;}).indexOf(lesao.id)+1;
+  var rot=pares.length>1?('Localização do nódulo '+ordem):'Localização do nódulo';
+  var linha='\n**'+rot+': '+novo+'.**';
+  L.corpo=corpo.slice(0,fim).replace(/\s+$/,'')+linha+corpo.slice(fim);
+  return true;
+}
+function tireoideInformarLocal(id,campo,valor,estrutura){
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='tireoide'||!ex.laudo||!ex.laudo._classifBruto) return;
+  var permitidos={
+    nivel:['superior','juncao-superior-medio','medio','juncao-medio-inferior','inferior'],
+    transversal:estrutura==='istmo'?['direita','central','esquerda']:['medial','central','lateral'],
+    profundidade:['anterior','central','posterior']
+  };
+  if(!permitidos[campo]||permitidos[campo].indexOf(valor)<0) return;
+  var d=(ex.laudo._classifBruto.tirads||[])[id]; if(!d) return;
+  d.estrutura=estrutura; d[campo]=valor;
+  var ed=ex.laudo._descritores=ex.laudo._descritores||{}, e=ed['tirads|'+id]=ed['tirads|'+id]||{};
+  e.estrutura=estrutura; e[campo]=valor;
+  var les=tireoideLesoes(ex.laudo).filter(function(x){return x.id===id;})[0];
+  if(les&&les.completa){
+    if(!tireoideRegistrarLocalNoCorpo(ex.laudo,les)){
+      log('Guardei a localização, mas não consegui achar com segurança onde registrá-la no texto. A ilustração ainda não foi adicionada.',true);
+      rev2Render(); return;
+    }
+    var frase=tireoideLocalTxt(les); d.localizacao=frase; e.localizacao=frase;
+  }
+  var todas=tireoideLesoes(ex.laudo).filter(function(x){return x.estrutura===estrutura;});
+  if(todas.length&&todas.every(function(x){return x.completa;})){
+    ex.laudo._tireoideIlustracoes=ex.laudo._tireoideIlustracoes||{};
+    ex.laudo._tireoideIlustracoes[estrutura]=true;
+    log('Localização completa — ilustração adicionada ao laudo.');
+  }else log('Localização anotada. Complete o que ainda falta para adicionar a ilustração.');
+  try{ agendarSalvarSessao(); }catch(_e){}
+  rev2Render();
+}
+function tireoideAlternar(estrutura){
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='tireoide') return;
+  var m=ex.laudo._tireoideIlustracoes=ex.laudo._tireoideIlustracoes||{}; m[estrutura]=!m[estrutura];
+  try{ agendarSalvarSessao(); }catch(e){}
+  rev2Render();
+  log(m[estrutura]?'Ilustração adicionada — ela aparecerá logo abaixo do texto desta estrutura.':'Ilustração removida deste laudo.');
+}
+/* A mama reaproveita o esquema frontal+lateral que ficou dormente, mas segue a mesma
+   decisão editorial da tireoide: a configuração disponibiliza o recurso e o médico
+   escolhe, no cartão da mama afetada, se aquela ilustração entra neste laudo. */
+function mamaLadoTitulo(titulo){
+  var t=norm(titulo||'');
+  if(!/\bmama\b/.test(t)) return null;
+  if(/\bdireit[ao]\b/.test(t)) return 'D';
+  if(/\besquerd[ao]\b/.test(t)) return 'E';
+  return null;
+}
+function mamaCaixaHTML(ex,b){
+  if(!MAMA_DESENHOS||!ex||ex.tipo!=='mama'||!imagensRevisaoLigadas()) return '';
+  var lado=mamaLadoTitulo(b&&b.titulo);
+  if(!lado||!rev2TemAchado(ex,b)) return '';
+  var r=mamaLesoes(ex.laudo), plot=r.plot.filter(function(x){return x.lado===lado;});
+  var incompletas=r.semPos.filter(function(x){return x.lado===lado;});
+  /* Como na tireoide, dado ausente é perguntado AQUI. A imagem não é montada pela metade
+     nem obriga a gerar o laudo de novo. Contradição de descritores continua sendo apenas
+     avisada: escolher uma hora não resolveria uma incoerência BI-RADS. */
+  if(incompletas.length){
+    var h='<div class="caixa amb"><b>Para adicionar a ilustração, complete a localização:</b>';
+    incompletas.forEach(function(x){
+      h+='<div style="margin-top:7px;font-weight:700">'+esc(x.rotulo||'Achado')+'</div>';
+      if(x.porque==='hora do relógio não informada'){
+        h+='<div class="tireoidePergunta"><span class="rot">Hora do relógio — falta informar</span><div class="fichas">'
+          +[1,2,3,4,5,6,7,8,9,10,11,12].map(function(hr){return '<button class="ficha" onclick="mamaInformarHora(\''+x.id+'\','+hr+',\''+lado+'\')">'+hr+' h</button>';}).join('')
+          +'</div></div>';
+      }else h+='<div style="margin-top:5px;font-weight:500">'+esc(x.porque)+'. Corrija os descritores no texto antes de ilustrar.</div>';
+    });
+    return h+'<div style="margin-top:8px;font-size:11px;font-weight:500">Ao responder o último item, a ilustração será incluída automaticamente — sem gerar o laudo novamente.</div></div>';
+  }
+  if(!plot.length) return '';
+  var on=!!(((ex.laudo||{})._mamaIlustracoes||{})[lado]);
+  return '<div class="caixa mama">'+(on?'Ilustração adicionada ao laudo.':'Vistas frontal e lateral disponíveis para os achados desta mama.')
+    +'<button class="ficha'+(on?' on':'')+'" onclick="mamaAlternar(\''+lado+'\')">'+(on?'Remover ilustração':'Adicionar ilustração')+'</button></div>';
+}
+function mamaAlternar(lado){
+  if(lado!=='D'&&lado!=='E') return;
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='mama'||!ex.laudo) return;
+  var m=ex.laudo._mamaIlustracoes=ex.laudo._mamaIlustracoes||{}; m[lado]=!m[lado];
+  if(m[lado]&&!mamaSecoesLocalizar(ex.laudo).some(function(s){return s.lado===lado;})){
+    m[lado]=false;
+    log('Não adicionei a figura: este modelo não tem uma caixa de texto marcada para a mama '+
+      (lado==='D'?'direita':'esquerda')+'. Abra e salve o modelo nas Configurações para a IA marcá-la.',true);
+    return;
+  }
+  try{ agendarSalvarSessao(); }catch(e){}
+  rev2Render();
+  log(m[lado]
+    ? 'Ilustração da mama '+(lado==='D'?'direita':'esquerda')+' adicionada — vistas frontal e lateral ficarão junto ao texto.'
+    : 'Ilustração da mama '+(lado==='D'?'direita':'esquerda')+' removida deste laudo.');
+}
+function mamaRegistrarHoraNoCorpo(L,lado,hora,id){
+  if(!L) return false;
+  var corpo=String(L.corpo||''), nome=lado==='D'?'DIREITA':'ESQUERDA';
+  var re=new RegExp('\\*\\*MAMA\\s+'+nome+'\\s*:?\\*\\*','i'), m=re.exec(corpo);
+  if(!m) return false;
+  var resto=corpo.slice(m.index+m[0].length), prox=/\n\s*\*\*MAMA\s+(?:DIREITA|ESQUERDA)\s*:?\*\*/i.exec(resto);
+  var fim=prox?(m.index+m[0].length+prox.index):corpo.length;
+  var ordem=parseInt(String(id||'').replace(/\D/g,''),10), rot=isFinite(ordem)?('Localização do achado '+ordem):'Localização do achado';
+  var linha='\n'+rot+': mama '+(lado==='D'?'direita':'esquerda')+', às '+hora+' h.';
+  L.corpo=corpo.slice(0,fim).replace(/\s+$/,'')+linha+corpo.slice(fim);
+  return true;
+}
+function mamaInformarHora(id,hora,lado){
+  hora=parseInt(hora,10);
+  if((lado!=='D'&&lado!=='E')||!isFinite(hora)||hora<1||hora>12) return;
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='mama'||!ex.laudo) return;
+  var L=ex.laudo, lista=Array.isArray(L.birads)?L.birads:(((L._classifBruto||{}).birads)||[]);
+  var idx=parseInt(String(id||'').replace(/\D/g,''),10)-1, d=lista[idx]; if(!d) return;
+  var base=String(d.localizacao||'').replace(/[.,;:\s]+$/,'').trim();
+  if(!base) base='mama '+(lado==='D'?'direita':'esquerda');
+  var nova=base+', às '+hora+' h';
+  if(!mamaRegistrarHoraNoCorpo(L,lado,hora,id)){
+    log('Guardei a hora, mas não encontrei com segurança a seção da mama no texto. A ilustração ainda não foi adicionada.',true);
+    rev2Render(); return;
+  }
+  d.localizacao=nova;
+  var ed=L._descritores=L._descritores||{}, e=ed['birads|'+idx]=ed['birads|'+idx]||{}; e.localizacao=nova;
+  var r=mamaLesoes(L), faltam=r.semPos.some(function(x){return x.lado===lado;}), tem=r.plot.some(function(x){return x.lado===lado;});
+  if(tem&&!faltam){
+    if(mamaSecoesLocalizar(L).some(function(s){return s.lado===lado;})){
+      L._mamaIlustracoes=L._mamaIlustracoes||{}; L._mamaIlustracoes[lado]=true;
+      log('Localização completa — ilustração da mama '+(lado==='D'?'direita':'esquerda')+' adicionada ao laudo.');
+    }else log('Localização completa, mas este modelo não tem a caixa da mama '+
+      (lado==='D'?'direita':'esquerda')+' marcada. Salve o modelo nas Configurações para a IA marcá-la.',true);
+  }else log('Hora anotada. Complete o que ainda falta para adicionar a ilustração.');
+  try{ agendarSalvarSessao(); }catch(e){}
+  rev2Render();
+}
+function tireoideImagensCarregar(){
+  if(_tireoideImgPromessa) return _tireoideImgPromessa;
+  _tireoideImgPromessa=Promise.all(Object.keys(TIREOIDE_ARQS).map(function(k){
+    return fetch(TIREOIDE_ARQS[k]).then(function(r){if(!r.ok) throw new Error('HTTP '+r.status);return r.blob();})
+      .then(function(b){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){_tireoideImgData[TIREOIDE_ARQS[k]]=fr.result;res();};fr.onerror=rej;fr.readAsDataURL(b);});});
+  })).catch(function(e){ _tireoideImgPromessa=null; throw e; });
+  return _tireoideImgPromessa;
+}
+function tireoideAplicarDataImgs(raiz){
+  var r=raiz||document; Array.prototype.forEach.call(r.querySelectorAll('img.laudoTireoideImg[data-tireoide-src]'),function(im){
+    var p=im.getAttribute('data-tireoide-src'); if(_tireoideImgData[p]) im.src=_tireoideImgData[p];
+  });
+}
+function tireoideReporSrcNoHistorico(html){
+  return String(html||'').replace(/<img\b[^>]*class="[^"]*laudoTireoideImg[^"]*"[^>]*>/gi,function(tag){
+    var m=/data-tireoide-src="([^"]+)"/i.exec(tag); if(!m) return tag;
+    return /\ssrc="[^"]*"/i.test(tag)?tag.replace(/\ssrc="[^"]*"/i,' src="'+m[1]+'"'):tag.replace(/>$/,' src="'+m[1]+'">');
+  });
+}
+function tireoideSubstituirLocal(corpo,antiga,nova){
+  var s=String(corpo||''), a=String(antiga||'').trim(); if(!a) return {ok:false,corpo:s};
+  var re=new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+'),'i');
+  if(!re.test(s)) return {ok:false,corpo:s};
+  return {ok:true,corpo:s.replace(re,nova)};
+}
+function tireoideSnap(L,vista,x,y){
+  var niveis=[['superior',31],['juncao-superior-medio',40],['medio',51],['juncao-medio-inferior',61],['inferior',71]];
+  if(L.estrutura==='istmo') niveis=[['superior',54],['juncao-superior-medio',55.5],['medio',57],['juncao-medio-inferior',58.5],['inferior',60]];
+  var perto=function(arr,v){return arr.slice().sort(function(a,b){return Math.abs(a[1]-v)-Math.abs(b[1]-v);})[0][0];};
+  L.nivel=perto(niveis,y);
+  if(vista==='anterior'){
+    var xs=L.estrutura==='istmo'?[['direita',46],['central',50],['esquerda',54]]
+      :(L.estrutura==='lobo-direito'?[['lateral',16],['central',27],['medial',37]]:[['medial',63],['central',73],['lateral',84]]);
+    L.transversal=perto(xs,x);
+  }else{
+    var xp=L.estrutura==='istmo'?[['anterior',51],['central',48.5],['posterior',45.8]]:[['anterior',53],['central',42],['posterior',31]];
+    L.profundidade=perto(xp,x);
+  }
+  return L;
+}
+function tireoideArrasteLigar(raiz,ex){
+  if(!raiz||!ex||ex.tipo!=='tireoide') return;
+  /* #areaImpressao é reutilizada entre pacientes. O ouvinte fica, mas o exame apontado
+     por ele precisa ser o atual — prender a primeira closure moveria o nódulo do paciente
+     anterior ao arrastar no seguinte. */
+  raiz._tireoideEx=ex;
+  if(raiz._tireoideArraste) return; raiz._tireoideArraste=true;
+  raiz.addEventListener('pointerdown',function(ev){
+    var atual=raiz._tireoideEx; if(!atual||atual.tipo!=='tireoide') return;
+    var mk=ev.target.closest&&ev.target.closest('.laudoTireoideMarca'); if(!mk) return;
+    var fig=mk.closest('.laudoTireoideFigura'), id=parseInt(mk.getAttribute('data-lesao'),10), vista=mk.getAttribute('data-vista');
+    var les=tireoideLesoes(atual.laudo).filter(function(x){return x.id===id;})[0]; if(!fig||!les) return;
+    ev.preventDefault(); try{mk.setPointerCapture(ev.pointerId);}catch(e){}
+    var antes={nivel:les.nivel,transversal:les.transversal,profundidade:les.profundidade};
+    function pos(e){var r=fig.getBoundingClientRect();return [Math.max(0,Math.min(100,(e.clientX-r.left)/r.width*100)),Math.max(0,Math.min(100,(e.clientY-r.top)/r.height*100))];}
+    function mover(e){var p=pos(e);mk.style.left=p[0]+'%';mk.style.top=p[1]+'%';}
+    function soltar(e){
+      window.removeEventListener('pointermove',mover);window.removeEventListener('pointerup',soltar);
+      var p=pos(e), coordX=tireoideXEspelho(les.estrutura,vista,p[0]);
+      var novo=tireoideSnap({estrutura:les.estrutura,nivel:les.nivel,transversal:les.transversal,profundidade:les.profundidade},vista,coordX,p[1]);
+      var frase=tireoideLocalTxt(novo), tro=tireoideSubstituirLocal(atual.laudo.corpo,les.localizacao,frase);
+      if(!tro.ok){ log('Não movi o marcador: não encontrei com segurança a frase de localização no texto do laudo.',true); abrirRevisao(atual.id,true); return; }
+      atual.laudo.corpo=tro.corpo;
+      var d=(atual.laudo._classifBruto.tirads||[])[id]; if(d){d.localizacao=frase;d.estrutura=novo.estrutura;d.nivel=novo.nivel;d.transversal=novo.transversal;d.profundidade=novo.profundidade;}
+      var ed=atual.laudo._descritores=atual.laudo._descritores||{}; var x=ed['tirads|'+id]=ed['tirads|'+id]||{};
+      x.localizacao=frase;x.estrutura=novo.estrutura;x.nivel=novo.nivel;x.transversal=novo.transversal;x.profundidade=novo.profundidade;
+      try{agendarSalvarSessao();}catch(_e){} abrirRevisao(atual.id,true); log('Localização atualizada no desenho e no texto do laudo.');
+    }
+    window.addEventListener('pointermove',mover);window.addEventListener('pointerup',soltar);
+  });
+}
+
 /* ============ ESQUEMA ANATÔMICO DA MAMA ============
    Especificação 03 do pacote de mama (20/08/2026).
 
@@ -11322,20 +12210,22 @@ function mamaLocalDoTexto(txt){
    reescreve a posição aqui. Se as duas buscas divergissem, arrastar um nódulo reescreveria
    a frase de outro — o pior defeito possível nesta funcionalidade, e silencioso.
    Devolve {texto, ini, fim}; ini<0 quando a frase não foi localizada no corpo. */
-function _mamaFraseDo(corpo, rotulo, quantosAchados){
+function _mamaFraseDo(corpo, rotulo, quantosAchados, lesaoId){
   var texto=String(corpo||'');
+  /* A numeracao visivel e a identidade estavel entre o texto e o desenho. Hora e
+     distancia mudam quando o marcador e arrastado; "Achado 2" nao muda. Sem esta ancora,
+     varios itens cujo rotulo estruturado diz apenas "mama direita" recaem todos na
+     primeira linha desse lado. */
+  var _num=parseInt(String(lesaoId||'').replace(/\D/g,''),10);
+  if(_num>0){
+    var _reN=new RegExp('(?:^|\\n)[^\\n]*\\bAchado\\s+'+_num+'\\s*[\\u2014\\u2013:-][^\\n]*','i');
+    var _mN=_reN.exec(texto);
+    if(_mN){
+      var _tN=_mN[0], _avan=(_tN.charAt(0)==='\n'?1:0);
+      return {texto:_tN.slice(_avan), ini:_mN.index+_avan, fim:_mN.index+_tN.length};
+    }
+  }
   if(rotulo){
-    /* 24/08/2026 — PROCURA PELA HORA, DENTRO DA SEÇÃO DA MAMA CERTA.
-       A busca antiga (logo abaixo) usa só a primeira parte do rótulo — "mama esquerda" —
-       e casa com a PRIMEIRA frase que contenha isso. Num laudo real essa frase é o
-       cabeçalho: "**MAMA ESQUERDA** / DESCRIÇÃO: / Mama simétrica." Resultado: o achado
-       era casado com uma frase que não fala dele, e tudo que só existe na frase certa —
-       distância da papila, profundidade, medidas — vinha vazio. Foi assim que um nódulo
-       com "distando 5 cm da papila" escrito no laudo saiu no desenho como "distância não
-       informada".
-       A hora é o que identifica o achado dentro da mama, então é por ela que se procura;
-       e a busca fica presa à seção daquele lado, para a hora de uma mama nunca casar com
-       a frase da outra. */
     var _mh=/(\d{1,2})\s*(?:h\b|horas?\b)/i.exec(String(rotulo));
     var _lado=/esquerd/i.test(rotulo)?'ESQUERDA':(/direit/i.test(rotulo)?'DIREITA':null);
     if(_mh){
@@ -11350,24 +12240,16 @@ function _mamaFraseDo(corpo, rotulo, quantosAchados){
         }
       }
       var _sec=texto.slice(_ini,_fim);
-      /* A "frase" vai até o ponto FINAL — e nem todo ponto é final. Dois cortavam a frase
-         no meio (achado em auditoria, 24/08): o "....." em branco dos dizeres padrão e o
-         decimal escrito com ponto ("5.5 cm"). Com a frase truncada, tudo que vinha depois
-         — inclusive a distância — sumia da leitura, e o arraste chegava a escrever uma
-         segunda distância por achar que não havia nenhuma. `\.\.+` engole o branco;
-         o olhar para trás deixa passar o ponto entre dígitos. */
-      /* SEM "olhar para trás" (lookbehind) de propósito: ele só existe no Safari 16.4+, e
-         este app também abre no iPad — num Safari mais velho a expressão estouraria ao ser
-         montada, dentro de uma função que nem sempre está protegida por try/catch, e o
-         laudo pararia de desenhar sem explicação. `\d\.\d` faz o mesmo trabalho (deixa
-         passar o ponto entre dígitos) e funciona em qualquer navegador. */
-      /* A ORDEM DAS ALTERNATIVAS IMPORTA: `\d\.\d` vem PRIMEIRO. Com `[^.]` na frente, o
-         "5" de "5.5" era consumido sozinho, o ponto seguinte já não tinha dígito antes de
-         si, e a frase cortava ali mesmo — o defeito que se queria evitar. */
-      var _PT='(?:\\d\\.\\d|\\.\\.+|[^.])*';
-      var _reH=new RegExp(_PT+'\\b0*'+parseInt(_mh[1],10)+'\\s*(?:h\\b|horas?\\b)'+_PT+'\\.', 'i');
+      var _reH=new RegExp('(?:^|\\n)[^\\n]*\\b0*'+parseInt(_mh[1],10)+'\\s*(?:h\\b|horas?\\b)[^\\n]*', 'i');
       var _mS=_reH.exec(_sec);
-      if(_mS) return {texto:_mS[0], ini:_ini+_mS.index, fim:_ini+_mS.index+_mS[0].length};
+      if(_mS){
+        var _tS=_mS[0], _avS=(_tS.charAt(0)==='\n'?1:0);
+        return {texto:_tS.slice(_avS), ini:_ini+_mS.index+_avS, fim:_ini+_mS.index+_tS.length};
+      }
+      var _PT='(?:\\d\\.\\d|\\.\\.+|[^.])*';
+      var _reOld=new RegExp(_PT+'\\b0*'+parseInt(_mh[1],10)+'\\s*(?:h\\b|horas?\\b)'+_PT+'\\.', 'i');
+      var _mOld=_reOld.exec(_sec);
+      if(_mOld) return {texto:_mOld[0], ini:_ini+_mOld.index, fim:_ini+_mOld.index+_mOld[0].length};
     }
     var chave=String(rotulo).split(/[,;]/)[0].trim();
     if(chave){
@@ -11386,8 +12268,8 @@ function _mamaFraseDo(corpo, rotulo, quantosAchados){
    descrição. É o que fecha o ciclo do arraste: mexeu no desenho, o texto acompanha.
    Devolve {corpo, ok, frase}. ok=false quando não houve onde escrever — e aí quem chama
    TEM de avisar, nunca fingir que salvou. */
-function mamaReescreverLocal(corpo, rotulo, quantosAchados, hora, distCm){
-  var f=_mamaFraseDo(corpo, rotulo, quantosAchados);
+function mamaReescreverLocal(corpo, rotulo, quantosAchados, hora, distCm, lesaoId){
+  var f=_mamaFraseDo(corpo, rotulo, quantosAchados, lesaoId);
   if(f.ini<0) return {corpo:corpo, ok:false, frase:''};
   var antes=f.texto, depois=antes, mudou=false;
   if(hora!=null){
@@ -11427,6 +12309,46 @@ function mamaReescreverLocal(corpo, rotulo, quantosAchados, hora, distCm){
   if(!mudou) return {corpo:corpo, ok:false, frase:''};
   return {corpo: corpo.slice(0,f.ini)+depois+corpo.slice(f.fim), ok:true, frase:depois};
 }
+/* O primeiro arraste não pode envelhecer o rótulo estruturado. `mamaLesoes` usa esse
+   rótulo para reencontrar a frase certa no próximo gesto; se o corpo muda de 9 h para
+   7 h e o BI-RADS continua dizendo 9 h, o segundo arraste procura uma hora que já não
+   existe, cai no cabeçalho da mama e se recusa a escrever. Mantém as duas fontes juntas. */
+function mamaRotuloAtualizado(rotulo,lado,hora,distCm){
+  var s=String(rotulo||'').trim();
+  if(!s) s='mama '+(lado==='E'?'esquerda':'direita');
+  if(hora!=null){
+    var reH=/(?:[àa]s\s*)?\b\d{1,2}\s*(?:h\b|horas?\b)/i;
+    if(reH.test(s)) s=s.replace(reH,'às '+hora+' h');
+    else s=s.replace(/[.,;:\s]+$/,'')+', às '+hora+' h';
+  }
+  if(distCm!=null){
+    var reD=/(?:dist(?:ando|a|ante)\s*(?:de\s*)?|[àa]\s*)?[\d.,]+\s*(?:mm|cm)\s*d[aeo]s?\s+(?:papila|mamilo)(?:\s+mam[áa]ria)?/i;
+    if(reD.test(s)) s=s.replace(reD,'distando '+distCm+' cm da papila');
+  }
+  return s;
+}
+function mamaLocalEstruturadaAtualizar(L,id,lado,hora,distCm){
+  if(!L) return false;
+  var idx=parseInt(String(id||'').replace(/\D/g,''),10)-1; if(idx<0) return false;
+  var listas=[];
+  if(Array.isArray(L.birads)) listas.push(L.birads);
+  var bruto=(L._classifBruto||{}).birads;
+  if(Array.isArray(bruto) && listas.indexOf(bruto)<0) listas.push(bruto);
+  var mudou=false, novo='';
+  listas.forEach(function(lista){
+    var d=lista[idx]; if(!d) return;
+    novo=mamaRotuloAtualizado(d.localizacao,lado,hora,distCm);
+    d.localizacao=novo; mudou=true;
+  });
+  if(!mudou) return false;
+  /* A escolha manual vence uma eventual regeneração pela mesma via dos descritores que o
+     médico corrige na revisão. */
+  var ed=L._descritores=L._descritores||{}, e=ed['birads|'+idx]=ed['birads|'+idx]||{};
+  e.localizacao=novo;
+  var ach=(((L.dados_estruturados||{}).achados)||[])[idx];
+  if(ach) ach.localizacao=novo;
+  return true;
+}
 /* Junta o que a IA JÁ devolve (birads[]: forma/orientação/margem; achados[]: medidas em
    mm) com o que se lê do texto (lado, hora, distância). Devolve só as lesões PLOTÁVEIS,
    mais a lista das que ficaram sem posição — que a legenda declara, em vez de sumir com
@@ -11447,13 +12369,14 @@ function mamaLesoes(L){
   var estr=(((L.dados_estruturados||{}).achados)||[]);
   var corpo=String(L.corpo||'');
   // cada achado do BI-RADS casa com o trecho do corpo que fala dele, pela localização
-  var plot=[], semPos=[], n=0, _fraseVezes={};
+  var plot=[], semPos=[], _fraseVezes={};
   bir.forEach(function(d,i){
     d=d||{};
     var rotulo=String(d.localizacao||'').trim();
     // o trecho do corpo que descreve este achado (ver _mamaFraseDo — é a MESMA busca que o
     // arraste usa para reescrever, e é de propósito que seja a mesma função)
-    var _f=_mamaFraseDo(corpo, rotulo, bir.length);
+    var _id='L'+(i+1);
+    var _f=_mamaFraseDo(corpo, rotulo, bir.length, _id);
     var frase=_f.texto;
     var loc=mamaLocalDoTexto(frase||rotulo);
     /* 24/08/2026 — O RÓTULO TAMBÉM É FONTE, e era jogado fora quando havia frase.
@@ -11516,9 +12439,18 @@ function mamaLesoes(L){
     if(!medidas.length && d.tamanho_cm){ var t=mamaMm(d.tamanho_cm,'cm'); if(t!=null) medidas=[t]; }
     var forma=String(d.forma||'').toLowerCase();
     var orient=String(d.orientacao||'').toLowerCase();
-    var item={ id:'L'+(i+1), lado:loc.lado, hora:loc.hora, distCm:loc.distCm,
+    var margem=String(d.margem||'').toLowerCase();
+    var caso=String(d.caso_especial||'');
+    if(!caso) caso=mamaCasoEspecialDoTexto(frase)||mamaCasoEspecialDoTexto(rotulo)||'';
+    /* O estilo do marcador representa o TIPO da lesao, nao a completude da localizacao.
+       Cisto simples e sempre vazado/pontilhado. Nodulo e preenchido; margem suspeita gera
+       contorno irregular mesmo quando o campo "forma" veio apenas como oval. */
+    var marcador = caso==='cistoSimples' ? 'cisto-simples'
+                 : ((forma==='irregular'||/irregular|indistint|angular|microlobul|espicul/.test(margem))
+                    ? 'nodulo-irregular' : 'nodulo-regular');
+    var item={ id:_id, lado:loc.lado, hora:loc.hora, distCm:loc.distCm,
                prof:loc.prof||'media', profMm:(loc.profMm==null?null:loc.profMm),
-               forma:forma, orientacao:orient,
+               forma:forma, orientacao:orient, marcador:marcador,
                /* A categoria vem da MESMA conta que o laudo usa (_mamaCatDoAchado). Antes
                   este campo lia `d.categoria`, que a IA nunca devolve — ela anota os
                   descritores e o app é que calcula. Ficava sempre vazio, e vazio calado:
@@ -11543,8 +12475,10 @@ function mamaLesoes(L){
        aí não há o que desenhar. */
     var temPos = item.lado && item.hora!=null;
     if(item.distCm==null && temPos) item.distIgnorada=true;
-    if(temPos && !item.incoerencia){ item.n=++n; plot.push(item); }
-    else semPos.push({rotulo:rotulo||('achado '+(i+1)), porque: item.incoerencia ||
+    /* O numero vem do ID estruturado, nao da contagem dos que conseguiram ser plotados.
+       Se L1 estiver sem hora, L2 continua sendo 2 no desenho e no corpo — nunca vira 1. */
+    if(temPos && !item.incoerencia){ item.n=i+1; plot.push(item); }
+    else semPos.push({id:item.id, lado:item.lado, rotulo:rotulo||('achado '+(i+1)), porque: item.incoerencia ||
         (!item.lado?'lado não identificado':'hora do relógio não informada')});
   });
   return {plot:plot, semPos:semPos};
@@ -11618,20 +12552,18 @@ function _mamaFrontal(lesoes, lado){
     var p=_mamaXY(L.hora, L.distCm, cx, cy, R);
     var m=(L.mm&&L.mm.length)?Math.max.apply(null,L.mm):null;
     var r=_mamaRaioPx(m);
-    /* Sem distância ditada: marcador VAZADO e tracejado. A hora está certa (é o raio que
-       não se sabe), e um marcador cheio afirmaria uma posição que ninguém informou. */
-    s+=_mamaContorno(p[0], p[1], r, r*(L.forma==='oval'?0.72:1), L.forma, L.n,
-                     'data-lesao="'+L.id+'" style="cursor:grab" '
-                     /* pointer-events:all no vazado (25/08, ciclo 3): com fill="none" o
-                        MIOLO do marcador é inerte ao toque — só o traço de 1,8 px pegava,
-                        inatingível com o dedo. E é justamente a lesão sem distância a que
-                        mais precisa ser arrastada (arrastar É informar, item 15). */
-                     +(L.distIgnorada
+    var _cisto=L.marcador==='cisto-simples';
+    var _formaMarca=_cisto?'redonda':(L.marcador==='nodulo-irregular'?'irregular':L.forma);
+    /* O vazado pontilhado identifica cisto simples. Distancia nao informada continua sendo
+       declarada na legenda, mas nao muda um nodulo solido para o simbolo de cisto. */
+    s+=_mamaContorno(p[0], p[1], r, _cisto?r:r*(L.forma==='oval'?0.72:1), _formaMarca, L.n,
+                     'data-lesao="'+L.id+'" data-tipo-marcador="'+L.marcador+'" style="cursor:grab" '
+                     +(_cisto
                         ? 'fill="none" pointer-events="all" stroke="#6A4FB6" stroke-width="1.8" stroke-dasharray="3 2"'
                         : 'fill="#6A4FB6" stroke="#fff" stroke-width="1.5"'));
     /* O número vai DENTRO só quando cabe. Numa lesão de 2 mm o marcador é minúsculo e o
        número por cima o esconderia — aí ele vai ao lado, com um traço curto ligando. */
-    if(r>=8 && !L.distIgnorada){
+    if(r>=8 && !_cisto){
       /* pointer-events:none (25/08, ciclo 3): o número fica POR CIMA do marcador e, sem
          isto, era ele quem recebia o toque — pressionar no centro de uma lesão grande
          não iniciava o arraste. O número é rótulo, não botão. */
@@ -11665,11 +12597,26 @@ function _mamaFrontal(lesoes, lado){
    - linha pontilhada da pele até a lesão, com a distância escrita. */
 const MAMA_Y_PELE=26;            // a superfície da pele, de onde a linha de profundidade parte
 function _mamaLateral(lesoes, lado){
-  var x0=66, x1=238, s='', faixas=[['Pele',26,34,'#eef1f6'],['TCSC',34,58,'#f7f4ec'],
-                                   ['Glândula',58,132,'#fdf7fb'],['Peitoral',132,158,'#eef3ee']];
-  faixas.forEach(function(f){
-    s+='<rect x="'+x0+'" y="'+f[1]+'" width="'+(x1-x0)+'" height="'+(f[2]-f[1])+'" fill="'+f[3]+'" stroke="#c8d0da" stroke-width="0.7"/>'
-      +'<text x="'+(x0-5)+'" y="'+((f[1]+f[2])/2+3).toFixed(1)+'" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+f[0]+'</text>';
+  var x0=66, x1=238, s='', gradId='gradMamaLateral_'+(lado||'D');
+  /* 09/09/2026: Fundo integrado em degradê anatômico contínuo (sem divisórias rígidas internas)
+     para que lesões a ~0,9 cm da pele não pareçam confinadas ao TCSC quando estão no parênquima mamário. */
+  s+='<defs>'
+    +'<linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
+    +'<stop offset="0%" stop-color="#e8ecf2"/>'
+    +'<stop offset="4%" stop-color="#f2f5f8"/>'
+    +'<stop offset="8%" stop-color="#fbf8f0"/>'
+    +'<stop offset="15%" stop-color="#fdf5f9"/>'
+    +'<stop offset="26%" stop-color="#faf0f8"/>'
+    +'<stop offset="72%" stop-color="#faf0f8"/>'
+    +'<stop offset="82%" stop-color="#f2f4f2"/>'
+    +'<stop offset="100%" stop-color="#e4ece4"/>'
+    +'</linearGradient>'
+    +'</defs>'
+    +'<rect x="'+x0+'" y="26" width="'+(x1-x0)+'" height="132" rx="3" fill="url(#'+gradId+')" stroke="#cbd5e1" stroke-width="0.9"/>'
+    +'<line x1="'+x0+'" y1="26" x2="'+x1+'" y2="26" stroke="#94a3b8" stroke-width="1.3"/>';
+  var rotulos=[['Pele',31],['TCSC',42],['Glândula',92],['Peitoral',146]];
+  rotulos.forEach(function(r){
+    s+='<text x="'+(x0-6)+'" y="'+r[1]+'" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">'+r[0]+'</text>';
   });
   s+='<text x="'+x0+'" y="172" font-size="8" fill="#5a6478" font-family="Arial,Helvetica,sans-serif">papila</text>'
     +'<text x="'+x1+'" y="172" font-size="8" fill="#5a6478" text-anchor="end" font-family="Arial,Helvetica,sans-serif">periferia</text>';
@@ -11693,6 +12640,9 @@ function _mamaLateral(lesoes, lado){
     var naoParalela=/nao|não/.test(L.orientacao);
     var rx = redonda?rg : (naoParalela?rp:rg);
     var ry = redonda?rg : (naoParalela?rg:rp);
+    var _cisto=L.marcador==='cisto-simples';
+    var _formaMarca=_cisto?'redonda':(L.marcador==='nodulo-irregular'?'irregular':L.forma);
+    if(_cisto){ rx=rg; ry=rg; }
     // a linha pontilhada, da pele até a borda de cima da lesão
     var topo=y-ry;
     s+='<line x1="'+x.toFixed(1)+'" y1="'+MAMA_Y_PELE+'" x2="'+x.toFixed(1)+'" y2="'+topo.toFixed(1)+'" '
@@ -11709,12 +12659,12 @@ function _mamaLateral(lesoes, lado){
        "18 mm da pele" num laudo que só disse "profundidade média" seria inventar medida. */
     profs.push({n:L.n, txt:(L.profMm!=null) ? (cmTxt(L.profMm)+' cm da pele')
               : ({anterior:'anterior', media:'média', posterior:'posterior'}[L.prof]||'média')});
-    s+=_mamaContorno(x, y, rx, ry, L.forma, L.n,
-                     'data-lesao="'+L.id+'" style="cursor:grab" '
-                     +(L.distIgnorada
+    s+=_mamaContorno(x, y, rx, ry, _formaMarca, L.n,
+                     'data-lesao="'+L.id+'" data-tipo-marcador="'+L.marcador+'" style="cursor:grab" '
+                     +(_cisto
                         ? 'fill="none" stroke="#6A4FB6" stroke-width="1.6" stroke-dasharray="3 2"'
                         : 'fill="#6A4FB6" fill-opacity="0.85" stroke="#fff" stroke-width="1.3"'));
-    if(Math.min(rx,ry)>=7 && !L.distIgnorada){
+    if(Math.min(rx,ry)>=7 && !_cisto){
       s+='<text x="'+x.toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
     }else{
       s+='<text x="'+(x+rx+4).toFixed(1)+'" y="'+(y+3.4).toFixed(1)+'" font-size="9.5" fill="#6A4FB6" font-weight="bold" font-family="Arial,Helvetica,sans-serif">'+L.n+'</text>';
@@ -11751,20 +12701,264 @@ function _mamaLateral(lesoes, lado){
   return '<svg viewBox="0 0 250 '+alt+'" width="250" height="'+alt+'" xmlns="http://www.w3.org/2000/svg" role="img" '
        + 'aria-label="Corte lateral da mama '+(lado==='D'?'direita':'esquerda')+' mostrando profundidade">'+s+'</svg>';
 }
-/* ============ INTERRUPTOR DOS DESENHOS DA MAMA (27/08/2026) ============
-   DESLIGADO A PEDIDO DELE, e de propósito TEMPORÁRIO: "vamos remover as imagens como
-   padrão dos laudos de mama temporariamente até a gente conseguir ajustar — eu preciso
-   que o laudo de mama esteja pronto pra usar amanhã".
-   Com isto em `false`, o laudo de mama sai SÓ COM TEXTO: nada de esquema anatômico e
-   nada de gráfico de evolução. O laudo cai no caminho de FLUXO (sem moldura de duas
-   folhas), que é o plano B decidido por ele em 26/08 e já testado.
-   NADA FOI APAGADO: o desenho, o arraste do marcador, a evolução e as suítes deles
-   continuam inteiros. Para religar, basta trocar para `true` — é a única linha a mexer.
-   Os testes que exercitam o desenho ligam este interruptor sozinhos. */
-var MAMA_DESENHOS = false;
+/* ============ DESENHOS DA MAMA (reativados em 08/09/2026) ============
+   O motor volta a ficar disponível, mas o desenho NUNCA entra automaticamente. A
+   configuração geral apenas mostra o botão na revisão; a escolha de incluir é guardada
+   em cada laudo e em cada lado, como já ocorre com as ilustrações da tireoide. */
+var MAMA_DESENHOS = true;
+function mamaLadosSelecionados(L){
+  var m=(L&&L._mamaIlustracoes)||{};
+  return {D:!!m.D,E:!!m.E};
+}
+function mamaTemSelecao(L){
+  var m=mamaLadosSelecionados(L); return m.D||m.E;
+}
+function mamaEsquemaSelecionadoHTML(L,arraste){
+  if(!mamaTemSelecao(L)) return '';
+  return mamaEsquemaHTML(L,arraste,mamaLadosSelecionados(L));
+}
+function mamaLayoutDo(L,lado){
+  var x=(((L||{})._mamaLayout||{})[lado])||{};
+  var modo=/^(esquerda|direita)$/.test(x.modo||'')?x.modo:'abaixo';
+  var topo=parseFloat(x.topo); if(!isFinite(topo)||topo<0) topo=0;
+  var largura=parseFloat(x.largura); if(!isFinite(largura)||largura<160) largura=null;
+  var formato=/^(horizontal|vertical)$/.test(x.formato||'')?x.formato:'horizontal';
+  return {travado:x.travado!==false,modo:modo,topo:Math.min(topo,600),largura:largura,formato:formato};
+}
+function mamaLayoutControlesHTML(L,lado){
+  var p=mamaLayoutDo(L,lado), ladoTxt=lado==='D'?'direita':'esquerda';
+  return '<div class="laudoMamaLayoutControles">'
+    +(!p.travado?'<button type="button" class="laudoMamaLayoutBt laudoMamaLayoutMover" data-mama-mover="'+lado+'" '
+      +'title="Arraste para a esquerda, abaixo ou para a direita do texto">✥ Mover figura</button>':'')
+    +'<button type="button" class="laudoMamaLayoutBt" onclick="mamaLayoutAlternarTrava(event,\''+lado+'\')" '
+      +'title="'+(p.travado?'Destravar':'Travar')+' a figura da mama '+ladoTxt+'">'
+      +(p.travado?'🔒 Travada':'🔓 Destravada')+'</button></div>';
+}
+function mamaLayoutAlternarTrava(ev,lado){
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='mama'||!ex.laudo) return;
+  var all=ex.laudo._mamaLayout=ex.laudo._mamaLayout||{}, p=mamaLayoutDo(ex.laudo,lado);
+  all[lado]={travado:!p.travado,modo:p.modo,topo:p.topo,largura:p.largura,formato:p.formato};
+  try{agendarSalvarSessao();}catch(e){}
+  abrirRevisao(ex.id,true);
+  log(all[lado].travado?'Figura travada nesta posição.':'Figura destravada — use as alças para mover ou redimensionar.');
+}
+function mamaLayoutAlternarFormato(ev,lado){
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  var ex=rev2Ex(); if(!ex||ex.tipo!=='mama'||!ex.laudo) return;
+  var all=ex.laudo._mamaLayout=ex.laudo._mamaLayout||{}, p=mamaLayoutDo(ex.laudo,lado);
+  var novoFormato=(p.formato==='vertical'?'horizontal':'vertical');
+  var novaLargura=(novoFormato==='vertical'?220:360);
+  all[lado]={travado:false,modo:p.modo,topo:p.topo,largura:novaLargura,formato:novoFormato};
+  try{agendarSalvarSessao();}catch(e){}
+  abrirRevisao(ex.id,true);
+  log('Formato da mama '+(lado==='D'?'direita':'esquerda')+' alterado para '+(novoFormato==='horizontal'?'horizontal (lado a lado)':'vertical (empilhado)')+'.');
+}
+function mamaEsquemaLadoHTML(L,lado,arraste){
+  var s={D:false,E:false}; s[lado]=true;
+  return mamaEsquemaHTML(L,arraste,s);
+}
+function mamaHostConteudoHTML(L,lado,arraste){
+  var p=mamaLayoutDo(L,lado);
+  var rz=!p.travado?'<div class="laudoLayoutResizeHandle" data-mama-resize="'+lado+'" title="Arraste para redimensionar tamanho e formato">⌟</div>':'';
+  return mamaLayoutControlesHTML(L,lado)+mamaEsquemaLadoHTML(L,lado,arraste)+rz;
+}
+function mamaEsquemaRedesenhar(ex,arraste){
+  if(!ex||!ex.laudo) return;
+  Array.prototype.forEach.call(document.querySelectorAll('#mamaEsqBox .laudoMamaEsqHost[data-lado]'),function(h){
+    var lado=h.getAttribute('data-lado');
+    h.innerHTML=mamaHostConteudoHTML(ex.laudo,lado,arraste);
+  });
+}
+function mamaTituloDeSecao(txt){
+  var t=String(txt||'').replace(/\*\*/g,'').replace(/\s+/g,' ').trim();
+  if(!t||t.length>70||/[.!?]$/.test(t)) return false;
+  if(/^(descri[çc][ãa]o|achados?|t[ée]cnica|m[ée]todo)\s*:?$/i.test(t)) return false;
+  return /:$/.test(t)||(/^[^a-z]+$/.test(t)&&/[A-ZÁÂÃÉÊÍÓÔÕÚÇ]/.test(t));
+}
+/* Localiza as duas caixas de texto. Primeiro usa a marcacao salva pela IA no modelo;
+   depois aplica uma leitura local conservadora. A figura nunca vai para o lado oposto se
+   uma ancora personalizada estiver ausente: nesse caso aquele lado simplesmente nao entra. */
+function mamaSecoesLocalizar(L){
+  var corpo=String((L&&L.corpo)||''), ach=[], usados={};
+  function porTrecho(lado,trecho){
+    trecho=String(trecho||'').trim(); if(!trecho) return;
+    var i=corpo.toLocaleLowerCase('pt-BR').indexOf(trecho.toLocaleLowerCase('pt-BR'));
+    if(i>=0&&!usados[lado]){ ach.push({lado:lado,ini:i,tam:trecho.length}); usados[lado]=1; }
+  }
+  var anc=(L&&L._mamaAncoras)||{};
+  porTrecho('D',anc.D||anc.direita); porTrecho('E',anc.E||anc.esquerda);
+  var re=/\*\*\s*(MAMA\s+(DIREITA|ESQUERDA))\s*:?\s*\*\*/gi,m;
+  while((m=re.exec(corpo))){
+    var lado=/direita/i.test(m[2])?'D':'E';
+    if(!usados[lado]){ ach.push({lado:lado,ini:m.index,tam:m[0].length}); usados[lado]=1; }
+  }
+  var reLivre=/(^|\n)[ \t]*(MAMA\s+(DIREITA|ESQUERDA)\s*:?[ \t]*)(?=\n|$)/gim;
+  while((m=reLivre.exec(corpo))){
+    var lado2=/direita/i.test(m[3])?'D':'E';
+    if(!usados[lado2]){
+      var ini2=m.index+m[1].length+(m[0].length-m[2].length-m[1].length);
+      ach.push({lado:lado2,ini:ini2,tam:m[2].length}); usados[lado2]=1;
+    }
+  }
+  ach.sort(function(a,b){return a.ini-b.ini;});
+  for(var i=0;i<ach.length;i++){
+    var limite=(i+1<ach.length)?ach[i+1].ini:corpo.length;
+    var resto=corpo.slice(ach[i].ini+ach[i].tam,limite), rTit=/\n\s*(\*\*[^*\n]{1,80}\*\*)/g, mt;
+    while((mt=rTit.exec(resto))){
+      if(mamaTituloDeSecao(mt[1])){ limite=ach[i].ini+ach[i].tam+mt.index; break; }
+    }
+    ach[i].fim=limite;
+  }
+  return ach;
+}
+function mamaHostHTML(L,lado){
+  if(!mamaLadosSelecionados(L)[lado]) return '';
+  var desenho=mamaEsquemaLadoHTML(L,lado); if(!desenho) return '';
+  var p=mamaLayoutDo(L,lado), cls='laudoMamaEsqHost';
+  if(p.modo!=='abaixo') cls+=' flutua '+p.modo;
+  if(p.formato==='vertical') cls+=' formato-vertical';
+  else cls+=' formato-horizontal';
+  var st='';
+  if(p.modo!=='abaixo') st+='margin-top:'+Math.round(p.topo)+'px;';
+  if(p.largura) st+='width:'+Math.round(p.largura)+'px;max-width:100%;';
+  var stAttr=st?(' style="'+st+'"'):'';
+  var rz=!p.travado?'<div class="laudoLayoutResizeHandle" data-mama-resize="'+lado+'" title="Arraste para redimensionar tamanho e formato">⌟</div>':'';
+  return '<div class="'+cls+'" data-lado="'+lado+'" contenteditable="false"'+stAttr+'>'
+    +mamaLayoutControlesHTML(L,lado)+desenho+rz+'</div>';
+}
+/* Cada figura fica dentro da secao do proprio lado. No modo padrao ela vem DEPOIS do
+   texto; quando solta numa lateral, vem logo depois do titulo e flutua ao lado do texto. */
+function mamaCorpoHTML(L){
+  if(L && L.corpo){
+    try{
+      var _birNums=Array.isArray(L.birads)?L.birads:(((L._classifBruto||{}).birads)||[]);
+      var _numChk=mamaNumerarAchados(L.corpo,_birNums);
+      if(_numChk.mudou) L.corpo=_numChk.corpo;
+    }catch(_e){}
+  }
+  var corpo=String((L&&L.corpo)||'').replace(/\n{3,}/g,'\n\n');
+  if(!mamaTemSelecao(L)) return negrito(corpo);
+  var ss=mamaSecoesLocalizar(L); if(!ss.length) return negrito(corpo);
+  var out='',pos=0;
+  ss.forEach(function(s){
+    out+=negrito(corpo.slice(pos,s.ini));
+    var parte=corpo.slice(s.ini,s.fim), host=mamaHostHTML(L,s.lado), p=mamaLayoutDo(L,s.lado);
+    if(host){
+      if(p.modo==='abaixo'){
+        var parteAbaixo=parte.replace(/\s*\*+\s*$/, '\n\n');
+        out+='<div class="laudoMamaSecao" data-lado="'+s.lado+'">'+negrito(parteAbaixo)+host+'</div>';
+      }else{
+        var p1=parte.slice(0,s.tam).replace(/\s*\*+\s*$/, '\n\n');
+        var p2=parte.slice(s.tam).replace(/^\s*\*+\s*/, '');
+        out+='<div class="laudoMamaSecao" data-lado="'+s.lado+'">'
+          +negrito(p1)+host+negrito(p2)+'</div>';
+      }
+    }else out+=negrito(parte);
+    pos=s.fim;
+  });
+  return out+negrito(corpo.slice(pos));
+}
+function mamaLayoutLigar(raiz,ex){
+  if(!raiz) return; raiz._mamaLayoutEx=ex;
+  if(raiz._mamaLayoutLigado) return; raiz._mamaLayoutLigado=true;
+  raiz.addEventListener('pointerdown',function(ev){
+    var btMover=ev.target.closest&&ev.target.closest('[data-mama-mover]');
+    var btResize=ev.target.closest&&ev.target.closest('[data-mama-resize]');
+    if(!btMover && !btResize) return;
+    var atual=raiz._mamaLayoutEx;
+    if(!atual||!atual.laudo) return;
+
+    if(btMover){
+      var lado=btMover.getAttribute('data-mama-mover');
+      var host=btMover.closest('.laudoMamaEsqHost'), sec=btMover.closest('.laudoMamaSecao');
+      if(!host||!sec||mamaLayoutDo(atual.laudo,lado).travado) return;
+      ev.preventDefault(); var x0=ev.clientX,y0=ev.clientY,moveu=false;
+      function mover(e){ moveu=true; host.style.transform='translate('+(e.clientX-x0)+'px,'+(e.clientY-y0)+'px)'; host.style.zIndex='10'; e.preventDefault(); }
+      function soltar(e){
+        window.removeEventListener('pointermove',mover);window.removeEventListener('pointerup',soltar);
+        host.style.transform='';host.style.zIndex=''; if(!moveu) return;
+        var r=sec.getBoundingClientRect(), rel=(e.clientX-r.left)/Math.max(r.width,1);
+        var modo=rel<0.35?'esquerda':(rel>0.65?'direita':'abaixo');
+        var folha=sec.closest('.laudoFolha');
+        var pxmm=folha?(folha.clientWidth/210):3.7795;
+        var pageH=297*pxmm;
+        var cs=folha?getComputedStyle(folha):{};
+        var botPx=parseFloat(cs.paddingBottom)||0;
+        var FRISO=12;
+        var fr=folha?folha.getBoundingClientRect():{top:0};
+        var secTop=r.top-fr.top;
+        var pag=Math.max(0,Math.floor(secTop/pageH));
+        var limPag=(pag+1)*pageH-botPx-FRISO;
+        var hH=host.offsetHeight||240;
+        var maxTopo=Math.max(0, limPag-secTop-hH);
+        var topoBruto=Math.max(0, e.clientY-r.top-28);
+        var topo=modo==='abaixo'?0:Math.min(maxTopo, topoBruto);
+        var all=atual.laudo._mamaLayout=atual.laudo._mamaLayout||{};
+        var formato=(modo==='abaixo')?'horizontal':'vertical';
+        var larg=(modo==='abaixo')?null:(formato==='vertical'?220:360);
+        all[lado]={travado:false,modo:modo,topo:topo,largura:larg,formato:formato};
+        try{agendarSalvarSessao();}catch(_e){}
+        abrirRevisao(atual.id,true);
+        log('Figura da mama '+(lado==='D'?'direita':'esquerda')+' posicionada '+
+          (modo==='abaixo'?'abaixo do texto':('à '+modo+', com o texto ao redor'))+'.');
+      }
+      window.addEventListener('pointermove',mover,{passive:false});window.addEventListener('pointerup',soltar);
+    } else if(btResize){
+      var ladoR=btResize.getAttribute('data-mama-resize');
+      var hostR=btResize.closest('.laudoMamaEsqHost'), secR=btResize.closest('.laudoMamaSecao');
+      if(!hostR||!secR||mamaLayoutDo(atual.laudo,ladoR).travado) return;
+      ev.preventDefault(); var x0R=ev.clientX,y0R=ev.clientY,w0=hostR.getBoundingClientRect().width,h0=hostR.getBoundingClientRect().height;
+      var pR=mamaLayoutDo(atual.laudo,ladoR), moveuR=false, wFinal=w0, formatoFinal=pR.formato;
+      var secW=secR.getBoundingClientRect().width;
+      function moverR(e){
+        moveuR=true; var dw=e.clientX-x0R, dh=e.clientY-y0R;
+        var wNovo=Math.max(180,Math.min(secW,w0+dw));
+        var hNovo=Math.max(120,h0+dh);
+        wFinal=wNovo; hostR.style.width=Math.round(wNovo)+'px';
+        formatoFinal=(wNovo>=280||(wNovo/Math.max(hNovo,1))>=1.02)?'horizontal':'vertical';
+        hostR.classList.toggle('formato-vertical',formatoFinal==='vertical');
+        hostR.classList.toggle('formato-horizontal',formatoFinal==='horizontal');
+        var vistas=hostR.querySelector('.mamaEsqVistas');
+        if(vistas){
+          vistas.classList.toggle('formato-vertical',formatoFinal==='vertical');
+          vistas.classList.toggle('formato-horizontal',formatoFinal==='horizontal');
+          vistas.style.flexDirection=formatoFinal==='vertical'?'column':'row';
+        }
+        e.preventDefault();
+      }
+      function soltarR(e){
+        window.removeEventListener('pointermove',moverR);window.removeEventListener('pointerup',soltarR);
+        if(!moveuR) return;
+        var folha=secR.closest('.laudoFolha');
+        var pxmm=folha?(folha.clientWidth/210):3.7795;
+        var pageH=297*pxmm;
+        var cs=folha?getComputedStyle(folha):{};
+        var botPx=parseFloat(cs.paddingBottom)||0;
+        var FRISO=12;
+        var fr=folha?folha.getBoundingClientRect():{top:0};
+        var secTop=secR.getBoundingClientRect().top-fr.top;
+        var pag=Math.max(0,Math.floor(secTop/pageH));
+        var limPag=(pag+1)*pageH-botPx-FRISO;
+        var hH=hostR.offsetHeight||240;
+        var maxTopo=Math.max(0, limPag-secTop-hH);
+        var topoAjustado=pR.modo==='abaixo'?0:Math.min(maxTopo, pR.topo);
+        var allR=atual.laudo._mamaLayout=atual.laudo._mamaLayout||{};
+        allR[ladoR]={travado:false,modo:pR.modo,topo:topoAjustado,largura:Math.round(wFinal),formato:formatoFinal};
+        try{agendarSalvarSessao();}catch(_e){}
+        abrirRevisao(atual.id,true);
+        log('Figura da mama '+(ladoR==='D'?'direita':'esquerda')+' redimensionada ('+(formatoFinal==='horizontal'?'formato horizontal, lado a lado':'formato vertical, empilhado')+').');
+      }
+      window.addEventListener('pointermove',moverR,{passive:false});window.addEventListener('pointerup',soltarR);
+    }
+  });
+}
 /* O bloco inteiro, pronto para entrar no laudo. Devolve '' quando não há o que desenhar —
    exame normal não ganha esquema, e isso é regra, não economia. */
-function mamaEsquemaHTML(L, arraste){
+function mamaEsquemaHTML(L, arraste, lados){
+  /* Chamadas antigas e testes sem escolha explícita continuam desenhando tudo. Dentro do
+     laudo real, a escolha persistida passa a valer inclusive durante o arraste. */
+  if(lados===undefined && L && L._mamaIlustracoes) lados=mamaLadosSelecionados(L);
   var r=mamaLesoes(L);
   /* Durante o arraste o desenho é redesenhado com a posição PROVISÓRIA, sem ainda tocar no
      laudo. É isto que faz a distância da papila andar nas DUAS vistas ao mesmo tempo (§8.1
@@ -11804,10 +12998,11 @@ function mamaEsquemaHTML(L, arraste){
       + 'esquemática, sem escala anatômica real. A localização das lesões segue a descrição do exame.</div>';
   var h='';
   ['D','E'].forEach(function(lado){
+    if(lados && !lados[lado]) return;
     var doLado=r.plot.filter(function(x){ return x.lado===lado; });
     if(!doLado.length) return;                    // mama sem lesão não é desenhada
     h+='<div class="mamaEsq" data-lado="'+lado+'" style="'+_cartao+'">'
-      +'<div style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start;margin-bottom:6px">'
+      +'<div class="mamaEsqVistas" style="display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start;margin-bottom:6px">'
       + _mamaFrontal(doLado, lado) + _mamaLateral(doLado, lado) + '</div>';
     h+='<div style="font-size:11.5px;color:#3F3357;line-height:1.5;margin-top:4px">';
     doLado.forEach(function(L2){
@@ -11857,10 +13052,14 @@ function mamaEsquemaHTML(L, arraste){
   /* Achado sem posição NÃO some: some do desenho e aparece aqui dito. A especificação é
      explícita — nunca inventar posição, e nunca deixar o leitor achar que o desenho
      mostra tudo. Vive num cartão próprio, depois dos desenhos. */
-  if(r.semPos.length){
+  var _semMostrar=r.semPos.filter(function(s){
+    if(!lados) return true;
+    return !!(s.lado && lados[s.lado]);
+  });
+  if(_semMostrar.length){
     h+='<div class="mamaEsq" data-lado="?" style="'+_cartao+'">'
       +'<div style="font-size:11px;color:#8a5a00">';
-    r.semPos.forEach(function(s){ h+='<div>• <b>'+esc(s.rotulo)+'</b> — sem localização pontual no desenho ('+esc(s.porque)+').</div>'; });
+    _semMostrar.forEach(function(s){ h+='<div>• <b>'+esc(s.rotulo)+'</b> — sem localização pontual no desenho ('+esc(s.porque)+').</div>'; });
     h+='</div></div>';
   }
   return h;
@@ -11920,8 +13119,7 @@ function mamaArrasteLigar(caixa, ex){
       _mamaArraste.profMm=mm;
       _mamaArraste.prof = mm<20?'anterior':(mm>45?'posterior':'media');
     }
-    var alvo=document.getElementById('mamaEsqBox');
-    if(alvo) alvo.innerHTML=mamaEsquemaHTML(ex.laudo, _mamaArraste);
+    mamaEsquemaRedesenhar(ex,_mamaArraste);
     ev.preventDefault();
   };
   var soltar=function(){
@@ -11933,16 +13131,14 @@ function mamaArrasteLigar(caixa, ex){
        mudou" e o médico levava um aviso de defeito ("não consegui reescrever…") por ter
        apenas tocado no marcador. */
     if(!a.moveu){
-      var alvoP=document.getElementById('mamaEsqBox');
-      if(alvoP) alvoP.innerHTML=mamaEsquemaHTML(ex.laudo);
+      mamaEsquemaRedesenhar(ex);
       return;
     }
     /* Valor que não é número de verdade NUNCA vira texto de laudo. Se alguma conta
        degenerar (foi exatamente o defeito de hoje), o desenho volta ao lugar do texto
        e nada é escrito. */
     if((a.hora!=null&&!isFinite(a.hora))||(a.distCm!=null&&!isFinite(a.distCm))||(a.profMm!=null&&!isFinite(a.profMm))){
-      var alvoNF=document.getElementById('mamaEsqBox');
-      if(alvoNF) alvoNF.innerHTML=mamaEsquemaHTML(ex.laudo);
+      mamaEsquemaRedesenhar(ex);
       return;
     }
     /* O ENCAIXE ACONTECE AQUI, uma vez só: hora inteira e centímetro inteiro, como o
@@ -11955,11 +13151,10 @@ function mamaArrasteLigar(caixa, ex){
        EXCEÇÃO: lesão que estava SEM distância informada — para ela, arrastar É informar
        (item 15 de ontem), mesmo que o número coincida com o do desenho provisório. */
     if(!a.eraIgnorada && a.hora===a.hora0 && a.distCm===a.dist0){
-      var alvoI=document.getElementById('mamaEsqBox');
-      if(alvoI) alvoI.innerHTML=mamaEsquemaHTML(ex.laudo);
+      mamaEsquemaRedesenhar(ex);
       return;
     }
-    var r=mamaReescreverLocal(ex.laudo.corpo, a.rotulo, a.quantos, a.hora, a.distCm);
+    var r=mamaReescreverLocal(ex.laudo.corpo, a.rotulo, a.quantos, a.hora, a.distCm, a.id);
     if(!r.ok){
       /* Não houve onde escrever — a frase foi reescrita à mão e não tem mais os pedaços de
          localização. O desenho volta ao lugar antigo e o médico é avisado. Nunca se
@@ -11968,11 +13163,13 @@ function mamaArrasteLigar(caixa, ex){
       log('⚠️ Não consegui reescrever a localização deste achado no texto — a frase não '
          +'tem mais o trecho "às ..h, distando ..cm". Ajuste pelo texto; o desenho voltou '
          +'ao lugar anterior.', true);
-      var alvo2=document.getElementById('mamaEsqBox');
-      if(alvo2) alvo2.innerHTML=mamaEsquemaHTML(ex.laudo);
+      mamaEsquemaRedesenhar(ex);
       return;
     }
     ex.laudo.corpo=r.corpo;
+    /* Corpo e dado BI-RADS mudam na MESMA confirmação. Sem isto o primeiro gesto funciona,
+       mas o segundo ainda procura a hora anterior e parece que o marcador travou. */
+    mamaLocalEstruturadaAtualizar(ex.laudo,a.id,a.lado,a.hora,a.distCm);
     if(typeof revMarcarEditado==='function') revMarcarEditado();
     abrirRevisao(ex.id, true);                    // redesenha texto E esquema, juntos
     /* 24/08/2026 — E A TELA ESTRUTURADA TAMBÉM. `abrirRevisao` refaz a FOLHA do laudo; os
@@ -11981,9 +13178,9 @@ function mamaArrasteLigar(caixa, ex){
        outra coisa — duas verdades sobre o mesmo achado. Se muda em um, muda no outro. */
     try{ if(typeof rev2Ex==='function' && rev2Ex() && rev2Ex().id===ex.id) rev2Render(); }catch(e){}
     // destaca por ~2 s o trecho que mudou, para o médico VER o que o arraste escreveu
-    var box=document.getElementById('mamaEsqBox');
-    if(box && box.previousSibling){
-      var cx=box.parentNode;
+    var box=document.querySelector('#mamaEsqBox .laudoMamaEsqHost[data-lado="'+a.lado+'"]');
+    if(box){
+      var cx=box.closest('.laudoMamaSecao');
       if(cx){ cx.style.transition='background .25s'; cx.style.background='#fff6d6';
               setTimeout(function(){ cx.style.background=''; }, 2000); }
     }
@@ -11998,8 +13195,7 @@ function mamaArrasteLigar(caixa, ex){
     if(!_mamaArraste) return;
     _mamaArraste=null;
     document.removeEventListener('mousemove',mover); document.removeEventListener('touchmove',mover);
-    var alvoC=document.getElementById('mamaEsqBox');
-    if(alvoC) alvoC.innerHTML=mamaEsquemaHTML(ex.laudo);
+    mamaEsquemaRedesenhar(ex);
   };
   caixa.addEventListener('mousedown', function(ev){ _mamaIniciar(ev, caixa, ex, mover, soltar); });
   caixa.addEventListener('touchstart', function(ev){ _mamaIniciar(ev, caixa, ex, mover, soltar); }, {passive:false});
@@ -12039,7 +13235,7 @@ function _mamaIniciar(ev, caixa, ex, mover, soltar){
   var _bir=(Array.isArray(ex.laudo.birads)?ex.laudo.birads
            :(((ex.laudo._classifBruto||{}).birads)||[]));
   _mamaArraste={ id:id, svg:svg, rect:_rc, lv:(parseFloat(_vb[2])||210), av:(parseFloat(_vb[3])||210),
-                 rotulo:L.rotulo, moveu:false,
+                 rotulo:L.rotulo, lado:L.lado, moveu:false,
                  hora0:L.hora, dist0:L.distCm, eraIgnorada:!!L.distIgnorada,
                  quantos:(_bir.length||1),
                  vista:(/Corte lateral/.test(svg.getAttribute('aria-label')||'')?'lateral':'frontal'),
@@ -12268,14 +13464,11 @@ function _mamaData(s){
 function _mamaBlocosCorpo(corpo){
   var linhas=String(corpo||'').split('\n'), blocos=[], atual=null;
   linhas.forEach(function(ln,i){
-    var m=/^\*\*MAMA (DIREITA|ESQUERDA)\*\*/i.exec(ln.trim());
+    var m=/^(?:\*\*\s*)?MAMA\s+(DIREITA|ESQUERDA)(?:\s*:?\s*\*\*|\s*:?)/i.exec(ln.trim());
     if(m){ atual={lado:(/D/i.test(m[1][0])?'D':'E'), ini:i, fim:i, achados:[]}; blocos.push(atual); return; }
     if(!atual) return;
     atual.fim=i;
-    /* 25/08/2026: a forma "a 4 cm da papila" (sem o verbo "distando") é aceita pela
-       leitura de localização desde 24/08 — aqui ela também precisa contar como achado,
-       senão a lesão escrita assim some da ordenação e da lista de múltiplos. */
-    if(/às?\s*\d{1,2}\s*(?:h\b|horas?\b)/i.test(ln) && /dist|papila/i.test(ln)) atual.achados.push(i);
+    if(/às?\s*\d{1,2}\s*(?:h\b|horas?\b)/i.test(ln)) atual.achados.push(i);
   });
   return {linhas:linhas, blocos:blocos};
 }
@@ -12288,6 +13481,69 @@ function _mamaBlocosCorpo(corpo){
    A frase do laudo já diz "cisto simples" / "formação cística simples" com todas as
    letras — é o dizer padrão do próprio médico. Este helper a lê. A guarda de "não
    simples" existe porque \bsimples\b casaria dentro de "aspecto não simples". */
+/* Da ao texto a mesma numeracao que aparece nos marcadores. Alem de facilitar a leitura,
+   esta e a chave que permite editar exatamente o achado tocado mesmo quando a IA devolve
+   "mama direita" como localizacao de todos eles. So numeramos quando cada item pode ser
+   ligado, sem ambiguidade, a uma linha propria; uma linha que descreve varios achados nao
+   e artificialmente dividida. */
+function mamaNumerarAchados(corpo,birads){
+  var bir=Array.isArray(birads)?birads:[];
+  var B=_mamaBlocosCorpo(corpo), candidatos=[];
+  B.blocos.forEach(function(bl){
+    for(var i=bl.ini+1;i<=bl.fim;i++){
+      var ln=B.linhas[i], loc=mamaLocalDoTexto(ln);
+      if(loc.hora==null) continue;
+      /* Mais de uma hora na mesma linha significa achado coletivo: nao existe uma linha
+         independente onde colocar cada numero com seguranca. */
+      if(loc.horas&&loc.horas.length>1) continue;
+      candidatos.push({i:i,lado:bl.lado,hora:loc.hora,usado:false});
+    }
+  });
+  if(candidatos.length<2) return {corpo:corpo,mudou:false,n:0};
+  var pares=[];
+  if(bir.length>=2){
+    bir.forEach(function(d,idx){
+      var rot=String((d||{}).localizacao||''), loc=mamaLocalDoTexto(rot);
+      var lado=loc.lado;
+      if(!lado) lado=/esquerd/i.test(rot)?'E':(/direit/i.test(rot)?'D':null);
+      var cand=null;
+      if(loc.hora!=null) cand=candidatos.filter(function(c){
+        return !c.usado&&(!lado||c.lado===lado)&&c.hora===loc.hora;
+      })[0];
+      if(!cand&&lado) cand=candidatos.filter(function(c){return !c.usado&&c.lado===lado;})[0];
+      if(!cand) return;
+      cand.usado=true; pares.push({idx:idx,i:cand.i});
+    });
+  }
+  candidatos.forEach(function(c){
+    if(!c.usado){
+      pares.push({idx:pares.length,i:c.i});
+      c.usado=true;
+    }
+  });
+  if(pares.length<2) return {corpo:corpo,mudou:false,n:0};
+  var linhas=B.linhas.slice(), mudou=0;
+  pares.forEach(function(p){
+    var ln=linhas[p.i], numero=p.idx+1;
+    if(new RegExp('\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]','i').test(ln)){
+      var lnL=ln.replace(new RegExp('(\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]\\s*)\\*+\\s*','i'),'$1');
+      lnL=lnL.replace(/\s*\*+([.,;:!?]?)\s*$/,'$1');
+      lnL=lnL.replace(new RegExp('(\\bAchado\\s+'+numero+'\\s*[\\u2014\\u2013-]\\s*)\\*\\*([^*]+)\\*\\*','i'),'$1$2');
+      if(lnL!==ln){ linhas[p.i]=lnL; mudou++; }
+      return;
+    }
+    var m=/^(\s*)(?:([\u2022]|-(?!\s*-)|\*(?!\*))\s+)?/.exec(ln);
+    var ini=m?m[0]:'', esp=m?m[1]:'';
+    var bala=(m&&m[2])?(m[2]+' '):'', resto=ln.slice(ini.length).trim();
+    resto=resto.replace(/^(?:\*+)?\s*(?:Localiza[çc][ãa]o\s+do\s+)?Achado\s+\d+\s*(?::|\*+:?|[\u2014\u2013-]|—)?\s*(?:\*+)?\s*(?:[\u2014\u2013-]|—)?\s*/i,'');
+    resto=resto.replace(/^\*+\s*/,'');
+    resto=resto.replace(/\s*\*+([.,;:!?]?)\s*$/,'$1').trim();
+    resto=resto.replace(/^\*\*([^*]+)\*\*/,'$1');
+    linhas[p.i]=esp+bala+'Achado '+numero+' \u2014 '+resto;
+    mudou++;
+  });
+  return {corpo:mudou?linhas.join('\n'):corpo,mudou:!!mudou,n:mudou};
+}
 function mamaCasoEspecialDoTexto(frase){
   var f=String(frase||'');
   if(!f) return null;
@@ -12472,7 +13728,8 @@ function mamaCorrelacao(corpo){
 }
 
 /* ============ SEÇÃO "PARA A PACIENTE" ============
-   Especificação 01 §4 (21/08/2026). Uma explicação em linguagem simples no fim do laudo.
+   Especificação 01 §4 (21/08/2026). Uma explicação em linguagem simples numa folha
+   própria, antes das páginas do laudo técnico.
 
    ZERO GERAÇÃO LIVRE, e esta é a decisão que sustenta tudo o mais. Se a IA escrevesse esta
    seção, mais cedo ou mais tarde ela suavizaria ou endureceria algo em relação ao texto
@@ -12535,18 +13792,26 @@ function pacienteHTML(ex){
   var chave=_pacienteChave(alta);
   if(!chave) return '';
   var t=PACIENTE_TXT[chave];
-  var h='<div class="pacBox" style="margin-top:14px;border:1px solid #c8d0da;border-radius:8px;'
-   + 'padding:10px 12px;background:#fbfcfe;font-size:12px;color:#2b3242">'
-   + '<div style="font-weight:700;color:#3F3357;margin-bottom:6px">PARA A PACIENTE — explicação em linguagem simples</div>'
-   + '<p style="margin:4px 0"><b>O que foi examinado.</b> Foi feito um ultrassom das mamas. '
+  var h='<div class="pacBox">'
+   + '<div class="pacTitulo">Informações para você sobre seu exame</div>'
+   + '<p class="pacLinha"><b>O que foi examinado.</b> Foi feito um ultrassom das mamas. '
    + 'O aparelho usa ondas de som, não usa radiação.</p>'
-   + '<p style="margin:4px 0"><b>O que foi encontrado.</b> '+esc(t.oque)+'</p>'
-   + '<p style="margin:4px 0"><b>O que isso quer dizer.</b> '+esc(t.diz)+'</p>'
-   + '<p style="margin:4px 0"><b>Qual o próximo passo.</b> '+esc(t.passo)+'</p>'
-   + '<p style="margin:6px 0 0;font-size:10.5px;color:#5a6478">Esta explicação é um resumo e '
-   + '<b>não substitui</b> o texto técnico acima nem a consulta com o seu médico. Leve este '
+   + '<p class="pacLinha"><b>O que foi encontrado.</b> '+esc(t.oque)+'</p>'
+   + '<p class="pacLinha"><b>O que isso quer dizer.</b> '+esc(t.diz)+'</p>'
+   + '<p class="pacLinha"><b>Qual o próximo passo.</b> '
+   + '<u>Levar esse exame para seu médico.</u><br>'+esc(t.passo)+'</p>'
+   + '<p class="pacNota">Esta explicação é um resumo e '
+   + '<b>não substitui</b> o laudo técnico apresentado nas páginas seguintes nem a consulta com o seu médico. Leve este '
    + 'laudo à sua próxima consulta.</p></div>';
   return h;
+}
+/* A folha amigavel e apenas uma moldura de apresentacao. O conteudo continua vindo de
+   pacienteHTML, portanto nenhuma frase clinica muda e as categorias 4/5/6 conservam as
+   mesmas cautelas. Devolve vazio junto com ele, sem criar pagina em branco. */
+function pacienteFolhaHTML(ex){
+  var miolo=pacienteHTML(ex); if(!miolo) return '';
+  return '<section class="pacienteFolha" contenteditable="false" aria-label="Explicação para a paciente">'
+    +'<div class="pacienteFolhaConteudo">'+miolo+'</div></section>';
 }
 
 /* ============ TELA 1 — GRADE DE MODELOS DE LAUDO (22/08/2026) ============
@@ -12960,8 +14225,25 @@ function cfgPaneRender(pane){
     if(pane==='impressao'){ impPintarEstado(); impCarregarImpressoras(false); }
     if(pane==='backup'){ atualizarEstadoBackup(); }
     if(pane==='assinatura'){ mostrarAssPrev(); }
-    if(pane==='revisao'){ biopsiaRender(); renderRegras(); }
+    if(pane==='revisao'){
+      biopsiaRender(); renderRegras();
+      var im=document.getElementById('cfgImagensRevisao');
+      if(im) im.checked=imagensRevisaoLigadas();
+    }
   }catch(e){}
+}
+
+/* Preferência permanente da tela de revisão. Ligada, ela só disponibiliza o botão que
+   será usado para inserir uma ilustração; nunca escolhe nem acrescenta imagem sozinha. */
+function imagensRevisaoLigadas(){
+  try{ return localStorage.getItem('grev2imagens')!=='0'; }
+  catch(e){ return true; }
+}
+function imagensRevisaoAlternar(el){
+  dadoSalvar('grev2imagens', el.checked?'1':'0');
+  log(el.checked
+    ? 'Ilustrações disponíveis na revisão — nenhuma entra sem sua confirmação.'
+    : 'Ilustrações ocultas na revisão.');
 }
 /* ============ QUAL MOTOR ESTÁ TRABALHANDO (30/08/2026) ============
    Em 27/08 o motor caiu da placa para o processador às 10h16 e ficou lá o resto do dia.
@@ -13214,7 +14496,7 @@ function modCfgFecharModelo(){
 /* Salva SÓ este modelo, mesclando no conjunto. O editor antigo pode gravar "o que está na
    tela" e pronto, porque lá estão todos os modelos abertos ao mesmo tempo. Aqui há um só:
    gravar o que está na tela apagaria os outros vinte e quatro. */
-function modCfgSalvarModelo(){
+async function modCfgSalvarModelo(){
   var host=document.getElementById('mdHost'); if(!host) return;
   var box=host.querySelector('.modeloBox'); if(!box) return;
   var chave=box.getAttribute('data-key')||'';
@@ -13224,6 +14506,7 @@ function modCfgSalvarModelo(){
   if(!corpo){ log('O corpo do laudo ficou vazio. Um modelo sem corpo escreveria laudo em branco.', true); return; }
   var m={ nome:nome, titulo:campo('mdTitulo'), tecnica:campo('mdTecnica'), corpo:corpo, conclusao:campo('mdConclusao') };
   var extra=campo('mdExtra'); if(extra) m.extra=extra;
+  m=await modeloMamaMapear(m,MODELOS[chave]);
   /* MESCLA, e por isso o conjunto inteiro é reescrito com este trocado. */
   var todos={}; Object.keys(MODELOS).forEach(function(k){ todos[k]=MODELOS[k]; });
   todos[chave]=m;
@@ -13991,6 +15274,634 @@ function mostrarAba(nome){
   window.__abaAtual=nome;
   window.scrollTo(0,0);
 }
+
+/* ============ ESQUEMA ANATÔMICO DO ÚTERO / MIOMA FIGO ============
+   Duas vistas ortogonais por exame de ultrassom transvaginal ou pélvico:
+   1) Vista Lateral (Corte Sagital): perfil anatômico em anteversoflexão (fundo, corpo,
+      colo, cavidade endometrial) com classificação FIGO de profundidade (0 a 7, e 2-5).
+   2) Corte Ortogonal (Corte Transversal / Orto-Axial): secção perpendicular ao eixo
+      sagital, demonstrando lateralização (direita/esquerda) e paredes anterior/posterior.
+
+   A movimentação interativa do nódulo pelo médico atualiza a posição nas duas vistas e
+   reescreve a frase do laudo e a classificação FIGO em tempo real. */
+
+function uteroNorm(s){
+  var t=String(s||'').toLowerCase();
+  try{ t=t.normalize('NFD').replace(/[\u0300-\u036f]/g,''); }catch(e){}
+  return t.replace(/[_–—]+/g,'-').replace(/\s+/g,' ').trim();
+}
+
+function uteroFigoDesc(f){
+  var m={
+    '0':'FIGO 0 (submucoso pedunculado intracavitário)',
+    '1':'FIGO 1 (submucoso < 50% intramural)',
+    '2':'FIGO 2 (submucoso ≥ 50% intramural)',
+    '3':'FIGO 3 (intramural com contato endometrial)',
+    '4':'FIGO 4 (intramural puro)',
+    '5':'FIGO 5 (subseroso ≥ 50% intramural)',
+    '6':'FIGO 6 (subseroso < 50% intramural)',
+    '7':'FIGO 7 (subseroso pedunculado)',
+    '2-5':'FIGO 2-5 (transmural híbrido)',
+    '8':'FIGO 8 (cervical / outros)'
+  };
+  return m[f] || (f ? ('FIGO ' + f) : 'FIGO não classificado');
+}
+
+function uteroFigoGrupo(f){
+  if(/^(0|1|2)$/.test(f)) return 'submucoso';
+  if(/^(3|4)$/.test(f)) return 'intramural';
+  if(/^(5|6|7)$/.test(f)) return 'subseroso';
+  if(f==='2-5') return 'hibrido';
+  return 'outro';
+}
+
+function uteroFigoCor(f){
+  var g=uteroFigoGrupo(f);
+  if(g==='submucoso') return '#D97706';
+  if(g==='intramural') return '#0284C7';
+  if(g==='subseroso') return '#2563EB';
+  if(g==='hibrido') return '#7C3AED';
+  return '#475569';
+}
+
+function uteroParede(v){
+  var t=uteroNorm(v);
+  if(/lateral.*direit|direit.*lateral|corno.*direit/.test(t)) return 'lateral-direita';
+  if(/lateral.*esquerd|esquerd.*lateral|corno.*esquerd/.test(t)) return 'lateral-esquerda';
+  if(/fundic|fundo/.test(t)) return 'fundo';
+  if(/colo|cervic|istm/.test(t)) return 'colo';
+  if(/posterior|dorsal/.test(t)) return 'posterior';
+  if(/anterior|ventral/.test(t)) return 'anterior';
+  return 'anterior';
+}
+
+function uteroTerco(v){
+  var t=uteroNorm(v);
+  if(/superior|fundo/.test(t)) return 'superior';
+  if(/inferior|istm|colo/.test(t)) return 'inferior';
+  return 'medio';
+}
+
+function uteroFigo(v){
+  var t=uteroNorm(v);
+  var m=/\bfigo\s*(2\s*[-– ]\s*5|[0-8])\b/i.exec(t);
+  if(m) return m[1].replace(/[\s–]+/g,'-');
+  if(/pedunculado.*(?:intra|cavit)|intracavit/i.test(t)) return '0';
+  if(/submucoso.*<\s*50/i.test(t)) return '1';
+  if(/submucoso.*(?:>=|≥|mais|maior).*50/i.test(t)) return '2';
+  if(/submucoso/i.test(t)) return '1';
+  if(/transmural/i.test(t)) return '2-5';
+  if(/subseroso.*(?:>=|≥|mais|maior).*50/i.test(t)) return '5';
+  if(/subseroso.*<\s*50/i.test(t)) return '6';
+  if(/subseroso.*pedunculado|pedunculado.*subseroso/i.test(t)) return '7';
+  if(/subseroso/i.test(t)) return '6';
+  if(/intramural.*contato.*endo|contat.*endo/i.test(t)) return '3';
+  if(/intramural/i.test(t)) return '4';
+  if(/cervical|colo/i.test(t)) return '8';
+  return '4';
+}
+
+function uteroMedidasMm(txt){
+  var t=String(txt||'');
+  var m=t.match(/([\d.,]+)\s*(?:x\s*([\d.,]+))?(?:\s*x\s*([\d.,]+))?\s*(cm|mm)\b/i);
+  if(!m) return [];
+  var un=(m[4]||'').toLowerCase();
+  var res=[];
+  for(var i=1;i<=3;i++){
+    if(m[i]){
+      var v=parseFloat(m[i].replace(',','.'));
+      if(isFinite(v)&&v>0) res.push(un==='cm'?v*10:v);
+    }
+  }
+  return res;
+}
+
+function _uteroRaioPx(mm){
+  var m=Array.isArray(mm)?(Math.max.apply(null,mm)||20):(parseFloat(mm)||20);
+  return Math.max(10, Math.min(24, (m/20)*13));
+}
+
+function uteroSagitalXY(L){
+  var parede=L.parede||'anterior', figo=String(L.figo||'4'), terco=L.terco||'medio';
+  var rMap = {
+    '0': 8, '1': 22, '2': 34, '3': 46, '4': 60,
+    '5': 74, '6': 88, '7': 104, '2-5': 46, '8': 15
+  };
+  var r = rMap[figo] != null ? rMap[figo] : 60;
+
+  if(parede === 'fundo' || terco === 'superior'){
+    return [95 - r * 0.45, 80 - r * 0.70];
+  }
+  if(parede === 'colo' || terco === 'inferior'){
+    return [245 + r * 0.4, 145 + r * 0.35];
+  }
+  if(parede === 'anterior'){
+    var x0 = 145, y0 = 92;
+    var ang = -55 * Math.PI / 180;
+    return [x0 + r * Math.cos(ang), y0 + r * Math.sin(ang)];
+  }
+  var x0p = 135, y0p = 105;
+  var angP = 125 * Math.PI / 180;
+  return [x0p + r * Math.cos(angP), y0p + r * Math.sin(angP)];
+}
+
+function uteroTransversalXY(L){
+  var parede=L.parede||'anterior', figo=String(L.figo||'4');
+  var cx = 160, cy = 120, rx = 110, ry = 80;
+  var kMap = {
+    '0': 0.18, '1': 0.34, '2': 0.46, '3': 0.58, '4': 0.72,
+    '5': 0.85, '6': 0.98, '7': 1.15, '2-5': 0.60, '8': 0.5
+  };
+  var k = kMap[figo] != null ? kMap[figo] : 0.72;
+
+  var ang = -Math.PI / 2;
+  if(parede === 'posterior') ang = Math.PI / 2;
+  else if(parede === 'lateral-direita') ang = Math.PI;
+  else if(parede === 'lateral-esquerda') ang = 0;
+  else if(parede === 'fundo') ang = -Math.PI / 2;
+
+  return [cx + rx * k * Math.cos(ang), cy + ry * k * Math.sin(ang)];
+}
+
+function uteroLesoes(L){
+  L=L||{};
+  var corpo=String(L.corpo||'');
+  var plot=[], semPos=[];
+
+  var frases = corpo.split(/\n+/);
+  var miomaLinhas = [];
+  frases.forEach(function(linha, idx){
+    if(/\b(?:mioma|leiomioma|n[oó]dulo(?:\s+s[oó]lido)?\s+(?:hipoec|heterog|no\s+miom[ée]trio|uterino|na\s+parede))\b/i.test(linha)){
+      miomaLinhas.push({ linha: linha.trim(), idx: idx });
+    }
+  });
+
+  var desc = (L._descritores) || {};
+  var escolhas = (L._uteroIlustracoes) || {};
+
+  if(miomaLinhas.length === 0 && escolhas.ativo){
+    miomaLinhas.push({ linha: 'Mioma intramural na parede anterior FIGO 4', idx: 0 });
+  }
+
+  miomaLinhas.forEach(function(item, i){
+    var txt = item.linha;
+    var dEd = desc['utero|' + i] || {};
+    var p = dEd.parede || uteroParede(txt);
+    var t = dEd.terco || uteroTerco(txt);
+    var f = dEd.figo || uteroFigo(txt);
+    var mm = uteroMedidasMm(txt);
+
+    plot.push({
+      id: 'U' + (i + 1),
+      n: i + 1,
+      parede: p,
+      terco: t,
+      figo: f,
+      mm: mm,
+      linha: txt,
+      frase: txt
+    });
+  });
+
+  return { plot: plot, semPos: semPos };
+}
+
+function uteroReescreverLocal(corpo, lesaoId, novaParede, novoTerco, novoFigo){
+  var s = String(corpo || '');
+  var idx = parseInt(String(lesaoId || '').replace(/\D/g, ''), 10) - 1;
+  if(idx < 0) idx = 0;
+
+  var r = uteroLesoes({ corpo: s });
+  var alvo = r.plot[idx];
+  if(!alvo) return { corpo: s, ok: false, frase: '' };
+
+  var antes = alvo.linha;
+  var depois = antes;
+
+  var descParede = {
+    'anterior': 'na parede anterior corporal',
+    'posterior': 'na parede posterior corporal',
+    'fundo': 'no fundo uterino',
+    'colo': 'na região ístmica/cervical',
+    'lateral-direita': 'na parede lateral direita',
+    'lateral-esquerda': 'na parede lateral esquerda'
+  }[novaParede] || ('na parede ' + novaParede);
+
+  var reParede = /(?:na\s+parede\s+(?:corporal\s+)?(?:anterior|posterior|lateral\s+direita|lateral\s+esquerda|[xX]+)|no\s+fundo\s+uterino|na\s+regi[ãa]o\s+[íi]stmica\/cervical)/i;
+  if(reParede.test(depois)){
+    depois = depois.replace(reParede, descParede);
+  } else {
+    depois = depois.replace(/(medindo\b|$)/i, descParede + ', $1');
+  }
+
+  var reFigo = /\bFIGO\s*(?:[0-8]|2\s*[-–]\s*5|[xX]+)\b/i;
+  if(reFigo.test(depois)){
+    depois = depois.replace(reFigo, 'FIGO ' + novoFigo);
+  } else {
+    depois = depois.replace(/(,\s*medindo|$)/i, ', FIGO ' + novoFigo + '$1');
+  }
+
+  if(depois === antes) return { corpo: s, ok: false, frase: antes };
+
+  var novoCorpo = s.replace(antes, depois);
+
+  var reConc = /(leiomioma\s+uterino\s+FIGO\s*)(?:[0-8]|2\s*[-–]\s*5|[xX]+)/i;
+  if(reConc.test(novoCorpo)){
+    novoCorpo = novoCorpo.replace(reConc, '$1' + novoFigo);
+  }
+
+  return { corpo: novoCorpo, ok: true, frase: depois };
+}
+
+function uteroLocalEstruturadaAtualizar(L, id, novaParede, novoTerco, novoFigo){
+  if(!L) return false;
+  var idx = parseInt(String(id || '').replace(/\D/g, ''), 10) - 1;
+  if(idx < 0) idx = 0;
+  var ed = L._descritores = L._descritores || {};
+  ed['utero|' + idx] = { parede: novaParede, terco: novoTerco, figo: novoFigo };
+  var ach = (((L.dados_estruturados || {}).achados) || [])[idx];
+  if(ach){
+    ach.parede = novaParede;
+    ach.figo = novoFigo;
+  }
+  return true;
+}
+
+function _uteroSagitalSVG(lesoes, arraste){
+  var w = 320, h = 240;
+  var s = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-label="Corte sagital do útero">'
+    + '<defs>'
+    + '<linearGradient id="utMioSag" x1="0%" y1="0%" x2="100%" y2="100%">'
+    + '<stop offset="0%" stop-color="#b85472"/><stop offset="60%" stop-color="#a34460"/><stop offset="100%" stop-color="#8a334d"/>'
+    + '</linearGradient>'
+    + '<linearGradient id="utEndoSag" x1="0%" y1="0%" x2="100%" y2="100%">'
+    + '<stop offset="0%" stop-color="#4a1525"/><stop offset="100%" stop-color="#2c0b15"/>'
+    + '</linearGradient>'
+    + '</defs>'
+    + '<rect width="'+w+'" height="'+h+'" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>'
+    + '<path d="M 65 80 C 50 30, 115 12, 175 35 C 230 58, 275 100, 288 135 C 295 155, 278 165, 258 155 C 235 142, 215 122, 190 112 C 150 98, 120 118, 80 172 C 55 205, 30 178, 45 142 C 52 122, 68 102, 65 80 Z" fill="url(#utMioSag)" stroke="#742238" stroke-width="2.2"/>'
+    + '<path d="M 72 78 C 60 42, 115 25, 168 46 C 218 68, 258 105, 272 134" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
+    + '<path d="M 85 82 C 80 56, 120 46, 158 64 C 196 82, 230 112, 246 134" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
+    + '<path d="M 92 78 C 88 66, 112 62, 138 72 C 172 88, 205 120, 228 138 C 218 144, 198 125, 170 110 C 142 96, 122 100, 100 120 C 90 130, 84 110, 92 78 Z" fill="url(#utEndoSag)" stroke="#1a040b" stroke-width="1.4"/>'
+    + '<text x="95" y="26" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Fundo</text>'
+    + '<text x="205" y="48" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Parede Anterior</text>'
+    + '<text x="120" y="190" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Parede Posterior</text>'
+    + '<text x="275" y="178" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Colo</text>';
+
+  lesoes.forEach(function(L){
+    var p = uteroSagitalXY(L);
+    var r = _uteroRaioPx(L.mm);
+    var cor = uteroFigoCor(L.figo);
+    s += '<g class="uteroMarcador" data-utero-mk-sag="1" data-lesao="'+L.id+'" transform="translate('+p[0].toFixed(1)+','+p[1].toFixed(1)+')" style="cursor:grab">'
+      + '<circle r="'+r+'" fill="'+cor+'" stroke="#ffffff" stroke-width="2" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.35))"/>'
+      + '<text y="3.8" text-anchor="middle" fill="#ffffff" font-weight="bold" font-size="11" font-family="Arial,sans-serif" style="pointer-events:none">'+L.n+'</text>'
+      + '</g>';
+  });
+
+  s += '</svg><div class="laudoUteroRot">CORTE SAGITAL (VISTA LATERAL)</div>';
+  return s;
+}
+
+function _uteroTransversalSVG(lesoes, arraste){
+  var w = 320, h = 240;
+  var cx = 160, cy = 120, rx = 110, ry = 80;
+  var s = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-label="Corte transversal do útero">'
+    + '<defs>'
+    + '<linearGradient id="utMioTra" x1="0%" y1="0%" x2="100%" y2="100%">'
+    + '<stop offset="0%" stop-color="#b85472"/><stop offset="70%" stop-color="#a34460"/><stop offset="100%" stop-color="#8a334d"/>'
+    + '</linearGradient>'
+    + '<linearGradient id="utEndoTra" x1="0%" y1="0%" x2="100%" y2="100%">'
+    + '<stop offset="0%" stop-color="#4a1525"/><stop offset="100%" stop-color="#2c0b15"/>'
+    + '</linearGradient>'
+    + '</defs>'
+    + '<rect width="'+w+'" height="'+h+'" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>'
+    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+rx+'" ry="'+ry+'" fill="url(#utMioTra)" stroke="#742238" stroke-width="2.2"/>'
+    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="92" ry="66" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
+    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="62" ry="42" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
+    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="34" ry="11" fill="url(#utEndoTra)" stroke="#1a040b" stroke-width="1.4"/>'
+    + '<text x="'+cx+'" y="28" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Anterior (Ventral)</text>'
+    + '<text x="'+cx+'" y="224" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Posterior (Dorsal)</text>'
+    + '<text x="32" y="124" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Direita</text>'
+    + '<text x="288" y="124" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Esquerda</text>';
+
+  lesoes.forEach(function(L){
+    var p = uteroTransversalXY(L);
+    var r = _uteroRaioPx(L.mm);
+    var cor = uteroFigoCor(L.figo);
+    s += '<g class="uteroMarcador" data-utero-mk-tra="1" data-lesao="'+L.id+'" transform="translate('+p[0].toFixed(1)+','+p[1].toFixed(1)+')" style="cursor:grab">'
+      + '<circle r="'+r+'" fill="'+cor+'" stroke="#ffffff" stroke-width="2" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.35))"/>'
+      + '<text y="3.8" text-anchor="middle" fill="#ffffff" font-weight="bold" font-size="11" font-family="Arial,sans-serif" style="pointer-events:none">'+L.n+'</text>'
+      + '</g>';
+  });
+
+  s += '</svg><div class="laudoUteroRot">CORTE TRANSVERSAL (ORTO-AXIAL)</div>';
+  return s;
+}
+
+function uteroEsquemaHTML(L, arraste){
+  var r = uteroLesoes(L);
+  if(!r.plot.length) return '';
+  var h = '<div class="laudoUteroCard">'
+    + '<div class="laudoUteroVistas">'
+    + '<div>' + _uteroSagitalSVG(r.plot, arraste) + '</div>'
+    + '<div>' + _uteroTransversalSVG(r.plot, arraste) + '</div>'
+    + '</div>'
+    + '<div class="laudoUteroLegenda">';
+
+  r.plot.forEach(function(x){
+    var med = (x.mm && x.mm.length) ? (' (' + x.mm.map(cmTxt).join(' × ') + ' cm)') : '';
+    h += '<div>• <b>Mioma ' + x.n + ':</b> ' + uteroFigoDesc(x.figo) + med + ' — parede ' + x.parede + '.</div>';
+  });
+  h += '</div>'
+    + '<div class="laudoUteroNota">Representação esquemática, sem escala anatômica real. A localização e classificação FIGO seguem a descrição do exame.</div>'
+    + '</div>';
+  return h;
+}
+
+function uteroLayoutDo(L){
+  var x = (L && L._uteroLayout) || {};
+  var modo = /^(esquerda|direita)$/.test(x.modo || '') ? x.modo : 'abaixo';
+  var topo = parseFloat(x.topo); if(!isFinite(topo) || topo < 0) topo = 0;
+  var largura = parseFloat(x.largura); if(!isFinite(largura) || largura < 200) largura = null;
+  var formato = /^(horizontal|vertical)$/.test(x.formato || '') ? x.formato : 'horizontal';
+  return { travado: x.travado !== false, modo: modo, topo: Math.min(topo, 600), largura: largura, formato: formato };
+}
+
+function uteroLayoutControlesHTML(L){
+  var p = uteroLayoutDo(L);
+  return '<div class="laudoUteroLayoutControles">'
+    + (!p.travado ? '<button type="button" class="laudoUteroLayoutBt laudoUteroLayoutMover" data-utero-mover="1" title="Arraste para reposicionar a figura">✥ Mover figura</button>' : '')
+    + '<button type="button" class="laudoUteroLayoutBt" onclick="uteroLayoutAlternarTrava(event)" title="' + (p.travado ? 'Destravar' : 'Travar') + ' a figura">'
+    + (p.travado ? '🔒 Travada' : '🔓 Destravada') + '</button></div>';
+}
+
+function uteroLayoutAlternarTrava(ev){
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  var ex = rev2Ex(); if(!ex || !ex.laudo) return;
+  var p = uteroLayoutDo(ex.laudo);
+  ex.laudo._uteroLayout = { travado: !p.travado, modo: p.modo, topo: p.topo, largura: p.largura, formato: p.formato };
+  try{ agendarSalvarSessao(); }catch(e){}
+  abrirRevisao(ex.id, true);
+  log(ex.laudo._uteroLayout.travado ? 'Figura do útero travada.' : 'Figura destravada — use as alças para mover ou redimensionar.');
+}
+
+function uteroHostHTML(L){
+  var desenho = uteroEsquemaHTML(L);
+  if(!desenho) return '';
+  var p = uteroLayoutDo(L), cls = 'laudoUteroHost';
+  if(p.modo !== 'abaixo') cls += ' flutua ' + p.modo;
+  if(p.formato === 'vertical') cls += ' formato-vertical';
+  else cls += ' formato-horizontal';
+  var st = '';
+  if(p.modo !== 'abaixo') st += 'margin-top:' + Math.round(p.topo) + 'px;';
+  if(p.largura) st += 'width:' + Math.round(p.largura) + 'px;max-width:100%;';
+  var stAttr = st ? (' style="' + st + '"') : '';
+  var rz = !p.travado ? '<div class="laudoLayoutResizeHandle" data-utero-resize="1" title="Arraste para redimensionar tamanho e formato">⌟</div>' : '';
+  return '<div class="' + cls + '" contenteditable="false"' + stAttr + '>'
+    + uteroLayoutControlesHTML(L) + desenho + rz + '</div>';
+}
+
+function uteroSecoesLocalizar(L){
+  var corpo = String((L && L.corpo) || '');
+  var re = /(?:^|\n)\s*(\*\*(?:ÚTERO|UTERO)[^*\n]*\*\*|[ÚU]tero\s*:?)/i;
+  var m = re.exec(corpo);
+  if(!m) return null;
+  var ini = m.index;
+  var resto = corpo.slice(ini + m[0].length);
+  var prox = /\n\s*(\*\*(?:Ov[áa]rio|Anexo|F\.?S\.?D|Fundo\s+de\s+saco|Bexiga|Vagina|Conclus[ãa]o)[^*\n]*\*\*)/i.exec(resto);
+  var fim = prox ? (ini + m[0].length + prox.index) : corpo.length;
+  return { ini: ini, fim: fim, tam: m[0].length };
+}
+
+function uteroTemSelecao(L){
+  if(!L) return false;
+  var es = (L._uteroIlustracoes);
+  if(es && es.ativo === false) return false;
+  if(es && es.ativo === true) return true;
+  var les = uteroLesoes(L);
+  return (les.plot.length > 0);
+}
+
+function uteroCorpoHTML(L){
+  var corpo = String((L && L.corpo) || '').replace(/\n{3,}/g, '\n\n');
+  if(!uteroTemSelecao(L)) return negrito(corpo);
+  var host = uteroHostHTML(L);
+  if(!host) return negrito(corpo);
+  var p = uteroLayoutDo(L);
+
+  var sec = uteroSecoesLocalizar(L);
+  if(sec){
+    var parte = corpo.slice(sec.ini, sec.fim);
+    var blocoSec = '';
+    if(p.modo === 'abaixo'){
+      blocoSec = '<div class="laudoUteroSecao">' + negrito(parte) + host + '</div>';
+    } else {
+      blocoSec = '<div class="laudoUteroSecao">' + negrito(parte.slice(0, sec.tam)) + host + negrito(parte.slice(sec.tam)) + '</div>';
+    }
+    return negrito(corpo.slice(0, sec.ini)) + blocoSec + negrito(corpo.slice(sec.fim));
+  }
+  return negrito(corpo) + '<div class="laudoUteroSecao">' + host + '</div>';
+}
+
+function uteroCaixaHTML(ex, b){
+  if(!ex || (ex.tipo !== 'transvaginal' && ex.tipo !== 'pelvica') || !imagensRevisaoLigadas()) return '';
+  var t = uteroNorm(b && b.titulo);
+  if(!/utero|miometrio/.test(t) || !rev2TemAchado(ex, b)) return '';
+  var r = uteroLesoes(ex.laudo);
+  if(!r.plot.length) return '';
+  var on = uteroTemSelecao(ex.laudo);
+  return '<div class="caixa utero">'
+    + (on ? 'Ilustração com corte sagital e transversal (FIGO) adicionada ao laudo.'
+          : 'Esquema anatômico do útero com classificação FIGO disponível para este exame.')
+    + '<button class="ficha' + (on ? ' on' : '') + '" onclick="uteroAlternar()">'
+    + (on ? 'Remover ilustração' : 'Adicionar ilustração') + '</button></div>';
+}
+
+function uteroAlternar(){
+  var ex = rev2Ex(); if(!ex || !ex.laudo) return;
+  var es = ex.laudo._uteroIlustracoes = ex.laudo._uteroIlustracoes || {};
+  var antes = uteroTemSelecao(ex.laudo);
+  es.ativo = !antes;
+  try{ agendarSalvarSessao(); }catch(e){}
+  rev2Render();
+  log(es.ativo
+    ? 'Ilustração anatômica do útero (vistas sagital e transversal) adicionada ao laudo.'
+    : 'Ilustração do útero removida deste laudo.');
+}
+
+function uteroLayoutLigar(raiz, ex){
+  if(!raiz) return; raiz._uteroLayoutEx = ex;
+  if(raiz._uteroLayoutLigado) return; raiz._uteroLayoutLigado = true;
+  raiz.addEventListener('pointerdown', function(ev){
+    var btMover = ev.target.closest && ev.target.closest('[data-utero-mover]');
+    var btResize = ev.target.closest && ev.target.closest('[data-utero-resize]');
+    var mkSag = ev.target.closest && ev.target.closest('[data-utero-mk-sag]');
+    var mkTra = ev.target.closest && ev.target.closest('[data-utero-mk-tra]');
+    if(!btMover && !btResize && !mkSag && !mkTra) return;
+    var atual = raiz._uteroLayoutEx;
+    if(!atual || !atual.laudo) return;
+
+    if(btMover){
+      var host = btMover.closest('.laudoUteroHost'), sec = btMover.closest('.laudoUteroSecao');
+      if(!host || !sec || uteroLayoutDo(atual.laudo).travado) return;
+      ev.preventDefault(); var x0=ev.clientX, y0=ev.clientY, moveu=false;
+      function mover(e){ moveu=true; host.style.transform='translate('+(e.clientX-x0)+'px,'+(e.clientY-y0)+'px)'; host.style.zIndex='10'; e.preventDefault(); }
+      function soltar(e){
+        window.removeEventListener('pointermove',mover);window.removeEventListener('pointerup',soltar);
+        host.style.transform='';host.style.zIndex=''; if(!moveu) return;
+        var r=sec.getBoundingClientRect(), rel=(e.clientX-r.left)/Math.max(r.width,1);
+        var modo=rel<0.35?'esquerda':(rel>0.65?'direita':'abaixo');
+        var folha=sec.closest('.laudoFolha');
+        var pxmm=folha?(folha.clientWidth/210):3.7795;
+        var pageH=297*pxmm;
+        var cs=folha?getComputedStyle(folha):{};
+        var botPx=parseFloat(cs.paddingBottom)||0;
+        var FRISO=12;
+        var fr=folha?folha.getBoundingClientRect():{top:0};
+        var secTop=r.top-fr.top;
+        var pag=Math.max(0,Math.floor(secTop/pageH));
+        var limPag=(pag+1)*pageH-botPx-FRISO;
+        var hH=host.offsetHeight||240;
+        var maxTopo=Math.max(0, limPag-secTop-hH);
+        var topoBruto=Math.max(0, e.clientY-r.top-28);
+        var topo=modo==='abaixo'?0:Math.min(maxTopo, topoBruto);
+        var all=atual.laudo._uteroLayout=atual.laudo._uteroLayout||{};
+        var formato=(modo==='abaixo')?'horizontal':'vertical';
+        var larg=(modo==='abaixo')?null:(formato==='vertical'?260:480);
+        all.travado=false; all.modo=modo; all.topo=topo; all.largura=larg; all.formato=formato;
+        try{agendarSalvarSessao();}catch(_e){}
+        abrirRevisao(atual.id,true);
+        log('Figura do útero posicionada '+(modo==='abaixo'?'abaixo do texto':('à '+modo+', com o texto ao redor'))+'.');
+      }
+      window.addEventListener('pointermove',mover,{passive:false});window.addEventListener('pointerup',soltar);
+    } else if(btResize){
+      var hostR = btResize.closest('.laudoUteroHost'), secR = btResize.closest('.laudoUteroSecao');
+      if(!hostR || !secR || uteroLayoutDo(atual.laudo).travado) return;
+      ev.preventDefault(); var pR = uteroLayoutDo(atual.laudo);
+      var w0 = hostR.offsetWidth, x0R = ev.clientX, moveuR = false, wFinal = w0, formatoFinal = pR.formato;
+      function moverR(e){
+        moveuR = true;
+        var dx = e.clientX - x0R;
+        wFinal = Math.max(220, Math.min(secR.offsetWidth, w0 + (pR.modo === 'esquerda' ? dx : -dx)));
+        hostR.style.width = Math.round(wFinal) + 'px';
+        if(wFinal < 320 && formatoFinal !== 'vertical'){
+          formatoFinal = 'vertical';
+          hostR.classList.remove('formato-horizontal'); hostR.classList.add('formato-vertical');
+        } else if(wFinal >= 320 && formatoFinal !== 'horizontal'){
+          formatoFinal = 'horizontal';
+          hostR.classList.remove('formato-vertical'); hostR.classList.add('formato-horizontal');
+        }
+        e.preventDefault();
+      }
+      function soltarR(e){
+        window.removeEventListener('pointermove',moverR);window.removeEventListener('pointerup',soltarR);
+        if(!moveuR) return;
+        var folha=secR.closest('.laudoFolha');
+        var pxmm=folha?(folha.clientWidth/210):3.7795;
+        var pageH=297*pxmm;
+        var cs=folha?getComputedStyle(folha):{};
+        var botPx=parseFloat(cs.paddingBottom)||0;
+        var FRISO=12;
+        var fr=folha?folha.getBoundingClientRect():{top:0};
+        var secTop=secR.getBoundingClientRect().top-fr.top;
+        var pag=Math.max(0,Math.floor(secTop/pageH));
+        var limPag=(pag+1)*pageH-botPx-FRISO;
+        var hH=hostR.offsetHeight||240;
+        var maxTopo=Math.max(0, limPag-secTop-hH);
+        var topoAjustado=pR.modo==='abaixo'?0:Math.min(maxTopo, pR.topo);
+        var allR=atual.laudo._uteroLayout=atual.laudo._uteroLayout||{};
+        allR.travado=false; allR.modo=pR.modo; allR.topo=topoAjustado; allR.largura=Math.round(wFinal); allR.formato=formatoFinal;
+        try{agendarSalvarSessao();}catch(_e){}
+        abrirRevisao(atual.id,true);
+        log('Figura do útero redimensionada.');
+      }
+      window.addEventListener('pointermove',moverR,{passive:false});window.addEventListener('pointerup',soltarR);
+    } else if(mkSag || mkTra){
+      var id = (mkSag||mkTra).getAttribute('data-lesao') || 'U1';
+      var svg = (mkSag||mkTra).closest('svg');
+      var ehSag = !!mkSag;
+      ev.preventDefault();
+      var moveuMk = false;
+      var rSvg = svg.getBoundingClientRect();
+      var les = uteroLesoes(atual.laudo).plot.find(function(x){ return x.id===id; }) || { parede:'anterior', terco:'medio', figo:'4' };
+      var novaP = les.parede, novoT = les.terco, novoF = les.figo;
+
+      function moverM(e){
+        moveuMk = true;
+        var pt = {
+          x: Math.max(20, Math.min(300, (e.clientX - rSvg.left) * (320 / rSvg.width))),
+          y: Math.max(20, Math.min(220, (e.clientY - rSvg.top) * (240 / rSvg.height)))
+        };
+        if(ehSag){
+          if(pt.x < 100 && pt.y < 85){ novaP = 'fundo'; novoT = 'superior'; }
+          else if(pt.x > 240 && pt.y > 130){ novaP = 'colo'; novoT = 'inferior'; }
+          else if(pt.y < 95){ novaP = 'anterior'; novoT = 'medio'; }
+          else { novaP = 'posterior'; novoT = 'medio'; }
+
+          var dist = Math.hypot(pt.x - 145, pt.y - 95);
+          if(dist < 14) novoF = '0';
+          else if(dist < 26) novoF = '1';
+          else if(dist < 38) novoF = '2';
+          else if(dist < 50) novoF = '3';
+          else if(dist < 65) novoF = '4';
+          else if(dist < 78) novoF = '5';
+          else if(dist < 92) novoF = '6';
+          else novoF = '7';
+        } else {
+          var dx = pt.x - 160, dy = pt.y - 120;
+          var distR = Math.hypot(dx / 110, dy / 80);
+          if(Math.abs(dx) > Math.abs(dy) * 1.3){
+            novaP = dx < 0 ? 'lateral-direita' : 'lateral-esquerda';
+          } else if(dy < 0) novaP = 'anterior';
+          else novaP = 'posterior';
+
+          if(distR < 0.22) novoF = '0';
+          else if(distR < 0.36) novoF = '1';
+          else if(distR < 0.50) novoF = '2';
+          else if(distR < 0.64) novoF = '3';
+          else if(distR < 0.78) novoF = '4';
+          else if(distR < 0.90) novoF = '5';
+          else if(distR < 1.05) novoF = '6';
+          else novoF = '7';
+        }
+        var pSag = uteroSagitalXY({ parede: novaP, terco: novoT, figo: novoF });
+        var pTra = uteroTransversalXY({ parede: novaP, terco: novoT, figo: novoF });
+        var cor = uteroFigoCor(novoF);
+        var elS = raiz.querySelector('[data-utero-mk-sag][data-lesao="'+id+'"]');
+        var elT = raiz.querySelector('[data-utero-mk-tra][data-lesao="'+id+'"]');
+        if(elS){
+          elS.setAttribute('transform', 'translate('+pSag[0].toFixed(1)+','+pSag[1].toFixed(1)+')');
+          elS.querySelector('circle').setAttribute('fill', cor);
+        }
+        if(elT){
+          elT.setAttribute('transform', 'translate('+pTra[0].toFixed(1)+','+pTra[1].toFixed(1)+')');
+          elT.querySelector('circle').setAttribute('fill', cor);
+        }
+        e.preventDefault();
+      }
+
+      function soltarM(){
+        window.removeEventListener('pointermove', moverM);
+        window.removeEventListener('pointerup', soltarM);
+        if(!moveuMk) return;
+        var rTro = uteroReescreverLocal(atual.laudo.corpo, id, novaP, novoT, novoF);
+        if(rTro.ok){
+          atual.laudo.corpo = rTro.corpo;
+          uteroLocalEstruturadaAtualizar(atual.laudo, id, novaP, novoT, novoF);
+          try{ agendarSalvarSessao(); }catch(_e){}
+          abrirRevisao(atual.id, true);
+          log('Mioma reposicionado: ' + novaP + ', ' + uteroFigoDesc(novoF) + '.');
+        } else {
+          log('Posição calculada (' + uteroFigoDesc(novoF) + '), mas não encontrei a frase no laudo para substituir.', true);
+          abrirRevisao(atual.id, true);
+        }
+      }
+      window.addEventListener('pointermove', moverM, {passive:false});
+      window.addEventListener('pointerup', soltarM);
+    }
+  });
+}
+
 /* ===================== TELA DE ABERTURA (2.0) — comportamento =====================
    As três conferências saem de dados REAIS do agente, não de enfeite:
      microfone  -> /microfone/existe   (só pergunta se existe; NÃO abre nada)
@@ -14814,6 +16725,12 @@ function exRenderModos(){
   });
 }
 
+/* Ilustrações são uma FERRAMENTA disponível, não uma ordem para ilustrar todos os laudos.
+   A escolha nasce antes do atendimento para o médico não precisar configurar tamanho e
+   posição no meio da revisão. O "sim" apenas mostrará o botão de adicionar no laudo; a
+   figura continua dependendo de um gesto dele, exame por exame. Guardada no disco pelo
+   mesmo caminho do local e do modo de revisão, porque a porta do navegador muda a cada
+   abertura do programa. */
 /* Liga a gravação: teste de voz de 5s (o mesmo da tela de abertura) e depois o
    modo "aguardar exame do aparelho", que já existia. */
 async function exIniciar(){
@@ -16254,6 +18171,9 @@ function rev2Caixas(ex,b){
     h+='<div class="caixa ver">falta a medida: <b>'+esc(f.rotulo)+'</b>'
       +(f.quantos>1?(' ('+f.quantos+' números)'):'')+' — dite agora ou digite no texto acima</div>';
   });
+  h+=tireoideCaixaHTML(ex,b);
+  h+=mamaCaixaHTML(ex,b);
+  h+=uteroCaixaHTML(ex,b);
   return h;
 }
 function rev2AbrirOpcoes(i){

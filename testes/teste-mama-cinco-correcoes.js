@@ -18,12 +18,13 @@ function grab(nome) {
 
 console.log('=== 1. formatacao: nenhum bloco VAZIO no meio do laudo ===');
 // Sem exame anterior, mamaEvolucaoHTML devolve ''; com a secao da paciente desligada,
-// pacienteHTML tambem. Antes os dois viravam <div></div> ocos dentro do texto — um buraco
-// embaixo do texto e o desenho colado no paragrafo de cima.
+// pacienteFolhaHTML tambem. Antes os dois viravam blocos ocos no documento.
 const abrir = grab('abrirRevisao');
 ok(/_evo\?'<div class="mamaEvoBox"/.test(abrir), 'o bloco de evolucao so sai se tiver conteudo');
-ok(/return _p\?\('<div contenteditable="false">'\+_p\+'<\/div>'\):'';/.test(abrir),
-   'e a secao da paciente idem');
+const folhaPaciente = grab('pacienteFolhaHTML');
+ok(/if\(!miolo\) return '';/.test(folhaPaciente)
+   && /_folhaPaciente\+_folhaAbre/.test(abrir),
+   'a folha da paciente so existe quando tem conteudo e vem antes do laudo tecnico');
 const esquemaFn = grab('mamaEsquemaHTML');
 ok(/display:block;margin:20px 0 16px/.test(esquemaFn),
    'o espaco em volta do desenho vive num lugar so (CSS do bloco), nao em <br> soltos');
@@ -40,10 +41,10 @@ console.log('\n=== 3. a distancia ditada e LIDA (o achado casa com a frase certa
 // era casado com o CABECALHO da mama ("**MAMA ESQUERDA** / DESCRICAO: / Mama simetrica."),
 // que nao fala dele. Agora a busca e pela HORA, dentro da secao daquela mama.
 const fraseFn = grab('_mamaFraseDo');
-ok(/PROCURA PELA HORA, DENTRO DA SEÇÃO DA MAMA CERTA/.test(fraseFn), 'ha a busca pela hora');
+ok(fraseFn.indexOf('var _reH=new RegExp') >= 0, 'ha a busca de reserva pela hora');
 // indexOf, nao regex: a fonte tem barras invertidas ("MAMA\\s+") e escapa-las duas vezes
 // numa regex de teste e um jeito facil de reprovar codigo certo.
-ok(fraseFn.indexOf("'MAMA\\\\s+'+_lado") >= 0 && fraseFn.indexOf("'MAMA\\\\s+'+_outro") >= 0,
+ok(fraseFn.indexOf("MAMA\\\\s+'+_lado") >= 0 && fraseFn.indexOf("MAMA\\\\s+'+_outro") >= 0,
    'e ela fica presa a secao do lado — a hora de uma mama nao casa com a frase da outra');
 ok(fraseFn.indexOf('_reH') < fraseFn.indexOf('var chave='),
    'a busca pela hora vem ANTES da busca antiga, que fica so como reserva');

@@ -651,7 +651,7 @@ const VERIFICACOES = `(async () => {
     const quantosAntes = Object.keys(MODELOS).length;
     const abdomAntes = MODELOS.abdominal && MODELOS.abdominal.corpo;
     corpoEl.value = 'CORPO DE TESTE 25/08';
-    modCfgSalvarModelo();
+    await modCfgSalvarModelo();
     diz('salvar guarda o texto novo', MODELOS.mama.corpo === 'CORPO DE TESTE 25/08');
     diz('e NAO apaga os outros modelos', Object.keys(MODELOS).length === quantosAntes,
       Object.keys(MODELOS).length + ' de ' + quantosAntes);
@@ -856,16 +856,13 @@ const VERIFICACOES = `(async () => {
       getComputedStyle(pgFolhaR.querySelector('.laudoTexto')).lineHeight ===
       getComputedStyle(pgFolhaR).lineHeight);
 
-    // ---- O LAUDO DE MAMA SAI SEM DESENHO POR PADRAO (27/08, pedido dele) ----
-    // "vamos remover as imagens como padrao dos laudos de mama temporariamente ate a
-    // gente conseguir ajustar". O interruptor e MAMA_DESENHOS; o desenho em si continua
-    // inteiro, e as verificacoes dele (logo abaixo) ligam o interruptor de proposito.
-    diz('o interruptor dos desenhos da mama nasce DESLIGADO', MAMA_DESENHOS === false, MAMA_DESENHOS);
+    // ---- O DESENHO VOLTOU, MAS NENHUM LAUDO O RECEBE SOZINHO (08/09) ----
+    // O motor fica disponivel. Quem decide se ele entra e a escolha por lado guardada no
+    // proprio laudo; a configuracao geral apenas disponibiliza o botao na revisao.
+    diz('o motor dos desenhos da mama nasce DISPONIVEL', MAMA_DESENHOS === true, MAMA_DESENHOS);
 
     // ---- O DESENHO DA MAMA SE DIVIDE ENTRE AS FOLHAS (pedido do medico, 25/08) ----
-    // A partir daqui o interruptor fica LIGADO: estas verificacoes existem para o dia em
-    // que os desenhos voltarem, e ficariam verdes a toa se rodassem com eles desligados.
-    MAMA_DESENHOS = true;
+    // Estes casos simulam o toque em "Adicionar ilustracao" nos dois lados.
     // O laudo REAL dele gastava TRES folhas: o desenho das duas mamas era um bloco so,
     // nao cabia no fim da folha 1 e pulava inteiro, deixando meia folha em branco; a
     // terceira folha ficava quase vazia. Ele desenhou a solucao: uma mama fecha a folha 1,
@@ -873,6 +870,44 @@ const VERIFICACOES = `(async () => {
     // a apertar a entrelinha: assinatura orfa OU folha desperdicada.
     const NL = String.fromCharCode(10);
     const BUL = String.fromCharCode(8226);   // o bullet dos cistos, sem escape (ver a armadilha das crases)
+    // ---- A EXPLICACAO DA PACIENTE E A PAGINA 1, NAO O RODAPE DO LAUDO (09/09) ----
+    localStorage.setItem('gpaciente','1');
+    exames.push({ id: 9988, tipo: 'mama', paciente: 'Teste Paciente', imagens: [], audios: [],
+      laudo: { cab: { nome: 'Teste Paciente', idade: '48', realizado_em: '09/09/2026' },
+               titulo: MODELOS.mama.titulo, tecnica: MODELOS.mama.tecnica,
+               corpo: MODELOS.mama.corpo, conclusao: 'Categoria: BI-RADS 2.', obs: '' } });
+    abrirRevisao(9988);
+    const areaPac=document.getElementById('areaImpressao');
+    const folhaPac=areaPac.querySelector('.pacienteFolha'), folhaTec=areaPac.querySelector('.laudoFolha');
+    diz('a explicacao para a paciente e o PRIMEIRO elemento impresso',
+      !!folhaPac && areaPac.firstElementChild===folhaPac);
+    diz('o laudo tecnico comeca somente depois da folha da paciente',
+      !!folhaPac && !!folhaTec && folhaPac.nextElementSibling===folhaTec);
+    const mmPac=folhaPac ? folhaPac.clientWidth/210 : 1;
+    diz('a folha da paciente mede um A4 inteiro',
+      !!folhaPac && Math.abs(folhaPac.clientHeight/mmPac-297)<1,
+      folhaPac ? Math.round(folhaPac.clientHeight/mmPac)+' mm' : 'sem folha');
+    const bgPac=folhaPac?getComputedStyle(folhaPac).backgroundColor:'',
+          bgCard=folhaPac?getComputedStyle(folhaPac.querySelector('.pacBox')).backgroundColor:'';
+    diz('a pagina amigavel tem fundo claro e cartao branco, inclusive no tema escuro',
+      bgPac!=='rgb(0, 0, 0)' && bgPac!=='rgb(21, 24, 32)' && bgCard==='rgb(255, 255, 255)',
+      bgPac+' / '+bgCard);
+    const titPac=folhaPac&&folhaPac.querySelector('.pacTitulo'),
+          acaoPac=folhaPac&&folhaPac.querySelector('.pacLinha u'),
+          notaPac=folhaPac&&folhaPac.querySelector('.pacNota');
+    diz('a pagina usa o novo titulo dirigido diretamente a paciente',
+      !!titPac && titPac.textContent.trim()==='Informações para você sobre seu exame');
+    diz('o primeiro proximo passo e levar o exame ao medico, em letras sublinhadas',
+      !!acaoPac && acaoPac.textContent.trim()==='Levar esse exame para seu médico.'
+      && getComputedStyle(acaoPac).textDecorationLine.indexOf('underline')>=0);
+    diz('a ressalva aponta para o laudo tecnico das paginas seguintes',
+      !!notaPac && notaPac.textContent.indexOf('laudo técnico apresentado nas páginas seguintes')>=0
+      && notaPac.textContent.indexOf('texto técnico acima')<0);
+    const limPac=folhaHtmlLimpo();
+    diz('salvar e imprimir conservam a pagina da paciente antes do laudo',
+      limPac.indexOf('pacienteFolha')>=0 && limPac.indexOf('pacienteFolha')<limPac.indexOf('laudoFolha'));
+    localStorage.setItem('gpaciente','0');
+
     const mamaCorpo = [
       '**MAMA DIREITA**', '**DESCRICAO:**', '',
       'Mama simetrica.',
@@ -895,7 +930,7 @@ const VERIFICACOES = `(async () => {
                titulo: 'RELATORIO ULTRASSONOGRAFICO MAMA', tecnica: MODELOS.mama.tecnica,
                corpo: mamaCorpo,
                conclusao: 'Exame ecografico compativel com cisto simples na mama direita e nodulo mamario na esquerda.',
-               obs: '',
+               obs: '', _mamaIlustracoes: { D: true, E: true },
                _classifBruto: { birads: [
                  { localizacao: 'mama direita, as 9 h', caso_especial: 'cistoSimples' },
                  { localizacao: 'mama esquerda, as 3 h', forma: 'oval', orientacao: 'paralela',
@@ -929,12 +964,11 @@ const VERIFICACOES = `(async () => {
     };
     const mE = medE();
     diz('o laudo que gastava TRES folhas passa a caber em DUAS', mE.pags === 2, mE.pags + ' folhas');
-    // A quebra PODE cair entre as duas mamas — e isso que mata o vazio de meia folha.
-    // (Em que folha cada uma cai depende do comprimento do laudo; o que se garante aqui
-    // e que a paginacao enxerga os dois cartoes como pontos de quebra SEPARADOS.)
+    // A quebra PODE cair entre as duas mamas, mas nao entre o texto de um lado e sua
+    // figura: agora a unidade do paginador e a secao inteira daquele lado.
     const ptsE = _paginarPontos(fE.querySelector('.laudoTexto'));
-    diz('a quebra pode cair ENTRE as duas mamas (um ponto por cartao)',
-      [].every.call(cards, c => ptsE.some(p => p.node === c)),
+    diz('a quebra pode cair ENTRE as duas mamas (uma unidade por lado)',
+      [].every.call(cards, c => ptsE.some(p => p.node === c.closest('.laudoMamaSecao'))),
       ptsE.length + ' pontos de quebra');
     diz('os dois cartoes ficam na ordem direita-esquerda',
       mE.pagD <= mE.pagE, 'D=f' + (mE.pagD + 1) + ' E=f' + (mE.pagE + 1));
@@ -997,11 +1031,12 @@ const VERIFICACOES = `(async () => {
         + 'Parenquima mamario heterogeneo, notando-se formacao cistica simples, anecoica, localizada as 3 h, distando 4 cm da papila, medindo 0,5 x 0,4 x 0,4 cm.' + NL
         + (fE || '') + enc;
     };
-    const mCaso = (id, corpo, itens) => {
+    const mCaso = (id, corpo, itens, ilustracoes) => {
       exames.push({ id, tipo: 'mama', paciente: 'T' + id, imagens: [], audios: [],
         laudo: { cab: { nome: 'T' + id, idade: '48', realizado_em: '26/08/2026' },
                  titulo: 'RELATORIO ULTRASSONOGRAFICO MAMA', tecnica: MODELOS.mama.tecnica,
                  corpo, conclusao: 'Exame ecografico compativel com cistos simples.', obs: '',
+                 _mamaIlustracoes: ilustracoes === undefined ? { D: true, E: true } : ilustracoes,
                  _classifBruto: { birads: itens } } });
       abrirRevisao(id);
       paginarLaudoTela();
@@ -1014,24 +1049,23 @@ const VERIFICACOES = `(async () => {
       const B2 = el => el ? el.getBoundingClientRect().bottom - fr3.top : null;
       const T2 = el => el ? el.getBoundingClientRect().top - fr3.top : null;
       const pg2 = Math.round(f2.clientHeight / ph2);
-      // 26/08 (noite): a moldura fecha em cada folha e o texto guarda um respiro de 12px
-      // (FRISO) da linha do retangulo — o cartao crava 12px acima do pe, o da esquerda
-      // abre 12px abaixo do topo util
+      const secD=f2.querySelector('.laudoMamaSecao[data-lado="D"]');
+      const secE=f2.querySelector('.laudoMamaSecao[data-lado="E"]');
       return { mold: f2.getAttribute('data-moldura'), fonte: cs3.fontSize, pags: pg2,
-               DnoPe: cds[0] ? Math.abs(B2(cds[0]) - (ph2 - bp2 - 12)) <= 3 : null,
-               EnoTopo: cds[1] ? (T2(cds[1]) - (ph2 + tp2)) : null,
+               Dancorada:!!(secD&&cds[0]&&secD.contains(cds[0])),
+               Eancorada:!!(secE&&cds[1]&&secE.contains(cds[1])),
                assinPe: Math.abs(B2(rd2) - (pg2 * ph2 - bp2)) <= 3 };
     };
     const mIt2 = [{ localizacao: 'mama direita, as 9 h', caso_especial: 'cistoSimples' },
                   { localizacao: 'mama esquerda, as 3 h', caso_especial: 'cistoSimples' }];
     const mLin = 'Texto complementar do exame, escrito para alongar a descricao desta mama alem do habitual da clinica.' + NL;
     const mo1 = mCaso(9910, mCorpo('', ''), mIt2);
-    diz('bilateral CURTO entra na moldura', mo1.mold === '1' && mo1.pags === 2, mo1.pags + ' folhas');
-    diz('o cartao da direita CRAVA no pe da folha 1 (12px acima da moldura)', mo1.DnoPe === true);
-    diz('o da esquerda abre a folha 2 (respiro da moldura + margem do cartao)',
-      mo1.EnoTopo != null && mo1.EnoTopo >= 10 && mo1.EnoTopo <= 42, Math.round(mo1.EnoTopo) + 'px do topo util');
-    diz('a letra segue a PADRAO (a 10 dele) — moldura nunca mia a letra', mo1.fonte === '13px');
-    diz('conclusao e assinatura fecham a folha 2 no pe', mo1.assinPe === true);
+    diz('bilateral CURTO usa o fluxo sem separar figura do texto do lado',
+      mo1.mold == null && mo1.pags >= 1, mo1.pags + ' folhas');
+    diz('o cartao da direita mora dentro da secao da mama direita', mo1.Dancorada === true);
+    diz('o cartao da esquerda mora dentro da secao da mama esquerda', mo1.Eancorada === true);
+    diz('a letra segue a PADRAO (a 10 dele)', mo1.fonte === '13px');
+    diz('conclusao e assinatura fecham a ultima folha no pe', mo1.assinPe === true);
     const mo3 = mCaso(9912, mCorpo(mLin.repeat(24), mLin.repeat(24)), mIt2);
     diz('bilateral LONGO cai no plano B dele: fluxo, sem moldura',
       mo3.mold == null && mo3.pags >= 3, mo3.pags + ' folhas');
@@ -1045,11 +1079,7 @@ const VERIFICACOES = `(async () => {
       mo4.mold == null && mo4.pags === 1, mo4.pags + ' folha(s)');
     diz('com a assinatura no pe dela', mo4.assinPe === true);
     exames = exames.filter(e => [9910, 9912, 9913].indexOf(e.id) < 0);
-    MAMA_DESENHOS = false;   // volta ao padrao de amanha: mama sem desenho
-
-    // ---- O LAUDO DE MAMA DE AMANHA, DE PONTA A PONTA, SEM DESENHO (27/08) ----
-    // Este e o teste que ele pediu como ultimo: o laudo bilateral com cistos nos dois
-    // lados, do jeito que vai sair na clinica, com os desenhos desligados.
+    // ---- MOTOR DISPONIVEL, MAS LAUDO SEM CONFIRMACAO CONTINUA SEM DESENHO ----
     const mo5 = mCaso(9917,
       '**MAMA DIREITA**' + NL + '**DESCRICAO:**' + NL + NL + 'Mama simetrica.' + NL
       + 'Parenquima mamario heterogeneo, **notando-se formacoes cisticas simples:**' + NL
@@ -1062,7 +1092,7 @@ const VERIFICACOES = `(async () => {
       + '**' + BUL + ' as 3 h, a 2 cm da papila, medindo 1,0 x 1,1 x 0,4 cm.**' + NL
       + 'Regiao axilar livre.',
       [{ localizacao: 'mama direita, as 2 h', caso_especial: 'cistoSimples' },
-       { localizacao: 'mama esquerda, as 12 h', caso_especial: 'cistoSimples' }]);
+       { localizacao: 'mama esquerda, as 12 h', caso_especial: 'cistoSimples' }], {});
     const f5 = document.querySelector('#areaImpressao');
     diz('MAMA: nenhum desenho na folha (nem esquema, nem grafico)',
       !f5.querySelector('#mamaEsqBox') && !f5.querySelector('.mamaEvoBox'));

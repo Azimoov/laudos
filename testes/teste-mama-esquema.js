@@ -33,10 +33,13 @@ const MODULO = (function () {
   if (i < 0 || f < 0) throw new Error('não achei o módulo do esquema no index.html');
   return HTML.slice(i, f);
 })();
-const api = new Function('esc', MODULO +
+const api = new Function('esc','negrito', MODULO +
   '\nreturn {mamaMm, mamaCmInteiro, mamaLocalDoTexto, mamaLesoes, mamaEsquemaHTML,'
+  + ' mamaEsquemaSelecionadoHTML, mamaTemSelecao, mamaLadosSelecionados,mamaCorpoHTML,'
+  + ' mamaSecoesLocalizar,mamaLayoutDo,mamaHostHTML,'
   + ' _mamaXY, _mamaRaioPx, _mamaContorno};'
-)(s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])));
+)(s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
+  s => String(s == null ? '' : s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'));
 
 console.log('=== unidade: lê o número E a unidade, nunca adivinha ===');
 // Pedido explícito do médico (20/08): o aparelho mede em cm, o laudo de mama passou a
@@ -248,6 +251,45 @@ ok((duas.match(/<svg/g) || []).length === 4, 'quatro vistas (duas por mama)');
 ok(/<b>1<\/b> — Mama direita/.test(duas) && /<b>2<\/b> — Mama esquerda/.test(duas),
    'numeração CONTÍNUA entre as mamas, não reiniciada por lado');
 
+console.log('\n=== reativação opcional por lado (08/09) ===');
+const bilateral = laudo([
+  { localizacao: 'mama direita, às 9 h', forma:'oval', orientacao:'paralela' },
+  { localizacao: 'mama esquerda, às 3 h', forma:'oval', orientacao:'paralela' }
+], 'Cisto na mama direita, às 9 h, distando 3 cm da papila, medindo 6 mm. Cisto na mama esquerda, às 3 h, distando 4 cm da papila, medindo 5 mm.');
+ok(api.mamaEsquemaSelecionadoHTML(bilateral) === '', 'sem confirmação, o laudo continua sem desenho');
+bilateral._mamaIlustracoes = { D:true, E:false };
+const soD = api.mamaEsquemaSelecionadoHTML(bilateral);
+ok(/data-lado="D"/.test(soD) && !/data-lado="E"/.test(soD), 'é possível adicionar somente a mama direita');
+bilateral._mamaIlustracoes.E = true;
+const ambosSel = api.mamaEsquemaSelecionadoHTML(bilateral);
+ok(/data-lado="D"/.test(ambosSel) && /data-lado="E"/.test(ambosSel), 'cada lado é escolhido de forma independente');
+
+console.log('\n=== cada figura fica sob o texto do próprio lado ===');
+const corpoBil='**MAMA DIREITA**\n**DESCRIÇÃO:**\nTexto exclusivo da direita. Cisto na mama direita, às 9 h, distando 3 cm da papila, medindo 6 mm.\n\n'
+  +'**MAMA ESQUERDA**\n**DESCRIÇÃO:**\nTexto exclusivo da esquerda. Cisto na mama esquerda, às 3 h, distando 4 cm da papila, medindo 5 mm.';
+bilateral.corpo=corpoBil;
+bilateral._mamaIlustracoes={D:true,E:false};
+let corpoPos=api.mamaCorpoHTML(bilateral);
+const hostD=corpoPos.indexOf('class="laudoMamaEsqHost');
+ok(corpoPos.indexOf('Texto exclusivo da direita.') < hostD &&
+   hostD < corpoPos.indexOf('MAMA ESQUERDA'),
+   'figura direita entra depois do texto direito e antes da seção esquerda');
+ok(!/laudoMamaEsqHost[^>]*data-lado="E"/.test(corpoPos), 'selecionar só a direita não cria figura esquerda');
+bilateral._mamaIlustracoes={D:false,E:true};
+corpoPos=api.mamaCorpoHTML(bilateral);
+const hostE=corpoPos.indexOf('class="laudoMamaEsqHost');
+ok(corpoPos.indexOf('Texto exclusivo da esquerda.') < hostE,
+   'figura esquerda entra depois do texto esquerdo');
+ok(!/laudoMamaEsqHost[^>]*data-lado="D"/.test(corpoPos), 'selecionar só a esquerda não cria figura direita');
+bilateral._mamaIlustracoes={D:true,E:true};
+corpoPos=api.mamaCorpoHTML(bilateral);
+ok((corpoPos.match(/laudoMamaEsqHost/g)||[]).length===2, 'selecionar os dois lados cria duas âncoras independentes');
+ok(/🔒 Travada/.test(corpoPos), 'cada caixa nasce com cadeado visível e travado');
+bilateral._mamaLayout={D:{travado:false,modo:'esquerda',topo:80}};
+corpoPos=api.mamaCorpoHTML(bilateral);
+ok(/flutua esquerda/.test(corpoPos) && /margin-top:80px/.test(corpoPos) && /Mover figura/.test(corpoPos),
+   'destravada, a caixa pode flutuar e oferece a alça de movimento');
+
 console.log('\n=== geometria: 12h em cima, 3h à direita da tela, nas DUAS mamas ===');
 // Confirmado na fonte primária: "Clock face is oriented based on the patient facing the
 // observer... 3:00 is in the lateral left breast and the medial right breast."
@@ -264,11 +306,22 @@ const alem = api._mamaXY(12, 40, cx, cy, R);
 ok(Math.abs(alem[1] - cy) <= R + 0.01, 'distância maior que o raio fica NA BORDA, não fora do desenho');
 
 console.log('\n=== o esquema entra no lugar que o BI-RADS §16.4 fixa ===');
-const bloco = HTML.slice(HTML.indexOf("negrito((L.corpo||'')"), HTML.indexOf("+'<br><br><b>CONCLUSÃO: "));
-ok(/mamaEsquemaHTML\(L\)/.test(bloco), 'entre a descrição dos achados e a conclusão');
+const bloco = HTML.slice(HTML.indexOf("ex.tipo==='tireoide'?tireoideCorpoHTML"), HTML.indexOf("+'<br><br><div class=\"laudoFecho\""));
+ok(/mamaCorpoHTML\(L\)/.test(bloco), 'as figuras são inseridas dentro da descrição, nas seções laterais');
 ok(/ex\.tipo==='mama'/.test(bloco), 'e só em exame de mama');
 ok(/contenteditable="false"/.test(bloco),
    'o desenho não se edita digitando — ele nasce do texto');
+
+console.log('\n=== o esquema nunca cai na faixa morta entre as páginas ===');
+const ligaMama = grab('mamaLayoutLigar');
+ok(/limPag\s*-\s*secTop\s*-\s*hH/.test(ligaMama) && /limPag\s*=\s*\(pag\s*\+\s*1\)\s*\*\s*pageH\s*-\s*botPx/.test(ligaMama),
+   'arraste e redimensionamento da mama travam na fronteira da folha para nunca cair no vão');
+const ligaTir = grab('tireoideLayoutLigar');
+ok(/limPag\s*-\s*secTop\s*-\s*hH/.test(ligaTir) && /limPag\s*=\s*\(pag\s*\+\s*1\)\s*\*\s*pageH\s*-\s*botPx/.test(ligaTir),
+   'tireoide também trava na fronteira da folha ao arrastar e redimensionar');
+const pagPontos = grab('_paginarPontos');
+ok(/laudoMamaSecao/.test(pagPontos) && /laudoMamaEsqHost/.test(pagPontos),
+   'paginação decompõe a seção anatômica para a figura saltar de página sem prender o texto');
 
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');

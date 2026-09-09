@@ -31,7 +31,7 @@ let guardado = {};
 const api = new Function('esc', 'localStorage', 'log', 'dadoSalvar',
   'const MAMA_RANK={"5":90,"4C":80,"4B":70,"4A":60,"4":55,"0":50,"6":95,"3":30,"2":20,"1":10};'
   + 'function _mamaRank(c){ var v=MAMA_RANK[String(c||"").toUpperCase()]; return v==null?-1:v; }\n'
-  + PAC + '\nreturn {pacienteHTML, pacienteLigada, pacienteAlternar, PACIENTE_TXT, _pacienteChave};'
+  + PAC + '\nreturn {pacienteHTML, pacienteFolhaHTML, pacienteLigada, pacienteAlternar, PACIENTE_TXT, _pacienteChave};'
 )(s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
   { getItem: k => (k in guardado ? guardado[k] : null), setItem: (k, v) => { guardado[k] = v; } },
   () => {}, (k, v) => { guardado[k] = v; });
@@ -51,7 +51,8 @@ ok(/DADOS_SINCRONIZADOS[^\]]*gpaciente/.test(HTML.replace(/\n/g, ' ')),
 
 console.log('\n=== ligada, ela sai — e só em mama ===');
 guardado.gpaciente = '1';
-ok(api.pacienteHTML(exame('2')).indexOf('PARA A PACIENTE') > 0, 'ligada, a seção aparece');
+ok(api.pacienteHTML(exame('2')).indexOf('Informações para você sobre seu exame') > 0,
+   'ligada, a seção aparece com o título amigável');
 ok(api.pacienteHTML({ tipo: 'tireoide', laudo: { conclusao: 'Categoria: TI-RADS 3.' } }) === '',
    'e NÃO aparece em exame que não é de mama — as redações são de mama');
 ok(api.pacienteHTML({ tipo: 'mama', laudo: { conclusao: 'Sem categoria.' } }) === '',
@@ -69,7 +70,7 @@ console.log('\n=== 4, 5 e 6: NÃO explicam a suspeita ===');
 // Esta é a asserção mais importante do arquivo.
 ['4A', '4B', '4C', '5', '6'].forEach(c => {
   const h = api.pacienteHTML(exame(c));
-  ok(h.indexOf('PARA A PACIENTE') > 0, 'categoria ' + c + ': a seção existe');
+  ok(h.indexOf('Informações para você sobre seu exame') > 0, 'categoria ' + c + ': a seção existe');
   ok(!/c[âa]ncer|maligno|malignidade|tumor|suspeit/i.test(h),
      '   e NÃO usa "câncer", "maligno", "tumor" nem "suspeito"');
   ok(/investiga(ção|cao) adicional/i.test(h), '   diz que precisa de investigação adicional');
@@ -84,6 +85,10 @@ console.log('\n=== a ressalva legal não é enfeite ===');
 const h2 = api.pacienteHTML(exame('2'));
 ok(/não substitui/.test(h2), 'diz que não substitui o texto técnico');
 ok(/consulta com o seu médico/.test(h2), 'nem a consulta');
+ok(/<u>Levar esse exame para seu médico\.<\/u><br>/.test(h2),
+   'o próximo passo começa com a orientação sublinhada');
+ok(/laudo técnico apresentado nas páginas seguintes/.test(h2) && !/texto técnico acima/.test(h2),
+   'a ressalva aponta para o laudo técnico nas páginas seguintes, não para cima');
 ok(/Leve este laudo/.test(h2), 'e manda levar o laudo à consulta');
 ok(/ondas de som, não usa radiação/.test(h2), 'e explica o método sem jargão');
 
@@ -107,14 +112,29 @@ ok(/investiga(ção|cao) adicional/i.test(hv),
    'com um achado 2 e outro 4B, vale a redação do 4B — nunca a mais tranquila');
 
 console.log('\n=== onde ela entra no laudo ===');
-ok(HTML.indexOf('pacienteHTML(ex)') > HTML.indexOf('negrito(L.extra)'),
-   'por ÚLTIMO: depois do texto técnico e das ressalvas');
-// 24/08: a seção passou a sair só quando TEM conteúdo (antes deixava um <div> vazio no fim
-// do laudo, ocupando espaço à toa). Com isso o contenteditable ficou DEPOIS da chamada, e
-// a janela de busca precisa olhar os dois lados.
-const ctx = HTML.slice(HTML.indexOf('pacienteHTML(ex)') - 160, HTML.indexOf('pacienteHTML(ex)') + 160);
-ok(/contenteditable="false"/.test(ctx),
+const montagem=HTML.slice(HTML.indexOf('function abrirRevisao('),HTML.indexOf('function revMarcarEditado',HTML.indexOf('function abrirRevisao(')));
+ok(montagem.indexOf('_folhaPaciente+_folhaAbre')>=0,
+   'a folha da paciente entra ANTES da primeira folha técnica');
+ok(!/pacienteHTML\(ex\)[\s\S]{0,300}<\/div><\/div>/.test(montagem),
+   'a explicação não continua anexada ao fim do corpo técnico');
+ok(/contenteditable="false"/.test(api.pacienteFolhaHTML(exame('2'))),
    'e não editável — editá-la à mão faria o que o desenho dela evita: divergir do técnico');
+ok(api.pacienteFolhaHTML(exame('2')).indexOf(api.pacienteHTML(exame('2')))>=0,
+   'a folha nova reutiliza exatamente os dizeres existentes, sem gerar outra versão');
+guardado={};
+ok(api.pacienteFolhaHTML(exame('2'))==='',
+   'com a opção desligada, não nasce uma primeira página vazia');
+
+console.log('\n=== a folha amigável é A4 e clara ===');
+const cssFolha=HTML.slice(HTML.indexOf('.pacienteFolha{'),HTML.indexOf('/* Mama e Tireoide:',HTML.indexOf('.pacienteFolha{')));
+ok(/height:297mm/.test(cssFolha) && /width:210mm/.test(cssFolha),
+   'tem dimensões exatas de uma folha A4');
+ok(/page-break-after:always/.test(cssFolha) && /break-after:page/.test(cssFolha),
+   'obriga o laudo técnico a começar na página seguinte');
+ok(/background:#F4FAF9!important/.test(cssFolha) && !/background:\s*#(?:000|111|121|151)/i.test(cssFolha),
+   'usa fundo claro opaco, sem o cartão preto');
+ok(/\.pacienteFolha \.pacBox[\s\S]*background:#FFFFFF!important/.test(cssFolha),
+   'o conteúdo fica em cartão branco de alto contraste');
 
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');

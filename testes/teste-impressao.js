@@ -100,6 +100,19 @@ console.log('\n=== as imagens sao as do exame QUE ESTA SENDO IMPRESSO ===');
 ok(/exames\.find\(function\(e\)\{ return e\.id===exId; \}\)/.test(escolha),
    'a lista vem do exame pedido, nao de uma variavel global de "exame atual"');
 
+console.log('\n=== imprime a montagem unica, nao as fotos soltas ===');
+const folhas = grab('impFolhasDeImagens');
+ok(/gerarPdfImagens\(imagens, paciente\)/.test(folhas),
+   'primeiro monta o mesmo PDF unico que organiza as imagens em folhas');
+ok(/arquivoParaImagens\(arq\)/.test(folhas),
+   'e abre somente as paginas dessa montagem para o Windows imprimir');
+ok(/await impFolhasDeImagens\(exId\)/.test(grab('impImprimirAgora')),
+   'a impressao usa as folhas prontas, nao a lista de fotografias');
+ok(/As fotos separadas NÃO foram impressas/.test(HTML),
+   'se a montagem falhar, avisa e nao volta silenciosamente as fotos soltas');
+ok(/imagensOrganizadas:true/.test(grab('impImprimirAgora')),
+   'o agente recebe a marca de que as imagens ja sao paginas A4');
+
 console.log('\n=== uma impressora so, quando a opcao esta desligada ===');
 const imprimir = grab('impImprimirAgora');
 ok(/impSeparadas\(\)\?impEscolhida\('imagens'\):impLaudo/.test(imprimir),
@@ -174,6 +187,18 @@ ok(/display==='none'/.test(medindo) && /tela\.style\.display=antes/.test(medindo
 ok(/prepararPapel/.test(HTML) && /rev2PaginarMedindo\(alvo\)/.test(grab('prepararPapel')),
    'os dois caminhos de impressao usam a MESMA paginacao — nao duas contas diferentes');
 
+console.log('\n=== limpeza da foto: controles de tela e folha da paciente ===');
+ok(/laudoMamaLayoutControles/.test(htmlLaudo) && /laudoLayoutResizeHandle/.test(htmlLaudo),
+   'controles da tela (botao de travar e alcas de redimensionamento) saem da foto do laudo');
+ok(/pacienteFolha/.test(htmlLaudo) && /297mm/.test(htmlLaudo),
+   'folha da paciente tem altura exata de A4 para manter a paginacao do laudo alinhada');
+ok(/#F2F7F6/.test(htmlLaudo),
+   'cartao da folha da paciente usa fundo opaco que nao vaza timbrado no SetColorKey');
+const cssFn = grab('laudoCssText');
+ok(/paciente|pacBox/.test(cssFn) && /display:none!important/.test(cssFn),
+   'laudoCssText embarca estilos da folha da paciente e esconde controles');
+
+
 console.log('\n=== falha de impressora nunca derruba o laudo ===');
 ok(/catch\(e\)\{[\s\S]{0,200}Não consegui falar com o computador para imprimir/.test(imprimir),
    'erro de rede vira aviso, nao excecao');
@@ -197,8 +222,12 @@ ok(/HasMorePages/.test(ps1),
    'laudo mais alto que uma folha e paginado, em vez de sair cortado');
 ok(/Get-CorteSeguro/.test(ps1) && /recua/.test(ps1),
    'e o corte da pagina recua para uma linha em branco — cortar no ponto exato partiria a linha de texto (podia partir um numero de medida)');
-ok(/Paisagem/.test(ps1) && /paisagem=True/.test(py),
-   'as fotos saem deitadas: em pe ficariam pequenas no meio da folha');
+ok(/Paisagem/.test(ps1) && /paisagem=not imagens_organizadas/.test(py),
+   'o caminho antigo ainda aceita fotos deitadas, sem girar as folhas da montagem nova');
+ok(/imagens_organizadas = bool\(corpo\.get\("imagensOrganizadas"\)\)/.test(py),
+   'o agente reconhece que recebeu a montagem pronta');
+ok(/paisagem=not imagens_organizadas/.test(py),
+   'as folhas organizadas saem em retrato; so o caminho antigo de fotos soltas usa paisagem');
 const escolhaA4 = ps1.slice(ps1.indexOf('if ($DaBorda)'), ps1.indexOf('$temMargens'));
 ok(/borderless|sem\\s\+\(borda\|margem\|margens\)/.test(escolhaA4) && !/if\s*\(\$Fundo\)/.test(escolhaA4),
    'o laudo prefere A4 sem bordas mesmo sem timbrado — senao o driver pode encolher a folha');

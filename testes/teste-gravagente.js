@@ -176,6 +176,14 @@ ok(/dadoSalvar\('g20local'/.test(HTML) && !/localStorage\.setItem\('g20local'/.t
 ok(/'g20local'/.test(SINCR), 'e por isso sobrevive a fechar e reabrir o programa');
 ok(/dadoSalvar\('g20modo'/.test(HTML) && /'g20modo'/.test(SINCR),
    'o modo de revisao tambem');
+ok(/id="cfgImagensRevisao"/.test(HTML) && /Mostrar o botão “Adicionar ilustração”/.test(HTML),
+   'a escolha das imagens fica nas Configuracoes de revisao');
+ok(!/data-imagens=/.test(HTML),
+   'a escolha nao aparece mais na tela de iniciar o atendimento');
+ok(/dadoSalvar\('grev2imagens'/.test(HTML) && /'grev2imagens'/.test(SINCR),
+   'a preferencia das imagens sobrevive a fechar e reabrir o programa');
+ok(/Nenhuma imagem[\s\S]{0,80}sozinha/.test(HTML),
+   'a configuracao deixa claro que nenhuma figura entra sem confirmacao');
 ok(/window\.__fundo=k/.test(HTML), 'escolher o local ja troca o timbrado que sai no laudo');
 /* E se a ficha do timbrado nao estiver em FUNDOS na hora de montar a folha, o programa
    FALA. Antes caia em branco calado, e a chave continuava escrita em data-fundo — uma

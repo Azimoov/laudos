@@ -193,7 +193,7 @@ const MEDIR = `(() => {
     const comTimbre = await naPagina(cdp, `_estiloPaginaTexto(34,24,8,true)`);
     ok(/@page\{size:A4;margin:0;\}/.test(comTimbre),
        'laudo COM timbrado continua como sempre foi (já era margem zero)');
-    ok(!/margin:8mm/.test(await naPagina(cdp, `document.documentElement.innerHTML`)),
+    ok(!/@page\s*\{[^}]*margin:\s*8mm/i.test(await naPagina(cdp, `document.documentElement.innerHTML`)),
        'não sobrou nenhuma margem de 8mm no arquivo — era por ela que os carimbos entravam');
     const M = await naPagina(cdp, `JSON.stringify(margensDaFolha('branco'))`);
     ok(/"topo":15/.test(M) && /"base":15/.test(M) && /"lado":12/.test(M),

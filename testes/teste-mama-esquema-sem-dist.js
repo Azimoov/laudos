@@ -12,8 +12,9 @@
 // e quando ele DITAVA a distancia tambem nao aparecia, porque a frase nao era entendida.
 //
 // A regra que fica: desenha-se o que se sabe; o que falta e DITO, nunca inventado. Sem a
-// distancia o marcador vai no raio medio, VAZADO e tracejado, e a legenda diz que a
-// distancia nao foi informada — o `distCm` continua nulo no dado.
+// distancia o marcador vai no raio medio e a legenda diz que a distancia nao foi
+// informada — o `distCm` continua nulo no dado. O estilo do marcador continua pertencendo
+// ao TIPO da lesao: cisto simples vazado/pontilhado; nodulo preenchido.
 const fs = require('fs');
 const path = require('path');
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
@@ -73,8 +74,9 @@ ok(/const MAMA_DIST_INDEF_CM = MAMA_RAIO_CM\/2;/.test(HTML),
 ok(api._mamaXY(3, null, 100, 100, 80)[0] > 100,
    'e o marcador pousa na hora certa mesmo com distancia nula (3h = a direita)');
 const frontal = grab('_mamaFrontal');
-ok(/L\.distIgnorada[\s\S]{0,120}stroke-dasharray="3 2"/.test(frontal),
-   'o marcador sai VAZADO e tracejado quando a distancia nao foi informada');
+ok(/var _cisto=L\.marcador==='cisto-simples'/.test(frontal)
+   && /_cisto[\s\S]{0,420}stroke-dasharray="3 2"/.test(frontal),
+   'vazado e tracejado depende de ser CISTO SIMPLES, nao de faltar distancia');
 const esquema = grab('mamaEsquemaHTML');
 ok(/L2\.distIgnorada \? '<i>distância da papila não informada<\/i>'/.test(esquema),
    'e a legenda DIZ que nao foi informada, em vez de mostrar um numero');
@@ -87,8 +89,9 @@ console.log('\n=== a vista lateral tambem aguenta a falta ===');
 const lateral = grab('_mamaLateral');
 ok(/var _d=\(L\.distCm==null\)\?MAMA_DIST_INDEF_CM:L\.distCm;/.test(lateral),
    'o eixo papila→periferia usa o raio de pouso quando nao ha distancia');
-ok(/L\.distIgnorada[\s\S]{0,140}stroke-dasharray="3 2"/.test(lateral),
-   'e o marcador sai tracejado tambem aqui');
+ok(/var _cisto=L\.marcador==='cisto-simples'/.test(lateral)
+   && /_cisto[\s\S]{0,900}stroke-dasharray="3 2"/.test(lateral),
+   'e a vista lateral preserva a mesma semantica do tipo da lesao');
 
 // ===================== A SEGUNDA CAUSA, achada no dado REAL =====================
 // O primeiro conserto (desenhar sem a distancia) NAO bastou: o esquema continuou vazio.

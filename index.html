@@ -962,6 +962,7 @@ try{if(new URLSearchParams(location.search).get('auth')==='1')document.getElemen
         </div>
       </div>
       <div class="ab-topo-meta">
+        <button class="authUsuarioBt" id="abContaUsuario" type="button" onclick="modCfgAbrir();modCfgIr('conta')" style="display:none">Conta</button>
         <div class="ab-badge-agente"><span class="ab-dot-live"></span><span>Agente Conectado</span></div>
         <span class="ab-data" id="abData"></span>
       </div>
@@ -2000,6 +2001,7 @@ button.repoSelo:hover{filter:brightness(.95)}
       </div>
       <div class="nav-group">
         <div class="nav-label">Sistema</div>
+        <button class="nav-item" type="button" data-pane="conta" onclick="modCfgIr('conta')">Conta e acesso</button>
         <button class="nav-item" type="button" data-pane="assinatura" onclick="modCfgIr('assinatura')">Assinatura e cabeçalho</button>
         <button class="nav-item" type="button" data-pane="backup" onclick="modCfgIr('backup')">Backup</button>
         <!-- SAÍDA DE EMERGÊNCIA. O painel antigo continua existindo (é dele que vêm os
@@ -2217,6 +2219,31 @@ button.repoSelo:hover{filter:brightness(.95)}
         <div class="iaAtalho">A <b>segunda leitura</b> do laudo mora em
           <button class="iaMini" type="button" onclick="modCfgIr('ia')">Provedor de IA</button>,
           porque é ela que usa o modelo auxiliar e aparece na fatura.</div>
+      </div>
+
+      <div id="paneConta" style="display:none">
+        <div class="head"><h1>Conta e acesso</h1><span class="mdConta" id="authContaSelo">—</span></div>
+        <p class="sub">A conta identifica cada pessoa; a clínica reúne os usuários e é quem possui a assinatura. Os dados dos pacientes permanecem neste computador.</p>
+        <section class="iaSec">
+          <div class="iaSecTop"><h2>Sessão atual</h2></div>
+          <div class="authResumo">
+            <div><b>Usuário</b><span id="authContaUsuario">—</span></div>
+            <div><b>Clínica</b><span id="authContaClinica">—</span></div>
+            <div><b>Função</b><span id="authContaPapel">—</span></div>
+            <div><b>Assinatura</b><span id="authContaAssinatura">—</span></div>
+          </div>
+          <div class="iaState" id="authContaEstado" style="margin-top:14px"></div>
+          <div class="iaBotoes">
+            <button class="iaBt forte" id="authContaEntrar" type="button" onclick="authEntrar()">Entrar</button>
+            <button class="iaBt" id="authContaRevalidar" type="button" onclick="authAtualizar(true)">Confirmar assinatura agora</button>
+            <button class="iaBt" id="authContaSair" type="button" onclick="authSair()">Sair deste computador</button>
+          </div>
+        </section>
+        <section class="iaSec">
+          <div class="iaSecTop"><h2>Onde ficam os dados</h2><span class="iaTag">local primeiro</span></div>
+          <p class="iaHint"><b>Neste computador:</b> pacientes, laudos, imagens, áudios, transcrições e modelos personalizados.</p>
+          <p class="iaHint"><b>No serviço de acesso:</b> usuário, clínica, função, assinatura e contagem de uso — sem o conteúdo do laudo.</p>
+        </section>
       </div>
 
       <div id="paneAssinatura" style="display:none">
@@ -2627,6 +2654,7 @@ button.repoSelo:hover{filter:brightness(.95)}
 <header>
   <button id="btnVoltarInicio" class="btn peq sec" onclick="abVoltarInicio()">‹ Início</button>
   <h1>Laudos USG</h1>
+  <button class="authUsuarioBt" id="authHeaderUsuario" type="button" onclick="modCfgAbrir();modCfgIr('conta')" style="display:none">Conta</button>
   <button class="btn peq sec" onclick="modCfgAbrir()">⚙︎ Configurações</button>
   <button class="btn peq sec" onclick="alternarHistorico()">📁 Histórico</button>
 </header>
@@ -3722,6 +3750,8 @@ async function fetchRetentativa(fazerFetch, rotulo, maxTent){
   }
 }
 async function openai(conteudo, querJson=true, opts){
+  if(typeof authExigir==='function' && !(await authExigir('criar')))
+    throw new Error('Sua conta não está autorizada a usar a inteligência artificial agora.');
   // A chave mora no AGENTE (computador da clínica), não aqui: quem abrisse o console
   // do navegador copiava. Só quando o agente não responde é que se usa a chave local —
   // caso do iPhone fora do alcance dele, para não deixar o médico sem IA no meio do dia.
@@ -14670,7 +14700,7 @@ function modCfgRender(){
    if encadeado — o próximo painel que migrar entra aqui e em mais nenhum lugar. */
 const MOD_PANES = {modelos:'paneModelos', bizus:'paneBizus', ia:'paneIa',
                    ditado:'paneDitado', impressao:'paneImpressao', revisao:'paneRevisao',
-                   assinatura:'paneAssinatura', backup:'paneBackup'};
+                   conta:'paneConta', assinatura:'paneAssinatura', backup:'paneBackup'};
 function modCfgMostrarPane(pane){
   Object.keys(MOD_PANES).forEach(function(k){
     var el=document.getElementById(MOD_PANES[k]);
@@ -15097,6 +15127,7 @@ function modCfgIr(pane){
   if(pane==='modelos'){ modCfgMostrarPane('modelos'); modCfgRender(); return; }
   if(pane==='bizus'){ modCfgMostrarPane('bizus'); bzRender(); return; }
   if(pane==='ia'){ modCfgMostrarPane('ia'); iaCfgRender(); return; }
+  if(pane==='conta'){ modCfgMostrarPane('conta'); authRenderConta(); return; }
   if(CFG_BLOCOS[pane]){ modCfgMostrarPane(pane); cfgPaneRender(pane); return; }
   if(pane==='antigo'){ modCfgAbrirAntigo(); return; }
   if(pane==='lexico' || pane==='referencias'){
@@ -16296,7 +16327,7 @@ function uteroProfundidadeDoFigo(figo, rr){
    miométrio e a serosa são deslocamentos desta mesma linha, para o lado anterior e para o
    posterior. É POR ISSO que o marcador cai sempre na camada certa: o desenho e a conta
    usam a mesma linha, em vez de duas aproximações que divergem. */
-var UT_EIXO = [[252,228],[258,156],[170,86],[78,102]];
+var UT_EIXO = [[262,220],[268,150],[186,80],[100,96]];
 function _utBez(P, t){
   var u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
   return [a*P[0][0]+b*P[1][0]+c*P[2][0]+d*P[3][0], a*P[0][1]+b*P[1][1]+c*P[2][1]+d*P[3][1]];
@@ -16666,11 +16697,11 @@ function _uteroSagitalSVG(lesoes, arraste){
       + '" x2="'+(C[0]-N[0]*d).toFixed(1)+'" y2="'+(C[1]-N[1]*d).toFixed(1)
       + '" stroke="'+UT_COR.guia+'" stroke-width="1" stroke-dasharray="3 3"/>';
   });
-  s += _utRot(72, 56, 'Fundo')
-    + _utRot(206, 48, 'Parede anterior')
-    + _utRot(126, 196, 'Parede posterior')
-    + _utRot(318, 200, 'Colo', 'end')
-    + _utRot(160, 232, 'terço proximal · médio · distal')
+  s += _utRot(104, 40, 'Fundo')
+    + _utRot(228, 44, 'Parede anterior')
+    + _utRot(120, 212, 'Parede posterior')
+    + _utRot(330, 196, 'Colo', 'end')
+    + _utRot(-12, -6, 'terços: proximal · médio · distal', 'start')
     + '<g font-size="8.5" fill="'+UT_COR.rot+'" font-family="Arial,sans-serif">'
     + '<rect x="-8" y="246" width="9" height="9" rx="2" fill="'+UT_COR.endo+'" stroke="'+UT_COR.endoBorda+'"/>'
     + '<text x="6" y="254">endométrio</text>'
@@ -22484,6 +22515,114 @@ function hisFecharLaudo(){
   var a=document.getElementById('areaImpressaoHist'); if(a) a.innerHTML='';   // não fica ocupando memória
   var h=document.getElementById('telaHistorico'); if(h) h.style.display='block';  // volta para onde ele estava
 }
+
+/* ============ Conta, clinica e assinatura (10/09/2026) ============
+   O navegador nunca guarda token. Ele pergunta ao agente apenas: quem entrou e o que
+   essa pessoa pode fazer. Fechar a porta de verdade e responsabilidade do agente. */
+var _authEstado=null, _authPoll=null;
+function authObrigatorioNaAbertura(){
+  try{return new URLSearchParams(location.search).get('auth')==='1';}catch(e){return false;}
+}
+function authTextoPapel(p){
+  return ({owner:'Proprietário',admin:'Administrador',doctor:'Médico',assistant:'Assistente',
+           desenvolvimento:'Desenvolvimento'})[String(p||'').toLowerCase()] || p || '—';
+}
+function authTextoStatus(s){
+  return ({active:'Ativa',trialing:'Período de teste',past_due:'Pagamento pendente',
+           unpaid:'Não paga',canceled:'Cancelada',incomplete:'Cadastro incompleto',
+           development:'Em preparação'})[String(s||'').toLowerCase()] || s || '—';
+}
+function authEl(id){return document.getElementById(id);}
+function authRenderConta(){
+  var s=_authEstado||{}, u=s.usuario||{}, c=s.clinica||{}, a=s.assinatura||{};
+  var dev=!s.configurado;
+  var nome=u.nome||u.email||(dev?'Acesso local da reforma':'—');
+  var clin=c.nome||c.name||(dev?'Ainda não vinculada':'—');
+  var plano=a.planName||a.plan||'';
+  var status=authTextoStatus(a.status);
+  if(plano) status+=' · '+plano;
+  var vals={authContaUsuario:nome,authContaClinica:clin,authContaPapel:authTextoPapel(s.papel),
+            authContaAssinatura:status,authContaSelo:(s.offline?'modo offline':(s.autenticado?'conectada':(dev?'preparação':'entrada necessária')))};
+  Object.keys(vals).forEach(function(k){var e=authEl(k);if(e)e.textContent=vals[k];});
+  var est=authEl('authContaEstado');
+  if(est) est.textContent=s.aviso||(s.autenticado?'Identidade e assinatura confirmadas.':
+    'O serviço comercial ainda não foi configurado nesta instalação.');
+  var entrar=authEl('authContaEntrar'), sair=authEl('authContaSair'), rev=authEl('authContaRevalidar');
+  if(entrar) entrar.style.display=(s.configurado&&!s.autenticado)?'':'none';
+  if(sair) sair.style.display=s.autenticado?'':'none';
+  if(rev) rev.style.display=s.autenticado?'':'none';
+}
+function authAplicar(s){
+  _authEstado=s||{};
+  var gate=authEl('authGate'), ge=authEl('authGateEstado'), aviso=authEl('authAvisoConta');
+  var precisa=!!s.configurado && !s.autenticado;
+  if(gate) gate.classList.toggle('aberto',precisa);
+  if(ge){ge.textContent=s.aviso||(precisa?'Entre para acessar o programa.':'Acesso confirmado.');
+         ge.classList.toggle('ruim',precisa&&!!s.aviso);}
+  var nome=((s.usuario||{}).nome||(s.usuario||{}).email||'').trim();
+  var clin=((s.clinica||{}).nome||(s.clinica||{}).name||'').trim();
+  var rot=s.autenticado?(nome+(clin?' · '+clin:'')):(s.configurado?'Entrar':'Conta em preparação');
+  ['abContaUsuario','authHeaderUsuario'].forEach(function(id){var e=authEl(id);if(e){e.textContent=rot;e.style.display='';}});
+  var podeCriar=!!((s.acesso||{}).criar);
+  if(aviso){
+    var mostrar=!!s.autenticado && (!podeCriar||s.offline);
+    aviso.classList.toggle('aberto',mostrar);
+    var at=authEl('authAvisoTexto'); if(at) at.textContent=s.aviso||'Novos laudos estão temporariamente pausados para esta conta.';
+  }
+  authRenderConta();
+}
+async function authAtualizar(forcar){
+  try{
+    var r=await fetch(agenteBase()+'/auth/estado'+(forcar?'?forcar=1':''),{cache:'no-store'});
+    var j=await r.json(); if(!r.ok||!j.ok) throw new Error(j.erro||('HTTP '+r.status));
+    authAplicar(j); return j;
+  }catch(e){
+    if(authObrigatorioNaAbertura()){
+      var falha={configurado:true,autenticado:false,acesso:{},usuario:{},clinica:{},assinatura:{},
+        aviso:'O agente local não respondeu. Por segurança, o arquivo clínico permanece fechado até ele voltar.'};
+      authAplicar(falha);
+    }else{
+      /* Linha ainda em preparação: falha do agente nao pode bloquear os testes que ja
+         funcionavam sem ele. O modo comercial, marcado na URL, sempre falha fechado. */
+      authAplicar({configurado:false,autenticado:false,desenvolvimento:true,acesso:{consultar:true,criar:true,assinar:true,administrar:true},
+        usuario:{},clinica:{},papel:'desenvolvimento',assinatura:{status:'development'},aviso:'Login comercial em preparação.'});
+    }
+    return _authEstado;
+  }
+}
+async function authEntrar(){
+  var bt=authEl('authEntrarBt'), ge=authEl('authGateEstado'); if(bt)bt.disabled=true;
+  if(ge){ge.textContent='Abrindo a página segura de entrada no navegador…';ge.classList.remove('ruim');}
+  try{
+    var r=await fetch(agenteBase()+'/auth/iniciar',{method:'POST'}), j=await r.json();
+    if(!r.ok||!j.ok) throw new Error(j.erro||('HTTP '+r.status));
+    if(ge) ge.textContent='Conclua a entrada no navegador. Esta tela abrirá sozinha depois.';
+    if(_authPoll)clearInterval(_authPoll);
+    var tent=0; _authPoll=setInterval(async function(){
+      tent++; var s=await authAtualizar(false);
+      if(s&&s.autenticado){clearInterval(_authPoll);_authPoll=null;if(bt)bt.disabled=false;}
+      else if(tent>=300){clearInterval(_authPoll);_authPoll=null;if(bt)bt.disabled=false;
+        if(ge){ge.textContent='O tempo para entrar terminou. Toque no botão para tentar novamente.';ge.classList.add('ruim');}}
+    },2000);
+  }catch(e){if(bt)bt.disabled=false;if(ge){ge.textContent='Não foi possível iniciar a entrada: '+e.message;ge.classList.add('ruim');}}
+}
+async function authSair(){
+  if(!confirm('Sair desta conta neste computador? Os laudos locais não serão apagados.'))return;
+  try{var r=await fetch(agenteBase()+'/auth/sair',{method:'POST'}),j=await r.json();if(!r.ok||!j.ok)throw new Error(j.erro||('HTTP '+r.status));await authAtualizar(false);}
+  catch(e){var el=authEl('authContaEstado');if(el)el.textContent='Não foi possível sair: '+e.message;}
+}
+async function authExigir(acao){
+  var s=_authEstado||await authAtualizar(false);
+  if(!s.configurado) return true;
+  var ok=!!(s.autenticado&&(s.acesso||{})[acao]);
+  if(!ok){
+    var msg=s.aviso||(acao==='criar'?'A assinatura ou sua função não permite criar novos laudos.':'Sua conta não permite esta ação.');
+    log(msg,true); var a=authEl('authAvisoConta'),t=authEl('authAvisoTexto');if(t)t.textContent=msg;if(a)a.classList.add('aberto');
+  }
+  return ok;
+}
+
+window.addEventListener('DOMContentLoaded', function(){ authAtualizar(false); });
 
 window.addEventListener('DOMContentLoaded', function(){
   mostrarAba('captura');       // deixa uma aba pronta atrás da tela de abertura

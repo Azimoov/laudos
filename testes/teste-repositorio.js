@@ -152,10 +152,17 @@ const pintaFotos = grab('repoFotosPintar');
 ok(/ampliarImg/.test(pintaFotos), 'da para ver em tamanho cheio');
 ok(/repoImgIncluir/.test(pintaFotos), 'da para INCLUIR imagens (pedido de 09/09)');
 ok(/repoImgTirar/.test(pintaFotos), 'e da para EXCLUIR as que tem');
-/* Estudo que so existe no aparelho nao pode oferecer incluir/excluir: as fotos moram la,
-   e apagar dali seria mexer no arquivo do servico por um botao de lista. */
-ok(/podeMexer=!!it\.ex/.test(pintaFotos),
-   'mas so quando o exame esta no trabalho — nao se mexe no arquivo do aparelho');
+/* 09/09/2026 (tarde) — "poder mexer" MUDOU DE SIGNIFICADO. De manha era "ja esta aberto
+   nesta janela", e um exame que so estava no aparelho recebia "traga o exame primeiro".
+   Ele respondeu: "eu nao quero que tenha que trazer o exame de lugar nenhum. Eu quero que
+   o exame ja esteja aqui." Agora vale para todo exame de verdade; o unico que fica de
+   fora e o LAUDO ANTIGO do historico, e por um motivo que nao e arbitrario: as imagens
+   daquele dia nao existem em lugar nenhum que este programa alcance -- o laudo guardou o
+   desenho, nao os arquivos. */
+ok(/podeMexer=!it\.hist/.test(pintaFotos),
+   'e vale para qualquer exame — so o laudo antigo do historico fica de fora');
+ok(/laudo antigo/.test(pintaFotos),
+   'e ali a tela EXPLICA por que (as imagens do dia nao ficam guardadas)');
 
 const ouvir = grab('repoOuvir'), pintaAudio = grab('repoAudioPintar');
 ok(/<audio controls/.test(pintaAudio), 'o audio abre num tocador de verdade');
@@ -252,12 +259,23 @@ console.log('\n=== trazer daqui usa o caminho ja provado ===');
 const trazer = grab('repoTrazer');
 ok(/capForcarTrazer\(it\.est\.id, destino\)/.test(trazer),
    'reusa capForcarTrazer, com as travas de 03/09 (inclusive a pergunta antes de duplicar)');
-const acoes = grab('repoAcoesHtml');
-// as aspas do destino vao escapadas dentro do template: \'hoje\'
-ok(/hoje\\'\)/.test(acoes) && /antigos\\'\)/.test(acoes),
-   'os dois destinos que ele escolheu em 03/09 continuam sendo dele');
-ok(/if\(!it\.est\) return ''/.test(acoes),
-   'exame que nao esta mais no aparelho nao oferece um botao que falharia');
+/* ⚠️ 09/09/2026 (tarde) — OS DOIS BOTOES ⤵ SAIRAM DO CARTAO, a pedido dele. Estas linhas
+   cobravam os dois destinos ("para hoje" / "para antigos") escolhidos em 03/09. Continuam
+   existindo como CAMINHO (repoTrazer, capForcarTrazer), o que saiu foi o botao: o exame
+   ja esta na lista, e pedir para "traze-lo" antes de mexer nele expunha uma divisao
+   interna do programa que nao e problema do medico. */
+ok(grab('repoAcoesHtml').replace(/\s/g, '').indexOf("return''") >= 0,
+   'o cartao nao oferece mais os botoes ⤵');
+const garante = grab('repoGarantirExame');
+ok(/capForcarTrazer\(it\.est\.id, 'lista'\)/.test(garante),
+   'quem traz agora e o proprio botao em que ele toca, por baixo');
+ok(/if\(!it\.est\)/.test(garante),
+   'e o laudo antigo do historico, que nao tem estudo no aparelho, e tratado a parte');
+/* Reencontrar o exame recem-aberto pelo IDENTIFICADOR, e nao por "o ultimo da lista":
+   entre o pedido e a resposta a varredura pode ter posto outro exame ali -- e ai o audio
+   ou a foto iriam para o exame errado, que e o erro mais caro deste programa. */
+ok(/x\._estudoId && String\(x\._estudoId\)===String\(it\.estudoId\)/.test(garante),
+   'e o exame aberto e reencontrado pelo identificador, nao por "o ultimo da lista"');
 
 console.log('\n=== agente desligado vira mensagem, nao lista vazia ===');
 const pintar = grab('repoPintar');

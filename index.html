@@ -1095,6 +1095,10 @@ button.repoSelo:hover{filter:brightness(.95)}
 .repoSelo.vazio{background:#F1F3F5;color:#8A93A0;border-color:#DDE2E7;font-weight:500}
 .repoSelo.on{box-shadow:inset 0 0 0 2px rgba(14,110,107,.35)}
 .repoAcoes{display:flex;gap:6px;flex-wrap:wrap}
+/* A situação do laudo no cartão da lista — as mesmas palavras e o mesmo peso do painel
+   do dia, para os dois cartões se lerem igual (09/09/2026). */
+.repoSit{font-size:13px;color:#B97A0F;margin-left:auto}
+.repoSit.ok{color:#1B7048}
 .repoBt{background:#fff;border:1px solid #0E6E6B;color:#0E6E6B;border-radius:14px;padding:6px 14px;
   font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
 .repoBt:hover{background:#E7F1F0}
@@ -9475,8 +9479,15 @@ async function capForcarTrazer(id, destino){
        data, marca-se o exame como trazido à mão para hoje, e o filtro o aceita por isso.
        Ver diaExamesDeHoje. */
     var novo=exames[exames.length-1];
-    if(novo){ novo._forcadoHoje=true; }
+    /* `destino==='lista'` (09/09/2026): o exame foi aberto para o médico MEXER nele na
+       lista de trabalho — pôr um áudio, incluir uma foto. Ele NÃO vira exame de hoje.
+       A marca `_forcadoHoje` é o que faz o painel do dia aceitar um exame de outra data;
+       usá-la aqui poria um exame da semana passada dentro de "EXAMES DE HOJE", e a
+       primeira coisa que essa lista precisa ser é verdadeira. Na lista de trabalho ele
+       continua sob a data real dele, que é onde ele já estava. */
+    if(novo && destino!=='lista'){ novo._forcadoHoje=true; }
     try{ diaRenderLista(); }catch(_){}      // a lista do dia se redesenha na hora, sem esperar os 5 s
+    if(destino==='lista') return;
     capForcarAviso('✔ Exame de <b>'+esc(est.paciente||'?')+'</b> ('+esc(est.data||'')+') está na lista de hoje.', '#1f7a3d');
   }catch(e){
     capForcarAviso('não consegui trazer o exame ('+esc((e&&e.message)||String(e))+').', '#b3261e');
@@ -17794,24 +17805,110 @@ function repoSelosHtml(it){
 
   return '<span class="repoSelos">'+s.join('')+'</span>';
 }
-/* Os botões de AÇÃO da linha. Exame desta sessão já tem os seus no cartão do dia; aqui
-   valem os dois destinos que ele escolheu em 03/09 — trazer para hoje ou para a tela de
-   exames antigos. */
-function repoAcoesHtml(it){
-  if(!it.est) return '';
-  var na=it.ex?' cinza':'';
-  return '<span class="repoAcoes">'
-    +'<button type="button" class="repoBt'+na+'" onclick="repoTrazer(\''+esc(it.chave)+'\',\'hoje\')" '
-    +'title="põe este exame no painel de hoje">⤵ para hoje</button>'
-    +'<button type="button" class="repoBt cinza" onclick="repoTrazer(\''+esc(it.chave)+'\',\'antigos\')" '
-    +'title="abre a tela de fotos e áudios antigos com as imagens já baixadas">⤵ para antigos</button>'
-    +'</span>';
+/* ⚠️ 09/09/2026 — OS DOIS BOTÕES ⤵ SAÍRAM DA LINHA, a pedido dele:
+   "os botões para hoje e para antigos devem ser excluídos. (…) Eu não quero que tenha que
+   trazer o exame de lugar nenhum. Eu quero que o exame já esteja aqui."
+
+   E ele tem razão sobre o que a tela estava dizendo. O exame ESTÁ na lista — ele o vê,
+   com nome, hora e tipo. Pedir para "trazê-lo" antes de mexer nele é o programa expondo
+   uma divisão interna (o que já foi aberto nesta janela × o que ainda está só no
+   aparelho) que não é problema dele. Do lado de cá da tela, exame que aparece é exame que
+   existe.
+
+   Agora quem traz é o próprio botão em que ele toca: ver `repoGarantirExame`. A função
+   `repoTrazer` fica, e continua sendo o caminho para a tela de antigos. */
+function repoAcoesHtml(it){ return ''; }
+/* Deixa o exame PRONTO para receber áudio, foto ou laudo — trazendo-o do aparelho se
+   ainda não estiver aberto nesta janela. Devolve o exame, ou null se não deu.
+   É o que faz a promessa acima ser verdade: o médico toca no que quer fazer, e o
+   programa resolve por baixo o que precisa resolver. */
+async function repoGarantirExame(chave, ondeAvisar){
+  var it=_repoIndice[chave]; if(!it) return null;
+  if(it.ex) return it.ex;
+  if(!it.est){
+    /* Laudo antigo do histórico: não há estudo no aparelho para abrir. Não é falha da
+       peça — é ausência, e quem chamou precisa saber para dizer a coisa certa. */
+    return null;
+  }
+  var p=ondeAvisar||document.getElementById('repoP'+chave);
+  if(p) p.innerHTML='<span class="repoNota">abrindo o exame de <b>'+esc(it.paciente)
+    +'</b> — baixando '+it.instancias.length+' imagem(ns)…</span>';
+  try{
+    await capForcarTrazer(it.est.id, 'lista');
+  }catch(e){
+    if(p) p.innerHTML='<span class="repoNota">não consegui abrir este exame ('
+      +esc(e&&e.message||e)+').</span>';
+    return null;
+  }
+  /* Reencontra o exame recém-aberto pelo identificador do aparelho, e NÃO por "o último
+     da lista": entre o pedido e a resposta a varredura pode ter posto outro exame ali. */
+  var novo=exames.filter(function(x){ return x._estudoId && String(x._estudoId)===String(it.estudoId); })[0];
+  if(!novo){
+    if(p) p.innerHTML='<span class="repoNota">o exame não abriu. Veja o diário para o motivo.</span>';
+    return null;
+  }
+  it.ex=novo;
+  it.nImagens=(novo.imagens||[]).length;
+  repoAudioRecalcular(chave);
+  repoAtualizarSelos(chave);
+  return novo;
+}
+/* ⚠️ 09/09/2026 — O CARTÃO DA LISTA VIROU O MESMO DO PAINEL DE HOJE.
+   Palavras dele, olhando a tela: "nos exames de hoje já é conforme eu pedi; o que eu
+   quero é que na lista de trabalho seja do mesmo jeito."
+   O cartão de hoje tinha a situação do laudo e os três botões de trabalho (Revisar,
+   Abrir na pasta, Reabrir); o da lista tinha só os quatro sinais. Duas listas de exames
+   com dois cartões diferentes são, na prática, duas listas — que é o oposto do que esta
+   reconstrução inteira está fazendo. Agora os dois saem daqui. */
+function repoBotoesHtml(it){
+  if(!it.ex) return '';           // exame ainda não aberto: os quatro sinais é que agem
+  var bts=[];
+  if(it.ex.laudo)
+    bts.push('<button class="repoBt" onclick="repoRevisar(\''+esc(it.chave)+'\')">Revisar</button>');
+  if(it.liberado)
+    bts.push('<button class="repoBt cinza" onclick="diaAbrirNaPasta('+it.ex.id+')">Abrir na pasta de destino</button>');
+  bts.push('<button class="repoBt cinza" onclick="repoReabrir(\''+esc(it.chave)+'\')" '
+    +'title="devolve o exame para a fila a liberar e volta a receber as imagens do aparelho">'
+    +'Reabrir exame</button>');
+  return '<span class="repoAcoes">'+bts.join('')+'</span>';
+}
+/* A situação do laudo, com as mesmas palavras do painel de hoje. */
+function repoSituacaoHtml(it){
+  if(!it.ex) return '';
+  if(it.liberado) return '<span class="repoSit ok">revisado e assinado ✓</span>';
+  if(it.ex.laudo) return '<span class="repoSit">laudo pronto — aguarda revisão</span>';
+  return '<span class="repoSit">aguardando o ditado ser processado</span>';
+}
+/* Revisar e Reabrir a partir da LISTA. Não dá para reaproveitar `diaRevisar`/`diaReabrir`
+   direto: aquelas fecham o painel do dia e mandam o "Voltar" devolver para lá — e quem
+   tocou aqui está na lista de trabalho, ou no painel do dia. Estas duas descobrem de onde
+   vieram. */
+function repoDeOndeVim(){
+  try{
+    var t=document.getElementById('telaTrabalho');
+    if(t && getComputedStyle(t).display!=='none') return 'trabalho';
+  }catch(e){}
+  return 'dia';
+}
+function repoRevisar(chave){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var de=repoDeOndeVim();
+  _rev2Origem=de;
+  if(de==='trabalho') trabFechar(true); else diaFechar();
+  rev2Abrir(it.ex.id);
+}
+function repoReabrir(chave){
+  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  diaReabrir(it.ex.id);                       // a regra de reabrir é uma só, e mora lá
+  if(repoDeOndeVim()==='trabalho') trabPintar();
 }
 function repoLinhaHtml(it){
   return '<div class="repoLinha" id="repoL'+esc(it.chave)+'">'
     +'<span class="hr">'+esc(it.hora||'--:--')+'</span>'
     +'<span class="quem"><span class="nm">'+esc(it.paciente)+'</span>'
     +'<span class="tp">'+esc(it.tipo)+'</span></span>'
+    +repoSituacaoHtml(it)
+    +'<span style="flex:1 0 100%;display:flex;gap:8px;flex-wrap:wrap">'+repoBotoesHtml(it)+'</span>'
     +repoSelosHtml(it)+repoAcoesHtml(it)
     +'<div class="repoPainel" id="repoP'+esc(it.chave)+'"></div></div>';
 }
@@ -17875,7 +17972,14 @@ async function repoVerFotos(chave){
   // já estão na tela? (exame desta sessão) — não pede nada ao aparelho
   var fotos=(it.ex&&(it.ex.imagens||[]).length)?it.ex.imagens:_repoFotos[it.estudoId];
   if(!fotos){
-    p.innerHTML='<span class="repoNota">baixando '+it.instancias.length+' imagem(ns) do aparelho…</span>';
+    /* ⚠️ 09/09/2026 — OS BOTÕES APARECEM ANTES DAS FOTOS. Aqui a tela escrevia só
+       "baixando N imagens…" e ficava assim até o aparelho responder. Com o agente fora do
+       ar, `dicomBaixarImagem` não volta nunca: o painel ficava preso naquela frase, sem
+       botão nenhum e sem saída — e o médico não tinha como nem incluir uma imagem do
+       computador, que é justamente o que ele faria se o aparelho não estivesse
+       respondendo. Os botões não dependem do download; então eles vêm primeiro, e as
+       miniaturas entram quando (e se) chegarem. Apanhado pelo teste do navegador. */
+    repoFotosPintar(chave, [], {baixando:it.instancias.length});
     fotos=[];
     for(var i=0;i<it.instancias.length;i++){
       try{ fotos.push(await dicomBaixarImagem(it.instancias[i])); }
@@ -17895,10 +17999,15 @@ async function repoVerFotos(chave){
    mentira (some da tela e volta no próximo toque) ou seria apagar do APARELHO, que é o
    arquivo do serviço e não se mexe por um botão de lista. Nesse caso o painel diz o que
    fazer — trazer o exame primeiro — em vez de oferecer um botão que não cumpre. */
-function repoFotosPintar(chave, fotos){
+function repoFotosPintar(chave, fotos, opc){
   var it=_repoIndice[chave]; var p=document.getElementById('repoP'+chave);
   if(!it || !p) return;
-  var podeMexer=!!it.ex;
+  var baixando=(opc||{}).baixando||0;
+  /* 09/09/2026: "poder mexer" deixou de significar "já está aberto nesta janela" e passou
+     a significar "não é um laudo antigo do histórico". Exame que está só no aparelho é
+     aberto por baixo quando ele toca em incluir ou excluir — ele não precisa saber que
+     essa diferença existe. */
+  var podeMexer=!it.hist;
   var h='';
   if(fotos && fotos.length){
     h+='<div class="repoMinis">'+fotos.map(function(u,i){
@@ -17908,6 +18017,9 @@ function repoFotosPintar(chave, fotos){
         +'</span>'; }).join('')+'</div>'
       +'<span class="repoNota">toque numa foto para ver em tamanho cheio'
       +(podeMexer?' · o ✕ tira a foto deste exame':'')+'</span>';
+  } else if(baixando){
+    h+='<span class="repoNota">baixando '+baixando+' imagem(ns) do aparelho… '
+      +'(se ele não responder, os botões abaixo continuam valendo)</span>';
   } else {
     h+='<span class="repoNota">'+(it.instancias.length
       ? 'não consegui ler as imagens deste exame no aparelho.'
@@ -17928,16 +18040,14 @@ function repoFotosPintar(chave, fotos){
     h+='<span class="repoNota">este é um laudo antigo, aberto pelo histórico: as imagens '
       +'do dia não ficam guardadas, só o laudo pronto. Toque em <b>✓ liberado</b> para '
       +'abri-lo.</span>';
-  } else {
-    h+='<span class="repoNota">as imagens estão no aparelho. Para incluir ou excluir, '
-      +'traga o exame para o trabalho primeiro (botões ⤵ ao lado).</span>';
   }
   h+='</div>';
   p.innerHTML=h;
 }
-function repoImgTirar(chave, i){
-  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+async function repoImgTirar(chave, i){
+  var it=_repoIndice[chave]; if(!it || it.hist) return;
   if(!confirm('Tirar esta imagem do exame?')) return;
+  if(!await repoGarantirExame(chave)) return;      // abre o exame por baixo, se preciso
   if(!exameTirarImagem(it.ex, i)) return;
   /* O cache do que já foi baixado do aparelho tem de esquecer este exame: sem isso, o
      painel se redesenha com a lista ANTIGA e a foto "apagada" reaparece no próximo
@@ -17946,11 +18056,12 @@ function repoImgTirar(chave, i){
   repoFotosPintar(chave, it.ex.imagens||[]);
   repoAtualizarSelos(chave);
 }
-function repoImgTirarTodas(chave){
-  var it=_repoIndice[chave]; if(!it || !it.ex) return;
-  var n=(it.ex.imagens||[]).length;
+async function repoImgTirarTodas(chave){
+  var it=_repoIndice[chave]; if(!it || it.hist) return;
+  var n=it.nImagens||0;
   if(!n) return;
   if(!confirm('Tirar as '+n+' imagens deste exame? O laudo e o áudio não são tocados.')) return;
+  if(!await repoGarantirExame(chave)) return;      // abre o exame por baixo, se preciso
   it.ex.imagens=[];
   if(Array.isArray(it.ex._instIds)) it.ex._instIds=[];
   delete _repoFotos[it.estudoId];
@@ -17958,12 +18069,13 @@ function repoImgTirarTodas(chave){
   repoAtualizarSelos(chave);
 }
 async function repoImgIncluir(chave){
-  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var it=_repoIndice[chave]; if(!it || it.hist) return;
   var inp=document.createElement('input');
   inp.type='file'; inp.accept='application/pdf,image/*'; inp.multiple=true;
   inp.onchange=async function(){
     var arqs=Array.prototype.slice.call(inp.files||[]);
     if(!arqs.length) return;
+    if(!await repoGarantirExame(chave)) return;    // abre o exame por baixo, se preciso
     var p=document.getElementById('repoP'+chave);
     if(p) p.innerHTML='<span class="repoNota">lendo '+arqs.length+' arquivo(s)…</span>';
     var novas=0;
@@ -18042,19 +18154,21 @@ function repoAudioPintar(chave){
       +'Grave agora, ou traga um arquivo do computador.</span>';
   }
   h+='<div class="repoBarra">';
-  if(it.ex){
+  /* ⚠️ 09/09/2026 — OS DOIS BOTÕES APARECEM SEMPRE, tenha o exame sido aberto nesta
+     janela ou não. Antes, um exame que ainda estava só no aparelho recebia a frase
+     "traga o exame para o trabalho primeiro". Ele respondeu: "eu não quero que tenha que
+     trazer o exame de lugar nenhum. Eu quero que o exame já esteja aqui."
+     Quem traz agora é o próprio botão (repoGarantirExame), por baixo, sem pedir nada. */
+  if(!it.hist){
     var gravando=(_repoGravando===chave);
     h+='<button type="button" class="repoBt'+(gravando?' perigo':'')+'" '
       +'onclick="repoAudioGravar(\''+esc(chave)+'\')">'
       +(gravando?'⏹ parar e transcrever':'🎙 gravar novo')+'</button>';
     h+='<button type="button" class="repoBt cinza" onclick="repoAudioArquivo(\''+esc(chave)+'\')">'
-      +'📁 trazer arquivo</button>';
-  } else if(it.hist){
+      +'📁 escolher arquivo de áudio</button>';
+  } else {
     h+='<span class="repoNota">laudo antigo do histórico: o ditado dele já passou dos '
       +_repo.retAudio+' dias ou nunca foi guardado por aqui.</span>';
-  } else {
-    h+='<span class="repoNota">para gravar ou trazer um arquivo, traga o exame para o '
-      +'trabalho primeiro (botões ⤵ ao lado).</span>';
   }
   if(it.audio.tem)
     h+='<button type="button" class="repoBt perigo" onclick="repoAudioApagar(\''+esc(chave)+'\')">'
@@ -18069,7 +18183,8 @@ var _repoGravando='', _repoMr=null, _repoPedacos=[];
    a ESTE exame (adicionarAudioArquivo recebe o id), e não solto para o programa adivinhar
    de quem é: dar o áudio de um exame a outro é o erro mais caro que este programa comete. */
 async function repoAudioGravar(chave){
-  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var it=_repoIndice[chave]; if(!it) return;
+  if(_repoGravando!==chave && !await repoGarantirExame(chave)) return;   // abre o exame se preciso
   if(_repoGravando===chave){                       // segundo toque: para e transcreve
     try{ _repoMr && _repoMr.state!=='inactive' && _repoMr.stop(); }catch(e){}
     return;
@@ -18097,8 +18212,12 @@ async function repoAudioGravar(chave){
     log('Não consegui abrir o microfone: '+e.message, true);
   }
 }
+/* A "pastinha" que ele pediu: escolher um arquivo de áudio para AQUELE exame. A janela de
+   arquivos abre PRIMEIRO — abrir o exame antes faria o médico esperar o download de doze
+   imagens só para descobrir qual arquivo ele queria. Escolhido o arquivo, aí sim o exame
+   é aberto por baixo, se preciso. */
 function repoAudioArquivo(chave){
-  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var it=_repoIndice[chave]; if(!it || it.hist) return;
   var inp=document.createElement('input');
   inp.type='file'; inp.accept='audio/*,.m4a,.mp3,.wav';
   inp.onchange=function(){ var f=inp.files&&inp.files[0]; if(f) repoAudioAnexar(chave, f); };
@@ -18107,7 +18226,8 @@ function repoAudioArquivo(chave){
 /* Substituir ou adicionar — ele pediu os dois. A pergunta só aparece quando JÁ HÁ áudio;
    sem áudio anterior não há escolha a fazer, e perguntar seria só um passo a mais. */
 async function repoAudioAnexar(chave, arq){
-  var it=_repoIndice[chave]; if(!it || !it.ex) return;
+  var it=_repoIndice[chave]; if(!it) return;
+  if(!await repoGarantirExame(chave)) return;      // abre o exame por baixo, se preciso
   if(it.audio.tem){
     var trocar=confirm('Este exame já tem áudio.\n\nOK = SUBSTITUIR (o áudio de agora entra '
       +'no lugar do anterior)\nCancelar = ADICIONAR (os dois ficam)');
@@ -18518,6 +18638,12 @@ function rev2Voltar(){
   // veio do Histórico: volta para lá, não para o painel do dia (que ligaria a gravação)
   if(_rev2Origem==='historico'){ _rev2Origem='dia'; hisAbrir(); return; }
   if(_rev2Origem==='abertura'){ _rev2Origem='dia'; abVoltarInicio(); return; }
+  /* ⚠️ 09/09/2026 — VEIO DA LISTA DE TRABALHO, volta para ela. Sem esta linha, sair da
+     revisão caía no `diaAbrir()` lá embaixo, que abre o painel do dia e LIGA A GRAVAÇÃO —
+     sem paciente na frente, sem ele ter pedido. O mesmo perigo que a linha do Histórico,
+     logo acima, já registrava; eu criei a origem 'trabalho' na etapa 4 e esqueci de
+     ensiná-la aqui. */
+  if(_rev2Origem==='trabalho'){ _rev2Origem='dia'; trabAbrir(); return; }
   diaAbrir();
 }
 /* A calculadora existe desde antes da Reforma. Ela fica na mesma fonte de contas

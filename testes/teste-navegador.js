@@ -2077,7 +2077,11 @@ const VERIFICACOES = `(async () => {
       document.querySelectorAll('#repoPS7001 .repoTirar').length + ' X para 1 foto');
     // excluir de verdade: a foto sai do exame E o selo muda
     window.confirm = () => true;
-    repoImgTirar('S7001', 0);
+    // ATENCAO: nada de crase neste bloco -- ele vive DENTRO de um template literal, e uma
+    // crase aqui encerra o texto e quebra o arquivo inteiro (ja mordeu tres vezes).
+    // repoImgTirar virou assincrona em 09/09 (ela pode precisar ABRIR o exame antes de
+    // mexer nele). Sem o await, a linha abaixo media o estado de antes.
+    await repoImgTirar('S7001', 0);
     diz('o X tira a foto do exame', exames[0].imagens.length === 0, 'sobraram ' + exames[0].imagens.length);
     diz('e o mapa de instancias acompanha (senao a foto vai parar em outro exame)',
       exames[0]._instIds.length === 0, 'instIds: ' + exames[0]._instIds.length);
@@ -2090,7 +2094,9 @@ const VERIFICACOES = `(async () => {
     const pAud = document.getElementById('repoPS7002').textContent;
     diz('botao 2 ABRE mesmo sem audio (e quando gravar faz mais falta)', pAud.length > 0);
     diz('  e oferece GRAVAR novo', /gravar novo/.test(pAud));
-    diz('  e oferece TRAZER arquivo', /trazer arquivo/.test(pAud));
+    // "a pastinha" que ele pediu: escolher um arquivo de audio para AQUELE exame
+    diz('  e oferece a pastinha para escolher um arquivo de audio',
+      /escolher arquivo de áudio/.test(pAud));
     diz('  e sem audio nao oferece apagar (nao ha o que apagar)', !/apagar/.test(pAud));
 
     // --- botao 3: liberacao ---
@@ -2133,6 +2139,74 @@ const VERIFICACOES = `(async () => {
     exames = [];
   } catch (e) {
     diz('os quatro botoes do cartao', false, e.constructor.name + ': ' + e.message);
+  }
+
+  /* ===== "EU QUERO QUE O EXAME JA ESTEJA AQUI" (09/09/2026, tarde) =====
+     Palavras dele, olhando a tela: "os botoes para hoje e para antigos devem ser
+     excluidos. Se eu clicar no botao sem audio, esse botao deve obrigatoriamente abrir
+     para mim (...) uma pastinha para adicionar um audio para aquele exame especifico.
+     (...) Eu nao quero que tenha que trazer o exame de lugar nenhum."
+     O caso que importa e o exame que existe SO NO APARELHO: ele aparece na lista, e ate
+     hoje de manha o painel dele respondia "traga o exame para o trabalho primeiro". */
+  try {
+    exames = [];
+    _repo.historico = [];
+    _repo.estudos = [{ id: 'EST-SO-APARELHO', paciente: 'SOUZA^ANA', data: repoHojeBr(),
+                       hora: '09:15', descricao: 'MAMA', nImagens: 3,
+                       instancias: ['i1', 'i2', 'i3'], dataOrdem: '20260909091500' }];
+    trabAbrir();
+    await new Promise(r => setTimeout(r, 250));
+    await trabPintar();
+
+    const linha = document.getElementById('repoLEEST-SO-APARELHO');
+    diz('exame que so esta no aparelho aparece na lista', !!linha);
+    if (linha) {
+      diz('  e NAO tem mais os botoes ⤵ "para hoje"/"para antigos"',
+        linha.textContent.indexOf('para hoje') < 0 && linha.textContent.indexOf('para antigos') < 0,
+        linha.textContent.replace(/\s+/g, ' ').trim().slice(0, 80));
+
+      repoOuvir('EEST-SO-APARELHO');
+      await new Promise(r => setTimeout(r, 250));
+      const pa = document.getElementById('repoPEEST-SO-APARELHO').textContent;
+      diz('  tocar em "sem audio" oferece GRAVAR', /gravar novo/.test(pa), pa.replace(/\s+/g, ' ').trim().slice(0, 70));
+      diz('  e oferece a pastinha de escolher arquivo', /escolher arquivo de áudio/.test(pa));
+      diz('  e NAO manda trazer o exame de lugar nenhum',
+        pa.indexOf('traga o exame') < 0 && pa.indexOf('⤵') < 0);
+
+      /* Aqui a espera e longa de proposito: sem aparelho de verdade, as tres imagens sao
+         pedidas ao agente e cada uma leva o seu tempo para desistir. O painel so pinta os
+         botoes DEPOIS disso -- e o que se quer medir e o painel pintado, nao a frase
+         "baixando...". Esperar pouco mediria o estado intermediario e daria falso
+         vermelho. */
+      repoVerFotos('EEST-SO-APARELHO');
+      for (let i = 0; i < 40; i++) {
+        if (!/baixando/.test(document.getElementById('repoPEEST-SO-APARELHO').textContent)) break;
+        await new Promise(r => setTimeout(r, 250));
+      }
+      const pf = document.getElementById('repoPEEST-SO-APARELHO').textContent;
+      diz('  e o painel de imagens tambem oferece incluir, sem mandar trazer',
+        /incluir imagens/.test(pf) && pf.indexOf('traga o exame') < 0,
+        pf.replace(/\s+/g, ' ').trim().slice(0, 70));
+    }
+
+    /* E o cartao da lista passou a ser O MESMO do painel de hoje: "nos exames de hoje ja
+       e conforme eu pedi; o que eu quero e que na lista de trabalho seja do mesmo jeito." */
+    _repo.estudos = [];
+    exames = [{ id: 7700, paciente: 'Regiane Reis Brito', tipo: 'mama', _quando: Date.now(),
+                laudo: { corpo: 'x' }, _liberado: true, imagens: ['a'] }];
+    await trabPintar();
+    const c = document.getElementById('repoLS7700');
+    diz('o cartao da lista tem a SITUACAO, como o de hoje',
+      !!c && /revisado e assinado/.test(c.textContent));
+    diz('  e o botao Revisar', !!c && /Revisar/.test(c.textContent));
+    diz('  e o Abrir na pasta de destino', !!c && /Abrir na pasta de destino/.test(c.textContent));
+    diz('  e o Reabrir exame', !!c && /Reabrir exame/.test(c.textContent));
+    diz('  alem dos quatro sinais', !!c && c.querySelectorAll('.repoSelo').length === 4,
+      c ? c.querySelectorAll('.repoSelo').length + ' sinais' : '');
+    trabFechar();
+    exames = [];
+  } catch (e) {
+    diz('o exame ja esta aqui: nada de "trazer"', false, e.constructor.name + ': ' + e.message);
   }
 
   /* ===== NENHUM LAUDO SOME DO HISTORICO (etapa 7, 09/09/2026) =====

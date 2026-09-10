@@ -59,14 +59,31 @@ ok(/function capForcarTrazer\(/.test(HTML),
    'a valvula de escape continua existindo (capForcarTrazer)');
 ok(/function capForcarAbrir\(/.test(HTML),
    'e a lista de escolha tambem, para quem quiser religar o botao');
-const acoes = grab('repoAcoesHtml');
-ok(/repoTrazer\(/.test(acoes),
-   'o cartao do exame na lista oferece os botoes ⤵ de trazer');
-ok(/para hoje/.test(acoes) && /para antigos/.test(acoes),
-   'com os dois destinos: para hoje e para a tela de antigos');
-const trazerDoCartao = grab('repoTrazer');
-ok(/capForcarTrazer\(/.test(trazerDoCartao),
-   'e eles chamam a MESMA valvula de escape — a capacidade nao se perdeu com o botao');
+/* ⚠️ 09/09/2026, MESMO DIA, SEGUNDA MUDANCA. De manha estas linhas cobravam os botoes ⤵
+   ("para hoje" / "para antigos") no cartao da lista. A tarde ele olhou a tela e disse:
+   "os botoes para hoje e para antigos devem ser excluidos. (...) Eu nao quero que tenha
+   que trazer o exame de lugar nenhum. Eu quero que o exame ja esteja aqui."
+   E ele esta certo sobre o que a tela dizia: o exame ESTA na lista, com nome, hora e
+   tipo. Pedir para "traze-lo" antes de mexer nele era o programa expondo uma divisao
+   interna — o que ja foi aberto nesta janela x o que ainda esta so no aparelho — que nao
+   e problema dele.
+   A CAPACIDADE nao se perdeu, so mudou de gatilho: quem traz agora e o proprio botao em
+   que ele toca. E isso que se cobra aqui. */
+ok(grab('repoAcoesHtml').replace(/\s/g, '').indexOf("return''") >= 0,
+   'os botoes ⤵ sairam do cartao da lista');
+const garantir = grab('repoGarantirExame');
+ok(garantir.length > 0, 'e nasceu a peca que abre o exame por baixo (repoGarantirExame)');
+ok(/capForcarTrazer\(it\.est\.id, 'lista'\)/.test(garantir),
+   'que chama a MESMA valvula de escape — a capacidade continua inteira');
+/* O destino 'lista' existe para NAO marcar o exame como "trazido para hoje": um exame da
+   semana passada dentro de "EXAMES DE HOJE" seria uma lista mentindo. */
+ok(/destino!=='lista'/.test(proc) || /destino!=='lista'/.test(grab('capForcarTrazer')),
+   "e o destino 'lista' nao finge que o exame e de hoje");
+/* E quem PRECISA do exame aberto passa por ela, em vez de recusar. */
+['repoAudioAnexar', 'repoImgIncluir', 'repoImgTirar', 'repoImgTirarTodas', 'repoAudioGravar']
+  .forEach(function (n) {
+    ok(/repoGarantirExame\(/.test(grab(n)), '  ' + n + ' abre o exame por baixo, se preciso');
+  });
 
 /* Em que tela mora um trecho do arquivo. Nasceu em 03/09 de um erro meu: pus o botao na
    interface ANTIGA (telaExames), tudo compilou, a suite passou inteira, e ele respondeu

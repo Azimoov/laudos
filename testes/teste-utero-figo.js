@@ -32,7 +32,7 @@ const holder = { ex: null, logs: [] };
 const api = new Function('esc', 'negrito', 'imagensRevisaoLigadas', 'rev2TemAchado', 'rev2Ex', 'log', 'agendarSalvarSessao', 'rev2Render',
   MOD + '\nreturn {uteroNorm, uteroFigoDesc, uteroFigoGrupo, uteroFigoCor, uteroParede, uteroTerco, uteroFigo, uteroMedidasMm,' +
   ' _uteroRaioPx, uteroSagitalXY, uteroTransversalXY, uteroLesoes, uteroReescreverLocal, uteroLocalEstruturadaAtualizar,' +
-  ' _uteroSagitalSVG, _uteroTransversalSVG, uteroEsquemaHTML, uteroLayoutDo, uteroHostHTML, uteroCorpoHTML, uteroCaixaHTML, uteroTemSelecao, uteroFigoDaProfundidade, uteroProfundidadeDoFigo, uteroFracoes, uteroSagitalDe, uteroTransversalDe, UT_COR};')(
+  ' _uteroSagitalSVG, _uteroTransversalSVG, uteroEsquemaHTML, uteroLayoutDo, uteroHostHTML, uteroCorpoHTML, uteroCaixaHTML, uteroTemSelecao, uteroFigoDaProfundidade, uteroProfundidadeDoFigo, uteroFracoes, uteroSagitalDe, uteroTransversalDe, UT_COR, uteroPosturaDo, uteroPosturaUsar, UTERO_POSTURAS};')(
   s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])),
   s => String(s == null ? '' : s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'),
   () => true, () => true, () => holder.ex, m => holder.logs.push(m), () => {}, () => {}
@@ -256,7 +256,16 @@ const svgS = api._uteroSagitalSVG([{ id: 'U1', n: 1, parede: 'anterior', terco: 
 const svgT = api._uteroTransversalSVG([{ id: 'U1', n: 1, parede: 'anterior', figo: '3', mm: [20] }]);
 ok(svgS.includes(api.UT_COR.endo), 'o corte sagital desenha a camada do endometrio');
 ok(svgT.includes(api.UT_COR.endo), 'e o corte transversal tambem');
-ok(svgS.includes('endométrio') && svgS.includes('miométrio'), 'e a figura DIZ qual camada e qual');
+/* ⚠️ 10/09/2026 — A LEGENDA DAS CAMADAS MUDOU DE LUGAR, e por isso esta linha mudou.
+   Ela morava DENTRO do corte sagital e passou a viver embaixo, no cartao, valendo para as
+   duas vistas: com as tres posturas o utero ocupa cantos diferentes, e na retroversao
+   acentuada o fundo caia exatamente sobre ela. Agora se cobra do CARTAO, nao do SVG. */
+const cartaoLeg = api.uteroEsquemaHTML({
+  corpo: '**Mioma intramural com contato endometrial na parede anterior, medindo 2,0 cm.**',
+  _uteroIlustracoes: { ativo: true }
+});
+ok(/endométrio/.test(cartaoLeg) && /miométrio/.test(cartaoLeg) && /cavidade/.test(cartaoLeg),
+   'e a figura DIZ qual camada e qual (legenda no cartao, valendo para as duas vistas)');
 ok(svgS.includes(api.UT_COR.cav), 'a cavidade continua sendo desenhada, por dentro do endometrio');
 
 console.log('\n=== todos os miomas descritos, e so eles ===');
@@ -272,6 +281,57 @@ ok(numerados, 'cada um numerado, para casar o circulo com a linha da legenda');
 /* E os tres caem em lugares DIFERENTES: tres marcadores no mesmo ponto seriam um so. */
 const pontos = tres.plot.map(L => api.uteroSagitalXY(L).map(v => Math.round(v)).join(','));
 ok(new Set(pontos).size === 3, 'e em posicoes distintas', pontos.join(' | '));
+
+/* ⚠️ 10/09/2026 — AS TRES POSTURAS DO UTERO, pedido dele: "tem mais duas imagens que
+   quero que faças: 1) quando der retroversao ACENTUADA (...) e a retroversao MODERADA, que
+   e quando o angulo esta entre a anteversoflexao e a retroversao."
+   O que se tranca aqui NAO e o desenho (forma nao se testa em texto) -- e o que decide o
+   desenho, que e a FRASE DO LAUDO, e o que nao pode mudar com ele. */
+console.log('\n=== as tres posturas: quem escolhe e a frase do laudo ===');
+const post = (txt) => api.uteroPosturaDo({ corpo: txt });
+ok(post('**ÚTERO:** Anteversofletido, contornos regulares.') === 'anteverso', 'anteversofletido');
+ok(post('**ÚTERO:** Em retroversão moderada.') === 'intermediaria', 'retroversao MODERADA -> intermediaria');
+ok(post('**ÚTERO:** Retrovertido, em retroversoflexão acentuada.') === 'retroverso', 'retroversao acentuada');
+ok(post('**ÚTERO:** Retrovertido.') === 'retroverso', 'so "retrovertido" ja e a acentuada');
+ok(post('**ÚTERO:** Em médio-versão.') === 'intermediaria', 'medio-versao -> intermediaria');
+ok(post('') === 'anteverso', 'sem pista nenhuma, anteversoflexao (o que os modelos escrevem)');
+/* A armadilha: o modelo padrao do programa diz "em anteversoflexao, e CENTRALIZADO".
+   Se "centralizado" contasse como posicao intermediaria, todo laudo normal sairia com o
+   utero desenhado errado. */
+ok(post('Forma piriforme, contornos regulares, em anteversoflexão, e centralizado.') === 'anteverso',
+   '"centralizado" NAO e posicao intermediaria');
+
+console.log('\n=== as tres sao DESENHOS diferentes, e cada uma diz qual e ===');
+const eixos = ['anteverso', 'intermediaria', 'retroverso']
+  .map(k => JSON.stringify(api.UTERO_POSTURAS[k].eixo));
+ok(new Set(eixos).size === 3, 'os tres eixos sao distintos (senao seriam a mesma figura)');
+['anteverso', 'intermediaria', 'retroverso'].forEach(k => {
+  api.uteroPosturaUsar({ corpo: api.UTERO_POSTURAS[k].nome });
+  const svg = api._uteroSagitalSVG([{ id: 'U1', n: 1, parede: 'anterior', terco: 'medio', figo: '4', mm: [20] }]);
+  ok(svg.includes(api.UTERO_POSTURAS[k].nome),
+     '  o corte diz por escrito que e ' + api.UTERO_POSTURAS[k].nome);
+});
+
+console.log('\n=== e o que NAO pode mudar com a postura ===');
+/* 1. ANTERIOR continua sendo o lado de cima nas tres. A paciente nao virou junto do
+      desenho -- se "parede anterior" trocasse de lado numa das posturas, a figura passaria
+      a contradizer o texto do laudo, e a figura e a que o olho acredita. */
+['anteverso', 'intermediaria', 'retroverso'].forEach(k => {
+  api.uteroPosturaUsar({ corpo: api.UTERO_POSTURAS[k].nome });
+  const a = api.uteroSagitalXY({ parede: 'anterior', terco: 'medio', figo: '4', mm: [25] });
+  const p = api.uteroSagitalXY({ parede: 'posterior', terco: 'medio', figo: '4', mm: [25] });
+  ok(a[1] < p[1], '  em ' + k + ', anterior fica ACIMA de posterior');
+});
+/* 2. O TIPO FIGO nao muda com a postura. Ele sai da profundidade do nodulo na parede, e
+      virar o utero na tela nao mexe em onde o nodulo esta dentro dele. */
+const corpoMioma = '**Mioma submucoso com mais de 50% intramural na parede anterior, medindo 2,0 cm.**';
+const tipos = ['anteverso', 'intermediaria', 'retroverso'].map(k => {
+  api.uteroPosturaUsar({ corpo: api.UTERO_POSTURAS[k].nome });
+  return api.uteroLesoes({ corpo: corpoMioma }).plot[0].figo;
+});
+ok(new Set(tipos).size === 1 && tipos[0] === '2',
+   'o mesmo mioma da FIGO 2 nas tres posturas — virar a figura nao reclassifica o laudo');
+api.uteroPosturaUsar({ corpo: '' });     // devolve o estado para o resto do teste
 
 console.log('\n=== o gatilho: frases de laudo que DEVEM virar marcador ===');
 [

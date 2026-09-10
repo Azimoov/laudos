@@ -16331,7 +16331,59 @@ function uteroProfundidadeDoFigo(figo, rr){
    miométrio e a serosa são deslocamentos desta mesma linha, para o lado anterior e para o
    posterior. É POR ISSO que o marcador cai sempre na camada certa: o desenho e a conta
    usam a mesma linha, em vez de duas aproximações que divergem. */
-var UT_EIXO = [[253,119],[272,182],[148,216],[66,140]];
+/* ⚠️ AS TRÊS POSTURAS DO ÚTERO — 10/09/2026, pedido dele.
+   "Tem mais duas imagens que quero que faças: 1) quando der retroversão ACENTUADA (…)
+   e a retroversão MODERADA, que é quando o ângulo está entre a anteversoflexão e a
+   retroversão."
+
+   A postura muda UMA COISA SÓ: o eixo da cavidade. Todo o resto — cavidade, endométrio,
+   miométrio, serosa, os terços, os marcadores dos miomas e a conta do tipo FIGO — nasce
+   desse eixo e acompanha sozinho. Foi para isto que o desenho foi refeito em 10/09; três
+   figuras desenhadas à mão seriam três desenhos para consertar toda vez.
+
+   ⚠️ E O PROGRAMA NÃO ESCOLHE POR SI: quem manda é a frase do laudo. Desenhar um útero
+   antevertido num laudo que diz "retrovertido" seria a figura contradizendo o texto no
+   mesmo papel assinado — e a figura é a que o olho acredita. Por isso a postura desenhada
+   também aparece ESCRITA embaixo do corte, para dar para conferir de relance. */
+var UTERO_POSTURAS = {
+  anteverso: {
+    nome: 'anteversoflexão',
+    eixo: [[253,119],[272,182],[148,216],[66,140]]
+  },
+  /* O meio do caminho que ele descreveu: o corpo quase alinhado com o colo, sem a dobra
+     para a frente nem para trás. É a médio-versão. */
+  intermediaria: {
+    nome: 'retroversão moderada (posição intermediária)',
+    eixo: [[248,206],[266,150],[178,98],[80,96]]
+  },
+  /* Retroversão acentuada: o corpo cai para trás, e a concavidade que na anteversoflexão
+     olhava para a frente passa a olhar para trás. No quadro, a figura vira para baixo —
+     mas ANTERIOR continua sendo o lado de cima, porque a paciente não virou junto. */
+  retroverso: {
+    nome: 'retroversoflexão acentuada',
+    eixo: [[253,217],[272,154],[148,120],[66,196]]
+  }
+};
+var UT_POSTURA = 'anteverso';
+var UT_EIXO = UTERO_POSTURAS.anteverso.eixo;
+/* Qual postura o LAUDO descreve. Sem pista nenhuma, anteversoflexão — que é o que os
+   modelos do programa escrevem e o que a maioria dos exames encontra. */
+function uteroPosturaDo(L){
+  var t = uteroNorm((L && L.corpo) || '');
+  /* 'retrovers' NAO pega 'retroVERTido' -- a palavra que o laudo mais usa. Apanhado
+     pelo teste em 10/09: o laudo dizia 'Retrovertido' e o desenho saia antevertido. */
+  if(/retrove|retrofle|retro-?vers/.test(t)){
+    return /moderad|leve|discret|intermediari|parcial/.test(t) ? 'intermediaria' : 'retroverso';
+  }
+  if(/medio\s*-?\s*vers[aã]o|versao intermediaria|posicao intermediaria/.test(t)) return 'intermediaria';
+  return 'anteverso';
+}
+function uteroPosturaUsar(L){
+  var k = uteroPosturaDo(L);
+  UT_POSTURA = k;
+  UT_EIXO = UTERO_POSTURAS[k].eixo;
+  return UTERO_POSTURAS[k];
+}
 function _utBez(P, t){
   var u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
   return [a*P[0][0]+b*P[1][0]+c*P[2][0]+d*P[3][0], a*P[0][1]+b*P[1][1]+c*P[2][1]+d*P[3][1]];
@@ -16609,6 +16661,26 @@ function _utDefs(id){
     + '<stop offset="0%" stop-color="'+UT_COR.mio+'"/><stop offset="100%" stop-color="'+UT_COR.mio2+'"/>'
     + '</linearGradient>';
 }
+/* Um rótulo colado à borda do útero, do lado que ele nomeia. `lado` +1 é anterior, -1 é
+   posterior; `folga` é o quanto ele fica afastado da serosa. O encosto do texto muda com
+   a posição para o rótulo nunca cair para dentro do desenho. */
+function _utRotBorda(t, lado, txt, folga){
+  var C = _utBez(UT_EIXO, t), N = _utNormal(t), e = _utEsp(t);
+  var d = e.cav + e.endo + e.mio + (folga || 15);
+  var x = C[0] + N[0]*d*lado, y = C[1] + N[1]*d*lado;
+  x = Math.max(-8, Math.min(328, x)); y = Math.max(-2, Math.min(252, y));
+  return _utRot(x, y + 3, txt, x < 96 ? 'start' : (x > 224 ? 'end' : 'middle'));
+}
+/* O mesmo, mas pela PONTA do eixo (o colo, no t=0; o fundo, no t=1). */
+function _utRotPonta(t, txt, folga){
+  var C = _utBez(UT_EIXO, t), e = _utEsp(t);
+  var T = _utBezTang(UT_EIXO, t), m = Math.hypot(T[0], T[1]) || 1;
+  var sg = (t > 0.5 ? 1 : -1);
+  var d = e.cav + e.endo + e.mio + (folga || 15);
+  var x = C[0] + T[0]/m*sg*d, y = C[1] + T[1]/m*sg*d;
+  x = Math.max(-8, Math.min(328, x)); y = Math.max(-2, Math.min(252, y));
+  return _utRot(x, y + 3, txt, x < 96 ? 'start' : (x > 224 ? 'end' : 'middle'));
+}
 function _utRot(x, y, txt, anchor){
   return '<text x="'+x+'" y="'+y+'" font-size="9" fill="'+UT_COR.rot+'" text-anchor="'
     + (anchor||'middle') + '" font-family="Arial,sans-serif">'+txt+'</text>';
@@ -16715,19 +16787,26 @@ function _uteroSagitalSVG(lesoes, arraste){
       + '" x2="'+(C[0]-N[0]*d).toFixed(1)+'" y2="'+(C[1]-N[1]*d).toFixed(1)
       + '" stroke="'+UT_COR.guia+'" stroke-width="1" stroke-dasharray="3 3"/>';
   });
-  s += _utRot(76, 86, 'Fundo')
-    + _utRot(166, 122, 'Parede anterior')
-    + _utRot(190, 254, 'Parede posterior')
-    + _utRot(322, 116, 'Colo', 'end')
+  /* ⚠️ OS RÓTULOS NASCEM DA BORDA, não de coordenadas escritas à mão.
+     Com três posturas, cada uma vira a figura para um lado, e rótulo em posição fixa
+     acaba POR CIMA do desenho — foi o que aconteceu nas duas primeiras retroversões
+     desenhadas em 10/09: "Fundo" sumiu atrás do útero e "Parede posterior" caiu em cima da
+     legenda das camadas. Aqui cada rótulo é colocado a uma folga da borda que ele nomeia,
+     seja qual for a postura. Uma postura nova não precisa de acerto nenhum. */
+  s += _utRotBorda(0.98, 1, 'Fundo', 20)
+    + _utRotBorda(0.60, 1, 'Parede anterior', 15)
+    + _utRotBorda(0.60, -1, 'Parede posterior', 15)
+    + _utRotPonta(0, 'Colo', 15)
     + _utRot(-12, -6, 'terços: proximal · médio · distal', 'start')
-    + '<g font-size="8.5" fill="'+UT_COR.rot+'" font-family="Arial,sans-serif">'
-    + '<rect x="-8" y="246" width="9" height="9" rx="2" fill="'+UT_COR.endo+'" stroke="'+UT_COR.endoBorda+'"/>'
-    + '<text x="6" y="254">endométrio</text>'
-    + '<rect x="74" y="246" width="9" height="9" rx="2" fill="'+UT_COR.mio+'" stroke="'+UT_COR.serosa+'"/>'
-    + '<text x="88" y="254">miométrio</text></g>';
+    ;   /* a legenda das camadas saiu de DENTRO do desenho: ver uteroEsquemaHTML */
 
   _utEspalhar(lesoes, uteroSagitalXY).forEach(function(m){ s += _utMarcador(m.L, m.p, 'sag'); });
-  s += '</svg><div class="laudoUteroRot">CORTE SAGITAL (VISTA LATERAL)</div>';
+  /* ⚠️ A POSTURA DESENHADA VAI ESCRITA, embaixo do corte. Se o laudo disser "retrovertido"
+     e a figura sair antevertida, o texto e o desenho se contradizem no mesmo papel
+     assinado — e a figura é a que o olho acredita. Escrito ali, dá para conferir de
+     relance, sem precisar reconhecer a forma. */
+  var pNome = (UTERO_POSTURAS[UT_POSTURA] || UTERO_POSTURAS.anteverso).nome;
+  s += '</svg><div class="laudoUteroRot">CORTE SAGITAL (VISTA LATERAL) — ' + esc(pNome) + '</div>';
   return s;
 }
 
@@ -16754,6 +16833,7 @@ function _uteroTransversalSVG(lesoes, arraste){
 }
 
 function uteroEsquemaHTML(L, arraste){
+  uteroPosturaUsar(L);          // a frase do laudo decide qual utero desenhar
   var r = uteroLesoes(L);
   if(!r.plot.length) return '';
   var h = '<div class="laudoUteroCard">'
@@ -16776,7 +16856,22 @@ function uteroEsquemaHTML(L, arraste){
     var so = (x.parede === 'fundo' || x.parede === 'colo') ? ondeP : (ondeP + (ondeT ? ', ' + ondeT : ''));
     h += '<div>• <b>Mioma ' + x.n + ':</b> ' + uteroFigoDesc(x.figo) + med + ' — ' + so + '.</div>';
   });
+  /* ⚠️ A LEGENDA DAS CAMADAS SAIU DE DENTRO DO DESENHO (10/09/2026). Ela morava no canto
+     do corte sagital, e com as três posturas o útero passou a ocupar cantos diferentes:
+     na retroversão acentuada o fundo cai exatamente sobre ela, e o mioma subseroso de lá
+     tapava a palavra "endométrio". Aqui embaixo ela vale para as DUAS vistas e não disputa
+     espaço com desenho nenhum, em postura nenhuma. */
+  var chip = function(cor, borda, txt){
+    return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px">'
+      + '<span style="width:10px;height:10px;border-radius:3px;background:'+cor
+      + ';border:1px solid '+borda+';display:inline-block"></span>'+txt+'</span>';
+  };
   h += '</div>'
+    + '<div class="laudoUteroNota" style="margin-bottom:2px">'
+      + chip(UT_COR.endo, UT_COR.endoBorda, 'endométrio')
+      + chip(UT_COR.mio, UT_COR.serosa, 'miométrio')
+      + chip(UT_COR.cav, UT_COR.cav, 'cavidade')
+    + '</div>'
     + '<div class="laudoUteroNota">Representação esquemática, sem escala anatômica real. A localização e classificação FIGO seguem a descrição do exame.</div>'
     + '</div>';
   return h;
@@ -16998,6 +17093,7 @@ function uteroLayoutLigar(raiz, ex){
       ev.preventDefault();
       var moveuMk = false;
       var rSvg = svg.getBoundingClientRect();
+      uteroPosturaUsar(atual.laudo);   // arrastar mede no utero que esta na tela, nao no de outra postura
       var les = uteroLesoes(atual.laudo).plot.find(function(x){ return x.id===id; }) || { parede:'anterior', terco:'medio', figo:'4' };
       var novaP = les.parede, novoT = les.terco, novoF = les.figo;
 

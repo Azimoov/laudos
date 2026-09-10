@@ -251,7 +251,7 @@ ok(/capAudioDoAgente\(dit\.texto\|\|'', dit\.origem\|\|'recuperado', dit\.quando
 ok(/trechos:\(Array\.isArray\(trechos\)\?trechos:\[\]\)/.test(HTML),
    'o ditado guarda os trechos com hora que vierem do agente');
 // o lookbehind tira a DEFINICAO da funcao da conta — queremos so as chamadas
-ok((HTML.match(/(?<!function )capAudioDoAgente\([^)]*trechos\)/g) || []).length === 3,
+ok((HTML.match(/(?<!function )capAudioDoAgente\([^)]*trechos[^)]*\)/g) || []).length === 3,
    'os TRES caminhos de ditado repassam os trechos (botao, exame fechado, recuperacao)');
 ok(/const trechosEx *= *audios\.filter/.test(HTML),
    'na geracao do laudo os trechos do exame sao reunidos');

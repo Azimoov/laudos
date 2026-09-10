@@ -28,14 +28,14 @@ console.log('=== item 12 — o audio do exame passa a ter endereco ===');
 const PROC = corpoDe('capOrtProcessar');
 ok(/a\._estudoAudio=est\.id;/.test(PROC),
   'a captura AO VIVO grava de qual estudo e o audio (era o unico caminho que nao gravava)');
-ok(/a\.url=agenteBase\(\)\+'\/exame\/audio\/'\+encodeURIComponent\(est\.id\)/.test(PROC),
-  'e preenche a URL do audio — sem isso o tocador dizia "nao disponivel"');
+ok(/a\.url=res\.materialId[\s\S]*\/audio\/material\//.test(PROC),
+  'e preenche a URL pelo material novo — sem isso o tocador dizia "nao disponivel"');
 ok(/_estudoAudio:a\._estudoAudio\|\|''/.test(HTML), 'o campo entra no retrato da sessao');
-ok(/trechos:\(a\.trechos\|\|\[\]\)\}/.test(HTML),
+ok(/materialId:a\.materialId\|\|null, trechos:\(a\.trechos\|\|\[\]\)\}/.test(HTML),
   'os trechos com hora tambem entram no retrato (senao o VOZ morre ao reabrir)');
-ok(/sa\._estudoAudio \? \(agenteBase\(\)\+'\/exame\/audio\/'/.test(HTML),
-  'ao restaurar a sessao, a URL se REFAZ (o audio do agente nao tem blob)');
-ok(/if\(dit\.temAudio\)\{ a\._estudoAudio=est\.id;/.test(HTML),
+ok(/sa\.materialId[\s\S]{0,180}\/audio\/material\//.test(HTML),
+  'ao restaurar a sessao, a URL se REFAZ pelo material_id');
+ok(/if\(dit\.temAudio\)\{[\s\S]{0,80}a\._estudoAudio=est\.id;/.test(HTML),
   'o caminho de recuperacao tambem grava o estudo do audio');
 
 console.log('=== item 12b — ouvir o ditado (o botao mudou em 02/09/2026) ===');
@@ -48,24 +48,21 @@ console.log('=== item 12b — ouvir o ditado (o botao mudou em 02/09/2026) ===')
 ok(/function rev2OuvirAudio\(\)/.test(HTML), 'existe a funcao de tocar o ditado');
 ok(/id="rv2BtAudio"[^>]*onclick="rev2OuvirAudio\(\)"/.test(HTML), 'e tem botao na tela de revisao');
 ok(/function rev2Parar\(\)/.test(HTML), 'da para parar');
-const INT = corpoDe('rev2OuvirAudio');
-ok(/clearTimeout\(window\.__rv2Par\)/.test(INT),
-  'cancela o corte do trecho — o audio do exame nao para em 5 segundos');
-ok(/\.catch\(function\(e\)\{/.test(INT), 'falha ao tocar vira mensagem, nao silencio');
-ok(/o agente está desligado/.test(INT), 'e a mensagem diz a causa mais provavel');
-ok(/sem marcação de tempo/.test(INT),
-  'e o ditado da nuvem, sem hora, continua tocando inteiro em vez de ser recusado');
+const INT = corpoDe('rev2PrepararAudio');
+ok(!/currentTime/.test(INT),
+  'nao existe mais corte por relogio — o player recebe um arquivo fisico unico');
+ok(/catch\(e\)\{/.test(INT), 'falha ao tocar vira mensagem, nao silencio');
+ok(/O agente precisa estar ligado/.test(INT), 'e a mensagem diz a causa mais provavel');
+ok(/estado==='ready' && j\.temFala/.test(INT),
+  'so oferece o FLAC depois que o agente o marcou como pronto e validado');
 
-console.log('=== item 13 — o rodape deixou de ser um beco sem saida ===');
-// 19/08/2026 (2a passagem): o rodape dava "(transcrito na nuvem)" como CAUSA. Desde que a
-// cadeia da nuvem pede verbose_json ao whisper-1, nuvem ja nao e sinonimo de sem hora — a
-// causa virou chute, e o rodape passou a afirmar so o que a tela de fato sabe.
-ok(/sem marcação de tempo — não há VOZ por trecho/.test(HTML),
-  'diz que nao ha VOZ por trecho, sem chutar a causa');
-ok(!/\(transcrito na nuvem\) — não há VOZ/.test(HTML),
-  'e a causa que virou chute saiu do rodape');
-ok(/mas dá para ouvir o ditado inteiro no botão ao lado/.test(HTML),
-  'e aponta a saida, em vez de so dizer que nao funciona');
+console.log('=== item 13 — o rodape descreve o vinculo novo ===');
+ok(/áudio e transcrição vinculados por identidade própria/.test(HTML),
+  'o rodape confirma o vinculo exato do audio e da transcricao');
+ok(!/sem marcação de tempo — não há VOZ por trecho/.test(HTML),
+  'o aviso do mecanismo antigo saiu do rodape');
+ok(/laudo sem material de áudio novo vinculado/.test(HTML),
+  'laudo antigo sem material novo e identificado sem inventar um vinculo');
 
 console.log('=== item 14 — acrescentar a foto que faltou ===');
 ok(/async function rev2BuscarImagens\(\)/.test(HTML), 'da para buscar as fotos no aparelho');

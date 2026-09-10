@@ -738,88 +738,237 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
      existe; o "voltar" traz de volta para cá.
      Tudo aqui usa prefixo ab- para não esbarrar no CSS antigo. -->
 <style>
-#telaAbertura{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
-  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif}
-#telaAbertura .ab-folha{max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
-  border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
-#telaAbertura .ab-topo{background:#0E3A40;color:#fff;padding:16px 28px;
-  display:flex;align-items:center;justify-content:space-between}
-#telaAbertura .ab-marca{font-size:16px;font-weight:700}
-#telaAbertura .ab-data{font-size:12.5px;color:#B9D6D4}
-#telaAbertura .ab-corpo{padding:26px 24px 24px}
-#telaAbertura .ab-eb{font-size:11.5px;font-weight:700;color:#0E6E6B;letter-spacing:1.3px;
-  margin:0 0 12px 4px}
-#telaAbertura .ab-card{background:#fff;border:1px solid #E2E5EA;border-radius:10px;padding:6px 4px}
-#telaAbertura .ab-linha{display:flex;align-items:center;gap:14px;padding:13px 20px}
-#telaAbertura .ab-bola{flex:0 0 22px;height:22px;border-radius:50%;display:flex;
-  align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;
-  background:#CBD4DC}
-#telaAbertura .ab-bola.ok{background:#1E8E5A}
-#telaAbertura .ab-bola.ruim{background:#C0392B}
-#telaAbertura .ab-txt{flex:1;font-size:14px;color:#26303C}
-#telaAbertura .ab-vu{display:flex;align-items:flex-end;gap:5px;height:22px}
-#telaAbertura .ab-vu i{width:6px;background:#CBD4DC;border-radius:1px;height:6px;
-  transition:height .12s linear,background .12s linear}
-#telaAbertura .ab-mini{border:1px solid #C6CDD4;background:#fff;border-radius:14px;
-  padding:4px 12px;font-size:12px;color:#4A5560;cursor:pointer}
-#telaAbertura .ab-mini:hover{background:#F1F4F7}
-#telaAbertura .ab-titulo{text-align:center;font-size:21px;font-weight:700;color:#1C2430;
-  margin:34px 0 22px}
-#telaAbertura .ab-botao{display:flex;align-items:center;gap:22px;width:100%;text-align:left;
-  background:#fff;border:1px solid #DCE2E8;border-radius:12px;padding:18px 22px;margin-bottom:16px;
-  cursor:pointer;font:inherit}
-#telaAbertura .ab-botao:hover{border-color:#0E6E6B;box-shadow:0 2px 10px rgba(14,110,107,.10)}
-#telaAbertura .ab-icone{flex:0 0 52px;height:52px;border-radius:50%;background:#E7F1F0;
-  display:flex;align-items:center;justify-content:center;font-size:23px}
-#telaAbertura .ab-nome{font-size:17px;font-weight:700;color:#1C2430}
-#telaAbertura .ab-sub{font-size:12.5px;color:#6B7480;margin-top:5px}
-#telaAbertura .ab-selo{background:#FBF3E1;border:1px solid #E4C983;color:#8A6A1F;
-  border-radius:13px;padding:5px 14px;font-size:12px;white-space:nowrap}
-#telaAbertura .ab-seta{color:#9AA3AF;font-size:20px}
-#telaAbertura .ab-rodape{display:flex;justify-content:flex-end;margin-top:28px}
-#telaAbertura .ab-cfg{border:1px solid #C6CDD4;background:#fff;border-radius:20px;
-  padding:9px 20px;font-size:13.5px;color:#4A5560;cursor:pointer}
-#telaAbertura .ab-cfg:hover{background:#F1F4F7}
+#telaAbertura{position:fixed;inset:0;z-index:9000;background:#F6F8FB;overflow:auto;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  color:#0F172A;-webkit-font-smoothing:antialiased}
+#telaAbertura .ab-folha{max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FFFFFF;
+  border:1px solid rgba(226,232,240,0.85);border-radius:22px;box-shadow:0 10px 25px -3px rgba(15,23,42,0.06),0 4px 10px -2px rgba(15,23,42,0.03);overflow:hidden;position:relative}
+#telaAbertura .ab-topo{background:linear-gradient(135deg, #0A292D 0%, #0F3A40 100%);color:#fff;padding:18px 28px;
+  display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08)}
+#telaAbertura .ab-marca-box{display:flex;align-items:center;gap:12px}
+#telaAbertura .ab-marca-ico{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg, #10B981 0%, #06B6D4 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;box-shadow:0 4px 12px rgba(16,185,129,0.35)}
+#telaAbertura .ab-marca{font-size:18px;font-weight:700;letter-spacing:-0.02em}
+#telaAbertura .ab-marca-sub{font-size:11px;color:#93C5C3;text-transform:uppercase;letter-spacing:0.8px;font-weight:600}
+#telaAbertura .ab-topo-meta{display:flex;align-items:center;gap:14px}
+#telaAbertura .ab-badge-agente{display:flex;align-items:center;gap:6px;background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.35);color:#34D399;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px}
+#telaAbertura .ab-dot-live{width:6px;height:6px;border-radius:50%;background:#10B981;box-shadow:0 0 8px #10B981;animation:abPulseLive 2s infinite}
+@keyframes abPulseLive{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+#telaAbertura .ab-data{font-size:13px;color:#CBD5E1}
+#telaAbertura .ab-corpo{padding:26px 28px 34px}
+#telaAbertura .ab-eb{font-size:11px;font-weight:700;color:#0E6E6B;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 14px 4px;display:flex;align-items:center;gap:6px}
+#telaAbertura .ab-eb::before{content:"●";color:#10B981;font-size:12px}
+
+/* Grid de Sensores e Telemetria (Apple Health) */
+#telaAbertura .ab-card{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;background:none;border:none;padding:0;border-radius:0}
+@media (max-width:850px){ #telaAbertura .ab-card{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:520px){ #telaAbertura .ab-card{grid-template-columns:1fr} }
+
+#telaAbertura .ab-linha{background:#fff;border:1px solid rgba(226,232,240,0.95);border-radius:16px;padding:16px;box-shadow:0 2px 6px rgba(15,23,42,0.04);display:flex;flex-direction:column;justify-content:space-between;transition:all .25s ease;position:relative;gap:8px}
+#telaAbertura .ab-linha:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(15,23,42,0.06);border-color:#CBD5E1}
+
+#telaAbertura .ab-card-top{display:flex;align-items:center;justify-content:space-between;width:100%}
+#telaAbertura .ab-icon-bubble{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;background:#ECFDF5;color:#10B981;border:1px solid #A7F3D0}
+#telaAbertura .ab-icon-bubble.cyan{background:#ECFEFF;color:#06B6D4;border-color:#A5F3FC}
+#telaAbertura .ab-icon-bubble.indigo{background:#EEF2FF;color:#6366F1;border-color:#C7D2FE}
+
+#telaAbertura .ab-bola{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;font-size:10.5px;font-weight:700;color:#fff;background:#94A3B8}
+#telaAbertura .ab-bola.ok{background:#10B981}
+#telaAbertura .ab-bola.ruim{background:#EF4444}
+
+#telaAbertura .ab-card-tit{font-size:13.5px;font-weight:700;color:#0F172A;margin-top:2px}
+#telaAbertura .ab-txt{font-size:11.5px;color:#64748B;line-height:1.45;flex:1;min-height:34px}
+#telaAbertura .ab-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding-top:8px;border-top:1px solid #F1F5F9;min-height:26px}
+
+#telaAbertura .ab-vu{display:flex;align-items:flex-end;gap:3px;height:18px}
+#telaAbertura .ab-vu i{width:3.5px;background:#CBD4DC;border-radius:2px;height:4px;transition:height .12s linear,background .12s linear}
+#telaAbertura .ab-mini{border:1px solid #E2E8F0;background:#F8FAFC;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;color:#475569;cursor:pointer;transition:all .15s ease}
+#telaAbertura .ab-mini:hover{background:#EEF2F6;color:#0F172A}
+#telaAbertura .ab-card-tag{font-size:10.5px;color:#94A3B8;font-weight:500}
+
+/* Título de Atividade */
+#telaAbertura .ab-titulo{text-align:center;font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#0F172A;margin:32px 0 20px}
+
+/* Botões de Ação Apple Health */
+#telaAbertura .ab-botoes-cx{display:flex;flex-direction:column;gap:14px}
+#telaAbertura .ab-botao{display:flex;align-items:center;gap:22px;width:100%;text-align:left;background:#FFFFFF;border:1.5px solid #E2E8F0;border-radius:20px;padding:20px 26px;cursor:pointer;font:inherit;position:relative;overflow:hidden;transition:all .25s cubic-bezier(0.16,1,0.3,1);box-shadow:0 2px 6px rgba(15,23,42,0.04)}
+#telaAbertura .ab-botao:hover{border-color:#10B981;box-shadow:0 18px 32px -5px rgba(13,51,56,0.10);transform:translateY(-2px)}
+#telaAbertura .ab-botao:first-of-type .ab-icone{background:linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);border:1px solid #A7F3D0;color:#059669;box-shadow:0 4px 12px rgba(16,185,129,0.12)}
+#telaAbertura .ab-botao:nth-of-type(2){border-radius:16px;padding:16px 24px;border-width:1px}
+#telaAbertura .ab-botao:nth-of-type(2):hover{border-color:#CBD5E1;box-shadow:0 6px 16px rgba(15,23,42,0.06)}
+#telaAbertura .ab-botao:nth-of-type(2) .ab-icone{background:#F1F5F9;color:#475569;border:1px solid #E2E8F0;box-shadow:none;width:44px;height:44px;font-size:20px}
+
+#telaAbertura .ab-icone{flex:0 0 54px;height:54px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px}
+#telaAbertura .ab-nome{font-size:18px;font-weight:700;letter-spacing:-0.01em;color:#0F172A;display:flex;align-items:center;gap:10px}
+#telaAbertura .ab-botao:nth-of-type(2) .ab-nome{font-size:16px}
+#telaAbertura .ab-sub{font-size:13px;color:#64748B;margin-top:4px}
+#telaAbertura .ab-selo{background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;border-radius:10px;padding:3px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+#telaAbertura .ab-seta{width:36px;height:36px;border-radius:50%;background:#F8FAFC;border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:18px;transition:all .2s ease;margin-left:auto}
+#telaAbertura .ab-botao:hover .ab-seta{background:#10B981;border-color:#10B981;color:#fff;transform:translateX(4px)}
+
 #btnVoltarInicio{display:none;margin-right:8px}
+
 /* contador de exames do dia (19/08/2026) */
 #telaAbertura .ab-cont{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}
-#telaAbertura .ab-cont .n{flex:1 1 120px;background:#fff;border:1px solid #DFE3E8;
-  border-radius:10px;padding:12px 14px;text-align:center}
+#telaAbertura .ab-cont .n{flex:1 1 120px;background:#fff;border:1px solid #DFE3E8;border-radius:12px;padding:12px 14px;text-align:center;box-shadow:0 2px 6px rgba(15,23,42,0.03)}
 #telaAbertura .ab-cont .n b{display:block;font-size:25px;line-height:1.1;color:#0E3A40}
-#telaAbertura .ab-cont .n span{display:block;font-size:11.5px;color:#6B7480;margin-top:3px;
-  letter-spacing:.4px;text-transform:uppercase}
+#telaAbertura .ab-cont .n span{display:block;font-size:11.5px;color:#6B7480;margin-top:3px;letter-spacing:.4px;text-transform:uppercase}
 #telaAbertura .ab-cont .n.pend b{color:#C43B3B}
 #telaAbertura .ab-cont .n.ok b{color:#1F7A3D}
+
+/* ================= HUD JARVIS BOOT SEQUENCE ================= */
+#telaAbertura .jarvis-overlay{position:absolute;inset:0;background:rgba(255,255,255,0.95);backdrop-filter:blur(24px);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .7s cubic-bezier(0.16,1,0.3,1),visibility .7s;cursor:pointer}
+#telaAbertura .jarvis-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
+#telaAbertura .hud-core{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center}
+#telaAbertura .hud-ring-outer{position:absolute;width:100%;height:100%;border-radius:50%;border:2px dashed rgba(16,185,129,0.35);animation:abSpinClockwise 8s linear infinite}
+#telaAbertura .hud-ring-inner{position:absolute;width:150px;height:150px;border-radius:50%;border:3px solid transparent;border-top-color:#10B981;border-bottom-color:#06B6D4;animation:abSpinCounter 4s cubic-bezier(0.4,0,0.2,1) infinite}
+#telaAbertura .hud-ring-glow{position:absolute;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(16,185,129,0.25) 0%,rgba(6,182,212,0.1) 60%,transparent 80%);filter:blur(8px);animation:abPulseCore 2s ease-in-out infinite alternate}
+#telaAbertura .hud-center-logo{position:relative;z-index:2;width:66px;height:66px;border-radius:18px;background:linear-gradient(135deg, #10B981 0%, #06B6D4 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:800;box-shadow:0 10px 25px rgba(16,185,129,0.4)}
+@keyframes abSpinClockwise{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes abSpinCounter{from{transform:rotate(360deg)}to{transform:rotate(0deg)}}
+@keyframes abPulseCore{from{transform:scale(0.9);opacity:0.6}to{transform:scale(1.15);opacity:1}}
+#telaAbertura .hud-title{font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#0E6E6B;margin-top:24px;display:flex;align-items:center;gap:8px}
+#telaAbertura .hud-dot{width:7px;height:7px;border-radius:50%;background:#10B981;box-shadow:0 0 8px #10B981}
+#telaAbertura .hud-status-line{font-size:12.5px;color:#64748B;margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-weight:500;height:20px}
+#telaAbertura .hud-progress-wrap{width:240px;height:4px;background:#E2E8F0;border-radius:4px;margin-top:16px;overflow:hidden}
+#telaAbertura .hud-progress-bar{height:100%;width:0%;background:linear-gradient(90deg, #10B981, #06B6D4);border-radius:4px;transition:width 0.25s linear}
+#telaAbertura .hud-satellites{position:absolute;inset:0;pointer-events:none}
+#telaAbertura .hud-node{position:absolute;display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.96);border:1px solid #E2E8F0;padding:10px 16px;border-radius:14px;box-shadow:0 12px 30px rgba(15,23,42,0.10);opacity:0;transform:scale(0.7);transition:all 0.6s cubic-bezier(0.16,1,0.3,1)}
+#telaAbertura .hud-node.visible{opacity:1;transform:scale(1)}
+#telaAbertura .hud-node.docked{opacity:0;transform:scale(0.3)}
+#telaAbertura .node-mic{top:18%;left:10%}
+#telaAbertura .node-usg{top:18%;right:10%}
+#telaAbertura .node-rel{bottom:22%;left:10%}
+#telaAbertura .node-ai{bottom:22%;right:10%}
+#telaAbertura .node-icon{width:36px;height:36px;border-radius:10px;background:#ECFDF5;color:#10B981;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid #A7F3D0}
+#telaAbertura .node-name{font-size:12.5px;font-weight:700;color:#0F172A}
+#telaAbertura .node-metric{font-size:11px;color:#10B981;font-weight:600}
+#telaAbertura .hud-hint{font-size:11px;color:#94A3B8;margin-top:20px;letter-spacing:0.5px}
 </style>
 
 <div id="telaAbertura">
   <div class="ab-folha">
-    <div class="ab-topo"><span class="ab-marca">Laudos USG</span><span class="ab-data" id="abData"></span></div>
+    <!-- Jarvis Boot Sequence Overlay -->
+    <div id="jarvisOverlay" class="jarvis-overlay hidden" onclick="abFecharJarvis()">
+      <div class="hud-core">
+        <div class="hud-ring-outer"></div>
+        <div class="hud-ring-inner"></div>
+        <div class="hud-ring-glow"></div>
+        <div class="hud-center-logo">USG</div>
+      </div>
+      <div class="hud-title">
+        <span class="hud-dot"></span>
+        DIAGNÓSTICO BIOMÉDICO JARVIS
+      </div>
+      <div class="hud-status-line" id="hudStatus">Inicializando barramentos locais…</div>
+      <div class="hud-progress-wrap">
+        <div class="hud-progress-bar" id="hudProgress"></div>
+      </div>
+      <div class="hud-satellites">
+        <div class="hud-node node-mic" id="nodeMic">
+          <div class="node-icon">🎙️</div>
+          <div>
+            <div class="node-name">Canal de Áudio</div>
+            <div class="node-metric">Microfone Calibrado</div>
+          </div>
+        </div>
+        <div class="hud-node node-usg" id="nodeUsg">
+          <div class="node-icon" style="background:#ECFEFF;color:#06B6D4;border-color:#A5F3FC;">📡</div>
+          <div>
+            <div class="node-name">Recepção DICOM</div>
+            <div class="node-metric" style="color:#0891B2;">Porta 104 Ativa</div>
+          </div>
+        </div>
+        <div class="hud-node node-rel" id="nodeRel">
+          <div class="node-icon">⏱️</div>
+          <div>
+            <div class="node-name">Sincronia Temporal</div>
+            <div class="node-metric">Relógio Alinhado</div>
+          </div>
+        </div>
+        <div class="hud-node node-ai" id="nodeAi">
+          <div class="node-icon" style="background:#EEF2FF;color:#6366F1;border-color:#C7D2FE;">🧠</div>
+          <div>
+            <div class="node-name">Núcleo IA Whisper</div>
+            <div class="node-metric" style="color:#4F46E5;">GPU CUDA · Pronto</div>
+          </div>
+        </div>
+      </div>
+      <div class="hud-hint">Toque em qualquer lugar para avançar</div>
+    </div>
+
+    <div class="ab-topo">
+      <div class="ab-marca-box">
+        <div class="ab-marca-ico">✦</div>
+        <div>
+          <span class="ab-marca">Laudos USG 3.0</span>
+          <div class="ab-marca-sub">Sistema Clínico Inteligente</div>
+        </div>
+      </div>
+      <div class="ab-topo-meta">
+        <div class="ab-badge-agente"><span class="ab-dot-live"></span><span>Agente Conectado</span></div>
+        <span class="ab-data" id="abData"></span>
+      </div>
+    </div>
+
     <div class="ab-corpo">
       <!-- 19/08/2026: contador de exames do dia, pedido do médico. Os números vêm do
            BANCO (pelo agente), não da sessão aberta: assim valem mesmo depois de fechar
            a janela, e não zeram quando a sessão é recuperada. -->
       <div class="ab-cont" id="abContador" style="display:none"></div>
-      <div class="ab-eb">O SISTEMA CONFERE SOZINHO</div>
+      <div class="ab-eb">Sensores & Barramentos Operacionais</div>
       <div class="ab-card">
+        <!-- Card 1: Microfone -->
         <div class="ab-linha">
-          <span class="ab-bola" id="abMicBola">…</span>
-          <span class="ab-txt" id="abMicTxt">Procurando o microfone…</span>
-          <button class="ab-mini" id="abMicTestar" onclick="abTestarMicrofone()" style="display:none">testar</button>
-          <span class="ab-vu" id="abVu"><i></i><i></i><i></i><i></i><i></i></span>
+          <div class="ab-card-top">
+            <div class="ab-icon-bubble">🎙️</div>
+            <span class="ab-bola" id="abMicBola">…</span>
+          </div>
+          <div class="ab-card-tit">Microfone Clínico</div>
+          <div class="ab-txt" id="abMicTxt">Procurando o microfone…</div>
+          <div class="ab-card-foot">
+            <span class="ab-vu" id="abVu"><i></i><i></i><i></i><i></i><i></i></span>
+            <button class="ab-mini" id="abMicTestar" onclick="abTestarMicrofone()" style="display:none">testar</button>
+          </div>
         </div>
+
+        <!-- Card 2: DICOM Orthanc -->
         <div class="ab-linha">
-          <span class="ab-bola" id="abOrtBola">…</span>
-          <span class="ab-txt" id="abOrtTxt">Procurando o recebedor de exames…</span>
-          <button class="ab-mini" id="abOrtTestar" onclick="abTestarAparelho()" style="display:none">testar</button>
+          <div class="ab-card-top">
+            <div class="ab-icon-bubble cyan">📡</div>
+            <span class="ab-bola" id="abOrtBola">…</span>
+          </div>
+          <div class="ab-card-tit">Recepção DICOM</div>
+          <div class="ab-txt" id="abOrtTxt">Procurando o recebedor de exames…</div>
+          <div class="ab-card-foot">
+            <span class="ab-card-tag">Porta 104</span>
+            <button class="ab-mini" id="abOrtTestar" onclick="abTestarAparelho()" style="display:none">testar</button>
+          </div>
         </div>
+
+        <!-- Card 3: Relógio -->
         <div class="ab-linha">
-          <span class="ab-bola" id="abRelBola">…</span>
-          <span class="ab-txt" id="abRelTxt">Conferindo o relógio do aparelho…</span>
+          <div class="ab-card-top">
+            <div class="ab-icon-bubble">⏱️</div>
+            <span class="ab-bola" id="abRelBola">…</span>
+          </div>
+          <div class="ab-card-tit">Sincronia Temporal</div>
+          <div class="ab-txt" id="abRelTxt">Conferindo o relógio do aparelho…</div>
+          <div class="ab-card-foot">
+            <span class="ab-card-tag">Tolerância 2 min</span>
+          </div>
         </div>
+
+        <!-- Card 4: Transcrição IA -->
         <div class="ab-linha">
-          <span class="ab-bola" id="abAsrBola">…</span>
-          <span class="ab-txt" id="abAsrTxt">Carregando a transcrição…</span>
+          <div class="ab-card-top">
+            <div class="ab-icon-bubble indigo">🧠</div>
+            <span class="ab-bola" id="abAsrBola">…</span>
+          </div>
+          <div class="ab-card-tit">Transcrição Local</div>
+          <div class="ab-txt" id="abAsrTxt">Carregando a transcrição…</div>
+          <div class="ab-card-foot">
+            <span class="ab-card-tag">Whisper v3 CUDA</span>
+          </div>
         </div>
       </div>
 
@@ -839,24 +988,26 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
            some dela. As etiquetas `abPendentes` e `hisSelo` viviam nestes botões e
            continuam existindo no código; quem as escreve confere se elas estão na tela
            antes de escrever, então a contagem não quebra por elas terem saído daqui. -->
-      <button class="ab-botao" onclick="trabAbrir()">
-        <span class="ab-icone">🗂</span>
-        <span style="flex:1">
-          <span class="ab-nome">Trabalho</span>
-          <span class="ab-sub" style="display:block">os exames do dia e de todos os dias — fazer, liberar e imprimir</span>
-        </span>
-        <span class="ab-selo" id="abPendentes" style="display:none"></span>
-        <span class="ab-seta">›</span>
-      </button>
+      <div class="ab-botoes-cx">
+        <button class="ab-botao" onclick="trabAbrir()">
+          <span class="ab-icone">🗂</span>
+          <span style="flex:1">
+            <span class="ab-nome">Trabalho</span>
+            <span class="ab-sub" style="display:block">os exames do dia e de todos os dias — fazer, liberar e imprimir</span>
+          </span>
+          <span class="ab-selo" id="abPendentes" style="display:none"></span>
+          <span class="ab-seta">›</span>
+        </button>
 
-      <button class="ab-botao" onclick="abEscolher(null); modCfgAbrir();">
-        <span class="ab-icone">⚙︎</span>
-        <span style="flex:1">
-          <span class="ab-nome">Configuração</span>
-          <span class="ab-sub" style="display:block">locais de atendimento, modelos, impressão, provedor de IA e backup</span>
-        </span>
-        <span class="ab-seta">›</span>
-      </button>
+        <button class="ab-botao" onclick="abEscolher(null); modCfgAbrir();">
+          <span class="ab-icone">⚙︎</span>
+          <span style="flex:1">
+            <span class="ab-nome">Configuração</span>
+            <span class="ab-sub" style="display:block">locais de atendimento, modelos, impressão, provedor de IA e backup</span>
+          </span>
+          <span class="ab-seta">›</span>
+        </button>
+      </div>
       <!-- 17/08/2026: sem isto, tocar "Liberar laudos" com a sessão vazia
            escrevia a explicação no diário — que fica ATRÁS desta tela. O médico
            tocava o botão e não acontecia nada visível; parecia programa velho. -->
@@ -1551,13 +1702,11 @@ button.repoSelo:hover{filter:brightness(.95)}
         <div class="dir">
           <div class="eb">IMAGENS (<span id="rv2NImg">0</span>)</div>
           <div id="rv2Imgs"></div>
-          <div class="tocador" id="rv2Tocador">nenhum trecho selecionado — ouça o áudio do exame</div>
-          <!-- 02/09/2026, pedido dele: UM botão no lugar de dois. Saíram "Ouvir o ditado
-               inteiro" (19/08) e "Ouvir o áudio editado — só as patologias" (28/08). O que
-               ele quer ouvir é o exame do início ao fim, tirando só as partes caladas —
-               metade do áudio, medido nos 40 exames mais recentes. Ver rev2OuvirAudio. -->
+          <div class="tocador" id="rv2Tocador">áudio ainda não aberto</div>
           <button class="bt larga" id="rv2BtAudio" onclick="rev2OuvirAudio()"
-                  title="toca o exame do início ao fim, pulando os silêncios">🔊 Ouvir o áudio</button>
+                  title="abre o áudio único já montado, somente com as partes faladas">🔊 Ouvir áudio (só fala)</button>
+          <button class="bt larga cinza" id="rv2BtTranscricao" onclick="rev2VerTranscricao()"
+                  title="mostra a transcrição clínica completa usada como fonte do laudo">📄 Ver transcrição completa</button>
           <div class="lb">MODELO DO EXAME</div>
           <select id="rv2Modelo" onchange="rev2TrocarModelo(this.value)"></select>
           <button class="bt larga" onclick="rev2Regerar()">🤖 Regenerar laudo pela IA</button>
@@ -1597,11 +1746,19 @@ button.repoSelo:hover{filter:brightness(.95)}
       <p class="info centro">assinar gera o PDF e arquiva na pasta de destino — “imprimir” manda junto para a impressora padrão</p>
     </div>
   </div>
-  <audio id="rv2Audio" style="display:none"></audio>
+  <audio id="rv2Audio" controls preload="metadata" style="display:none;width:100%;margin-top:10px"></audio>
   <!-- a foto ampliada mora AQUI, fora da grade: dentro dela seria cortada pela
        rolagem (18/08/2026). Ver rev2LupaLigar. -->
   <img id="rv2Lupa" alt="">
 </div>
+
+<dialog id="rv2TranscricaoDlg" style="width:min(760px,90vw);max-height:82vh;border:1px solid #CAD4D8;border-radius:14px;padding:0;box-shadow:0 18px 60px #0004">
+  <div style="padding:18px 22px;border-bottom:1px solid #DDE5E7;display:flex;align-items:center;gap:12px">
+    <b style="flex:1;color:#174F52;font-size:17px">Transcrição completa usada como fonte</b>
+    <button class="bt cinza" onclick="document.getElementById('rv2TranscricaoDlg').close()">Fechar</button>
+  </div>
+  <pre id="rv2TranscricaoTexto" style="margin:0;padding:22px;white-space:pre-wrap;overflow:auto;max-height:65vh;font:14px/1.55 Arial,sans-serif;color:#26363A"></pre>
+</dialog>
 
 <!-- ============ VER O LAUDO FINAL (24/08/2026, pedido do médico) ============
      O laudo montado, do jeito que vai ser entregue: timbrado, assinatura, rodapé.
@@ -4544,7 +4701,7 @@ async function processar(){
        geral de áudios: lá ele voltaria a disputar dono no casamento por nome, que é
        exatamente o palpite que o microfone da linha existe para dispensar. Fica preso ao
        exame e é transcrito depois, em antVincularAudiosProprios. */
-    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:d.tipo||'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true, _estudoId:d.id||'', _instIds:(d.instancias||[]).slice(), _audiosProprios:(d.audios||[]).slice()}); }
+    for(let i=0;i<dicomProntos.length;i++){ const d=dicomProntos[i]; exames.push({id:0, nomeArquivo:'', paciente:d.paciente, subExame:'', imagens:d.imagens, tipo:d.tipo||'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:d.data||'', idadeExame:d.idade||'', codPac:d.codigo||'', nascPac:d.nascimento||'', sexoPac:d.sexo||'', _dicom:true, _estudoId:d.id||'', _instIds:(d.instancias||[]).slice(), _dicomStudyUid:d.studyInstanceUid||'', _audiosProprios:(d.audios||[]).slice()}); }
     exames.forEach(function(e,i){ e.id=i; });
     log('Agrupei '+(fEx.length+fPasta.length)+' arquivo(s)'+(dicomProntos.length?' + '+dicomProntos.length+' exame(s) do aparelho':'')+' em '+exames.length+' exame(s).');
     /* 21/08/2026 — a lista de importados é ESVAZIADA aqui, depois de virar exame. Ela
@@ -5302,6 +5459,9 @@ async function gerarLaudo(exId, opts){
     // para comparar, para auditar e para treinar. Só este trecho vai para o
     // banco; a gravação da sala inteira continua fora dele.
     ex._transcricao = trans;
+    ex._entradaIa = fitaNum || trans;
+    ex._materialIds = audios.filter(function(a){ return a.exameId===exId && a.materialId; })
+      .map(function(a){ return a.materialId; });
     const regrasAprend = regrasParaPrompt(ex.tipo);
     const ant = examesAnterioresDoPaciente(await histParaBusca(), ex.paciente, ex.tipo, ex.codPac, ex.histKey);
     ex._antInfo = ant.lista.length ? {n:ant.lista.length, data:ant.lista[0].data||'', pend:false}
@@ -5869,11 +6029,11 @@ async function salvarSessao(comImagens){
     var db=await dbOpen();
     // _estudoId/_dicom/_captura PRECISAM entrar no snapshot: é por eles que a recuperação
     // sabe que o exame já existe. Sem isso ela recriava tudo e o exame saía DUPLICADO.
-    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_instIds:e._instIds||[],_dicom:!!e._dicom,_captura:!!e._captura,_preset:e._preset||''}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
+    var snap=comLaudo.map(function(e){ var o={id:e.id,paciente:e.paciente,tipo:e.tipo,subExame:e.subExame||'',lateralidade:e.lateralidade||'',laudo:e.laudo,_liberado:!!e._liberado,histKey:e.histKey||'',audios:(e.audios||[]).slice(),_estudoId:e._estudoId||'',_dicomStudyUid:e._dicomStudyUid||'',_instIds:e._instIds||[],_dicom:!!e._dicom,_captura:!!e._captura,_preset:e._preset||'',_transcricao:e._transcricao||'',_entradaIa:e._entradaIa||''}; if(comImagens!==false) o.imagens=e.imagens||[]; return o; });
     /* _estudoAudio e trechos entram no retrato (19/08/2026): sem eles, reabrir a janela
        devolvia o ditado MUDO (a URL não se refazia) e sem marcação de tempo (o botão VOZ
        morria). Os dois são baratos — um id e uma lista de tempos, sem áudio junto. */
-    var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||'', _estudoAudio:a._estudoAudio||'', trechos:(a.trechos||[])}; });
+    var audsMeta=audios.map(function(a){ return {idx:a.idx, nome:a.nome||'', transcricao:a.transcricao||'', nomePaciente:a.nomePaciente||'', tipoExame:a.tipoExame||'', lateralidade:a.lateralidade||'', exameId:a.exameId, score:a.score||0, _motivo:a._motivo||'', _estudoAudio:a._estudoAudio||'', materialId:a.materialId||null, trechos:(a.trechos||[])}; });
     await new Promise(function(res,rej){var tx=db.transaction('sessoes','readwrite');var st=tx.objectStore('sessoes');st.clear();
       // lista vazia = apagou tudo: limpa e não grava nada (senão voltaria um "0 laudos")
       if(snap.length) st.add({quando:Date.now(),exames:snap,audios:audsMeta});
@@ -6005,7 +6165,9 @@ async function restaurarSessao(id, opc){
       (sess.audios||[]).forEach(function(sa){
         var bl=porIdx[sa.idx]; if(bl) comSom++;
         var url = bl ? URL.createObjectURL(bl)
-                     : (sa._estudoAudio ? (agenteBase()+'/exame/audio/'+encodeURIComponent(sa._estudoAudio)) : null);
+                     : (sa.materialId
+                        ? (agenteBase()+'/audio/material/'+encodeURIComponent(sa.materialId)+'/fala')
+                        : (sa._estudoAudio ? (agenteBase()+'/exame/audio/'+encodeURIComponent(sa._estudoAudio)) : null));
         audios.push(Object.assign({}, sa, {blob:bl||null, url:url, pendente:sa.exameId==null}));
       });
     }catch(e){}
@@ -7155,12 +7317,15 @@ function bancoMontarPayload(ex, resp){
            indicacao_clinica:String((ex.laudo&&ex.laudo.cab&&ex.laudo.cab.dados_clinicos)
                                     ||de.indicacao_clinica||'').trim()||null,
            study_uid:String(ex._estudoId||'')||null,
+           dicom_study_uid:String(ex._dicomStudyUid||'')||null,
+           material_ids:(ex._materialIds||[]).slice(),
            conclusao_codigo:CODIGOS[cod]?cod:'outro',
            laudo_gerado:textoClinicoLaudo(ex.laudo), json_gerado:JSON.stringify(resp||{}),
            // 17/08: a forma ESTRUTURADA viaja junto — é ela que o Recuperar devolve
            laudo_obj:JSON.stringify(ex.laudo||null),
            modelo_ia:cfg.modelo||'', custo_estimado_usd:null,
-           transcricao:String(ex._transcricao||'')||null},
+           transcricao:String(ex._transcricao||'')||null,
+           entrada_ia:String(ex._entradaIa||'')||null},
     achados:achados
   };
 }
@@ -8851,11 +9016,13 @@ async function capToggleRec(){
     capEstado='idle'; clearInterval(capTimer2); capSetRecUI();
     if(resP && resP.texto && resP.texto.trim()){
       capAvisarMotor(resP);
-      var aP=capAudioDoAgente(resP.texto, 'botao', null, resP.trechos);
+      var aP=capAudioDoAgente(resP.texto, 'botao', null, resP.trechos, resP.materialId);
       // _estudoAudio junto: sem ele, este áudio volta MUDO ao recarregar a janela, porque a
       // URL só se refaz a partir dele (o ditado do agente não tem blob no navegador)
       if(resP.ditadoId){ aP._estudoAudio=resP.ditadoId;
-        aP.url=agenteBase()+'/exame/audio/'+encodeURIComponent(resP.ditadoId); }
+        aP.url=resP.materialId
+          ? (agenteBase()+'/audio/material/'+encodeURIComponent(resP.materialId)+'/fala')
+          : (agenteBase()+'/exame/audio/'+encodeURIComponent(resP.ditadoId)); }
       try{
         var mP=await capClassificarDitado(resP.texto, '');
         aP.nomePaciente=mP.nome_paciente||''; aP.tipoExame=mP.tipo_exame||'';
@@ -9263,6 +9430,7 @@ async function capVizinhosDoExame(est){
 async function capAgenteFecharExame(est){
   var viz=await capVizinhosDoExame(est);
   var corpo={estudoId:est.id||'', contentDate:est.imgData||'', contentTime:est.imgHora||'',
+             dicomStudyUid:est.studyInstanceUid||'', pacienteCodigo:codDoEstudo(est),
              contentDateFim:est.imgDataFim||'', contentTimeFim:est.imgHoraFim||'', margemSeg:90};
   Object.keys(viz).forEach(function(k){ corpo[k]=viz[k]; });
   // Prazo: este fetch não tinha nenhum. Com a rede da nuvem, o pior caso do agente
@@ -9292,28 +9460,18 @@ async function capAgenteFecharExame(est){
    /exame/ditados na recuperação. Sem ela, vale o momento de agora.
    É esse carimbo que permite casar ditado e exame pelo relógio em vez de pelo
    nome — e o nome, desde 12/08, o médico não diz mais. */
-/* O agente diz por qual motor o ditado saiu ("local" ou "nuvem"). Até 13/08 o app
-   simplesmente não lia esse campo: pelo botão vermelho, um ditado transcrito na nuvem
-   chegava sem marcação de tempo, com o botão de VOZ morto na revisão, e sem uma palavra
-   ao médico. Receber pior sem saber é o pior dos casos. */
+/* O agente diz por qual motor o ditado saiu ("local" ou "nuvem"). A origem deve ficar
+   visível ao médico, mas já não interfere na reprodução: o arquivo clínico sem silêncio
+   é preparado localmente e não depende das marcações de tempo da transcrição. */
 function capAvisarMotor(j){
   if(!j || j.motor!=='nuvem') return;
   // o agente já manda o próprio aviso no fechamento do exame: dois textos quase iguais
   // sobre a mesma coisa viram barulho, e barulho é o que faz aviso deixar de ser lido
   if(/NUVEM/i.test(String(j.aviso||''))) return;
-  /* 19/08/2026: a frase deixou de ser fixa. Desde que a cadeia da nuvem pede
-     verbose_json ao whisper-1, um ditado de nuvem PODE vir com hora — e mandar o médico
-     não usar um botão que funciona é tão ruim quanto deixá-lo clicar num que não
-     funciona. Quem manda é o que chegou (trechos), não por onde chegou (motor). */
-  var comHora = !!(j.trechos && j.trechos.length);
-  log('⚠️ Este ditado foi transcrito na NUVEM (o motor de voz local falhou). '
-     +(comHora
-       ? ('O texto veio COM marcação de tempo ('+j.trechos.length+' trecho(s)) — o botão '
-         +'de voz da revisão funciona normalmente.')
-       : 'O texto veio, mas SEM marcação de tempo — o botão de voz da revisão não '
-        +'funciona neste exame.'), true);
+  log('⚠️ Este ditado foi transcrito na NUVEM porque o motor de voz local falhou. '
+     +'O áudio só com fala continua sendo preparado e guardado localmente.', true);
 }
-function capAudioDoAgente(texto, origem, quandoSeg, trechos){
+function capAudioDoAgente(texto, origem, quandoSeg, trechos, materialId){
   var idx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
   var ms=(quandoSeg&&isFinite(quandoSeg))?Math.round(quandoSeg*1000):Date.now();
   var hora=new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -9322,6 +9480,7 @@ function capAudioDoAgente(texto, origem, quandoSeg, trechos){
          // trechos = [{inicio, fim, texto}] em segundos, vindos do agente (12/08/2026).
          // É o que permite tocar só o pedaço do ditado que gerou cada parte do laudo.
          trechos:(Array.isArray(trechos)?trechos:[]),
+         materialId:String(materialId||'')||null,
          quando:ms, _captura:true, _agente:true};
   audios.push(a);
   return a;
@@ -9661,7 +9820,7 @@ async function capOrtProcessar(est, forcar){
      aparelho tinha mandado o sexo direitinho. O aviso culpava o aparelho por uma perda
      que era daqui. */
   var ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens, tipo:'', lateralidade:'',
-          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _instIds:instIds, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
+          audios:[], laudo:null, metaConf:1, dataExame:est.data||'', idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), codPac:codDoEstudo(est), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _instIds:instIds, _dicomStudyUid:est.studyInstanceUid||'', _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
   ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
@@ -9682,7 +9841,7 @@ async function capOrtProcessar(est, forcar){
       if(capEstado==='agente'){ capEstado='idle'; if(capTimer2) clearInterval(capTimer2); capSetRecUI(); }
       if(res.texto && res.texto.trim()){
         capAvisarMotor(res);
-        var a=capAudioDoAgente(res.texto, res.origem, null, res.trechos);
+        var a=capAudioDoAgente(res.texto, res.origem, null, res.trechos, res.materialId);
         /* 19/08/2026 — O ÁUDIO NÃO TOCAVA. Este é o caminho do dia a dia (o exame chega do
            aparelho e o agente fecha o ditado), e era o ÚNICO dos três que nunca preenchia
            a URL: capAudioDoAgente nasce com url:null, a parada manual e a recuperação
@@ -9692,7 +9851,9 @@ async function capOrtProcessar(est, forcar){
            _estudoAudio fica gravado junto para a URL poder ser REFEITA depois de recarregar
            a janela ou restaurar a sessão (o áudio do agente não tem blob para sobreviver). */
         a._estudoAudio=est.id;
-        a.url=agenteBase()+'/exame/audio/'+encodeURIComponent(est.id);
+        a.url=res.materialId
+          ? (agenteBase()+'/audio/material/'+encodeURIComponent(res.materialId)+'/fala')
+          : (agenteBase()+'/exame/audio/'+encodeURIComponent(est.id));
         var meta=await capClassificarDitado(res.texto, est.descricao);
         a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
         a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
@@ -9774,13 +9935,14 @@ async function capRecuperar(){
     var ex=exames.filter(function(e){ return e._estudoId===est.id; })[0];
     if(ex){
       if(!ex.imagens || !ex.imagens.length){ ex.imagens=imagens; ex._instIds=instOk; }
+      if(!ex._dicomStudyUid) ex._dicomStudyUid=est.studyInstanceUid||'';
       log('Recuperação: trazendo o ditado para o exame de '+(ex.paciente||'?')+' que já estava na lista.');
     }else{
       // 15/08/2026: nascimento e sexo também aqui — ver o comentário no outro caminho da
       // captura. Recuperar um exame não pode devolvê-lo com menos cadastro do que ele tinha.
       ex={id:0, nomeArquivo:'', paciente:capNome(est.paciente||'')||'(sem nome)', subExame:'', imagens:imagens,
           tipo:'', lateralidade:'', audios:[], laudo:null, metaConf:1, dataExame:est.data||'',
-          idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _instIds:instOk, _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
+          idadeExame:(est.idade===''||est.idade==null)?'':String(est.idade), nascPac:est.nascimento||'', sexoPac:est.sexo||'', _captura:true, _dicom:true, _estudoId:est.id, _instIds:instOk, _dicomStudyUid:est.studyInstanceUid||'', _quando:capQuandoDoEstudo(est), _preset:est.descricao||''};
       ex.id=exames.reduce(function(m,e){return Math.max(m,e.id);},-1)+1;
       ex._liberado=!!jaLiberados[est.id];   // volta sabendo se já foi assinado
     // 17/08: antes de re-gerar, pergunta ao BANCO — o laudo pode já existir lá.
@@ -9790,6 +9952,9 @@ async function capRecuperar(){
       var jb=await rb.json();
       if(jb && jb.achou && jb.laudo_obj){
         ex.laudo=JSON.parse(jb.laudo_obj);
+        ex._transcricao=jb.transcricao||ex._transcricao||'';
+        ex._entradaIa=jb.entrada_ia||ex._entradaIa||'';
+        ex._materialIds=Array.isArray(jb.material_ids)?jb.material_ids.slice():[];
         log('Laudo de '+ex.paciente+' RESTAURADO do banco ('+(jb.versoes||1)+' versão(ões); veio a mais recente). Nada a refazer.');
       } else if(jb && jb.achou && (jb.laudo_final||jb.laudo_gerado)){
         log('⚠️ '+ex.paciente+': o banco guarda só o TEXTO deste laudo (gravado antes do conserto de 17/08). Se re-gerar, confira contra o texto guardado.', true);
@@ -9801,7 +9966,8 @@ async function capRecuperar(){
     // dit.quando: a hora que o agente carimbou quando guardou este ditado.
     // Sem ela, o ditado recuperado entraria com a hora de AGORA e o encaixe
     // pelo relógio olharia para o momento errado.
-    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado', dit.quando, dit.trechos);
+    var a=capAudioDoAgente(dit.texto||'', dit.origem||'recuperado', dit.quando,
+                           dit.trechos, dit.materialId);
     // "pre-transcricao" é a marca que o agente deixa quando grava o WAV ANTES de
     // transcrever. Se ela sobreviveu, a transcrição nunca terminou — e um ditado que
     // volta em branco por falha é coisa muito diferente de um exame sem fala nenhuma.
@@ -9812,7 +9978,12 @@ async function capRecuperar(){
     if(falhou) log('⚠️ O ditado de '+(est.paciente||'?')+' voltou SEM TEXTO: a transcrição não '
                   +'chegou a terminar. O áudio está guardado e pode ser ouvido.', true);
     // _estudoAudio junto com a URL: é o que permite refazer o endereço ao restaurar a sessão
-    if(dit.temAudio){ a._estudoAudio=est.id; a.url=agenteBase()+'/exame/audio/'+encodeURIComponent(est.id); }
+    if(dit.temAudio){
+      a._estudoAudio=est.id;
+      a.url=dit.materialId
+        ? (agenteBase()+'/audio/material/'+encodeURIComponent(dit.materialId)+'/fala')
+        : (agenteBase()+'/exame/audio/'+encodeURIComponent(est.id));
+    }
     var meta=await capClassificarDitado(dit.texto||'', est.descricao);
     a.nomePaciente=meta.nome_paciente||''; a.tipoExame=meta.tipo_exame||''; a.lateralidade=meta.lateralidade||'';
     a.tiposCitados=meta.tipos_citados||[]; a.motivoTipo=meta.motivo||'';
@@ -16781,6 +16952,75 @@ function abAtualizarTudo(){
   abCarregarTranscricao();     // pedido: carregar já aqui, para conferir que está ok
 }
 
+/* ================= SEQUENCIA DE ABERTURA JARVIS (10/09/2026) =================
+   Inspirado no HUD do Jarvis: animação biomédica em anéis concêntricos que escaneia
+   os 4 módulos essenciais (Áudio, DICOM, Relógio, IA Whisper), confirma o estado de
+   operação e recolhe os módulos suavemente para os cards da tela de abertura.
+   Dura ~2.8s no primeiro carregamento e não bloqueia: clicar em qualquer lugar pula
+   imediatamente para a tela normal. */
+var _jarvisExecutando=false;
+function abExecutarSequenciaJarvis(forcado){
+  if(_jarvisExecutando && !forcado) return;
+  var overlay=document.getElementById('jarvisOverlay');
+  if(!overlay) return;
+  try{
+    if(!forcado && typeof sessionStorage!=='undefined' && sessionStorage.getItem('jarvis_boot_done')){
+      overlay.classList.add('hidden');
+      return;
+    }
+  }catch(_){}
+  _jarvisExecutando=true;
+  overlay.classList.remove('hidden');
+  var hudStatus=document.getElementById('hudStatus');
+  var hudProgress=document.getElementById('hudProgress');
+  var nodeMic=document.getElementById('nodeMic');
+  var nodeUsg=document.getElementById('nodeUsg');
+  var nodeRel=document.getElementById('nodeRel');
+  var nodeAi=document.getElementById('nodeAi');
+  if(hudProgress) hudProgress.style.width='0%';
+  [nodeMic, nodeUsg, nodeRel, nodeAi].forEach(function(n){
+    if(n){ n.classList.remove('visible'); n.classList.remove('docked'); }
+  });
+  if(hudStatus){ hudStatus.textContent='Calibrando barramento de áudio…'; hudStatus.style.color=''; hudStatus.style.fontWeight=''; }
+  if(hudProgress) hudProgress.style.width='25%';
+  setTimeout(function(){ if(!_jarvisExecutando) return; if(nodeMic) nodeMic.classList.add('visible'); }, 300);
+  setTimeout(function(){
+    if(!_jarvisExecutando) return;
+    if(hudStatus) hudStatus.textContent='Escaneando porta DICOM Orthanc…';
+    if(hudProgress) hudProgress.style.width='50%';
+    if(nodeUsg) nodeUsg.classList.add('visible');
+  }, 750);
+  setTimeout(function(){
+    if(!_jarvisExecutando) return;
+    if(hudStatus) hudStatus.textContent='Sincronizando oscilador de tempo…';
+    if(hudProgress) hudProgress.style.width='75%';
+    if(nodeRel) nodeRel.classList.add('visible');
+  }, 1200);
+  setTimeout(function(){
+    if(!_jarvisExecutando) return;
+    if(hudStatus) hudStatus.textContent='Ativando modelo neural Whisper (CUDA)…';
+    if(hudProgress) hudProgress.style.width='100%';
+    if(nodeAi) nodeAi.classList.add('visible');
+  }, 1650);
+  setTimeout(function(){
+    if(!_jarvisExecutando) return;
+    if(hudStatus){ hudStatus.textContent='✓ TODOS OS SISTEMAS OPERACIONAIS'; hudStatus.style.color='#10B981'; hudStatus.style.fontWeight='700'; }
+  }, 2100);
+  setTimeout(function(){
+    if(!_jarvisExecutando) return;
+    [nodeMic, nodeUsg, nodeRel, nodeAi].forEach(function(n){ if(n) n.classList.add('docked'); });
+  }, 2550);
+  setTimeout(function(){
+    abFecharJarvis();
+  }, 2900);
+}
+function abFecharJarvis(){
+  _jarvisExecutando=false;
+  try{ if(typeof sessionStorage!=='undefined') sessionStorage.setItem('jarvis_boot_done','1'); }catch(_){}
+  var overlay=document.getElementById('jarvisOverlay');
+  if(overlay){ overlay.classList.add('hidden'); }
+}
+
 /* ================= TELA 2: REALIZAR EXAMES — comportamento =================
    As duas escolhas valem o dia inteiro e ficam GUARDADAS: a tela promete que
    "a escolha de ontem já vem marcada", e antes disso o local voltava para
@@ -19508,11 +19748,6 @@ function rev2Render(){
     var est=rev2Estado(ex,b), pr=rev2Proc(ex,b.titulo), selo='';
     if(pr && pr.imagem_n>0 && (ex.imagens||[]).length>=pr.imagem_n)
       selo+='<button class="img" onclick="rev2VerImagem('+pr.imagem_n+')" title="mostrar a imagem de onde saiu esta medida">IMG</button>';
-    /* 09/09/2026: Etapa 2 (Dr. Daniel) — Botão ÁUDIO: toca o áudio recortado do bloco sem os silêncios. */
-    var _clips=rev2ClipesDoBloco(ex, b);
-    if(_clips && _clips.length)
-      selo+='<button class="audio" onclick="rev2TocarAudioBloco('+i+')" title="ouvir o que você ditou sobre este bloco (sem silêncios)">ÁUDIO</button>';
-    var _fx=rev2RecortePorFaixa(ex,b);
     /* Corta o título do começo do texto SÓ quando ele É o título deste retângulo, e nunca
        a ponto de esvaziar o corpo (ver rev2CorpoVisivel). Antes cortava qualquer negrito
        inicial de até 70 caracteres, e isso causava dois estragos:
@@ -19569,21 +19804,12 @@ function rev2Render(){
 
   // ---- rodapé ----
   var a=audios.filter(function(x){ return x.exameId===ex.id; })[0];
-  var seg=(L.trechos||[]).reduce(function(m,t){ return Math.max(m,t.fim||0); },0);
-  document.getElementById('rv2Info').textContent=
-    'áudio deste exame: '+(seg?rev2Rel(seg):'—')
-    +' · origem: '+((a&&a._agente)?'pré-buffer':'—')
-    // "transcreva de novo com o agente novo" era conselho errado: se quem transcreveu
-    // foi a nuvem, refazer não traz hora nenhuma — a nuvem não devolve marcação.
-    +' · '+((L.trechos||[]).length
-            ? ((L.trechos||[]).length+' trecho(s) com hora')
-            // 19/08/2026: deixou de ser um beco. Sem marcação de tempo não há VOZ por
-            // trecho, mas o ditado INTEIRO continua ouvível — e é isso que se diz.
-            // O "(transcrito na nuvem)" saiu daqui de propósito: desde que a cadeia da
-            // nuvem pede verbose_json ao whisper-1, nuvem já não é sinônimo de sem hora,
-            // e afirmar a causa aqui virou chute. O que a tela sabe é que não há hora.
-            : 'sem marcação de tempo — não há VOZ por trecho, '
-              +'mas dá para ouvir o ditado inteiro no botão ao lado');
+  var nMatNovo=rev2MaterialIds(ex).length;
+  document.getElementById('rv2Info').textContent=nMatNovo
+    ? ('áudio e transcrição vinculados por identidade própria'
+       +(nMatNovo>1?(' · '+nMatNovo+' gravações usadas neste laudo'):'')
+       +' · origem: '+((a&&a._agente)?'captura contínua':'arquivo anexado'))
+    : 'laudo sem material de áudio novo vinculado';
 }
 function rev2Rel(s){ s=Math.max(0,Math.round(s||0)); return Math.floor(s/60)+' min '+('0'+(s%60)).slice(-2)+' s'; }
 
@@ -19979,642 +20205,100 @@ async function rev2AnexarFotos(inp){
                   : 'Nenhum dos arquivos era imagem.', !n);
   try{ agendarSalvarSessao(); }catch(e){}
 }
-/* ============ OUVIR O DITADO INTEIRO (19/08/2026) ============
-   A tela nova só sabia tocar PEDAÇO, e só quando havia marcação de tempo — que não existe
-   quando a transcrição foi feita na nuvem. Nesses exames o médico ficava sem nenhuma forma
-   de ouvir o próprio ditado. O áudio está guardado no computador o tempo todo (o agente o
-   serve em /exame/audio/), então o que faltava era um tocador comum. */
-function rev2AudiosDoExame(){
-  var ex=rev2Ex(); if(!ex) return [];
-  return audios.filter(function(x){ return x.exameId===ex.id && x.url; });
-}
-/* 02/09/2026: `rev2Inteiro` saiu daqui. Ela tocava a gravação do começo ao fim e era o
-   plano B de quem não tinha marcação de tempo. O plano B continua existindo — mudou de
-   lugar, para DENTRO de rev2OuvirAudio, que é o único botão de áudio agora. */
+/* O áudio clínico novo é um arquivo físico único; parar não depende de timers nem
+   de saltos dentro da gravação original. */
 function rev2Parar(){
-  var el=document.getElementById('rv2Audio'); if(el){ try{ el.pause(); }catch(e){} }
-  rev2PararEditado();
-  var cx=document.getElementById('rv2Tocador');
-  if(cx) cx.innerHTML='parado — ouça o áudio do exame.';
-}
-/* ============ OUVIR O ÁUDIO: O EXAME INTEIRO, SEM OS SILÊNCIOS ============
-   02/09/2026, pedido dele: os dois botões antigos ("ouvir o ditado inteiro" e "ouvir o
-   áudio editado — só as patologias") saem e dão lugar a UM. O que ele quer ouvir é o
-   exame do início ao fim, tirando só as partes caladas.
-
-   POR QUE ISSO VALE TANTO: medido nos 40 exames mais recentes com marcação de tempo —
-   196 minutos de gravação para 98 minutos de fala. METADE do áudio é silêncio. Num
-   exame havia uma pausa única de 5 minutos.
-
-   NÃO ANALISA A ONDA SONORA. O transcritor já diz onde houve fala (cada trecho tem
-   início e fim); silêncio é o que sobra entre eles. Sai de graça, é exato, e não
-   depende de escolher um limiar de volume que erraria com o ar-condicionado ligado.
-
-   O LIMITE DE 1 SEGUNDO, medido antes de escolher (792 pausas reais):
-     cortar acima de 0,5 s -> tira 97 min     cortar acima de 1,5 s -> tira 94 min
-     cortar acima de 1,0 s -> tira 96 min     cortar acima de 2,0 s -> tira 93 min
-   Um segundo pega quase todo o ganho E preserva a respiração natural entre frases.
-   Descer para 0,5 s picotaria a fala para ganhar um minuto — troca ruim para o ouvido.
-
-   A FOLGA existe porque cortar exatamente no fim da palavra come o final dela: sobra
-   um "esteatos" no lugar de "esteatose". Ela nunca invade o silêncio inteiro — no
-   máximo metade da pausa de cada lado, para dois blocos nunca se sobreporem. */
-var RV2_PAUSA_MAX = 1.0;     // silêncio acima disto é cortado
-var RV2_FOLGA_FALA = 0.25;   // respiro nas pontas de cada bloco, para não comer sílaba
-function rev2ClipesSemSilencio(){
-  var ex=rev2Ex(); if(!ex||!ex.laudo) return [];
-  var trechos=(ex.laudo.trechos||[]).filter(function(t){
-    return t && typeof t.inicio==='number' && typeof t.fim==='number' && t.fim>t.inicio;
-  }).slice().sort(function(a,b){ return a.inicio-b.inicio; });
-  if(!trechos.length) return [];
-  var meus=audios.filter(function(x){ return x.exameId===ex.id; });
-  var blocos=[];
-  trechos.forEach(function(t){
-    var url=(rev2AudioDoTrecho(meus, t)||{}).url||'';
-    if(!url) return;
-    var ult=blocos[blocos.length-1];
-    /* pausa curta continua no áudio: é a respiração da fala, não silêncio a cortar.
-       Trechos de arquivos diferentes nunca se juntam — seriam duas gravações. */
-    if(ult && ult.url===url && (t.inicio-ult.fim)<=RV2_PAUSA_MAX){
-      ult.fim=Math.max(ult.fim, t.fim);
-    } else {
-      blocos.push({ini:t.inicio, fim:t.fim, url:url});
-    }
-  });
-  // a folga entra depois de fundir, e limitada pela pausa que existe de fato
-  for(var i=0;i<blocos.length;i++){
-    var b=blocos[i], ant=blocos[i-1], prox=blocos[i+1];
-    var antes=(ant && ant.url===b.url) ? (b.ini-ant.fim)/2 : b.ini;
-    var depois=(prox && prox.url===b.url) ? (prox.ini-b.fim)/2 : RV2_FOLGA_FALA;
-    b.ini=Math.max(0, b.ini-Math.min(RV2_FOLGA_FALA, Math.max(0,antes)));
-    b.fim=b.fim+Math.min(RV2_FOLGA_FALA, Math.max(0,depois));
-  }
-  return blocos;
-}
-/* Toca os blocos em sequência, pulando o silêncio. Mesma mecânica do antigo áudio
-   editado: janelas do MESMO arquivo, sem gerar áudio novo. */
-function rev2OuvirAudio(){
-  var el=document.getElementById('rv2Audio'), cx=document.getElementById('rv2Tocador');
-  if(!el) return;
-  var lista=rev2AudiosDoExame();
-  if(!lista.length){
-    if(cx) cx.textContent='este exame não tem áudio guardado para tocar '
-      +'(ou o agente está desligado — o áudio mora no computador, não na janela).';
-    return;
-  }
-  var blocos=rev2ClipesSemSilencio();
-  clearTimeout(window.__rv2Par);
-  rev2PararEditado();
-  /* SEM MARCAÇÃO DE TEMPO não há como saber onde está o silêncio — é o caso do ditado
-     transcrito na nuvem e do que veio de antes de 19/08. Toca inteiro e DIZ por quê,
-     em vez de recusar: ouvir com silêncio é melhor que não ouvir. */
-  if(!blocos.length){
-    var a=lista[0];
-    if(el.src!==a.url) el.src=a.url;
-    el.currentTime=0;
-    el.play().then(function(){
-      if(cx) cx.innerHTML='▶ áudio do exame, inteiro — <b>'+esc(a.nome||'gravação')+'</b>'
-        +' <span class="aviso">(sem marcação de tempo neste ditado: não dá para tirar os silêncios)</span>'
-        +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
-    }).catch(function(e){
-      if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). O agente precisa estar ligado.';
-    });
-    return;
-  }
-  var sessao={vivo:true}; window.__rv2Ed=sessao;
-  var soma=blocos.reduce(function(s,b){ return s+(b.fim-b.ini); },0);
-  var bruto=blocos[blocos.length-1].fim-blocos[0].ini;
-  var n=0;
-  var tocar=function(){
-    if(!sessao.vivo) return;
-    if(n>=blocos.length){
-      try{ el.pause(); }catch(e){}
-      if(cx) cx.innerHTML='fim do áudio — <b>'+rev2Rel(soma)+'</b> ouvidos de '+rev2Rel(bruto)
-        +' de gravação. <button class="voz" onclick="rev2OuvirAudio()">tocar de novo</button>';
-      window.__rv2Ed=null; return;
-    }
-    var b=blocos[n++];
-    if(el.src!==b.url) el.src=b.url;
-    el.currentTime=b.ini;
-    el.play().catch(function(e){
-      if(cx) cx.textContent='não consegui tocar o áudio ('+((e&&e.message)||e)+'). O agente precisa estar ligado.';
-      sessao.vivo=false;
-    });
-    if(cx) cx.innerHTML='▶ áudio do exame, sem os silêncios — <b>'+rev2Rel(soma)+'</b> no lugar de '
-      +rev2Rel(bruto)+' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
-    clearTimeout(window.__rv2EdPar);
-    window.__rv2EdPar=setTimeout(tocar, Math.max(150,(b.fim-b.ini)*1000));
-  };
-  tocar();
-}
-/* ============ RECORTE FINO: SÓ A FRASE DA PATOLOGIA (28/08/2026) ============
-   Pedido dele: "no final do exame haja uma montagem de áudio, com trechos de poucos
-   segundos... nesses trechos deve haver apenas as menções às patologias".
-
-   O PROBLEMA MEDIDO: o trecho do transcritor é um PEDAÇO INTEIRO de fala, não a frase.
-   Nos 200 laudos de 26–27/08, 46% dos trechos que o VOZ tocava passavam de 10 s, 71
-   passavam de 20 s e o maior tinha 4 MINUTOS — por isso o botão parecia tocar "o áudio
-   todo" em vez de confirmar o achado.
-
-   O QUE ESTA FUNÇÃO FAZ: acha ONDE, dentro do trecho, está a frase que a IA citou
-   (procedencia.citacao) e devolve uma janela curta em volta dela. O transcritor local
-   não marca a hora de cada palavra — só o começo e o fim do trecho —, então a posição é
-   estimada pela REGRA DE TRÊS entre caracteres e segundos, com folga dos dois lados.
-   É ESTIMATIVA, e a folga existe para errar por sobra e nunca cortar a frase no meio.
-   Sem citação (ou não achando), devolve o começo do trecho limitado a TETO segundos —
-   nunca o trecho inteiro de 4 minutos. */
-var RV2_FOLGA=1.2;    // segundos de respiro ANTES da frase
-/* 31/08/2026, pedido dele: "pode botar o corte 2 segundos depois do fim daquela
-   patologia específica, porque ele tá cortando muito em cima".
-   A folga do FIM é maior que a do começo de propósito, e não por descuido: o começo da
-   frase se reconhece pelo silêncio anterior, mas o fim costuma trazer o complemento que
-   confirma o achado ("...compatível com esteatose hepática **leve**"). Cortar em cima do
-   fim tira justamente a palavra que decide.
-   AJUSTADO PARA 1,5 s na mesma noite, depois de ele ouvir os 3 s no exame das 22h43:
-   "a folga pode ser de 1,5 segundo". Três segundos alcançavam o achado seguinte quando
-   ele dita as patologias em sequência — o que a montagem agora apara, mas aparar é
-   remendo; 1,5 s já não invade. */
-var RV2_FOLGA_FIM=1.5;
-var RV2_MIN=2.5;      // nenhum recorte menor que isto (frase curta sem contexto não confirma)
-var RV2_TETO=14;      // nem maior que isto (deixa de ser "poucos segundos")
-/* ============ O RECORTE PELA PALAVRA (31/08/2026) ============
-   Desde hoje o transcritor devolve a hora de CADA PALAVRA (asr.py, word_timestamps).
-   Quando ela existe, o recorte deixa de ser estimativa e passa a ser medida: acha-se a
-   citacao dentro da fita de palavras e corta-se na hora da primeira e da ultima.
-
-   POR QUE ISTO IMPORTA — medido no ditado real "Teste 2" de 31/08: um trecho unico de
-   1,23 s a 26,89 s, texto "Ah, teste 2, exame de mama, ok.". Parece 25 s de fala; sao
-   dois jorros, com 20 s de silencio no meio. A regra de tres punha "exame de mama" aos
-   10,79 s (silencio puro); a hora de verdade e 24,51 s. Erro de 13,7 s.
-
-   O CASAMENTO NAO EXIGE CITACAO LITERAL. A IA copia "de 4 a 12 palavras do ditado", mas
-   corrige e resume — e uma citacao que nao bate como texto corrido deixava o botao mudo.
-   Aqui procura-se a maior sequencia EM ORDEM das palavras da citacao dentro da fita,
-   tolerando palavras no meio e ignorando as curtas (de, da, com, em...). */
-var RV2_STOP=' de da do das dos e ou em no na nos nas com sem por para a o as os um uma que se ao aos ';
-/* Duas palavras são a mesma? Igualdade, ou mesmo começo com o mesmo tamanho aproximado —
-   é o que casa "cálculo/cálculos" e "hepática/hepático" sem casar bobagem.
-   31/08/2026: a versão anterior aceitava QUALQUER uma ser pedaço da outra, e isso fazia
-   "de" casar dentro de "decúbito". Palavra curta (menos de 4 letras) agora só casa exata:
-   "rim" tem de ser "rim". */
-function rev2PalavraCasa(a, b){
-  if(!a || !b) return false;
-  if(a===b) return true;
-  if(a.length<4 || b.length<4) return false;
-  return a.slice(0,4)===b.slice(0,4) && Math.abs(a.length-b.length)<=3;
-}
-/* ACHAR A PATOLOGIA NA FITA DE PALAVRAS — reescrito em 31/08/2026 depois do exame real
-   das 22h21, onde os TRÊS achados saíram errados de três maneiras diferentes:
-
-   1. "esteatose 1" (fígado) — a citação tem UMA palavra-chave só ("1" é curto demais e
-      cai). A regra antiga exigia DUAS palavras casadas ("uma só é coincidência") e
-      devolvia NADA, jogando o recorte na estimativa: tocou 22,46 s quando a esteatose
-      foi dita aos 14,22 s. Oito segundos fora. Agora a exigência é
-      min(2, quantas a citação tem): citação de uma palavra vale com uma, desde que ela
-      seja longa o bastante para não ser coincidência.
-
-   2. "cálculo na vesícula biliar" — ele disse "cálculo" aos 16,78 s e só completou "na
-      vesícula biliar" aos 31,90 s, examinando no meio. A regra antiga pegava do PRIMEIRO
-      ao ÚLTIMO casamento: 16 segundos, mais que o teto. O corte então começava aos
-      15,58 s — dentro da fala da ESTEATOSE — e terminava aos 29,58 s, ANTES de a palavra
-      "vesícula" ser dita. Era o "misturou a esteatose com a vesícula" que ele relatou.
-      Agora procura-se a JANELA MAIS DENSA: o punhado de palavras-chave que cabe no
-      tempo do recorte. Para este caso dá "vesícula biliar" aos 32,18 s — a parte que
-      nomeia o achado, que é a que confirma.
-
-   3. Como o corte do fígado e o da vesícula se sobrepunham, a montagem do áudio editado
-      fundiu os dois num só e anunciou "2 patologias" havendo três. */
-function rev2AcharNasPalavras(pals, citacao){
-  var alvo=norm(citacao||'').split(' ').filter(function(w){
-    return w.length>2 && RV2_STOP.indexOf(' '+w+' ')<0; });
-  if(!alvo.length || !(pals&&pals.length)) return null;
-  // onde cada palavra-chave aparece na fita (uma marca por palavra falada)
-  var marcas=[];
-  for(var j=0;j<pals.length;j++){
-    var w=norm(pals[j].p);
-    for(var k=0;k<alvo.length;k++){
-      if(rev2PalavraCasa(w, alvo[k])){ marcas.push({j:j, k:k}); break; }
-    }
-  }
-  if(!marcas.length) return null;
-  /* PRIMEIRO SEPARA POR PAUSA. Uma palavra-chave que aparece longe das outras quase
-     sempre é OUTRA menção, não a mesma frase — e a palavra que mais se repete no laudo é
-     justamente a que nomeia o achado ("cálculo" na vesícula E no rim). Sem este corte, a
-     busca da vesícula alcançava o "cálculo" do rim 7 s adiante, contava 3 palavras e
-     devolvia uma janela de 13 s que atropelava o achado seguinte.
-     5 segundos: mais que isso, ele parou para examinar — não é a mesma frase. */
-  var RV2_PAUSA=5.0;
-  // quanto de FALA cabe dentro de um recorte, descontadas as folgas dos dois lados
-  var util=Math.max(RV2_MIN, RV2_TETO-RV2_FOLGA-RV2_FOLGA_FIM);
-  var grupos=[[marcas[0]]];
-  for(var g=1;g<marcas.length;g++){
-    var ant=grupos[grupos.length-1], ultimo=ant[ant.length-1];
-    if(pals[marcas[g].j].i - pals[ultimo.j].f <= RV2_PAUSA) ant.push(marcas[g]);
-    else grupos.push([marcas[g]]);
-  }
-  var melhor=null;
-  grupos.forEach(function(gr){
-    // dentro do grupo, a melhor janela que ainda CABE no recorte
-    for(var a=0;a<gr.length;a++){
-      var vistos={}, n=0, b=a;
-      for(var c=a;c<gr.length;c++){
-        if(pals[gr[c].j].f - pals[gr[a].j].i > util) break;      // nao cabe no recorte
-        if(!vistos[gr[c].k]){ vistos[gr[c].k]=1; n++; }          // conta palavra DISTINTA
-        b=c;
-      }
-      var span=pals[gr[b].j].f - pals[gr[a].j].i;
-      // mais palavras-chave distintas ganha; empatou, a janela mais APERTADA ganha
-      if(!melhor || n>melhor.n || (n===melhor.n && span<melhor.span))
-        melhor={a:gr[a], b:gr[b], n:n, span:span};
-    }
-  });
-  if(!melhor) return null;
-  // Uma palavra só: aceita, mas ela tem de ser longa — "esteatose" sim, "rim" não.
-  if(melhor.n<Math.min(2, alvo.length)) return null;
-  if(melhor.n===1 && alvo[melhor.a.k].length<5) return null;
-  return {ini:pals[melhor.a.j].i, fim:pals[melhor.b.j].f,
-          casou:melhor.n, de:alvo.length};
-}
-function rev2RecorteFino(tr, citacao){
-  var ini=(tr&&tr.inicio)||0, fim=(tr&&tr.fim)||ini;
-  var dur=fim-ini;
-  // caminho novo: a hora de verdade, quando o ditado foi transcrito com palavras
-  var pals=(tr&&tr.palavras)||null;
-  if(pals && pals.length && norm(citacao||'').length>=6){
-    var m=rev2AcharNasPalavras(pals, citacao);
-    if(m){
-      /* NEM O COMEÇO NEM O FIM SE PRENDEM AO TRECHO (31/08/2026).
-         O fim se soltou primeiro; o começo tinha um Math.max(ini, …) que fazia o mesmo
-         estrago do outro lado, e apareceu no exame das 22h43: ele disse "Esteatose 3" e
-         o transcritor abriu o trecho EXATAMENTE na palavra (18,24 s), porque o corte de
-         silêncio encosta o trecho na primeira sílaba. A folga de 1,2 s era zerada pelo
-         limite, o tocador entrava em cima do "Es-" e ele ouviu só "três".
-         O trecho é onde a FALA foi reconhecida, não onde o áudio começa: recuar antes
-         dele é recuar para o silêncio que veio antes, que é exatamente o que se quer. */
-      var a=Math.max(0, m.ini-RV2_FOLGA);
-      var b=m.fim+RV2_FOLGA_FIM;
-      if(b-a<RV2_MIN) b=a+RV2_MIN;                      // frase curta: da contexto
-      if(b-a>RV2_TETO) b=a+RV2_TETO;
-      /* falaIni/falaFim = onde a PATOLOGIA foi dita de verdade, sem as folgas. Quem monta
-         o áudio editado usa isto para aparar folga que invade o achado seguinte, sem
-         nunca cortar a fala em si. */
-      return {ini:a, fim:b, estimado:false, palavras:true, casou:m.casou, de:m.de,
-              falaIni:m.ini, falaFim:m.fim};
-    }
-  }
-  var corta=function(a,b){
-    b=Math.min(b, ini+Math.max(dur,0));
-    if(b-a<RV2_MIN) b=a+RV2_MIN;
-    if(b-a>RV2_TETO) b=a+RV2_TETO;
-    return {ini:Math.max(ini,a), fim:Math.min(Math.max(a,b), Math.max(fim,a+RV2_MIN)), estimado:true};
-  };
-  if(dur<=RV2_TETO) return {ini:ini, fim:fim, estimado:false};   // já é curto: vale inteiro
-  var texto=String((tr&&tr.texto)||''), c=norm(citacao||'');
-  var t=norm(texto);
-  var pos=(c.length>=6)?t.indexOf(c):-1;
-  if(pos<0 && c.length>=6){                       // não bateu inteira: tenta pelas palavras
-    var pal=c.split(' ').filter(function(p){ return p.length>3; });
-    for(var k=0;k<pal.length;k++){ var p2=t.indexOf(pal[k]); if(p2>=0){ pos=p2; break; } }
-  }
-  if(pos<0 || !t.length) return corta(ini, ini+RV2_TETO);        // sem pista: começo, curto
-  var segPorChar=dur/t.length;
-  var comeca=ini + pos*segPorChar - RV2_FOLGA;
-  /* Na ESTIMATIVA a folga do fim entra na duração, mas o recorte segue preso ao trecho
-     (o `corta` abaixo). Aqui não se sabe onde a frase termina de verdade — esticar para
-     fora do trecho seria somar folga a um palpite. Quem tem hora de palavra estica; quem
-     só tem regra de três, não. */
-  var dura=Math.max(RV2_MIN, Math.min(RV2_TETO, (c.length||40)*segPorChar + RV2_FOLGA + RV2_FOLGA_FIM));
-  return corta(Math.max(ini, comeca), Math.max(ini, comeca)+dura);
-}
-/* O ACHADO EM NEGRITO deste retângulo, sem a moldura do título.
-   31/08/2026 — serve de PLANO B da citação. Até aqui, quando a IA não devolvia
-   `procedencia.citacao`, o botão VOZ tocava o começo do trecho e o áudio editado dizia
-   "não há trecho de patologia para montar" — mesmo com o ditado inteiro guardado ali.
-   O programa dependia de a IA lembrar de copiar o ditado; agora, quando ela não copia,
-   procura-se o PRÓPRIO ACHADO na fita de palavras. "esteatose hepática moderada" está
-   escrito no laudo e foi dito no ditado: não era preciso um intermediário. */
-function rev2AchadoEmNegrito(b){
-  if(!b) return '';
-  var t=String(b.texto||'');
-  var cv=rev2CorpoVisivel(b);            // tira o "**Fígado**:" que é moldura, não achado
-  if(cv && cv.txt) t=cv.txt;
-  /* 01/09/2026 — O TETO DE 90 CARACTERES ESTAVA DESCARTANDO O ACHADO EM SILÊNCIO.
-     Medido nos laudos já gerados: de 2561 trechos em negrito, 268 (10,5%) passam de
-     90 caracteres — não é caso raro, é um em dez. Quando o achado é longo demais para
-     o teto, o regex simplesmente NÃO CASA aquele "**...**" (o fechamento fica fora da
-     janela de 90), e o exec() global recomeça a busca DEPOIS da abertura — encontrando
-     como próximo "**" o FECHAMENTO do próprio achado, e casando com ele como se fosse
-     uma NOVA abertura. O resultado, medido no exame de 01/09 07h55 (achado do Fígado
-     com 95 caracteres): rev2AchadoEmNegrito devolvia trecho de MEDIDA numérica do
-     órgão seguinte, não o achado. Sem teto: o "**...**" é delimitado pelo próprio par,
-     não por uma contagem de caracteres — não há razão para limitar aqui. */
-  var achados=[], m, re=/\*\*([^*]{3,})\*\*/g;
-  while((m=re.exec(t))) achados.push(m[1]);
-  return achados.join(' ').trim();
-}
-/* ============ O RECORTE EXATO, APONTADO PELA IA (01/09/2026) ============
-   A outra ponta da fita numerada (ver fitaDeTrechos, lá em cima). A IA devolve
-   palavra_ini/palavra_fim em cada item de procedencia; aqui esses números viram tempo.
-   Não há busca nenhuma — por isso este caminho não tem casos de borda.
-
-   MAS OS NÚMEROS SÃO DELA, e ela pode errar. Três conferências antes de aceitar:
-     · estão dentro da fita e em ordem;
-     · a fala apontada não é o exame inteiro (um achado não dura 90 s);
-     · e, havendo citação, as palavras apontadas têm de ter ALGO em comum com ela —
-       é o que pega o erro de dez posições, que seria o pior de todos: tocar com
-       confiança o achado do órgão errado.
-   Reprovando em qualquer uma, devolve null e a tela cai no casamento por busca. */
-/* O SELO: por qual caminho este recorte saiu. Três níveis de confiança, ditos com todas
-   as letras. O caminho "apontado" não tem busca nenhuma e por isso não tem caso de borda;
-   o "casado" procura na fita e acerta quase sempre; o "estimado" é regra de três e existe
-   só para ditado antigo, ou vindo da nuvem, que não devolve hora de palavra. */
-function rev2SeloDoRecorte(rec){
-  if(!rec) return '';
-  if(rec.apontado) return ' <span style="font-size:11px">(a IA apontou as palavras)</span>';
-  if(rec.palavras) return ' <span style="font-size:11px">(hora exata da fala)</span>';
-  if(rec.estimado) return ' <span class="aviso" style="font-size:11px">(recorte estimado — pode sair deslocado)</span>';
-  return '';
-}
-function rev2Fita(L){ return fitaDeTrechos((L||{}).trechos||[]); }
-function rev2RecortePorFaixa(ex, b){
-  var L=(ex||{}).laudo; if(!L) return null;
-  var pr=null; try{ pr=rev2Proc(ex, b&&b.titulo); }catch(e){}
-  if(!pr) return null;
-  var a=parseInt(pr.palavra_ini,10), z=parseInt(pr.palavra_fim,10);
-  if(!(a>0) || !(z>0) || z<a) return null;
-  var fita=rev2Fita(L); if(!fita.length || z>fita.length) return null;
-  var p1=fita[a-1], p2=fita[z-1];
-  if(p1.t!==p2.t) return null;                       // faixa cruzando gravações: desconfia
-  if(p2.f-p1.i>90) return null;                      // achado nenhum dura isso
-  /* A FAIXA DE ENCHIMENTO (medido em 01/09/2026). Num exame sem achado ditado, a IA
-     preencheu as DOZE seções com a MESMA faixa — e ela apontava "tudo bem, tá?", a
-     despedida. O médico apertaria o botão do fígado e ouviria isso. O pedido agora manda
-     usar zero nesses casos, mas a instrução é conselho: aqui é a trava.
-     Repetir uma faixa em duas seções é legítimo (ele diz "pedra no rim" uma vez e vale
-     para os dois rins). Em três ou mais, é enchimento. */
-  var repet=0, lista=(L.procedencia||[]);
-  for(var r=0;r<lista.length;r++){
-    var o=lista[r]||{};
-    if(parseInt(o.palavra_ini,10)===a && parseInt(o.palavra_fim,10)===z) repet++;
-  }
-  if(repet>=3) return null;
-  var cit=String(pr.citacao||'');
-  if(norm(cit).length>=6){
-    var alvo=norm(cit).split(' ').filter(function(w){
-      return w.length>2 && RV2_STOP.indexOf(' '+w+' ')<0; });
-    if(alvo.length){
-      var bateu=false;
-      for(var k=a-1;k<z && !bateu;k++){
-        var w=norm(fita[k].p);
-        for(var q=0;q<alvo.length;q++) if(rev2PalavraCasa(w, alvo[q])){ bateu=true; break; }
-      }
-      if(!bateu) return null;                        // apontou longe do que ela mesma citou
-    }
-  }
-  var ini=Math.max(0, p1.i-RV2_FOLGA), fim=p2.f+RV2_FOLGA_FIM;
-  if(fim-ini<RV2_MIN) fim=ini+RV2_MIN;
-  if(fim-ini>RV2_TETO) fim=ini+RV2_TETO;
-  return {ini:ini, fim:fim, estimado:false, palavras:true, apontado:true,
-          falaIni:p1.i, falaFim:p2.f, trecho:p1.t, audioUrl:p1.audioUrl||''};
-}
-/* A citação que explica ESTE retângulo (o botão VOZ manda o índice do bloco). */
-function rev2CitacaoDoBloco(ex, bi){
-  try{
-    var b=rev2BlocosDaTela(ex.laudo)[bi]; if(!b) return '';
-    return rev2ChaveDoBloco(ex, b);
-  }catch(e){ return ''; }
-}
-/* A chave de busca do retângulo: a citação da IA quando existe, o achado em negrito
-   quando não. Um lugar só, para o VOZ e o áudio editado nunca discordarem. */
-function rev2ChaveDoBloco(ex, b){
-  var pr=null;
-  try{ pr=rev2Proc(ex, b&&b.titulo); }catch(e){}
-  var c=(pr&&pr.citacao)||'';
-  if(norm(c).length>=6) return c;
-  return rev2AchadoEmNegrito(b);
-}
-/* Procura a chave em TODOS os trechos e devolve o que casou melhor.
-   Só funciona onde há hora por palavra — que é justamente o caso novo. */
-function rev2TrechoPorPalavras(ex, chave){
-  var tr=((ex.laudo||{}).trechos)||[];
-  if(norm(chave||'').length<6) return null;
-  var melhor=null;
-  for(var i=0;i<tr.length;i++){
-    var p=tr[i].palavras; if(!p||!p.length) continue;
-    var m=rev2AcharNasPalavras(p, chave);
-    if(m && (!melhor || m.casou>melhor.m.casou)) melhor={tr:tr[i], m:m};
-  }
-  return melhor?melhor.tr:null;
-}
-/* ============ QUAL TRECHO, COM QUAL CHAVE (01/09/2026) ============
-   Achado em negrito primeiro, citação da IA em segundo — troca de prioridade em cima
-   da que existia até aqui (rev2ChaveDoBloco preferia a citação sempre que ela não
-   estivesse vazia).
-
-   O CASO REAL que forçou a troca (exame de 01/09, 07h55): o médico ditou "Dados
-   clínicos, rotina. Esteatose hepática leve, cálculo no rim direito...". A IA citou,
-   para a seção Fígado, "Dados clínicos, rotina. Esteatose hepática leve" — uma citação
-   CORRETA sobre a esteatose, mas CONTAMINADA com a frase anterior, de outro assunto.
-   Essa citação tem 3 palavras em comum com o trecho da rotina (dados/clínicos/rotina)
-   e 3 com o trecho da esteatose (esteatose/hepática/leve) — EMPATE. rev2Trecho, no
-   empate, fica com o primeiro trecho que encontra — que era a conversa de rotina, não
-   o achado. O botão VOZ do fígado tocava "dados clínicos, rotina, tá?".
-
-   O achado em negrito ("esteatose hepática leve", ou o texto elaborado ao redor) não
-   tem essa contaminação: é vocabulário da PATOLOGIA, específico daquele órgão, que só
-   aparece no trecho certo — não empata com a conversa de entrada do exame. Por isso
-   vai primeiro. A citação continua como reserva, para quando o achado em negrito não
-   bate com nenhuma palavra do ditado (a IA às vezes reformula o achado longe do que
-   foi dito; a citação, sendo cópia literal, cobre esse caso). */
-function rev2TrechoDoBloco(ex, b){
-  var achado=rev2AchadoEmNegrito(b);
-  var tr=rev2Trecho(ex,achado) || rev2TrechoPorPalavras(ex,achado);
-  if(tr) return {tr:tr, chave:achado};
-  var pr=null; try{ pr=rev2Proc(ex, b&&b.titulo); }catch(e){}
-  var cit=(pr&&pr.citacao)||'';
-  tr=rev2Trecho(ex,cit) || rev2TrechoPorPalavras(ex,cit);
-  return tr ? {tr:tr, chave:cit} : null;
-}
-function rev2Tocar(i, bi){
-  var ex=rev2Ex(); if(!ex) return;
-  var tr=(((ex.laudo||{}).trechos)||[])[i]; if(!tr) return;
-  var a=rev2AudioDoTrecho(audios.filter(function(x){ return x.exameId===ex.id; }), tr);
   var el=document.getElementById('rv2Audio');
+  if(el){ try{ el.pause(); }catch(e){} }
   var cx=document.getElementById('rv2Tocador');
-  if(!a || !el){ if(cx) cx.textContent='o áudio deste exame não está disponível para tocar.'; return; }
-  /* 01/09/2026: a faixa apontada pela IA vem primeiro, aqui como no áudio editado — os
-     dois têm de mostrar o MESMO pedaço, senão o botão de um retângulo tocaria uma coisa
-     e o áudio editado outra, para o mesmo achado.
-     O recorte fino (quando a faixa não vem) usa a MESMA chave que escolheu este `tr` lá
-     no desenho da tela — achado em negrito primeiro, citação depois (rev2TrechoDoBloco).
-     Usar a citação sozinha aqui, como antes, podia recortar dentro do trecho CERTO com
-     a palavra ERRADA quando a citação da IA vinha contaminada por uma frase vizinha. */
-  var bl=(bi==null?null:rev2BlocosDaTela(ex.laudo)[bi]);
-  var _td=bl?rev2TrechoDoBloco(ex,bl):null;
-  var rec=(bl && rev2RecortePorFaixa(ex, bl)) || rev2RecorteFino(tr, _td?_td.chave:'');
-  var ini=rec.ini, fim=rec.fim;
-  rev2PararEditado();                         // um tocador de cada vez
-  if(el.src!==a.url) el.src=a.url;
-  el.currentTime=ini; el.play();
-  if(cx) cx.innerHTML='▶ trecho do ditado — <b>'+rev2Rel(ini)+'</b> · '+Math.max(1,Math.round(fim-ini))+' s'
-    /* 31/08/2026, ampliado em 01/09: a tela diz COMO o pedaço foi achado. São três
-       caminhos com confiança bem diferente, e ele precisa saber em qual está pisando —
-       boa parte da confusão de 31/08 foi descobrir o erro OUVINDO, sem a tela avisar. */
-    +rev2SeloDoRecorte(rec);
-  clearTimeout(window.__rv2Par);
-  window.__rv2Par=setTimeout(function(){ try{ el.pause(); }catch(e){} }, Math.max(500,(fim-ini)*1000));
+  if(cx) cx.textContent='parado — ouça o áudio do exame.';
 }
-/* ============ O ÁUDIO EDITADO — SÓ AS PATOLOGIAS, EM SEQUÊNCIA ============
-   Pedido dele (28/08): abaixo de "ouvir o ditado inteiro", uma opção que toca, um atrás
-   do outro, os recortes de TODAS as patologias daquele paciente.
-   QUEM ENTRA: só o retângulo em estado 'alterado' — que é como o programa já marca
-   achado patológico (negrito que não é moldura, ver rev2Estado). Órgão normal não entra,
-   e é isso que ele descreveu: fígado com esteatose e rim com cálculo entram; o resto não.
-   NÃO gera arquivo novo: toca janelas do MESMO áudio, em ordem de tempo. Recortes que se
-   encostam viram um só, para a frase não sair picada. */
-
-function rev2PararEditado(){
-  if(window.__rv2Ed){ window.__rv2Ed.vivo=false; window.__rv2Ed=null; }
-  clearTimeout(window.__rv2EdPar);
+/* ============ AUDIO CLINICO NOVO (10/09/2026) ================================
+   Substitui os dois mecanismos de salto por tempo. O navegador recebe um arquivo
+   fisico unico, ja montado pelo agente apenas com fala, e o toca como qualquer audio. */
+function rev2MaterialIds(ex){
+  var ids=[];
+  audios.filter(function(a){ return ex && a.exameId===ex.id; }).forEach(function(a){
+    if(a.materialId && ids.indexOf(a.materialId)<0) ids.push(a.materialId);
+  });
+  (ex&&ex._materialIds||[]).forEach(function(mid){
+    if(mid && ids.indexOf(mid)<0) ids.push(mid);
+  });
+  return ids;
 }
-
-/* ============ ETAPA 2 (PREPARADA): ÁUDIO RECORTADO POR BLOCO SEM SILÊNCIO ============
-   O antigo botão VOZ foi desativado a pedido do Dr. Daniel por falhas na heurística
-   de recorte fino de frases. Aqui fica preparada a infraestrutura para a Etapa 2:
-   extrair os trechos de fala correspondentes a este bloco/órgão e tocá-los pulando
-   os silêncios com a mesma precisão de rev2ClipesSemSilencio. */
-function rev2ClipesDoBloco(ex, b){
-  if(!ex || !ex.laudo || !b) return [];
-  var todos=(ex.laudo.trechos||[]).filter(function(t){
-    return t && typeof t.inicio==='number' && typeof t.fim==='number' && t.fim>t.inicio;
-  });
-  if(!todos.length) return [];
-  var meus=audios.filter(function(x){ return x.exameId===ex.id; });
-  var cand=[];
-  var _fx=rev2RecortePorFaixa(ex,b);
-  if(_fx && _fx.trecho!=null && todos[_fx.trecho]) cand.push(todos[_fx.trecho]);
-  var _td=rev2TrechoDoBloco(ex,b);
-  if(_td && _td.tr && cand.indexOf(_td.tr)<0) cand.push(_td.tr);
-
-  var ALIAS_ORGAO = {
-    'figado': ['figado', 'hepat'],
-    'vesicula': ['vesicul', 'biliar', 'coledoc'],
-    'rim': ['rim', 'rins', 'renal'],
-    'baco': ['baco', 'esplen'],
-    'pancreas': ['pancrea'],
-    'bexiga': ['bexiga', 'vesical'],
-    'prostata': ['prostat'],
-    'utero': ['utero', 'uterin', 'endometr', 'miometr'],
-    'ovario': ['ovari', 'anex'],
-    'mama': ['mama', 'mamari', 'axil'],
-    'tireoide': ['tireoid', 'istmo'],
-    'testiculo': ['testic', 'escrot', 'epididim']
-  };
-
-  var chaves=[];
-  var titN=norm((b&&b.titulo)||'');
-  if(titN){
-    chaves.push(titN);
-    for(var k in ALIAS_ORGAO){
-      var lista=ALIAS_ORGAO[k];
-      if(lista.some(function(rad){ return titN.indexOf(rad)>=0; })){
-        lista.forEach(function(rad){ if(chaves.indexOf(rad)<0) chaves.push(rad); });
-      }
-    }
-  }
-  var palBloco=norm((b&&b.texto)||'').split(' ').filter(function(w){ return w.length>4; });
-
-  todos.forEach(function(t){
-    var tt=norm(t.texto||'');
-    if(!tt) return;
-    var match=false;
-    if(chaves.length && chaves.some(function(ch){ return tt.indexOf(ch)>=0; })){
-      match=true;
-    } else if(palBloco.length>=3){
-      var batidas=palBloco.filter(function(p){ return tt.indexOf(p)>=0; }).length;
-      if(batidas>=2) match=true;
-    }
-    if(match && cand.indexOf(t)<0) cand.push(t);
-  });
-
-  if(cand.length){
-    for(var ci=0; ci<cand.length; ci++){
-      var tIdx=todos.indexOf(cand[ci]);
-      if(tIdx>=0 && tIdx+1<todos.length){
-        var prox=todos[tIdx+1];
-        if(cand.indexOf(prox)<0 && (prox.inicio - cand[ci].fim)<=RV2_PAUSA_MAX){
-          var proxTxt=norm(prox.texto||'');
-          var outroOrgao=false;
-          for(var kOrg in ALIAS_ORGAO){
-            if(chaves.indexOf(kOrg)>=0) continue;
-            if(ALIAS_ORGAO[kOrg].some(function(rad){ return proxTxt.indexOf(rad)>=0; })){
-              outroOrgao=true; break;
-            }
-          }
-          if(!outroOrgao) cand.push(prox);
-        }
-      }
-    }
-  }
-
-  if(!cand.length && todos.length===1) cand.push(todos[0]);
-  if(!cand.length) return [];
-  cand.sort(function(x,y){ return x.inicio-y.inicio; });
-  var blocos=[];
-  cand.forEach(function(t){
-    var url=(rev2AudioDoTrecho(meus, t)||{}).url||'';
-    if(!url) return;
-    var ult=blocos[blocos.length-1];
-    if(ult && ult.url===url && (t.inicio-ult.fim)<=RV2_PAUSA_MAX){
-      ult.fim=Math.max(ult.fim, t.fim);
-    } else {
-      blocos.push({ini:t.inicio, fim:t.fim, url:url});
-    }
-  });
-  for(var j=0;j<blocos.length;j++){
-    var blk=blocos[j], ant=blocos[j-1], prox=blocos[j+1];
-    var antes=(ant && ant.url===blk.url) ? (blk.ini-ant.fim)/2 : blk.ini;
-    var depois=(prox && prox.url===blk.url) ? (prox.ini-blk.fim)/2 : RV2_FOLGA_FALA;
-    blk.ini=Math.max(0, blk.ini-Math.min(RV2_FOLGA_FALA, Math.max(0,antes)));
-    blk.fim=blk.fim+Math.min(RV2_FOLGA_FALA, Math.max(0,depois));
-  }
-  return blocos;
-}
-
-function rev2TocarAudioBloco(i){
-  var ex=rev2Ex(); if(!ex||!ex.laudo) return;
-  var bl=(i!=null ? rev2BlocosDaTela(ex.laudo)[i] : null);
-  var el=document.getElementById('rv2Audio'), cx=document.getElementById('rv2Tocador');
-  if(!el) return;
-  var clips=rev2ClipesDoBloco(ex, bl);
-  if(!clips.length){
-    if(cx) cx.textContent='não há trecho de áudio identificado para este bloco.';
+async function rev2PrepararAudio(tentativa, tocarAutomatico, posicao){
+  var ex=rev2Ex(), el=document.getElementById('rv2Audio'), cx=document.getElementById('rv2Tocador');
+  if(!ex||!el) return;
+  var ids=rev2MaterialIds(ex);
+  if(!ids.length){
+    if(cx) cx.textContent='Este laudo é anterior ao novo arquivo “só fala” ou não tem áudio vinculado.';
+    el.style.display='none';
     return;
   }
-  clearTimeout(window.__rv2Par);
-  rev2PararEditado();
-  var sessao={vivo:true}; window.__rv2Ed=sessao;
-  var idx=0;
-  var soma=clips.reduce(function(s,b){ return s+(b.fim-b.ini); },0);
-  var tocarClip=function(){
-    if(!sessao.vivo) return;
-    if(idx>=clips.length){
-      try{ el.pause(); }catch(e){}
-      if(cx) cx.innerHTML='fim do áudio '+(bl&&bl.titulo?('— <b>'+esc(bl.titulo)+'</b>'):'')+' · <b>'+rev2Rel(soma)+'</b> ouvidos'
-        +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">fechar</button>';
+  var pos=Math.max(0,Math.min(ids.length-1,Number(posicao)||0));
+  var mid=ids[pos], base=agenteBase()+'/audio/material/'+encodeURIComponent(mid);
+  try{
+    var r=await fetch(base+'/estado',{cache:'no-store'}), j=await r.json();
+    if(!r.ok) throw new Error((j&&j.erro)||('HTTP '+r.status));
+    if(j.estado==='ready' && j.temFala){
+      var url=base+'/fala';
+      if(el.getAttribute('data-material')!==mid){
+        el.pause(); el.src=url; el.setAttribute('data-material',mid); el.load();
+      }
+      el.style.display='block';
+      el.onended=(pos+1<ids.length) ? function(){ rev2PrepararAudio(0,true,pos+1); } : null;
+      if(cx) cx.textContent=(ids.length>1?('Áudio '+(pos+1)+' de '+ids.length+' — '):'')+
+        'arquivo pronto: somente as partes com fala.';
+      if(tocarAutomatico){
+        try{ await el.play(); }
+        catch(_){ if(cx) cx.textContent='Áudio pronto — toque em reproduzir no tocador.'; }
+      }
       return;
     }
-    var c=clips[idx];
-    if(el.src!==c.url) el.src=c.url;
-    el.currentTime=c.ini;
-    el.play().catch(function(){});
-    if(cx) cx.innerHTML='▶ áudio '+(bl&&bl.titulo?('— <b>'+esc(bl.titulo)+'</b>'):'')
-      +' (<b>'+rev2Rel(soma)+'</b> sem silêncios)'
-      +' <button class="voz" style="margin-left:8px" onclick="rev2Parar()">parar</button>';
-    var dur=Math.max(200, (c.fim-c.ini)*1000);
-    window.__rv2EdPar=setTimeout(function(){ idx++; tocarClip(); }, dur);
-  };
-  tocarClip();
+    if(j.estado==='ready' && j.semFala){
+      if(cx) cx.textContent='O processador não encontrou fala nesta gravação. O WAV bruto foi preservado.';
+      el.style.display='none'; return;
+    }
+    if(j.estado==='failed'){
+      if(cx) cx.textContent='Não foi possível preparar o áudio sem silêncios. O original foi preservado.';
+      el.style.display='none'; return;
+    }
+    if(cx) cx.textContent='Preparando o áudio sem silêncios…';
+    if((tentativa||0)<30) setTimeout(function(){
+      rev2PrepararAudio((tentativa||0)+1,false,pos);
+    },1000);
+    else if(cx) cx.textContent='O áudio continua em processamento. Tente novamente em instantes.';
+  }catch(e){
+    if(cx) cx.textContent='Não consegui abrir o áudio ('+((e&&e.message)||e)+'). O agente precisa estar ligado.';
+  }
+}
+function rev2OuvirAudio(){
+  rev2Parar();
+  rev2PrepararAudio(0,true,0);
+}
+async function rev2VerTranscricao(){
+  var ex=rev2Ex(); if(!ex) return;
+  var texto=String(ex._transcricao||'').trim();
+  if(!texto){
+    texto=audios.filter(function(a){ return a.exameId===ex.id; })
+      .map(function(a){ return String(a.transcricao||'').trim(); }).filter(Boolean).join('\n\n---\n\n');
+  }
+  if(!texto){
+    var partes=[];
+    for(var i=0,ids=rev2MaterialIds(ex);i<ids.length;i++){
+      try{
+        var r=await fetch(agenteBase()+'/audio/material/'+encodeURIComponent(ids[i])+'/transcricao',
+                          {cache:'no-store'});
+        var j=await r.json();
+        if(r.ok && j.transcricao) partes.push(j.transcricao);
+      }catch(_){}
+    }
+    texto=partes.join('\n\n---\n\n').trim();
+  }
+  if(!texto) texto='Não há transcrição completa vinculada a este laudo.';
+  var dlg=document.getElementById('rv2TranscricaoDlg');
+  document.getElementById('rv2TranscricaoTexto').textContent=texto;
+  if(dlg.showModal) dlg.showModal(); else dlg.setAttribute('open','open');
 }
 
 
@@ -22308,6 +21992,7 @@ window.addEventListener('DOMContentLoaded', function(){
      caminhos, em vez de depender de por qual porta ele entrou. */
   try{ exAplicarLocaisExtra(); }catch(e){}
   abAtualizarTudo();
+  try{ abExecutarSequenciaJarvis(); }catch(e){}
 });
 /* UMA BARRA DE ROLAGEM SÓ (15/08/2026 — o médico viu duas na lateral direita).
    As quatro telas de tela cheia (abertura, exames, dia, revisão 2) são position:fixed,

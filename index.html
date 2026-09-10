@@ -18,23 +18,26 @@
      ganha uma segunda barra, horizontal, que é o defeito clássico deste ajuste. O 100%
      aqui é o da própria tela, que já desconta a barra.
 
-     POR QUE TETOS DIFERENTES, e não um só: cada tela usa a largura para coisa diferente.
-       · LISTA  — a tela de Trabalho, com as duas listas lado a lado. É a que mais ganha:
-                  largura vira coluna, e coluna vira exame inteiro numa linha só.
-       · PAINEL — coluna única de cartões (o painel do dia). Esticada demais, o nome fica
-                  num canto e os botões no outro, com um vão morto no meio: o olho passa
-                  a viajar para ler uma linha só.
-       · PORTA  — a abertura, com dois botões grandes. Botão de dois palmos não fica
-                  melhor por ser maior; fica estranho.
-       · LEITURA— onde se LÊ texto corrido (a liberação do laudo). NÃO alarga, e é
-                  decisão de leitura, não de gosto: linha muito longa cansa porque o olho
-                  perde o começo da seguinte. E a folha do laudo tem forma de A4 — quem
-                  manda na largura dela é o papel, não o monitor. */
-  --larg-lista: 1720px;
-  --larg-painel: 1320px;
-  --larg-porta: 1040px;
-  --larg-leitura: 920px;
-  --larg-folga: 40px;      /* respiro dos dois lados, para a folha não colar na borda */
+     ⚠️ UM TETO SÓ, e não um por tela — mudou em 10/09/2026, a pedido dele.
+     Nasceu com quatro tetos diferentes (1720 · 1320 · 1040 · 920), um por feitio de tela,
+     e o raciocínio era o de baixo: coluna única esticada demais põe o nome num canto e os
+     botões no outro, botão de dois palmos não fica melhor por ser maior. Ele viu na tela
+     e decidiu o contrário: "deixa TODAS as telas preenchendo a tela completamente, ainda
+     com aquela limitação do tamanho de tela muito grande. Não mexe na limitação, exceto
+     pela tela de liberação de laudo — mas as outras eu quero que preencham a tela em que
+     elas estiverem."
+     Quem trabalha nelas o dia inteiro é ele. O teto continua existindo (1720), que era o
+     ponto do ajuste: num monitor gigante a tela para de crescer em vez de virar uma faixa
+     de dois metros. O que caiu foi o teto MENOR de cada tela — o vão vazio à direita
+     incomodava mais do que o vão no meio da linha.
+
+     A ÚNICA que continua estreita é a de LEITURA (a liberação do laudo), e por decisão
+     dele, no mesmo pedido. Não é gosto: linha muito longa cansa porque o olho perde o
+     começo da seguinte, e a folha do laudo tem forma de A4 — quem manda na largura dela é
+     o papel, não o monitor. */
+  --larg-teto:    1720px;  /* todas as telas de trabalho param aqui */
+  --larg-leitura:  920px;  /* menos a da liberação do laudo, que é para LER */
+  --larg-folga:     40px;  /* respiro dos dois lados, para a folha não colar na borda */
 
   /* MODO ESCURO — identidade "dashboard" (fundo grafite, cards escuros, acentos vivos) */
   --fundo:#0e1116;--superficie:#161a22;--superficie-2:#1d232e;--borda:#262c37;
@@ -461,7 +464,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
   color:var(--ink-2);font:inherit;font-size:12.5px;padding:5px 10px;cursor:pointer;
   margin:0 12px 14px;width:calc(100% - 24px);text-align:left}
 #telaModelos .mdVoltar:hover{border-color:var(--doppler);color:var(--doppler)}
-#telaModelos .main{padding:30px 34px 60px;max-width:var(--larg-painel);width:calc(100% - var(--larg-folga));margin:0 auto}
+#telaModelos .main{padding:30px 34px 60px;max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:0 auto}
 #telaModelos .head{margin-bottom:6px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
 #telaModelos h1{font-size:25px;font-weight:600;letter-spacing:-.015em;margin:0}
 #telaModelos .mdConta{font-family:var(--mono);font-size:12px;color:var(--muted);
@@ -737,7 +740,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 <style>
 #telaAbertura{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif}
-#telaAbertura .ab-folha{max-width:var(--larg-porta);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
+#telaAbertura .ab-folha{max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaAbertura .ab-topo{background:#0E3A40;color:#fff;padding:16px 28px;
   display:flex;align-items:center;justify-content:space-between}
@@ -887,7 +890,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 <style>
 #telaTrabalho{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
-#telaTrabalho .ab-folha{max-width:var(--larg-lista);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
+#telaTrabalho .ab-folha{max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaTrabalho .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;
   display:flex;align-items:center;gap:14px}
@@ -1047,7 +1050,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 <style>
 #telaDia{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
-#telaDia .ab-folha{max-width:var(--larg-painel);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
+#telaDia .ab-folha{max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaDia .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;display:flex;align-items:center;gap:14px}
 #telaDia .pt{width:14px;height:14px;border-radius:50%;background:#FF5A52;flex:0 0 14px}
@@ -1638,7 +1641,7 @@ button.repoSelo:hover{filter:brightness(.95)}
    aconteceu ao criar esta aqui, em 19/08/2026. O teste pegou. */
 #telaHistorico{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
-#telaHistorico .ab-folha{max-width:var(--larg-lista);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
+#telaHistorico .ab-folha{max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaHistorico .ab-topo{background:#0E3A40;color:#fff;padding:16px 26px;
   display:flex;align-items:center;gap:14px}
@@ -1662,7 +1665,7 @@ button.repoSelo:hover{filter:brightness(.95)}
 #telaHistorico .lin .nome{flex:1;min-width:180px;font-size:14px;color:#1C2430}
 #telaHistorico .lin .tag{background:#EDF1F4;border-radius:12px;padding:2px 9px;font-size:11.5px;color:#4A5560}
 #telaHistorico .lin .selo{background:#E4F1EA;color:#1F6B45;border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:600}
-#telaAntigos .ab-folha{max-width:var(--larg-lista);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
+#telaAntigos .ab-folha{max-width:var(--larg-teto);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaAntigos .ab-topo{background:#0E3A40;color:#fff;padding:16px 26px;
   display:flex;align-items:center;gap:14px}

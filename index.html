@@ -9020,6 +9020,7 @@ document.addEventListener('keydown', function(e){
   if(au.paused){ var all=document.querySelectorAll('audio'); for(var i=0;i<all.length;i++){ if(all[i]!==au) all[i].pause(); } au.play().catch(function(){}); }
   else au.pause();
 });async function liberarEProximo(){
+  if(typeof authExigir==='function' && !(await authExigir('assinar'))) return;
   var exId=window.__revAtual&&window.__revAtual.exId!=null?window.__revAtual.exId:null;
   if(exId==null){ log('Nenhum exame ativo para liberar.',true); return; }
   // 1ª ação do gesto: garantir pasta se necessário (antes de qualquer await de longa duração).
@@ -16327,7 +16328,7 @@ function uteroProfundidadeDoFigo(figo, rr){
    miométrio e a serosa são deslocamentos desta mesma linha, para o lado anterior e para o
    posterior. É POR ISSO que o marcador cai sempre na camada certa: o desenho e a conta
    usam a mesma linha, em vez de duas aproximações que divergem. */
-var UT_EIXO = [[262,220],[268,150],[186,80],[100,96]];
+var UT_EIXO = [[250,112],[280,190],[150,218],[66,140]];
 function _utBez(P, t){
   var u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
   return [a*P[0][0]+b*P[1][0]+c*P[2][0]+d*P[3][0], a*P[0][1]+b*P[1][1]+c*P[2][1]+d*P[3][1]];
@@ -16355,9 +16356,9 @@ function _utEsp(t){
   var s = Math.min(1, Math.max(0, (x - 0.06) / 0.46));
   var corpo = s * s * (3 - 2 * s);          // sobe suave e depois fica cheia
   return {
-    cav:  0.9 + 3.1 * corpo,
+    cav:  2.6 + 2.4 * corpo,
     endo: 1.4 + 5.6 * corpo,
-    mio:  23.0 + 18.0 * corpo
+    mio:  26.0 + 16.0 * corpo
   };
 }
 /* O ponto (x,y) de um nódulo: em que terço do eixo, de que lado da parede, e a que
@@ -16674,7 +16675,21 @@ function _utContorno(ate){
     t = i/60; C = _utBez(UT_EIXO, t); N = _utNormal(t); d = _utDist(ate, _utEsp(t));
     pts.push([C[0] - N[0]*d, C[1] - N[1]*d]);
   }
-  pts = pts.concat(_utTampa(0, ate, -1, 1));          // o orifício externo do colo
+  if(ate === 'cav'){
+    /* ⚠️ O CANAL DO COLO NÃO SE FECHA — pedido dele em 10/09: "o colo deve ser mais espesso
+       e MOSTRANDO UMA ABERTURA para dentro da cavidade uterina."
+       Aqui o canal endocervical é levado até a SUPERFÍCIE do colo, em vez de terminar
+       arredondado lá dentro. É o orifício externo: a cavidade uterina desemboca nele, e é
+       por ele que se entra. Fechar essa ponta desenhava um útero sem saída. */
+    var C0 = _utBez(UT_EIXO, 0), N0 = _utNormal(0), e0 = _utEsp(0);
+    var T0 = _utBezTang(UT_EIXO, 0), m0 = Math.hypot(T0[0], T0[1]) || 1;
+    var fx = -T0[0]/m0, fy = -T0[1]/m0;               // para fora, pela ponta do colo
+    var saida = e0.endo + e0.mio;
+    pts.push([C0[0] - N0[0]*e0.cav + fx*saida, C0[1] - N0[1]*e0.cav + fy*saida]);
+    pts.push([C0[0] + N0[0]*e0.cav + fx*saida, C0[1] + N0[1]*e0.cav + fy*saida]);
+  } else {
+    pts = pts.concat(_utTampa(0, ate, -1, 1));        // o colo, arredondado por fora
+  }
   return 'M ' + pts.map(function(p){ return p[0].toFixed(1)+' '+p[1].toFixed(1); }).join(' L ') + ' Z';
 }
 function _uteroSagitalSVG(lesoes, arraste){
@@ -16697,10 +16712,10 @@ function _uteroSagitalSVG(lesoes, arraste){
       + '" x2="'+(C[0]-N[0]*d).toFixed(1)+'" y2="'+(C[1]-N[1]*d).toFixed(1)
       + '" stroke="'+UT_COR.guia+'" stroke-width="1" stroke-dasharray="3 3"/>';
   });
-  s += _utRot(104, 40, 'Fundo')
-    + _utRot(228, 44, 'Parede anterior')
-    + _utRot(120, 212, 'Parede posterior')
-    + _utRot(330, 196, 'Colo', 'end')
+  s += _utRot(76, 86, 'Fundo')
+    + _utRot(166, 122, 'Parede anterior')
+    + _utRot(190, 254, 'Parede posterior')
+    + _utRot(322, 116, 'Colo', 'end')
     + _utRot(-12, -6, 'terços: proximal · médio · distal', 'start')
     + '<g font-size="8.5" fill="'+UT_COR.rot+'" font-family="Arial,sans-serif">'
     + '<rect x="-8" y="246" width="9" height="9" rx="2" fill="'+UT_COR.endo+'" stroke="'+UT_COR.endoBorda+'"/>'
@@ -21265,6 +21280,7 @@ async function rev2FinalSalvarLiberar(){
    histórico leem os dois o MESMO #areaImpressao, então o que ele vê é o que é entregue
    e o que é arquivado. */
 async function rev2Aprovar(comImpressao, jaPreparado){
+  if(typeof authExigir==='function' && !(await authExigir('assinar'))) return;
   var ex=rev2Ex(); if(!ex) return;
   if(!jaPreparado) rev2Preparar();
   /* O resultado do salvar aparece NESTA TELA. Antes só ia para o diário, que fica atrás

@@ -128,16 +128,43 @@ ok(/NÃO traz ditado de volta/.test(doc),
 console.log('\n=== o cartao nao se contradiz depois de reabrir ===');
 // O selo de liberado saia do banco OU da sessao. Reabrir muda a sessao, nunca o banco:
 // o mesmo cartao dizia "aguarda revisao" e mostrava "liberado" ao lado.
-const item = grab('repoItem');
-ok(/liberado: \(ex && ex\.laudo\) \? !!ex\._liberado/.test(item),
-   'exame COM LAUDO nesta sessao manda sobre o banco');
-/* E O CONTRARIO TAMBEM TEM DE VALER. A 1a versao desta correcao fez a sessao mandar
-   SEMPRE, e criou a mentira ao contrario: exame trazido do aparelho nasce sem `_liberado`
-   (capOrtProcessar), e o cartao passou a dizer "○ a liberar" num exame ja assinado noutro
-   dia. Sem laudo aqui, quem sabe e o banco. */
-ok(/_repo\.liberados\[eid\]/.test(item),
+/* ⚠️ 10/09/2026 — ESTE BLOCO PASSOU A EXERCITAR A REGRA, e nao a cobrar o TEXTO dela.
+   Ele cobrava a expressao escrita letra por letra:
+       liberado: (ex && ex.laudo) ? !!ex._liberado
+   e ficou vermelho no dia em que outro trabalho no mesmo arquivo -- o arquivamento
+   excepcional -- envolveu essa expressao num `arquivado || (...)`. A REGRA continuava
+   inteira: em nenhum dos tres casos o resultado mudou. So o texto deixou de bater.
+   Teste que cobra a FORMA fica vermelho sem que nada de errado tenha acontecido, e
+   bateria com vermelho cronico e como alarme que toca todo dia: em duas semanas ninguem
+   olha mais, e e ai que um defeito de verdade se esconde.
+   Agora ele RODA `repoItem` nos tres casos e confere o que sai. Reescrever a expressao
+   de outro jeito continua verde; mudar a regra, nao. */
+const repoItem = new Function('capNome', 'MODELOS', 'repoDiaIso', 'repoAudioDe',
+                              'codDoEstudo', '_repo',
+  grab('repoItem') + '\nreturn repoItem;')(
+  s => String(s || ''), {}, d => String(d || ''),
+  () => ({ tem: false, url: '', fonte: '', dia: '' }),
+  () => '',
+  { liberados: { 'E9': true }, impressos: {}, arquivados: {} });
+
+const est = { id: 'E9', paciente: 'X', data: '01/01/2026', instancias: [], nImagens: 0 };
+
+/* 1) Exame COM LAUDO nesta sessao: a sessao manda, mesmo com o banco dizendo o contrario.
+      E o caso do REABRIR — o exame volta para a fila aqui, e o banco ainda tem o laudo
+      antigo registrado. Sem esta regra o cartao dizia "aguarda revisao" e mostrava
+      "✓ liberado" ao lado, no mesmo cartao. */
+ok(repoItem(est, { id: 1, laudo: { corpo: 'x' }, _liberado: false, _estudoId: 'E9' }).liberado === false,
+   'exame COM LAUDO nesta sessao manda sobre o banco (reabrir vale na hora)');
+/* 2) E O CONTRARIO TAMBEM TEM DE VALER. A 1a versao desta correcao fez a sessao mandar
+      SEMPRE, e criou a mentira ao contrario: exame trazido do aparelho nasce sem
+      `_liberado` (capOrtProcessar), e o cartao passou a dizer "○ a liberar" num exame ja
+      assinado noutro dia. Sem laudo aqui, quem sabe e o banco. */
+ok(repoItem(est, { id: 2, _estudoId: 'E9' }).liberado === true,
    'e exame SEM laudo aqui continua ouvindo o banco');
-ok(/TRÊS casos/.test(item),
+/* 3) Exame que nem esta na sessao: o banco e a unica fonte. */
+ok(repoItem(est, null).liberado === true,
+   'e exame que nao esta nesta sessao segue o banco');
+ok(/TRÊS casos/.test(grab('repoItem')),
    'e o comentario registra que a regra tem tres casos, nao dois');
 
 console.log('\n=== nenhuma outra saida da telaDia cai na interface antiga ===');

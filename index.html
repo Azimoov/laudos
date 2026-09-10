@@ -936,6 +936,25 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 /* A legenda dos sinais é a MESMA nas duas colunas. Repetida lado a lado, ela vira ruído e
    rouba a altura que os exames precisam — some da segunda, seja qual for a tela. */
 .duasListas>.col:last-child .repoLegenda{display:none}
+
+/* ===== A BUSCA POR NOME (10/09/2026) =====
+   Sem `#telaX` na frente, pelo mesmo motivo das duas listas acima: a MESMA barra aparece
+   na tela de Trabalho e no painel do dia. Uma definição, dois lugares. */
+.buscaCx{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #C3CCD6;
+  border-radius:26px;padding:6px 8px 6px 16px;margin-top:22px}
+.buscaCx:focus-within{border-color:#0E6E6B;box-shadow:0 0 0 3px rgba(14,110,107,.12)}
+.buscaCx .lupa{font-size:15px;opacity:.65;flex:0 0 auto}
+.buscaCx input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-family:inherit;
+  font-size:14px;color:#1C2430;padding:8px 0}
+.buscaCx input::placeholder{color:#98A2AC}
+.buscaNota{font-size:12.5px;color:#6B7480;margin:10px 4px 0;line-height:1.6}
+.buscaNota b{color:#1C2430}
+/* A posição no ranking, à esquerda de cada resultado: o 1º é o mais parecido com o que
+   ele escreveu. Sem isto, "por semelhança" seria uma promessa invisível. */
+.buscaPos{flex:0 0 26px;font-size:11.5px;font-weight:700;color:#98A2AC;text-align:right;
+  font-variant-numeric:tabular-nums}
+.buscaLinha{display:flex;align-items:flex-start;gap:8px}
+.buscaLinha>.repoLinha{flex:1;min-width:0}
 </style>
 <div id="telaTrabalho">
   <div class="ab-folha">
@@ -1001,6 +1020,11 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
            cartão mostra no 3º sinal. Assim a lista em que o exame está e o sinal que ele
            exibe nunca se contradizem: se o cartão diz "○ a liberar", ele está à esquerda;
            quando vira "✓ liberado", ele atravessa para a direita sozinho. -->
+      <!-- A barra de busca é montada por `buscaMontar` — a mesma peça que o painel do dia
+           usa, para as duas nunca divergirem. -->
+      <div id="trabBusca"></div>
+
+      <div id="trabListas">
       <div class="duasListas">
         <div class="col">
           <div class="eb">LISTA DE TRABALHO<span class="cnt" id="trabCntT"></span></div>
@@ -1010,6 +1034,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
           <div class="eb">HISTÓRICO<span class="cnt" id="trabCntH"></span></div>
           <div id="trabRepoHistorico"></div>
         </div>
+      </div>
       </div>
 
     </div>
@@ -1184,6 +1209,12 @@ button.repoSelo:hover{filter:brightness(.95)}
       <!-- 31/08/2026 (item 2 do pedido dele) — o contador dos exames do dia mora AQUI,
            que e a tela que ele olha o dia inteiro. Na 1a tentativa eu o coloquei na aba
            antiga "Exames identificados", que e outra lista. -->
+      <!-- A MESMA barra da tela de Trabalho, montada pela mesma peça (`buscaMontar`).
+           Ela procura em TUDO — os exames de hoje, a fila a liberar e o histórico —,
+           esteja a tela que estiver aberta. -->
+      <div id="diaBusca"></div>
+
+      <div id="diaListas">
       <div class="eb dep">EXAMES DE HOJE <span id="diaConta" class="diaConta"></span></div>
       <div id="diaLista"></div>
 
@@ -1211,8 +1242,9 @@ button.repoSelo:hover{filter:brightness(.95)}
            lição uma vez. Dois testes apanharam antes de chegar nele. -->
       <div id="capForcarLista" style="display:none;margin-top:8px"></div>
 
-      <div class="eb dep">OUTROS DIAS</div>
+      <div class="eb dep">TUDO QUE JÁ FOI FEITO</div>
       <div id="diaOutrosDias"></div>
+      </div><!-- /diaListas -->
 
       <p class="rodape">nada abre sozinho: o painel avisa (som + faixa) e você toca quando quiser</p>
     </div>
@@ -17508,6 +17540,7 @@ function diaAbrir(){
   telasEsconder('telaDia');
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
   faixaGravandoPintar();
+  buscaMontar('dia');               // a MESMA barra da tela de Trabalho, montada pela mesma peça
   diaAtualizar();
   /* As duas listas aqui de baixo não entram no relógio de 5 s de propósito: elas desenham
      TODOS os dias, e refazê-las a cada volta seria caro à toa. Elas se acertam quando algo
@@ -18111,6 +18144,17 @@ async function repoGerarLaudo(chave){
   trabPintar();                               // as duas listas, onde quer que estejam
   if(repoDeOndeVim()!=='trabalho'){ try{ _diaListaHtml=''; diaRenderLista(); }catch(e){} }
 }
+/* O carimbo de quem desenhou, aplicado a uma lista de itens. Ver a nota grande em
+   `repoDiasHtml`: é ele que dá etiqueta própria a cada cópia do mesmo exame na página. */
+function repoCarimbar(itens, idp){
+  if(!idp) return itens;
+  return itens.map(function(it){
+    var c={}; for(var k in it){ if(Object.prototype.hasOwnProperty.call(it,k)) c[k]=it[k]; }
+    c.chave=idp+it.chave;
+    _repoIndice[c.chave]=c;
+    return c;
+  });
+}
 function repoLinhaHtml(it){
   return '<div class="repoLinha" id="repoL'+esc(it.chave)+'">'
     +'<span class="hr">'+esc(it.hora||'--:--')+'</span>'
@@ -18144,14 +18188,7 @@ function repoDiasHtml(opc){
      Carimbando a chave com o nome do lugar, cada cópia passa a ter etiqueta própria.
      `_repoIndice` registra a cópia carimbada, e todo o resto continua funcionando sem
      saber que isso existe — o resto só conhece a chave, seja ela qual for. */
-  if(opc.idp){
-    itens=itens.map(function(it){
-      var c={}; for(var k in it){ if(Object.prototype.hasOwnProperty.call(it,k)) c[k]=it[k]; }
-      c.chave=opc.idp+it.chave;
-      _repoIndice[c.chave]=c;
-      return c;
-    });
-  }
+  itens=repoCarimbar(itens, opc.idp);
   var por=repoAgrupar(itens);
   var dias=Object.keys(por).filter(function(d){ return d!==opc.excluirDia; })
     .sort(function(a,b){ return repoOrdemDia(b).localeCompare(repoOrdemDia(a)); });
@@ -21576,6 +21613,7 @@ function trabAbrir(){
   telasEsconder('telaTrabalho');    // some com qualquer outra que esteja de pé
   var w=document.getElementById('telaTrabalho'); if(w) w.style.display='block';
   faixaGravandoPintar();
+  buscaMontar('trab');              // a barra de busca nasce uma vez e guarda o que ele escreveu
   /* `trabPintar` é assíncrona (as listas vêm do agente). Um try/catch em volta da chamada
      NÃO apanharia a falha — ela chega depois, como promessa recusada, e sumiria no
      console com a tela vazia e sem explicação. O `.catch` apanha e escreve na tela. */
@@ -21662,6 +21700,179 @@ function telaNoAr(id){
   }catch(e){ return false; }
 }
 function trabContar(){ duasListasContar('trab'); duasListasContar('dia2'); }
+
+/* =========================================================================================
+   A BUSCA DE PACIENTE POR NOME — 10/09/2026, pedido do Dr. Daniel
+   =========================================================================================
+   Palavras dele: "Tá faltando uma barra de busca por nome do paciente. Ela pode ser geral,
+   para buscar tanto na lista de trabalho como no histórico, como nos exames realizados no
+   dia. Eu quero que ela seja uma lista que funcione por INFERÊNCIA. Então, se eu escrevo
+   Joana Silva, vai aparecer uma paciente chamada Joana Silva em primeiro lugar, mas, se
+   tiver uma outra que chama Joana Pereira da Silva, ela vai aparecer também abaixo, sempre
+   classificando os primeiros da lista como os mais similares ao nome escrito. Mas SEM
+   EXCLUIR nomes que não sejam exatamente iguais."
+
+   ⚠️ ISTO NÃO É UM FILTRO, É UMA NOTA. A diferença é o pedido inteiro. Filtro responde
+   "dentro ou fora" e joga fora o que não bate — e é exatamente assim que a paciente cujo
+   nome ele escreveu com uma letra diferente some da tela como se não existisse. Aqui todo
+   nome com alguma relação entra na lista; quem responde é a ORDEM.
+
+   Ela procura em TUDO de uma vez, porque a lista de onde ela lê (`repoItens`) já junta as
+   três fontes: os exames no aparelho, os desta sessão (os de hoje) e o índice do histórico.
+   Uma busca por fonte daria três buscas, e ele teria de adivinhar em qual procurar. */
+function buscaMontar(pref){
+  var d=document.getElementById(pref+'Busca'); if(!d || d.firstChild) return;
+  d.innerHTML=
+     '<div class="buscaCx">'
+    +'<span class="lupa">🔎</span>'
+    +'<input type="search" id="'+pref+'BuscaCampo" autocomplete="off" spellcheck="false" '
+      +'placeholder="Buscar paciente pelo nome — procura em tudo: hoje, a liberar e o histórico" '
+      +'oninput="buscaDigitou(\''+pref+'\')" onkeydown="if(event.key===\'Escape\') buscaLimpar(\''+pref+'\')">'
+    +'<button type="button" class="repoBt cinza" id="'+pref+'BuscaLimpar" style="display:none" '
+      +'onclick="buscaLimpar(\''+pref+'\')">✕ limpar</button>'
+    +'</div>'
+    +'<div class="buscaNota" id="'+pref+'BuscaNota" style="display:none"></div>'
+    +'<div id="'+pref+'BuscaRes" style="display:none"></div>';
+}
+/* Espera ele parar de digitar. Sem isto, "Joana" dispara cinco buscas — e cada uma
+   remonta a lista inteira, o que faz a tela tremer enquanto ele escreve. */
+var _buscaEspera={};
+function buscaDigitou(pref){
+  clearTimeout(_buscaEspera[pref]);
+  _buscaEspera[pref]=setTimeout(function(){ buscaPintar(pref); }, 200);
+}
+function buscaLimpar(pref){
+  var c=document.getElementById(pref+'BuscaCampo'); if(c){ c.value=''; c.focus(); }
+  buscaPintar(pref);
+}
+function buscaTermo(pref){
+  var c=document.getElementById(pref+'BuscaCampo');
+  return c ? String(c.value||'').trim() : '';
+}
+/* Quantas letras separam duas palavras (trocada, faltando ou sobrando). É o que faz
+   "Rejane" achar "Regiane" e "Sousa" achar "Souza" — o nome escrito de ouvido, que neste
+   consultório é a regra, não a exceção. Tem TETO: acima de duas letras de diferença já
+   não é a mesma palavra, e continuar contando só gastaria tempo. */
+function buscaDist(a, b){
+  if(a===b) return 0;
+  var m=a.length, n=b.length;
+  if(!m) return n;
+  if(!n) return m;
+  if(Math.abs(m-n)>2) return 9;
+  var ant=[], atual=[], i, j;
+  for(j=0;j<=n;j++) ant[j]=j;
+  for(i=1;i<=m;i++){
+    atual[0]=i;
+    for(j=1;j<=n;j++){
+      var custo=(a.charAt(i-1)===b.charAt(j-1))?0:1;
+      atual[j]=Math.min(atual[j-1]+1, ant[j]+1, ant[j-1]+custo);
+    }
+    for(j=0;j<=n;j++) ant[j]=atual[j];
+  }
+  return ant[n];
+}
+/* Uma palavra que ele escreveu contra uma palavra do nome. Do mais forte para o mais
+   fraco: igual · o nome começa por ela ("sil" → "Silva") · ela contém o nome · ela aparece
+   no meio · quase igual (uma ou duas letras). */
+function buscaPalavra(q, p){
+  if(q===p) return 100;
+  if(p.indexOf(q)===0) return 82;
+  if(q.indexOf(p)===0 && p.length>=3) return 70;
+  if(p.indexOf(q)>=0 && q.length>=3) return 60;
+  if(q.length>=4 && p.length>=4){
+    var d=buscaDist(q, p);
+    if(d===1) return 55;
+    if(d===2) return 38;
+  }
+  return 0;
+}
+/* A nota do nome inteiro. Os dois bônus do fim são o coração do pedido dele:
+   · ter TODAS as palavras que ele escreveu sobe muito — é o que põe "Joana Silva" e
+     "Joana Pereira da Silva" acima de quem só tem "Joana";
+   · entre dois que têm todas, ganha o que tem MENOS palavra sobrando — é o que põe
+     "Joana Silva" na frente de "Joana Pereira da Silva", exatamente como ele descreveu. */
+function buscaPontos(termoN, nomeN){
+  if(!termoN || !nomeN) return 0;
+  if(nomeN===termoN) return 10000;
+  var pts=0;
+  if(nomeN.indexOf(termoN)===0) pts+=500;
+  else if(nomeN.indexOf(termoN)>=0) pts+=350;
+  var q=termoN.split(' '), p=nomeN.split(' '), casadas=0;
+  q.forEach(function(t){
+    var melhor=0;
+    p.forEach(function(x){ var v=buscaPalavra(t, x); if(v>melhor) melhor=v; });
+    if(melhor>0) casadas++;
+    pts+=melhor;
+  });
+  if(!pts) return 0;
+  if(casadas===q.length) pts+=150;
+  pts-=Math.min(60, Math.max(0, p.length-q.length)*8);
+  return pts;
+}
+var BUSCA_TETO=50;        // quantos resultados cabem na tela sem virar rolagem infinita
+function buscaOrdenar(itens, termo){
+  var t=norm(termo);
+  return itens.map(function(it){ return {it:it, pts:buscaPontos(t, norm(it.paciente||''))}; })
+    .filter(function(r){ return r.pts>0; })
+    .sort(function(a, b){
+      if(b.pts!==a.pts) return b.pts-a.pts;
+      /* Empate: o nome mais curto primeiro (é o mais perto do que ele escreveu) e, entre
+         iguais, o exame mais recente — é quase sempre o que ele está procurando. */
+      var la=(a.it.paciente||'').length, lb=(b.it.paciente||'').length;
+      if(la!==lb) return la-lb;
+      return String(b.it.ordem||'').localeCompare(String(a.it.ordem||''));
+    });
+}
+async function buscaPintar(pref){
+  var res=document.getElementById(pref+'BuscaRes'); if(!res) return;
+  var nota=document.getElementById(pref+'BuscaNota');
+  var lim=document.getElementById(pref+'BuscaLimpar');
+  var listas=document.getElementById(pref+'Listas');
+  var termo=buscaTermo(pref);
+  if(!termo){
+    res.style.display='none'; res.innerHTML='';
+    if(nota) nota.style.display='none';
+    if(lim) lim.style.display='none';
+    if(listas) listas.style.display='';
+    return;
+  }
+  if(lim) lim.style.display='';
+  if(listas) listas.style.display='none';     // buscando, as listas do dia saem da frente
+  res.style.display='';
+  if(!res.firstChild) res.innerHTML='<div class="repoVazio">procurando…</div>';
+  await repoCarregar(false);                  // usa o que já está na memória; não força
+  /* ⚠️ O TERMO É LIDO DE NOVO AQUI. Entre o toque e a volta da busca ele pode ter apagado
+     o campo ou digitado mais — escrever o resultado velho por cima seria mostrar a
+     resposta de uma pergunta que ele já não está fazendo. */
+  if(buscaTermo(pref)!==termo) return;
+  var achados=buscaOrdenar(repoCarimbar(repoItens(), pref+'b_'), termo);
+  var total=achados.length;
+  if(!total){
+    if(nota){
+      nota.style.display='';
+      nota.innerHTML='Nenhum nome se parece com <b>'+esc(termo)+'</b>. '
+        +'Confira as primeiras letras — a busca perdoa acento, maiúscula e até duas letras '
+        +'trocadas, mas não adivinha um nome inteiro diferente.';
+    }
+    res.innerHTML='';
+    return;
+  }
+  var mostrar=achados.slice(0, BUSCA_TETO);
+  if(nota){
+    nota.style.display='';
+    nota.innerHTML='<b>'+total+'</b> '+(total===1?'exame parecido':'exames parecidos')
+      +' com <b>'+esc(termo)+'</b> — o mais parecido vem primeiro.'
+      +(total>mostrar.length?' Mostrando os '+mostrar.length+' primeiros.':'');
+  }
+  res.innerHTML=mostrar.map(function(r, i){
+    /* A DATA ENTRA NA LINHA. Fora da lista por dia, um cartão sem data não diz de quando
+       é o exame — e "Joana Silva" pode ter cinco, de anos diferentes. */
+    r.it.tipo=(r.it.tipo||'')+(r.it.dia?' · '+r.it.dia:'');
+    return '<div class="buscaLinha"><span class="buscaPos">'+(i+1)+'</span>'
+      +repoLinhaHtml(r.it)+'</div>';
+  }).join('');
+  repoLupaLigar(pref+'BuscaRes');    // a foto aumenta com o mouse aqui também
+}
 
 function abVoltarInicio(){
   var t=document.getElementById('telaAbertura'); if(t) t.style.display='block';

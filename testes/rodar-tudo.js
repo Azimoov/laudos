@@ -50,6 +50,7 @@ const SUITE = [
   { arq: 'teste-abertura-vigia-agente.js', o: 'tela de abertura se corrige sozinha quando o agente volta' },
   { arq: 'teste-tela-trabalho.js', o: 'abertura de dois botoes e a tela de Trabalho (09/09)' },
   { arq: 'teste-pedido-layout-0909.js', o: 'a releitura final: os 24 pedidos do layout de 09/09, um a um' },
+  { arq: 'teste-busca-nome.js', o: 'busca de paciente por nome, por semelhanca (nota, nao filtro)' },
   { arq: 'teste-fundo-modal.js', o: 'modal "Fundo dos laudos" nao empilha (travava o gerar)' },
   { arq: 'teste-sem-probabilidade.js', o: 'BI-RADS: probabilidade de malignidade fora do laudo' },
   { arq: 'teste-sem-auditoria-cbr.js', o: 'AUDITORIA-CBR nao volta como fonte oficial' },

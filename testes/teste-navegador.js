@@ -2437,6 +2437,78 @@ const VERIFICACOES = `(async () => {
     diz('as tres correcoes de 09/09 (noite)', false, e.constructor.name + ': ' + e.message);
   }
 
+  /* ===== A BUSCA POR NOME, NA TELA (10/09/2026) =====
+     "Se eu escrevo Joana Silva, vai aparecer uma paciente chamada Joana Silva em primeiro
+     lugar, mas, se tiver uma outra que chama Joana Pereira da Silva, ela vai aparecer
+     tambem abaixo (...) sem excluir nomes que nao sejam exatamente iguais."
+     A bancada ja prova a NOTA. Aqui se prova a TELA: que o campo existe, que digitar
+     esconde as listas e mostra os achados na ordem certa, e que limpar traz tudo de volta.
+     Sao coisas diferentes -- a ordem podia estar certa e a lista nao aparecer. */
+  try {
+    _repo.estudos = []; _repo.historico = [];
+    exames = [
+      { id: 8801, paciente: 'Joana Pereira da Silva', tipo: 'mama', _quando: Date.now() - 3000, imagens: [] },
+      { id: 8802, paciente: 'Joana Silva', tipo: 'mama', _quando: Date.now() - 2000, imagens: [] },
+      { id: 8803, paciente: 'Joana Souza', tipo: 'mama', _quando: Date.now() - 1000, imagens: [] },
+      { id: 8804, paciente: 'Marcos Antunes', tipo: 'abdominal', _quando: Date.now(), imagens: [] },
+    ];
+    trabAbrir();
+    await new Promise(r => setTimeout(r, 250));
+
+    const campo = document.getElementById('trabBuscaCampo');
+    diz('a barra de busca existe na tela de Trabalho', !!campo);
+    diz('  e diz que procura em TUDO, para ele nao precisar adivinhar onde',
+      !!campo && /hoje/.test(campo.placeholder) && /hist/.test(campo.placeholder),
+      campo ? campo.placeholder.slice(0, 60) : '');
+
+    campo.value = 'Joana Silva';
+    await buscaPintar('trab');
+    const res = document.getElementById('trabBuscaRes');
+    const linhas = Array.from(res.querySelectorAll('.repoLinha'));
+    const nomes = linhas.map(l => (l.querySelector('.nm') || {}).textContent || '');
+    diz('digitar mostra os achados', linhas.length >= 3, 'achados: ' + linhas.length);
+    diz('  "Joana Silva" em PRIMEIRO', nomes[0] === 'Joana Silva', nomes.join(' > '));
+    diz('  "Joana Pereira da Silva" aparece TAMBEM, logo abaixo',
+      nomes[1] === 'Joana Pereira da Silva');
+    diz('  e quem nao tem relacao nenhuma fica de fora',
+      nomes.indexOf('Marcos Antunes') < 0);
+    diz('  cada achado vem numerado — "por semelhanca" nao pode ser promessa invisivel',
+      (res.querySelector('.buscaPos') || {}).textContent === '1');
+    diz('  e cada achado mostra a DATA do exame (fora da lista por dia, o cartao nao diria)',
+      /\\d{2}\\/\\d{2}\\/\\d{4}/.test((linhas[0].querySelector('.tp') || {}).textContent || ''),
+      (linhas[0].querySelector('.tp') || {}).textContent);
+    diz('  o achado traz o MESMO cartao das listas (os quatro sinais)',
+      linhas[0].querySelectorAll('.repoSelo').length === 4);
+    diz('  as duas listas saem da frente enquanto ele busca',
+      document.getElementById('trabListas').style.display === 'none');
+    diz('  e a tela diz quantos achou', /Joana Silva/.test(document.getElementById('trabBuscaNota').textContent));
+
+    // nome que nao existe: diz isso, em vez de tela em branco
+    campo.value = 'Zebedeu Nogueira';
+    await buscaPintar('trab');
+    diz('nome que nao existe DIZ que nao existe, em vez de deixar a tela em branco',
+      /Nenhum nome se parece/.test(document.getElementById('trabBuscaNota').textContent));
+
+    // o nome escrito de ouvido, que aqui e a regra
+    campo.value = 'Joana Sousa';
+    await buscaPintar('trab');
+    const ouvido = Array.from(document.getElementById('trabBuscaRes').querySelectorAll('.nm'))
+      .map(x => x.textContent);
+    diz('"Sousa" acha "Souza" — o nome escrito de ouvido nao pode sumir',
+      ouvido.indexOf('Joana Souza') >= 0, ouvido.join(' > '));
+
+    buscaLimpar('trab');
+    await new Promise(r => setTimeout(r, 60));
+    diz('limpar traz as duas listas de volta',
+      document.getElementById('trabListas').style.display !== 'none'
+      && document.getElementById('trabBuscaRes').style.display === 'none');
+
+    trabFechar();
+    exames = [];
+  } catch (e) {
+    diz('a busca por nome, na tela', false, e.constructor.name + ': ' + e.message);
+  }
+
   return R;
 })()`;
 

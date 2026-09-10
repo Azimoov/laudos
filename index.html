@@ -16142,12 +16142,20 @@ function uteroFigoCor(f){
   return '#475569';
 }
 
+/* ⚠️ AS QUATRO DIAGONAIS ENTRARAM em 10/09/2026 (ver UT_ANG). Elas são testadas ANTES das
+   laterais puras: "ântero-lateral direita" contém "lateral direita", e na ordem antiga
+   perderia a metade anterior no caminho. */
 function uteroParede(v){
   var t=uteroNorm(v);
-  if(/lateral.*direit|direit.*lateral|corno.*direit/.test(t)) return 'lateral-direita';
-  if(/lateral.*esquerd|esquerd.*lateral|corno.*esquerd/.test(t)) return 'lateral-esquerda';
   if(/fundic|fundo/.test(t)) return 'fundo';
   if(/colo|cervic|istm/.test(t)) return 'colo';
+  var diag=/(antero|postero)[-\s]*lateral/.exec(t);
+  if(diag){
+    var lado=/direit/.test(t) ? 'direita' : (/esquerd/.test(t) ? 'esquerda' : '');
+    if(lado) return diag[1] + '-lateral-' + lado;
+  }
+  if(/lateral.*direit|direit.*lateral|corno.*direit/.test(t)) return 'lateral-direita';
+  if(/lateral.*esquerd|esquerd.*lateral|corno.*esquerd/.test(t)) return 'lateral-esquerda';
   if(/posterior|dorsal/.test(t)) return 'posterior';
   if(/anterior|ventral/.test(t)) return 'anterior';
   return 'anterior';
@@ -16312,7 +16320,7 @@ function uteroFigoDaProfundidade(u, rr){
 function uteroProfundidadeDoFigo(figo, rr){
   rr = Math.max(0.02, rr);
   switch(String(figo)){
-    case '0':   return -rr;                       // todo na cavidade
+    case '0':   return -0.85;                     // dentro da cavidade, quase no meio dela
     case '1':   return -0.5 * rr;                 // 75% para dentro
     case '2':   return  0.5 * rr;                 // 25% para dentro
     case '3':   return  rr;                       // encostando, sem entrar
@@ -16418,9 +16426,28 @@ function _utEsp(t){
 }
 /* O ponto (x,y) de um nódulo: em que terço do eixo, de que lado da parede, e a que
    profundidade `u` atravessando o miométrio. */
+/* ⚠️ A RÉGUA DA PROFUNDIDADE TEM DOIS TRECHOS — 10/09/2026, relato dele: "ficou faltando
+   o FIGO 0."
+   Do endométrio (u=0) para FORA, a régua é a espessura do miométrio: u=1 é a serosa.
+   Do endométrio para DENTRO, a régua é a própria CAVIDADE: u=-1 é o meio dela.
+   Antes o lado de dentro também era medido em miométrio. Como a cavidade é fina (uns 9 px
+   contra 40 do miométrio), o ponto mais fundo que o dedo alcançava dava u ≈ -0,2 — e um
+   mioma de 2,8 cm precisa de u ≤ -0,33 para ser FIGO 0. Era INALCANÇÁVEL, e o tipo 0
+   simplesmente não existia no desenho.
+   Medido antes de consertar: varrendo o corte sagital inteiro saíam os tipos 1 a 7, nunca
+   o 0. No transversal saíam os oito, porque lá a cavidade é proporcionalmente maior — e é
+   por isso que o defeito passou despercebido. */
+function _utDeU(u, e){
+  var b = e.cav + e.endo;
+  return u >= 0 ? (b + u * e.mio) : b * (1 + Math.max(-1, u));
+}
+function _utParaU(d, e){
+  var b = e.cav + e.endo;
+  return d >= b ? (d - b) / e.mio : (d - b) / b;
+}
 function _utSagPonto(t, lado, u){
   var C = _utBez(UT_EIXO, t), N = _utNormal(t), e = _utEsp(t);
-  var d = e.cav + e.endo + u * e.mio;              // u=0 na borda da cavidade, u=1 na serosa
+  var d = _utDeU(u, e);
   return [C[0] + N[0] * d * lado, C[1] + N[1] * d * lado];
 }
 /* ⚠️ OS TRÊS TERÇOS SÃO DO CORPO, NÃO DO ÚTERO INTEIRO. O colo é a parte fina, e um mioma
@@ -16431,8 +16458,10 @@ function uteroSagitalXY(L){
   var parede = L.parede || 'anterior', terco = L.terco || 'medio';
   var figo = String(L.figo == null ? '' : L.figo);
   var t = UT_TERCO_T[terco] != null ? UT_TERCO_T[terco] : 0.52;
-  var lado = 1;                                     // +1 anterior, -1 posterior
-  if(parede === 'posterior') lado = -1;
+  /* +1 anterior, -1 posterior. As diagonais contam pela metade que elas nomeiam: a
+     ântero-lateral é anterior neste corte, a póstero-lateral é posterior. Quem diz
+     direita ou esquerda é o corte ao lado — este aqui não mostra esse eixo. */
+  var lado = /^postero|^posterior$/.test(parede) ? -1 : 1;
   /* ⚠️ O MIOMA DO FUNDO SAI PELA PONTA, não pela lateral. Empurrá-lo pela normal (que é o
      que vale nas paredes anterior e posterior) punha o mioma fúndico subseroso flutuando
      ao lado do útero, em cima do rótulo — parecia um erro de desenho. No fundo, "para
@@ -16463,7 +16492,7 @@ function uteroSagitalDe(x, y){
     }
   }
   var e = _utEsp(melhor.t);
-  return { t: melhor.t, lado: melhor.lado, u: (melhor.d - e.cav - e.endo) / e.mio, mio: e.mio };
+  return { t: melhor.t, lado: melhor.lado, u: _utParaU(melhor.d, e), mio: e.mio };
 }
 
 /* ---- o corte transversal: a mesma régua, num anel ----
@@ -16474,13 +16503,47 @@ function _utTraPonto(ang, u){
   var c = Math.cos(ang), s = Math.sin(ang);
   var rIn  = Math.hypot(T.cavx * c, T.cavy * s) + T.endo;   // borda externa do endométrio
   var rOut = Math.hypot(T.rx * c, T.ry * s);                // serosa
-  var d = rIn + u * (rOut - rIn);
+  var d = u >= 0 ? (rIn + u * (rOut - rIn)) : rIn * (1 + Math.max(-1, u));
   return [T.cx + d * c, T.cy + d * s];
 }
-var UT_ANG = { anterior: -Math.PI/2, posterior: Math.PI/2,
-               'lateral-direita': Math.PI, 'lateral-esquerda': 0, fundo: -Math.PI/2, colo: Math.PI/2 };
+/* ⚠️ OITO SETORES, NÃO QUATRO — 10/09/2026, pedido dele: "na vista transversal só dá para
+   colocar em eixos ortogonais, como x e y. Eu também quero poder colocar nas DIAGONAIS,
+   como se fosse entre 90° e 0°."
+   As quatro diagonais entram como paredes ÂNTERO e PÓSTERO-laterais, que é como se escreve
+   num laudo. Continua sendo uma lista de palavras, e não um ângulo livre: o laudo tem de
+   dizer onde o mioma está em português, e "na parede a 37°" não é coisa que se escreva.
+   Oito setores de 45° dobram a precisão e continuam dizíveis. */
+var UT_ANG = {
+  'anterior':                  -90,
+  'antero-lateral-esquerda':   -45,
+  'lateral-esquerda':            0,
+  'postero-lateral-esquerda':   45,
+  'posterior':                  90,
+  'postero-lateral-direita':   135,
+  'lateral-direita':           180,
+  'antero-lateral-direita':   -135,
+  'fundo':                     -90,
+  'colo':                       90
+};
+/* Distância entre dois ângulos em graus, sempre de 0 a 180 — a volta completa não conta. */
+function _utAngDist(a, b){
+  return Math.abs((((a - b) % 360) + 540) % 360 - 180);
+}
+/* Em qual das oito paredes cai este ângulo. É o inverso do mapa acima, e existe para o
+   arraste: o dedo dá um ângulo qualquer, e o laudo precisa de uma parede com nome. */
+function uteroParedeDoAngulo(gr){
+  var melhor = 'anterior', dmin = 999;
+  ['anterior','antero-lateral-esquerda','lateral-esquerda','postero-lateral-esquerda',
+   'posterior','postero-lateral-direita','lateral-direita','antero-lateral-direita']
+    .forEach(function(p){
+      var d = _utAngDist(gr, UT_ANG[p]);
+      if(d < dmin){ dmin = d; melhor = p; }
+    });
+  return melhor;
+}
 function uteroTransversalXY(L){
-  var ang = UT_ANG[L.parede] != null ? UT_ANG[L.parede] : -Math.PI/2;
+  var gr = UT_ANG[L.parede] != null ? UT_ANG[L.parede] : -90;
+  var ang = gr * Math.PI / 180;
   var T = UT_TRA, c = Math.cos(ang), s = Math.sin(ang);
   var esp = Math.hypot(T.rx*c, T.ry*s) - (Math.hypot(T.cavx*c, T.cavy*s) + T.endo);
   var rr = _uteroRaioPx(L.mm) / Math.max(1, esp);
@@ -16490,7 +16553,9 @@ function uteroTransversalDe(x, y){
   var T = UT_TRA, dx = x - T.cx, dy = y - T.cy;
   var ang = Math.atan2(dy, dx), c = Math.cos(ang), s = Math.sin(ang);
   var rIn = Math.hypot(T.cavx*c, T.cavy*s) + T.endo, rOut = Math.hypot(T.rx*c, T.ry*s);
-  return { ang: ang, u: (Math.hypot(dx, dy) - rIn) / Math.max(1, rOut - rIn), esp: rOut - rIn };
+  var dist = Math.hypot(dx, dy);
+  var u = dist >= rIn ? (dist - rIn) / Math.max(1, rOut - rIn) : (dist - rIn) / Math.max(1, rIn);
+  return { ang: ang, u: u, esp: rOut - rIn };
 }
 
 /* ⚠️ O QUE CONTA COMO MIOMA PARA DESENHAR O MARCADOR — refeito em 10/09/2026.
@@ -16607,10 +16672,17 @@ function uteroReescreverLocal(corpo, lesaoId, novaParede, novoTerco, novoFigo){
     'fundo': 'no fundo uterino',
     'colo': 'na região ístmica/cervical',
     'lateral-direita': 'na parede lateral direita',
-    'lateral-esquerda': 'na parede lateral esquerda'
+    'lateral-esquerda': 'na parede lateral esquerda',
+    'antero-lateral-direita': 'na parede ântero-lateral direita',
+    'antero-lateral-esquerda': 'na parede ântero-lateral esquerda',
+    'postero-lateral-direita': 'na parede póstero-lateral direita',
+    'postero-lateral-esquerda': 'na parede póstero-lateral esquerda'
   }[novaParede] || ('na parede ' + novaParede);
 
-  var reParede = /(?:na\s+parede\s+(?:corporal\s+)?(?:anterior|posterior|lateral\s+direita|lateral\s+esquerda|[xX]+)|no\s+fundo\s+uterino|na\s+regi[ãa]o\s+[íi]stmica\/cervical)/i;
+  /* ⚠️ AS DIAGONAIS VÊM PRIMEIRO na alternância. "ântero-lateral direita" CONTÉM "lateral
+     direita": na ordem contrária, a troca comeria só a metade final e o laudo ficaria com
+     "na parede ântero-na parede lateral direita". */
+  var reParede = /(?:na\s+parede\s+(?:corporal\s+)?(?:[âa]ntero[-\s]*lateral\s+(?:direita|esquerda)|p[óo]stero[-\s]*lateral\s+(?:direita|esquerda)|anterior|posterior|lateral\s+direita|lateral\s+esquerda|[xX]+)|no\s+fundo\s+uterino|na\s+regi[ãa]o\s+[íi]stmica\/cervical)/i;
   if(reParede.test(depois)){
     depois = depois.replace(reParede, descParede);
   } else {
@@ -16850,6 +16922,10 @@ function uteroEsquemaHTML(L, arraste){
        coisa que se escreva num laudo. */
     var ondeP = { anterior:'parede anterior', posterior:'parede posterior',
       'lateral-direita':'parede lateral direita', 'lateral-esquerda':'parede lateral esquerda',
+      'antero-lateral-direita':'parede ântero-lateral direita',
+      'antero-lateral-esquerda':'parede ântero-lateral esquerda',
+      'postero-lateral-direita':'parede póstero-lateral direita',
+      'postero-lateral-esquerda':'parede póstero-lateral esquerda',
       fundo:'fundo uterino', colo:'região ístmica/cervical' }[x.parede] || ('parede ' + x.parede);
     var ondeT = { superior:'terço distal (fúndico)', medio:'terço médio',
       inferior:'terço proximal (ístmico)' }[x.terco] || '';
@@ -16999,6 +17075,22 @@ function uteroAlternar(){
   }
 }
 
+/* ⚠️ REDESENHA A TELA EM QUE ELE ESTÁ — 10/09/2026, relato dele: "quando eu estou
+   movimentando na imagem, move e altera o texto do rodapé, mas NÃO o texto corrido do
+   corpo do laudo."
+   Era isto: ao soltar o marcador, o programa mandava redesenhar `abrirRevisao`, que é a
+   tela de revisão ANTIGA — a que ele não usa. A frase do laudo era reescrita direitinho na
+   memória, e a tela onde ele estava (a de liberação, `telaRev2`) nunca era refeita. O
+   trabalho acontecia e não aparecia.
+   O esquema da MAMA já fazia certo desde antes; era só o do útero que tinha ficado para
+   trás. Agora os dois seguem a mesma regra: redesenha a tela nova se for ela que está
+   aberta com este exame, e a antiga só quando for o caso. */
+function uteroRedesenhar(exId){
+  try{
+    if(typeof rev2Ex === 'function' && rev2Ex() && rev2Ex().id === exId){ rev2Render(); return; }
+  }catch(e){}
+  try{ abrirRevisao(exId, true); }catch(e){}
+}
 function uteroLayoutLigar(raiz, ex){
   if(!raiz) return; raiz._uteroLayoutEx = ex;
   if(raiz._uteroLayoutLigado) return; raiz._uteroLayoutLigado = true;
@@ -17126,11 +17218,7 @@ function uteroLayoutLigar(raiz, ex){
           novoF = uteroFigoDaProfundidade(gS.u, rPx / Math.max(1, gS.mio));
         } else {
           var gT = uteroTransversalDe(pt.x, pt.y);
-          var gr = gT.ang * 180 / Math.PI;             // -90 anterior · +90 posterior
-          if(gr > -45 && gr < 45) novaP = 'lateral-esquerda';
-          else if(gr > 135 || gr < -135) novaP = 'lateral-direita';
-          else if(gr <= -45) novaP = 'anterior';
-          else novaP = 'posterior';
+          novaP = uteroParedeDoAngulo(gT.ang * 180 / Math.PI);   // uma das OITO paredes
           novoF = uteroFigoDaProfundidade(gT.u, rPx / Math.max(1, gT.esp));
         }
         var pSag = uteroSagitalXY({ parede: novaP, terco: novoT, figo: novoF });
@@ -17158,11 +17246,11 @@ function uteroLayoutLigar(raiz, ex){
           atual.laudo.corpo = rTro.corpo;
           uteroLocalEstruturadaAtualizar(atual.laudo, id, novaP, novoT, novoF);
           try{ agendarSalvarSessao(); }catch(_e){}
-          abrirRevisao(atual.id, true);
+          uteroRedesenhar(atual.id);
           log('Mioma reposicionado: ' + novaP + ', ' + uteroFigoDesc(novoF) + '.');
         } else {
           log('Posição calculada (' + uteroFigoDesc(novoF) + '), mas não encontrei a frase no laudo para substituir.', true);
-          abrirRevisao(atual.id, true);
+          uteroRedesenhar(atual.id);
         }
       }
       window.addEventListener('pointermove', moverM, {passive:false});

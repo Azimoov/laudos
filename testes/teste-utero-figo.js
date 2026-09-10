@@ -28,11 +28,15 @@ function recortarFuncao(nome) {
 }
 const MOD = recortarFuncao('cmTxt') + '\n' + HTML.slice(ini, fim);
 
+/* Recorta uma funcao do index.html pelo nome — usado para conferir COMO ela e escrita,
+   e nao so o que ela devolve (o caso do redesenho da tela certa). */
+const grab = recortarFuncao;
+
 const holder = { ex: null, logs: [] };
 const api = new Function('esc', 'negrito', 'imagensRevisaoLigadas', 'rev2TemAchado', 'rev2Ex', 'log', 'agendarSalvarSessao', 'rev2Render',
   MOD + '\nreturn {uteroNorm, uteroFigoDesc, uteroFigoGrupo, uteroFigoCor, uteroParede, uteroTerco, uteroFigo, uteroMedidasMm,' +
   ' _uteroRaioPx, uteroSagitalXY, uteroTransversalXY, uteroLesoes, uteroReescreverLocal, uteroLocalEstruturadaAtualizar,' +
-  ' _uteroSagitalSVG, _uteroTransversalSVG, uteroEsquemaHTML, uteroLayoutDo, uteroHostHTML, uteroCorpoHTML, uteroCaixaHTML, uteroTemSelecao, uteroFigoDaProfundidade, uteroProfundidadeDoFigo, uteroFracoes, uteroSagitalDe, uteroTransversalDe, UT_COR, uteroPosturaDo, uteroPosturaUsar, UTERO_POSTURAS};')(
+  ' _uteroSagitalSVG, _uteroTransversalSVG, uteroEsquemaHTML, uteroLayoutDo, uteroHostHTML, uteroCorpoHTML, uteroCaixaHTML, uteroTemSelecao, uteroFigoDaProfundidade, uteroProfundidadeDoFigo, uteroFracoes, uteroSagitalDe, uteroTransversalDe, UT_COR, uteroPosturaDo, uteroPosturaUsar, UTERO_POSTURAS, uteroParedeDoAngulo};')(
   s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])),
   s => String(s == null ? '' : s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'),
   () => true, () => true, () => holder.ex, m => holder.logs.push(m), () => {}, () => {}
@@ -287,6 +291,91 @@ ok(new Set(pontos).size === 3, 'e em posicoes distintas', pontos.join(' | '));
    e quando o angulo esta entre a anteversoflexao e a retroversao."
    O que se tranca aqui NAO e o desenho (forma nao se testa em texto) -- e o que decide o
    desenho, que e a FRASE DO LAUDO, e o que nao pode mudar com ele. */
+/* ⚠️ 10/09/2026 — TRES RELATOS DELE SOBRE A FIGURA, num pedido so:
+   "ficou faltando o FIGO 0. Na vista transversal, so da para colocar em eixos ortogonais,
+    como x e y — eu tambem quero poder colocar nas DIAGONAIS. E quando eu estou
+    movimentando na imagem, move e altera o texto do rodape, mas NAO o texto corrido do
+    corpo do laudo." */
+console.log('\n=== 1) o FIGO 0 tem de ser ALCANCAVEL arrastando, nas duas vistas ===');
+/* Ele existia na tabela e nao existia na tela: o lado de DENTRO da parede era medido na
+   regua do miometrio, e a cavidade e fina demais (uns 9 px contra 40). O ponto mais fundo
+   que o dedo alcancava dava u ~ -0,2, e um mioma de 2,8 cm precisa de u <= -0,33 para ser
+   tipo 0. Passava despercebido porque no TRANSVERSAL a cavidade e proporcionalmente maior
+   e o 0 saia; era so no sagital que faltava.
+   Esta varredura passa o dedo pelo desenho inteiro e anota que tipos aparecem. */
+{
+  api.uteroPosturaUsar({ corpo: '' });
+  const rPx = api._uteroRaioPx([28, 22]);
+  const varre = (de, esp) => {
+    const achados = new Set();
+    for (let x = -10; x <= 330; x += 3) for (let y = -14; y <= 258; y += 3) {
+      const g = de(x, y);
+      achados.add(api.uteroFigoDaProfundidade(g.u, rPx / Math.max(1, esp(g))));
+    }
+    return achados;
+  };
+  const sag = varre(api.uteroSagitalDe, g => g.mio);
+  const tra = varre(api.uteroTransversalDe, g => g.esp);
+  ok(sag.has('0'), 'no corte SAGITAL da para chegar em FIGO 0 (era o que faltava)');
+  ok(tra.has('0'), 'e no transversal tambem');
+  ['0','1','2','3','4','5','6','7'].forEach(f => {
+    ok(sag.has(f) && tra.has(f), '  tipo ' + f + ' alcancavel nas duas vistas');
+  });
+}
+
+console.log('\n=== 2) as DIAGONAIS: oito paredes, nao quatro ===');
+/* Continua sendo lista de PALAVRAS e nao angulo livre: o laudo tem de dizer onde o mioma
+   esta em portugues, e "na parede a 37 graus" nao e coisa que se escreva. */
+[['na parede ântero-lateral direita','antero-lateral-direita'],
+ ['na parede póstero-lateral esquerda','postero-lateral-esquerda'],
+ ['antero lateral esquerda','antero-lateral-esquerda'],
+ ['na parede lateral direita','lateral-direita'],
+ ['na parede anterior','anterior']].forEach(([f, esperado]) => {
+  ok(api.uteroParede(f) === esperado, 'le "' + f.slice(0, 34) + '" -> ' + esperado);
+});
+[[-90,'anterior'],[-45,'antero-lateral-esquerda'],[0,'lateral-esquerda'],[45,'postero-lateral-esquerda'],
+ [90,'posterior'],[135,'postero-lateral-direita'],[180,'lateral-direita'],[-135,'antero-lateral-direita']]
+  .forEach(([g, esperado]) => {
+    ok(api.uteroParedeDoAngulo(g) === esperado, '  ' + String(g).padStart(4) + ' graus cai em ' + esperado);
+  });
+/* ⚠️ A ARMADILHA: "antero-lateral direita" CONTEM "lateral direita". Se a troca no texto
+   testasse a lateral pura primeiro, o laudo ficaria com "na parede antero-na parede
+   lateral direita" -- e ninguem le o laudo inteiro de novo depois de arrastar um marcador. */
+{
+  const c = '**Mioma intramural na parede anterior, medindo 2,0 cm.**';
+  const r1 = api.uteroReescreverLocal(c, 'U1', 'antero-lateral-direita', 'medio', '4');
+  ok(r1.ok && /na parede ântero-lateral direita/.test(r1.corpo),
+     'escreve a diagonal no corpo do laudo');
+  ok(!/parede ântero-na parede/.test(r1.corpo),
+     '  e NAO deixa "parede antero-na parede lateral direita" (a armadilha)');
+  const r2 = api.uteroReescreverLocal(r1.corpo, 'U1', 'lateral-esquerda', 'medio', '4');
+  ok(r2.ok && /na parede lateral esquerda/.test(r2.corpo) && !/ântero/.test(r2.corpo),
+     '  e da para voltar da diagonal para a parede pura');
+}
+/* No corte sagital a diagonal conta pela metade que ela nomeia: a antero-lateral fica do
+   lado anterior, a postero-lateral do posterior. Quem diz direita/esquerda e o outro corte. */
+{
+  const a = api.uteroSagitalXY({ parede: 'antero-lateral-direita', terco: 'medio', figo: '4', mm: [25] });
+  const p = api.uteroSagitalXY({ parede: 'postero-lateral-direita', terco: 'medio', figo: '4', mm: [25] });
+  ok(a[1] < p[1], '  no sagital, a antero-lateral fica ACIMA da postero-lateral');
+}
+
+console.log('\n=== 3) arrastar tem de redesenhar a tela em que ele ESTA ===');
+/* Ele relatou: o rodape mudava e o texto do corpo nao. A frase era reescrita certinho na
+   memoria, mas o programa mandava redesenhar `abrirRevisao` -- a tela de revisao ANTIGA,
+   que ele nao usa. A tela de liberacao (telaRev2) nunca era refeita, entao o trabalho
+   acontecia e nao aparecia. O esquema da MAMA ja fazia certo; so o utero ficou para tras. */
+{
+  const soltar = grab('uteroLayoutLigar');
+  ok(/uteroRedesenhar\(atual\.id\)/.test(soltar),
+     'ao soltar o marcador, chama uteroRedesenhar (e nao abrirRevisao direto)');
+  const redes = grab('uteroRedesenhar');
+  ok(/rev2Ex\(\)\.id === exId/.test(redes) && /rev2Render\(\)/.test(redes),
+     '  que redesenha a tela NOVA quando e ela que esta aberta com este exame');
+  ok(/abrirRevisao\(exId, true\)/.test(redes),
+     '  e a antiga so quando for o caso');
+}
+
 console.log('\n=== as tres posturas: quem escolhe e a frase do laudo ===');
 const post = (txt) => api.uteroPosturaDo({ corpo: txt });
 ok(post('**ÚTERO:** Anteversofletido, contornos regulares.') === 'anteverso', 'anteversofletido');

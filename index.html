@@ -5030,8 +5030,15 @@ async function adicionarAudioArquivo(exId, file){
   try{
     const r=await transcreverAudio(file);
     const novoIdx=audios.reduce(function(m,x){return Math.max(m,x.idx);},-1)+1;
-    const a={idx:novoIdx, nome:(nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||file.name||'áudio'), url:URL.createObjectURL(file), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:exId, trechos:(r.trechos||[])};
+    /* ⚠️ `blob:file` — 09/09/2026. Ele NÃO estava aqui, e a falta era séria: o retrato da
+       sessão só guarda no navegador (`audsBlobGravar`) os áudios que TÊM `blob`. Sem
+       ele, o áudio anexado por esta função existia apenas como endereço temporário na
+       memória da janela — fechar ou recarregar a janela e o som sumia, sobrando só a
+       transcrição. Um ditado que some é o pior que este programa pode perder.
+       Apareceu quando ele leu a legenda do tocador e perguntou o que ela significava. */
+    const a={idx:novoIdx, nome:(nomeAudio(r.nome_paciente,r.tipo_exame,r.lateralidade)||file.name||'áudio'), blob:file, url:URL.createObjectURL(file), transcricao:r.transcricao||'', nomePaciente:r.nome_paciente||'', tipoExame:r.tipo_exame||'', lateralidade:r.lateralidade||'', exameId:exId, trechos:(r.trechos||[])};
     audios.push(a);
+    try{ agendarSalvarSessao(); }catch(e){}   // o som entra no retrato, não só o texto
     const ex=exames.find(function(x){return x.id===exId;});
     if(ex){ ex.audios.push(a.idx); if(!ex.tipo && a.tipoExame) ex.tipo=a.tipoExame; }
     log('Áudio adicionado ao exame — toque "Refazer laudo" para aplicar.');
@@ -18254,16 +18261,32 @@ function repoAudioPintar(chave){
   /* Sem endereço não há o que tocar. Um <audio src=""> NÃO fica mudo: ele aponta para a
      PRÓPRIA PÁGINA e o navegador tenta tocar o programa como se fosse som. */
   if(it.audio.tem && it.audio.url){
-    var de = it.audio.fonte==='ditado' ? 'ditado guardado pelo agente'
-           : it.audio.fonte==='arquivo' ? 'áudio do exame, da pasta de consulta'
-           : 'gravação desta sessão';
+    /* ⚠️ 09/09/2026 — A LEGENDA DIZIA A MESMA COISA PARA AS TRÊS ORIGENS, E ERRAVA NUMA.
+       Ele leu e perguntou: "existe um botão aqui escrito, depois que eu gravei o áudio:
+       'gravação dessa sessão. O áudio mora no computador. Com o agente desligado não há o
+       que tocar.' O que isso significa?"
+       A segunda metade da frase estava colada em todas as três, e para a gravação FEITA
+       AGORA ela é falsa ao contrário: essa gravação NÃO mora no computador pelo agente —
+       ela mora na memória desta janela. Ligar ou desligar o agente não muda nada nela.
+       Uma legenda que explica errado é pior que legenda nenhuma: ele iria mexer no agente
+       para resolver um problema que não está lá. Agora cada origem diz a sua verdade. */
+    var de, onde;
+    if(it.audio.fonte==='ditado'){
+      de='ditado guardado pelo agente';
+      onde='mora no computador, na pasta do agente — com o agente desligado não há o que tocar';
+    } else if(it.audio.fonte==='arquivo'){
+      de='áudio do exame, da pasta de consulta';
+      onde='mora no computador, na pasta do dia — com o agente desligado não há o que tocar';
+    } else {
+      de='gravação feita agora, nesta janela';
+      onde='ainda está só nesta janela; uma cópia foi guardada na pasta de áudios';
+    }
     /* Quando a gravação está guardada num dia diferente do exame (exame que fechou no dia
        seguinte), a tela DIZ. Ele precisa ver de onde veio o áudio que está ouvindo. */
     if(it.audio.dia && it.audio.dia!==it.diaIso) de+=' — guardado em '+it.audio.dia;
     h+='<audio controls preload="none" style="width:100%;max-width:420px" '
       +'src="'+esc(it.audio.url)+'"></audio>'
-      +'<span class="repoNota">'+esc(de)+' · o áudio mora no computador: com o agente '
-      +'desligado não há o que tocar</span>';
+      +'<span class="repoNota">'+esc(de)+' · '+esc(onde)+'</span>';
   } else {
     h+='<span class="repoNota">este exame não tem áudio guardado. '
       +'Grave agora, ou traga um arquivo do computador.</span>';
@@ -18318,6 +18341,12 @@ async function repoAudioGravar(chave){
       var bl=new Blob(_repoPedacos, {type:'audio/webm'}); _repoPedacos=[];
       if(!bl.size){ log('A gravação saiu vazia — nada foi adicionado.', true); repoAudioPintar(chaveG); return; }
       var arq=new File([bl], 'ditado-'+Date.now()+'.webm', {type:'audio/webm'});
+      /* UMA CÓPIA VAI PARA A PASTA DE ÁUDIOS, como o gravador da tela antiga sempre fez.
+         O arquivo escolhido pelo médico já existe no computador dele; a gravação feita
+         AQUI não existe em lugar nenhum até alguém a guardar. Isto roda antes de
+         transcrever, de propósito: se a transcrição falhar, o som já está salvo. */
+      try{ await salvarAudioAuto(bl, 'ditado-'+(_repoIndice[chaveG]&&_repoIndice[chaveG].paciente||'exame'),
+                                 (bl.type||'').indexOf('webm')>=0?'webm':'m4a'); }catch(e){}
       await repoAudioAnexar(chaveG, arq);
     };
     _repoMr.start();

@@ -185,6 +185,42 @@ ok(/agente[\s\S]{0,40}desligado/.test(pintaAudio),
 ok(/repoAudioGravar/.test(pintaAudio), 'da para GRAVAR um audio novo');
 ok(/repoAudioArquivo/.test(pintaAudio), 'da para TRAZER um arquivo de fora');
 ok(/repoAudioApagar/.test(pintaAudio), 'e da para APAGAR o audio que existe');
+
+/* ⚠️ 09/09/2026 — A LEGENDA DO TOCADOR DIZIA A MESMA COISA PARA AS TRES ORIGENS.
+   Ele leu e perguntou: "existe um botao aqui escrito, depois que eu gravei o audio:
+   'gravacao dessa sessao. O audio mora no computador. Com o agente desligado nao ha o que
+   tocar.' O que isso significa?"
+   A segunda metade estava colada nas tres, e para a gravacao FEITA AGORA era falsa AO
+   CONTRARIO: ela nao mora no computador pelo agente, mora na memoria da janela; ligar ou
+   desligar o agente nao muda nada nela. Legenda que explica errado e pior que legenda
+   nenhuma -- ele iria mexer no agente para resolver um problema que nao esta la. */
+ok(/fonte==='ditado'/.test(pintaAudio) && /fonte==='arquivo'/.test(pintaAudio)
+   && (pintaAudio.match(/onde=/g) || []).length >= 3,
+   'a legenda tem um texto POR ORIGEM, nao um so para as tres');
+ok(/pasta do agente/.test(pintaAudio) && /pasta do dia/.test(pintaAudio),
+   'as duas que moram no computador dizem em QUAL pasta');
+ok(/ainda está só nesta janela/.test(pintaAudio),
+   'e a gravacao feita agora diz que ainda esta so na janela');
+ok(!/gravação desta sessão[\s\S]{0,120}com o agente\s*'\s*\+?\s*'?desligado/.test(pintaAudio),
+   'e NAO diz mais que a gravacao da sessao depende do agente');
+
+/* ⚠️ E O DEFEITO QUE ESSA PERGUNTA DESENTERROU, que era maior que a frase.
+   `audsBlobGravar` so guarda no navegador os audios que TEM o campo `blob`. Quem anexava
+   audio por `adicionarAudioArquivo` -- que e o caminho do botao de audio do cartao, tanto
+   para gravar quanto para escolher arquivo -- criava o registro SEM `blob`. O som existia
+   so como endereco temporario na memoria da janela: fechar ou recarregar e ele sumia,
+   sobrando a transcricao. Um ditado que some e o pior que este programa pode perder. */
+const anexa = grab('adicionarAudioArquivo');
+ok(/blob:file/.test(anexa),
+   'o audio anexado guarda o BLOB — senao some ao fechar a janela, sobrando so o texto');
+ok(/agendarSalvarSessao\(\)/.test(anexa),
+   'e entra no retrato da sessao na hora, nao so na proxima volta do relogio');
+const grava = grab('repoAudioGravar');
+ok(/salvarAudioAuto\(/.test(grava),
+   'e a gravacao feita no cartao deixa uma copia na pasta de audios (o arquivo escolhido '
+   + 'ja existe no computador; a gravacao nao existia em lugar nenhum)');
+ok(grava.indexOf('salvarAudioAuto') < grava.indexOf('repoAudioAnexar'),
+   'a copia e salva ANTES de transcrever — se a transcricao falhar, o som ja esta guardado');
 /* Apagar audio de paciente e irreversivel se for apagar mesmo. No agente e RENOMEAR, e a
    tela DIZ isso -- senao ele nao sabe que da para desfazer. */
 const apagar = grab('repoAudioApagar');

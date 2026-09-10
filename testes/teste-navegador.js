@@ -2287,6 +2287,31 @@ const VERIFICACOES = `(async () => {
       diz('  e o painel de imagens tambem oferece incluir, sem mandar trazer',
         /incluir imagens/.test(pf) && pf.indexOf('traga o exame') < 0,
         pf.replace(/\s+/g, ' ').trim().slice(0, 70));
+
+      /* ===== 10/09/2026, DOIS RELATOS DELE SOBRE ESTE MESMO CARTAO =====
+         1) "eu queria que a opcao do audio aparecesse ACIMA das imagens";
+         2) "eu clico nas imagens, elas se expandem. Ai eu clico no audio, aparece. Eu
+            clico para gravar, AS IMAGENS SOMEM. Isso nao e para acontecer."
+         O (2) so acontecia com o exame que esta SO NO APARELHO -- que e exatamente o
+         estado deste cartao aqui, e por isso a prova mora neste bloco. */
+      const gAud = document.getElementById('repoPaudiotrab_EEST-SO-APARELHO');
+      const gFot = document.getElementById('repoPfotostrab_EEST-SO-APARELHO');
+      diz('  a gaveta do AUDIO vem acima da das imagens',
+        !!(gAud && gFot) && (gAud.compareDocumentPosition(gFot) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+      diz('  e as duas estao abertas ao mesmo tempo, com conteudo',
+        !!gAud.innerHTML && !!gFot.innerHTML);
+      // o aviso "abrindo o exame..." NAO pode cair numa gaveta que ele esta olhando
+      diz('  com as fotos na tela, o aviso NAO escolhe a gaveta das fotos',
+        repoOndeAvisar('trab_EEST-SO-APARELHO') !== gFot,
+        'escolheu: ' + ((repoOndeAvisar('trab_EEST-SO-APARELHO') || {}).id || 'nenhuma'));
+      diz('  e quem tocou no audio avisa NA GAVETA DO AUDIO (era isso que apagava as fotos)',
+        repoOndeAvisar('trab_EEST-SO-APARELHO', gAud) === gAud);
+      // e com uma gaveta vazia disponivel, ele usa essa -- em vez de ficar calado
+      repoFecharPainel('trab_EEST-SO-APARELHO', 'audio');
+      diz('  havendo gaveta VAZIA, o aviso vai para ela',
+        repoOndeAvisar('trab_EEST-SO-APARELHO') === gAud);
+      repoOuvir('trab_EEST-SO-APARELHO');
+      await new Promise(r => setTimeout(r, 200));
     }
 
     /* E o cartao da lista passou a ser O MESMO do painel de hoje: "nos exames de hoje ja

@@ -17951,8 +17951,16 @@ function repoAcender(chave, modo, aceso){
   var s=document.querySelector('#repoL'+chave+' .repoSelo.'+REPO_SELO_DO_MODO[modo]);
   if(s) s.classList[aceso?'add':'remove']('on');
 }
+/* ⚠️ A ORDEM AQUI É A ORDEM NA TELA, e mudou em 10/09/2026 a pedido dele: "eu queria que
+   a opção do áudio aparecesse ACIMA das imagens."
+   Faz sentido pelo tamanho: a gaveta das fotos tem oito miniaturas e ocupa meia tela, e a
+   do áudio, dois botões. Com as fotos em cima, abrir o áudio empurrava os botões dele para
+   fora da vista, e ele tinha de rolar a tela para achar o que acabou de pedir.
+   Só a ORDEM DAS GAVETAS mudou — os quatro sinais do cartão continuam 🖼 🎧 ○ 🖨, que é
+   como ele lê a linha de longe. */
+var REPO_ORDEM_GAVETAS=['audio','fotos','imprimir'];
 function repoGavetasHtml(chave){
-  return REPO_MODOS.map(function(m){
+  return REPO_ORDEM_GAVETAS.map(function(m){
     return '<div class="repoPainel" id="repoP'+m+esc(chave)+'"></div>';
   }).join('');
 }
@@ -18272,6 +18280,27 @@ function repoAcoesHtml(it){ return ''; }
    ainda não estiver aberto nesta janela. Devolve o exame, ou null se não deu.
    É o que faz a promessa acima ser verdade: o médico toca no que quer fazer, e o
    programa resolve por baixo o que precisa resolver. */
+/* ⚠️ ONDE ESCREVER O AVISO "abrindo o exame…" — 10/09/2026, relato dele:
+   "eu clico nas imagens, elas se expandem. Aí eu clico no áudio, aparece. Eu clico para
+   gravar, AS IMAGENS SOMEM. Isso não é para acontecer."
+   O defeito era aqui, e era simples de não ver: o aviso ia SEMPRE para a gaveta das fotos,
+   mesmo quando ele tinha tocado no áudio. Escrever nela apagava as oito miniaturas que ele
+   estava olhando — quem apagava as fotos era o botão de gravar, do outro lado do cartão.
+   E só acontecia com o exame que ainda estava SÓ NO APARELHO (as fotos vêm direto do
+   aparelho; o exame só é aberto quando ele vai mexer nele), que é justamente o caso do dia.
+   A regra agora, em uma frase: escreve na gaveta em que ele TOCOU, e, na falta dela, só
+   numa gaveta VAZIA. Gaveta com coisa na tela não se sobrescreve — o aviso vai para o
+   diário, que não custa nada a ninguém. */
+function repoOndeAvisar(chave, preferida){
+  if(preferida) return preferida;                  // é onde ele tocou: pode escrever
+  var vazia=null;
+  REPO_MODOS.forEach(function(m){
+    if(vazia) return;
+    var g=repoGaveta(chave, m);
+    if(g && !g.innerHTML) vazia=g;
+  });
+  return vazia;                                    // nenhuma vazia: ninguém é sobrescrito
+}
 async function repoGarantirExame(chave, ondeAvisar){
   var it=_repoIndice[chave]; if(!it) return null;
   if(it.ex) return it.ex;
@@ -18280,9 +18309,7 @@ async function repoGarantirExame(chave, ondeAvisar){
        peça — é ausência, e quem chamou precisa saber para dizer a coisa certa. */
     return null;
   }
-  /* Avisa na gaveta em que ele tocou; sem saber qual, na das fotos, que e a que abre
-     junto quando o exame precisa ser baixado. */
-  var p=ondeAvisar||repoGaveta(chave,'fotos')||repoGaveta(chave,'audio');
+  var p=repoOndeAvisar(chave, ondeAvisar);
   if(p) p.innerHTML='<span class="repoNota">abrindo o exame de <b>'+esc(it.paciente)
     +'</b> — baixando '+it.instancias.length+' imagem(ns)…</span>';
   try{
@@ -18563,7 +18590,7 @@ function repoFotosPintar(chave, fotos, opc){
 async function repoImgTirar(chave, i){
   var it=_repoIndice[chave]; if(!it || it.hist) return;
   if(!confirm('Tirar esta imagem do exame?')) return;
-  if(!await repoGarantirExame(chave)) return;      // abre o exame por baixo, se preciso
+  if(!await repoGarantirExame(chave, repoGaveta(chave,'fotos'))) return;   // na gaveta das fotos
   if(!exameTirarImagem(it.ex, i)) return;
   /* O cache do que já foi baixado do aparelho tem de esquecer este exame: sem isso, o
      painel se redesenha com a lista ANTIGA e a foto "apagada" reaparece no próximo
@@ -18577,7 +18604,7 @@ async function repoImgTirarTodas(chave){
   var n=it.nImagens||0;
   if(!n) return;
   if(!confirm('Tirar as '+n+' imagens deste exame? O laudo e o áudio não são tocados.')) return;
-  if(!await repoGarantirExame(chave)) return;      // abre o exame por baixo, se preciso
+  if(!await repoGarantirExame(chave, repoGaveta(chave,'fotos'))) return;   // na gaveta das fotos
   it.ex.imagens=[];
   if(Array.isArray(it.ex._instIds)) it.ex._instIds=[];
   delete _repoFotos[it.estudoId];
@@ -18591,7 +18618,7 @@ async function repoImgIncluir(chave){
   inp.onchange=async function(){
     var arqs=Array.prototype.slice.call(inp.files||[]);
     if(!arqs.length) return;
-    if(!await repoGarantirExame(chave)) return;    // abre o exame por baixo, se preciso
+    if(!await repoGarantirExame(chave, repoGaveta(chave,'fotos'))) return;   // na gaveta das fotos
     var p=repoGaveta(chave,'fotos');
     if(p) p.innerHTML='<span class="repoNota">lendo '+arqs.length+' arquivo(s)…</span>';
     var novas=0;
@@ -18720,7 +18747,9 @@ var _repoGravando='', _repoMr=null, _repoPedacos=[];
    de quem é: dar o áudio de um exame a outro é o erro mais caro que este programa comete. */
 async function repoAudioGravar(chave){
   var it=_repoIndice[chave]; if(!it) return;
-  if(_repoGravando!==chave && !await repoGarantirExame(chave)) return;   // abre o exame se preciso
+  /* `repoGaveta(chave,'audio')`: o aviso vai na gaveta em que ele TOCOU. Sem isto ele ia
+     para a das fotos e apagava as miniaturas abertas — o relato dele de 10/09. */
+  if(_repoGravando!==chave && !await repoGarantirExame(chave, repoGaveta(chave,'audio'))) return;
   if(_repoGravando===chave){                       // segundo toque: para e transcreve
     try{ _repoMr && _repoMr.state!=='inactive' && _repoMr.stop(); }catch(e){}
     return;
@@ -18769,7 +18798,7 @@ function repoAudioArquivo(chave){
    sem áudio anterior não há escolha a fazer, e perguntar seria só um passo a mais. */
 async function repoAudioAnexar(chave, arq){
   var it=_repoIndice[chave]; if(!it) return;
-  if(!await repoGarantirExame(chave)) return;      // abre o exame por baixo, se preciso
+  if(!await repoGarantirExame(chave, repoGaveta(chave,'audio'))) return;   // na gaveta do audio
   if(it.audio.tem){
     var trocar=confirm('Este exame já tem áudio.\n\nOK = SUBSTITUIR (o áudio de agora entra '
       +'no lugar do anterior)\nCancelar = ADICIONAR (os dois ficam)');

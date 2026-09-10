@@ -5724,8 +5724,11 @@ async function salvarSessao(comImagens){
   // as imagens a cada laudo (travaria 100+ exames). comImagens!=false: snapshot completo (com
   // as fotos), usado em laudo avulso e no save final do lote — é o que a recuperação reexibe.
   var comLaudo=exames.filter(function(e){return e.laudo;});
-  // Página recém-aberta e nada gerado ainda: NÃO mexe no que está guardado, senão o
-  // banner "Sessão anterior encontrada" nunca apareceria.
+  // Página recém-aberta e nada gerado ainda: NÃO mexe no que está guardado, senão a
+  // sessão anterior seria apagada antes de voltar. (Até 09/09/2026 isto protegia um
+  // banner de "Restaurar"; o banner saiu e a sessão volta sozinha, mas a regra vale
+  // igual — e agora vale MAIS: não há mais um toque do médico para salvar o dia se este
+  // salvamento apagar o retrato antes da hora.)
   // Mas se JÁ houve laudo nesta página e a lista ficou vazia, é porque o médico apagou —
   // aí a lista vazia tem de ser gravada, senão o laudo apagado voltava ao recarregar.
   if(!comLaudo.length && !_sessaoViva) return;
@@ -17510,7 +17513,7 @@ function diaAtualizarContador(lista){
 
    O QUE ELE NÃO SABE E É DITO NA TELA, não escondido: exame antigo pode ter perdido o
    áudio (90 dias) sem ter perdido as imagens, e o selo cinza é essa notícia. */
-var _repo={estudos:null, ditados:{}, capturas:{}, liberados:{}, impressos:{},
+var _repo={estudos:null, ditados:{}, capturas:{}, liberados:{}, impressos:{}, historico:[],
            quando:0, erro:'', carregando:false, retAudio:90};
 var _repoIndice={};      // chave da linha -> item, para os botões acharem o exame
 var _repoFotos={};       // estudo -> imagens já baixadas (não rebaixa a cada toque)
@@ -17549,6 +17552,22 @@ async function repoCarregarLeve(forcar){
      verdade conhecida, em vez de inventar um "impresso" sem base. */
   try{ var ip=await (await fetch(agenteBase()+'/exames/impressos')).json();
        var mi={}; ((ip&&ip.uids)||[]).forEach(function(u){ mi[u]=true; }); _repo.impressos=mi; veio++; }catch(_){}
+  /* ⚠️ 09/09/2026 — O HISTÓRICO INTEIRO, e não só o que veio do aparelho.
+     Palavras dele: "Os laudos não devem mais sumir do histórico. (…) Nenhum exame deve
+     sumir mais da tela do aplicativo."
+     A lista se montava com os estudos do aparelho + os exames desta sessão. Isso cobre a
+     quase totalidade — mas NÃO o laudo feito a partir de fotos soltas, que nunca passou
+     pelo ultrassom e por isso não tem estudo lá. Passada a sessão, ele existia no banco e
+     no índice do agente, e não aparecia em lista nenhuma. Era exatamente o "sumir" que
+     ele mandou acabar. Este índice é leve de propósito (nome, tipo e data, ~442 bytes por
+     laudo) e é o mesmo que a busca do exame anterior já usava. */
+  /* ⚠️ ESTE NÃO CONTA PARA O `veio`. `histParaBusca` tem reserva LOCAL (o histórico
+     guardado no navegador) e responde mesmo com o agente fora do ar. Contá-lo faria a
+     carga parecer bem-sucedida quando nada veio do computador — e a marca de tempo
+     abaixo prenderia a tela por um minuto inteiro em "sem áudio, nada liberado", com
+     tudo intacto no disco. Falhar não é ter feito, e responder pela reserva não é ter
+     falado com o agente. Apanhado pelo teste do navegador. */
+  try{ var hi=await histParaBusca(); _repo.historico=Array.isArray(hi)?hi:[]; }catch(_){}
   /* SÓ MARCA A HORA SE ALGO VEIO. Com o agente subindo (ou fora do ar), as três falham —
      e marcar a hora aqui prenderia a tela por um minuto inteiro em "sem áudio, nada
      liberado", com tudo intacto no disco. Falhar não é ter feito. */
@@ -17668,6 +17687,26 @@ function repoItem(est, ex){
                                    : !!(eid && _repo.impressos && _repo.impressos[eid])
   };
 }
+/* Um item da lista feito a partir do ÍNDICE DO HISTÓRICO (09/09/2026). É o laudo antigo
+   que não veio do aparelho: não há estudo para pedir imagens, nem ditado para tocar, e
+   por isso os sinais dizem a verdade sobre o que existe em vez de prometer.
+   Ele é sempre `liberado`: estar no histórico é o que significa ter sido assinado — é
+   assim que ele cai na coluna da direita, que é onde ele pediu que ficasse. */
+function repoItemDoHistorico(r, dia){
+  var tipo=(MODELOS[r.tipo]&&MODELOS[r.tipo].nome)||r.tipo||'laudo';
+  var hora='';
+  try{ if(r.ts) hora=new Date(r.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }catch(e){}
+  return {
+    chave:'H'+String(r.id), estudoId:'', est:null, ex:null, hist:r,
+    paciente:capNome(r.paciente||'')||'(sem nome)', tipo:tipo,
+    dia:dia, diaIso:repoDiaIso(dia), hora:hora,
+    ordem:(repoDiaIso(dia)||'')+String(hora||'').replace(':',''),
+    nImagens:0, instancias:[],
+    audio:{tem:false, url:'', fonte:'', dia:''},
+    liberado:true,
+    impresso:false
+  };
+}
 function repoItens(){
   var itens=[], jaVi={};
   (_repo.estudos||[]).forEach(function(e){
@@ -17678,6 +17717,21 @@ function repoItens(){
   // exame desta sessão que NÃO veio do aparelho: ditado avulso, laudo reaberto do
   // histórico, material antigo montado à mão. Existe e tem de aparecer.
   exames.forEach(function(x){ if(!jaVi[x.id]) itens.push(repoItem(null, x)); });
+  /* 09/09/2026 — E OS LAUDOS ANTIGOS QUE NÃO VIERAM DO APARELHO.
+     O laudo feito de fotos soltas não tem estudo no ultrassom e, passada a sessão, não
+     aparecia em lista nenhuma — sumia da tela, que é o que ele mandou acabar.
+     Entra só o que AINDA NÃO está representado: o mesmo laudo não pode aparecer duas
+     vezes, uma pelo estudo e outra pelo histórico. A conferência é por paciente + dia,
+     que é o que os dois lados têm em comum (o índice do histórico não guarda o
+     identificador do aparelho). */
+  var jaNaTela={};
+  itens.forEach(function(it){ jaNaTela[norm(it.paciente)+'|'+(it.dia||'')]=true; });
+  (_repo.historico||[]).forEach(function(r){
+    var dia=hisDia(r), ch=norm(capNome(r.paciente||''))+'|'+dia;
+    if(jaNaTela[ch]) return;
+    jaNaTela[ch]=true;
+    itens.push(repoItemDoHistorico(r, dia));
+  });
   /* ACRESCENTA, não substitui: o painel do dia registra os exames de hoje pela chave
      dele ('S…') e esta lista registra os do aparelho ('E…'). Zerar aqui deixaria os
      selos de hoje sem dono até o próximo desenho, e um toque não faria nada. */
@@ -17866,6 +17920,14 @@ function repoFotosPintar(chave, fotos){
     if(fotos && fotos.length)
       h+='<button type="button" class="repoBt perigo" onclick="repoImgTirarTodas(\''+esc(chave)+'\')">'
         +'✕ excluir todas</button>';
+  } else if(it.hist){
+    /* Laudo antigo do histórico: as imagens daquele dia não estão em lugar nenhum que
+       este programa alcance — elas viveram na memória da janela e o laudo guardou o
+       DESENHO, não os arquivos. Dizer isso é melhor que oferecer um botão que não
+       cumpre, e melhor que ficar mudo. */
+    h+='<span class="repoNota">este é um laudo antigo, aberto pelo histórico: as imagens '
+      +'do dia não ficam guardadas, só o laudo pronto. Toque em <b>✓ liberado</b> para '
+      +'abri-lo.</span>';
   } else {
     h+='<span class="repoNota">as imagens estão no aparelho. Para incluir ou excluir, '
       +'traga o exame para o trabalho primeiro (botões ⤵ ao lado).</span>';
@@ -17987,6 +18049,9 @@ function repoAudioPintar(chave){
       +(gravando?'⏹ parar e transcrever':'🎙 gravar novo')+'</button>';
     h+='<button type="button" class="repoBt cinza" onclick="repoAudioArquivo(\''+esc(chave)+'\')">'
       +'📁 trazer arquivo</button>';
+  } else if(it.hist){
+    h+='<span class="repoNota">laudo antigo do histórico: o ditado dele já passou dos '
+      +_repo.retAudio+' dias ou nunca foi guardado por aqui.</span>';
   } else {
     h+='<span class="repoNota">para gravar ou trazer um arquivo, traga o exame para o '
       +'trabalho primeiro (botões ⤵ ao lado).</span>';
@@ -18106,6 +18171,11 @@ function repoAudioRecalcular(chave){
    laudo, voltar para a lista de trabalho." */
 function repoLiberar(chave){
   var it=_repoIndice[chave]; if(!it) return;
+  /* Laudo antigo, vindo do índice do histórico: ele EXISTE e está assinado, só não está
+     aberto nesta sessão. Abrir pelo caminho do histórico traz o desenho guardado daquele
+     dia — que é o certo: as imagens daquele exame não estão mais na memória da janela, e
+     re-gerar o laudo produziria um texto novo no lugar do que ele assinou. */
+  if(it.hist){ hisRevisar(String(it.hist.id)); return; }
   /* Sem laudo não há o que liberar, e o cartão precisa dizer o que falta em vez de abrir
      uma tela de revisão vazia — tela vazia parece defeito, e ele iria procurar o erro. */
   if(!it.ex || !it.ex.laudo){
@@ -18144,6 +18214,16 @@ function repoImprimir(chave){
   var sel=document.querySelector('#repoL'+chave+' .repoSelo.imp'); if(sel) sel.classList.add('on');
   var temLaudo=!!(it.ex && it.ex.laudo), temFotos=it.nImagens>0, k=esc(chave);
   var h='';
+  /* Laudo antigo do histórico: imprimir daqui exigiria montá-lo na área de impressão, e
+     quem sabe fazer isso é a tela de leitura do histórico, que já tem o desenho guardado
+     daquele dia e o botão de imprimir. Mandar por aqui produziria papel a partir de um
+     laudo que não está montado — folha em branco, o defeito de 01/09. */
+  if(it.hist){
+    p.innerHTML='<span class="repoNota">para imprimir um laudo antigo, abra-o em '
+      +'<b>✓ liberado</b>: a tela de leitura tem o laudo daquele dia e o botão de '
+      +'imprimir.</span>';
+    return;
+  }
   if(it.impresso) h+='<span class="repoNota">este laudo já saiu no papel — imprimir de novo é permitido.</span>';
   h+='<div class="repoBarra">'
     +'<button type="button" class="repoBt'+(temLaudo?'':' cinza')+'" '+(temLaudo?'':'disabled ')

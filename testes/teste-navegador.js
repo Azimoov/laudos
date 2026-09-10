@@ -2135,6 +2135,67 @@ const VERIFICACOES = `(async () => {
     diz('os quatro botoes do cartao', false, e.constructor.name + ': ' + e.message);
   }
 
+  /* ===== NENHUM LAUDO SOME DO HISTORICO (etapa 7, 09/09/2026) =====
+     Palavras dele: "Os laudos nao devem mais sumir do historico. (...) Nenhum exame deve
+     sumir mais da tela do aplicativo."
+     A LACUNA que a releitura final encontrou: a lista se montava com os estudos do
+     APARELHO + os exames desta SESSAO. Isso cobre quase tudo -- menos o laudo feito a
+     partir de fotos soltas, que nunca passou pelo ultrassom. Passada a sessao, ele existia
+     no banco e no indice do agente e nao aparecia em lista nenhuma. Era exatamente o
+     "sumir" que ele mandou acabar, e nao aparecia em teste nenhum. */
+  try {
+    exames = [];
+    _repo.estudos = [];
+    _repo.historico = [
+      { id: 'H-ANTIGO-1', paciente: 'Laudo De Fotos Soltas', tipo: 'mama',
+        ts: Date.now() - 30 * 86400000 },
+      { id: 'H-ANTIGO-2', paciente: 'Outro Antigo', tipo: 'abdome',
+        ts: Date.now() - 60 * 86400000 }
+    ];
+    trabAbrir();
+    await new Promise(r => setTimeout(r, 250));
+    await trabPintar();
+    const hist = () => document.getElementById('trabRepoHistorico').textContent;
+    diz('laudo antigo que NAO veio do aparelho aparece no historico',
+      hist().indexOf('Laudo De Fotos Soltas') >= 0);
+    diz('  e o segundo tambem', hist().indexOf('Outro Antigo') >= 0);
+    diz('  e nao vai parar na lista de trabalho (esta assinado)',
+      document.getElementById('trabRepoTrabalho').textContent.indexOf('Laudo De Fotos Soltas') < 0);
+
+    /* Nao pode aparecer DUAS vezes: uma pelo estudo do aparelho e outra pelo historico.
+       A conferencia e por paciente + dia, que e o que os dois lados tem em comum. */
+    const hojeBr = repoHojeBr();
+    exames = [{ id: 8801, paciente: 'Duplicado Teste', tipo: 'mama', _quando: Date.now(),
+                laudo: { corpo: 'x' }, _liberado: true, imagens: [] }];
+    _repo.historico = [{ id: 'H-DUP', paciente: 'Duplicado Teste', tipo: 'mama', data: hojeBr,
+                         ts: Date.now() }];
+    await trabPintar();
+    const quantos = (document.getElementById('trabRepoHistorico').textContent
+      .match(/Duplicado Teste/g) || []).length;
+    diz('o mesmo laudo NAO aparece duas vezes (estudo + historico)', quantos === 1,
+      'apareceu ' + quantos + 'x');
+
+    /* E o cartao do laudo antigo diz a VERDADE sobre o que existe: sem imagens (elas
+       viveram na memoria da janela) e sem audio (passou dos 90 dias). */
+    exames = [];
+    _repo.historico = [{ id: 'SO-1', paciente: 'So No Historico', tipo: 'mama',
+                         ts: Date.now() - 5 * 86400000 }];
+    await trabPintar();
+    // a chave do item do historico e 'H' + o id do registro -> a linha e 'repoL' + chave
+    const lin = document.getElementById('repoLHSO-1');
+    diz('o laudo antigo tem cartao proprio na lista', !!lin);
+    if (lin) {
+      const b = Array.from(lin.querySelectorAll('.repoSelo')).map(x => x.textContent.trim());
+      diz('  com os quatro sinais, dizendo a verdade do que existe', b.length === 4, b.join(' | '));
+      diz('  e marcado como liberado (estar no historico E ter sido assinado)',
+        !!lin.querySelector('.repoSelo.lib'));
+    }
+    trabFechar();
+    exames = []; _repo.historico = [];
+  } catch (e) {
+    diz('nenhum laudo some do historico', false, e.constructor.name + ': ' + e.message);
+  }
+
   return R;
 })()`;
 

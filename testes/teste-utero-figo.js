@@ -10,7 +10,23 @@ const ok = (c, m) => { console.log((c ? '  ok   ' : '  FALHA ') + m); if (!c) fa
 const ini = HTML.indexOf('/* ============ ESQUEMA ANATÔMICO DO ÚTERO / MIOMA FIGO ============');
 const fim = HTML.indexOf('/* ===================== TELA DE ABERTURA', ini);
 if (ini < 0 || fim < 0) throw new Error('não achei o módulo do útero no index.html');
-const MOD = HTML.slice(ini, fim);
+/* `cmTxt` (o milimetro escrito em centimetros) mora fora do modulo do utero, e a bancada
+   nao a fornecia. Ela so e chamada quando a lesao TEM medida -- e ate 10/09/2026 a lesao
+   do laudo de exemplo vinha da CONCLUSAO, que nao tem medida nenhuma. Corrigido o gatilho,
+   a lesao passou a vir da DESCRICAO, com medida, e a falta apareceu na hora.
+   Vem recortada do proprio index.html, nunca reescrita aqui: copia de regra passa verde
+   depois de o programa mudar de ideia. */
+function recortarFuncao(nome) {
+  const i = HTML.indexOf('function ' + nome + '(');
+  if (i < 0) throw new Error('não achei a função ' + nome);
+  let d = 0, comecou = false;
+  for (let j = i; j < HTML.length; j++) {
+    if (HTML[j] === '{') { d++; comecou = true; }
+    else if (HTML[j] === '}') { d--; if (comecou && d === 0) return HTML.slice(i, j + 1); }
+  }
+  throw new Error('função ' + nome + ' não fecha');
+}
+const MOD = recortarFuncao('cmTxt') + '\n' + HTML.slice(ini, fim);
 
 const holder = { ex: null, logs: [] };
 const api = new Function('esc', 'negrito', 'imagensRevisaoLigadas', 'rev2TemAchado', 'rev2Ex', 'log', 'agendarSalvarSessao', 'rev2Render',
@@ -171,6 +187,43 @@ ok(/laudoUteroSecao/.test(HTML) && /laudoUteroHost/.test(HTML), '_paginarPontos 
 ok(/laudoUteroLayoutControles/.test(HTML), 'controles do útero são expurgados na impressão');
 ok(/uteroCaixaHTML/.test(HTML), 'tela de revisão inclui cartão para útero');
 ok(/ex\.tipo==='transvaginal'/.test(HTML) && /uteroCorpoHTML/.test(HTML), 'areaImpressao injeta uteroCorpoHTML em transvaginal');
+
+/* ⚠️ 10/09/2026 — O GATILHO: QUE FRASE VIRA MARCADOR.
+   Relato dele: "fiz agora um teste e nao apareceu a opcao de incluir a imagem."
+   A regra antiga era uma expressao so, e na pratica SO A PALAVRA "mioma" funcionava:
+   ela exigia o qualificador colado na palavra nodulo ("nodulo miometrial hipoecogenico"
+   nao passava, porque "miometrial" esta no meio), e as alternativas "hipoec" e "heterog"
+   terminavam numa exigencia de FIM DE PALAVRA que "hipoecogenico" nunca cumpre -- estavam
+   mortas desde que foram escritas. O laudo dizia o mioma com todas as letras e a opcao
+   nao aparecia, sem erro e sem aviso.
+
+   ESTE BLOCO TEM DOIS LADOS, e os dois importam. Alargar o gatilho e facil; alargar sem
+   passar a marcar o que NAO e mioma e o trabalho. Marcador a mais e achado inventado num
+   documento assinado -- foi o defeito de 09/09, que pos "Mioma FIGO 4" num utero normal. */
+console.log('\n=== o gatilho: frases de laudo que DEVEM virar marcador ===');
+[
+  'Miométrio com ecotextura heterogênea, apresentando nódulo miometrial hipoecogênico na parede anterior, medindo 2,3 x 2,1 x 1,9 cm.',
+  'Presença de mioma intramural na parede posterior, medindo 3,0 cm.',
+  'Útero com contornos regulares, apresentando leiomioma subseroso na parede lateral direita.',
+  'Miométrio heterogêneo, com nódulo hipoecogênico de 2,0 cm na parede anterior.',
+  'Nódulo miometrial na parede posterior medindo 1,8 cm.',
+  'Útero aumentado, com formação nodular hipoecogênica intramural anterior de 2,5 cm.',
+  'Miométrio com nódulo sólido hipoecogênico na parede anterior.',
+  'Presença de imagem nodular hipoecogênica no miométrio, parede posterior, de 2,2 cm.',
+  'Dois miomas intramurais, o maior na parede anterior.',
+  'Nódulo uterino hipoecogênico de 1,5 cm.',
+].forEach(f => ok(api.uteroLesoes({ corpo: f }).plot.length > 0, f.slice(0, 78)));
+
+console.log('\n=== e as que NAO podem: marcador a mais e achado inventado ===');
+[
+  'Útero de contornos regulares e ecotextura homogênea. Miométrio sem alterações.',
+  'Ovário direito com cisto simples, anecoico, de 2,0 cm.',
+  'Nódulo sólido no ovário esquerdo, medindo 1,8 cm.',
+  'Formação anexial cística à direita.',
+  'Endométrio linear, homogêneo, medindo 4 mm.',
+  'Útero de paredes regulares, sem alterações.',
+  'Endometrioma no ovário direito de 3 cm.',
+].forEach(f => ok(api.uteroLesoes({ corpo: f }).plot.length === 0, f.slice(0, 78)));
 
 console.log('\n' + (falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo'));
 process.exit(falhas ? 1 : 0);

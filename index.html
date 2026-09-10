@@ -16174,15 +16174,56 @@ function uteroTransversalXY(L){
   return [cx + rx * k * Math.cos(ang), cy + ry * k * Math.sin(ang)];
 }
 
+/* ⚠️ O QUE CONTA COMO MIOMA PARA DESENHAR O MARCADOR — refeito em 10/09/2026.
+   Relato dele: "fiz agora um teste e não apareceu a opção de incluir a imagem."
+   A regra anterior era uma expressão só, e na prática **só a palavra "mioma" funcionava**.
+   Duas falhas, e as duas invisíveis:
+     · ela exigia que o qualificador viesse COLADO na palavra nódulo. "nódulo miometrial
+       hipoecogênico" não passava, porque "miometrial" está no meio;
+     · e as alternativas "hipoec" e "heterog" terminavam numa exigência de FIM DE PALAVRA.
+       Em "hipoecogênico" não há fim de palavra depois do "c" — então essas duas nunca
+       casaram com nada, em laudo nenhum. Estavam mortas desde que foram escritas.
+   Efeito prático: o laudo dizia o mioma com todas as letras, e a opção de incluir a
+   ilustração simplesmente não aparecia — sem erro, sem aviso, sem lugar para procurar.
+
+   A regra nova é uma frase em português: ou a linha diz MIOMA (ou leiomioma), ou ela tem
+   uma palavra de NÓDULO **mais** uma palavra que o põe no ÚTERO. As duas coisas na mesma
+   linha, e não coladas uma na outra.
+
+   ⚠️ E CONTINUA CONSERVADORA DE PROPÓSITO. Marcador a mais é achado inventado num
+   documento assinado — foi o defeito de 09/09, que pôs "Mioma FIGO 4" num útero normal.
+   Por isso a linha que fala de OVÁRIO/ANEXO não entra: nódulo de ovário não é mioma,
+   mesmo quando a palavra "parede" aparece perto. */
+var UTERO_MIOMA=/\b(?:mio|leiomio)mas?\b/i;
+var UTERO_NODULO=/\b(?:n[oó]dulos?|nodular(?:es)?)\b/i;   // pega "formação nodular" e "imagem nodular"
+var UTERO_NO_UTERO=/\b(?:miom[ée]tri(?:o|al|os|ais)|intramural|submucos[oa]s?|subseros[oa]s?|transmural|parede\s+(?:anterior|posterior|lateral|f[uú]ndica)|fundo\s+uterino|uterinos?|uterinas?)\b/i;
+var UTERO_ANEXOS=/\b(?:ov[aá]ri|anexial|anexiais|anexos?|tuba|paraov|endometrioma)/i;
+function uteroEhMioma(linha){
+  if(UTERO_MIOMA.test(linha)) return true;
+  if(!UTERO_NODULO.test(linha) || !UTERO_NO_UTERO.test(linha)) return false;
+  return !UTERO_ANEXOS.test(linha);
+}
+
 function uteroLesoes(L){
   L=L||{};
   var corpo=String(L.corpo||'');
   var plot=[], semPos=[];
 
   var frases = corpo.split(/\n+/);
+  /* ⚠️ A CONCLUSÃO NÃO ENTRA — 10/09/2026, apanhado pelo próprio teste ao alargar o
+     gatilho acima. A conclusão REPETE o achado ("compatível com leiomioma uterino FIGO
+     4"), então a mesma lesão era contada duas vezes: dois marcadores no esquema e dois
+     "Mioma 1 / Mioma 2" na legenda impressa, para UM mioma só. Marcador vem da DESCRIÇÃO,
+     que é onde o mioma tem parede, terço e medida — a conclusão não tem onde desenhar.
+     (Antes isto passava por acaso: o gatilho velho só reconhecia a palavra "mioma", e no
+     laudo de exemplo ela aparecia só na conclusão. Um defeito escondendo o outro.) */
+  var iConc = frases.findIndex(function(l){
+    return /^\s*\**\s*(?:conclus|impress[aã]o\s+diagn|opini[aã]o\s+diagn)/i.test(l);
+  });
+  if(iConc >= 0) frases = frases.slice(0, iConc);
   var miomaLinhas = [];
   frases.forEach(function(linha, idx){
-    if(/\b(?:mioma|leiomioma|n[oó]dulo(?:\s+s[oó]lido)?\s+(?:hipoec|heterog|no\s+miom[ée]trio|uterino|na\s+parede))\b/i.test(linha)){
+    if(uteroEhMioma(linha)){
       miomaLinhas.push({ linha: linha.trim(), idx: idx });
     }
   });

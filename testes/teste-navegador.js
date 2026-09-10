@@ -1749,27 +1749,27 @@ const VERIFICACOES = `(async () => {
     // tocar o programa como se fosse som
     repoOuvir('E' + 'R-SEMAUDIO');
     diz('pedir audio de quem nao tem diz isso, em vez de abrir um tocador vazio',
-      !document.querySelector('#repoP' + 'E' + 'R-SEMAUDIO audio')
-      && document.getElementById('repoP' + 'E' + 'R-SEMAUDIO').textContent.indexOf('não tem áudio') >= 0);
+      !document.querySelector('#repoPaudio' + 'E' + 'R-SEMAUDIO audio')
+      && document.getElementById('repoPaudio' + 'E' + 'R-SEMAUDIO').textContent.indexOf('não tem áudio') >= 0);
 
     // o audio ABRE de verdade, e aponta para a rota da pasta de consulta
     repoOuvir('E' + 'R-ANTIGO');
-    const tocador = document.querySelector('#repoP' + 'E' + 'R-ANTIGO audio');
+    const tocador = document.querySelector('#repoPaudio' + 'E' + 'R-ANTIGO audio');
     diz('tocar o selo de audio abre um tocador na propria linha', !!tocador);
     diz('e ele aponta para o audio daquele dia e daquele paciente',
       !!tocador && tocador.src.indexOf('dia=2026-09-02') >= 0
       && decodeURIComponent(tocador.src).indexOf('Ana Maria.wav') >= 0,
       tocador ? tocador.src.split('/').pop() : '');
     repoOuvir('E' + 'R-ANTIGO');
-    diz('e tocar de novo fecha', !document.querySelector('#repoP' + 'E' + 'R-ANTIGO audio'));
+    diz('e tocar de novo fecha', !document.querySelector('#repoPaudio' + 'E' + 'R-ANTIGO audio'));
 
     // as fotos, com o download de mentira
     const baixarAntes = window.dicomBaixarImagem;
     window.dicomBaixarImagem = async () => 'data:image/png;base64,iVBORw0KGgo=';
     await repoVerFotos('E' + 'R-ANTIGO');
     diz('o selo das imagens abre as fotos na propria linha',
-      document.querySelectorAll('#repoP' + 'E' + 'R-ANTIGO img').length === 4,
-      'fotos: ' + document.querySelectorAll('#repoP' + 'E' + 'R-ANTIGO img').length);
+      document.querySelectorAll('#repoPfotos' + 'E' + 'R-ANTIGO img').length === 4,
+      'fotos: ' + document.querySelectorAll('#repoPfotos' + 'E' + 'R-ANTIGO img').length);
     window.dicomBaixarImagem = baixarAntes;
 
     // e no painel do dia: hoje NAO pode aparecer duas vezes
@@ -2082,12 +2082,12 @@ const VERIFICACOES = `(async () => {
     // --- botao 1: imagens ---
     repoVerFotos('S7001');
     await new Promise(r => setTimeout(r, 400));
-    const pImg = document.getElementById('repoPS7001').textContent;
+    const pImg = document.getElementById('repoPfotosS7001').textContent;
     diz('botao 1 abre e oferece INCLUIR imagens', /incluir imagens/.test(pImg));
     diz('e oferece EXCLUIR as que tem', /excluir todas/.test(pImg));
     diz('e cada foto tem o seu proprio X',
-      document.querySelectorAll('#repoPS7001 .repoTirar').length === 1,
-      document.querySelectorAll('#repoPS7001 .repoTirar').length + ' X para 1 foto');
+      document.querySelectorAll('#repoPfotosS7001 .repoTirar').length === 1,
+      document.querySelectorAll('#repoPfotosS7001 .repoTirar').length + ' X para 1 foto');
     // excluir de verdade: a foto sai do exame E o selo muda
     window.confirm = () => true;
     // ATENCAO: nada de crase neste bloco -- ele vive DENTRO de um template literal, e uma
@@ -2104,7 +2104,7 @@ const VERIFICACOES = `(async () => {
     // --- botao 2: audio ---
     repoOuvir('S7002');
     await new Promise(r => setTimeout(r, 300));
-    const pAud = document.getElementById('repoPS7002').textContent;
+    const pAud = document.getElementById('repoPaudioS7002').textContent;
     diz('botao 2 ABRE mesmo sem audio (e quando gravar faz mais falta)', pAud.length > 0);
     diz('  e oferece GRAVAR novo', /gravar novo/.test(pAud));
     // "a pastinha" que ele pediu: escolher um arquivo de audio para AQUELE exame
@@ -2116,7 +2116,7 @@ const VERIFICACOES = `(async () => {
     repoLiberar('S7002');   // sem laudo: explica, nao abre tela vazia
     await new Promise(r => setTimeout(r, 200));
     diz('botao 3 sem laudo EXPLICA em vez de abrir revisao vazia',
-      /ainda não tem laudo para liberar/.test(document.getElementById('repoPS7002').textContent));
+      /ainda não tem laudo para liberar/.test(document.getElementById('repoPimprimirS7002').textContent));
     diz('  e nao trocou de tela', document.getElementById('telaTrabalho').style.display === 'block');
 
     // ja liberado: pergunta antes, e a pergunta e a que ele ditou
@@ -2136,13 +2136,13 @@ const VERIFICACOES = `(async () => {
     // --- botao 4: impressao ---
     repoImprimir('S7001');
     await new Promise(r => setTimeout(r, 250));
-    const pImp = document.getElementById('repoPS7001').textContent;
+    const pImp = document.getElementById('repoPimprimirS7001').textContent;
     diz('botao 4 abre as TRES opcoes que ele pediu',
       /só o laudo/.test(pImp) && /laudo e fotos/.test(pImp) && /só as fotos/.test(pImp), pImp.trim().slice(0, 70));
     /* Este exame ficou sem fotos (o X de cima tirou a unica). Os botoes que dependem de
        foto tem de estar apagados -- e a tela tem de DIZER por que, senao botao apagado
        sem explicacao ensina a desconfiar dos outros botoes. */
-    const bts = Array.from(document.querySelectorAll('#repoPS7001 .repoBt'));
+    const bts = Array.from(document.querySelectorAll('#repoPimprimirS7001 .repoBt'));
     diz('  "so o laudo" fica disponivel', !bts[0].disabled);
     diz('  "laudo e fotos" e "so as fotos" ficam apagados (nao ha foto)',
       bts[1].disabled && bts[2].disabled);
@@ -2180,17 +2180,17 @@ const VERIFICACOES = `(async () => {
 
     repoVerFotos(alvo);
     await new Promise(r => setTimeout(r, 300));
-    const abriu = (document.getElementById('repoP' + alvo) || {}).innerHTML || '';
-    diz('o painel de imagens abre', abriu.length > 0 && _repoPainel[alvo] === 'fotos');
+    const abriu = (document.getElementById('repoPfotos' + alvo) || {}).innerHTML || '';
+    diz('o painel de imagens abre', abriu.length > 0 && repoAberto(alvo, 'fotos'));
 
     // o relogio de 5 s bate duas vezes
     diaRenderLista();
     diaRenderLista();
     await new Promise(r => setTimeout(r, 200));
-    const depois = (document.getElementById('repoP' + alvo) || {}).innerHTML || '';
+    const depois = (document.getElementById('repoPfotos' + alvo) || {}).innerHTML || '';
     diz('e CONTINUA aberto depois do redesenho do painel do dia',
-      depois.length > 0 && _repoPainel[alvo] === 'fotos',
-      'painel: ' + _repoPainel[alvo] + ' / ' + depois.length + ' chars');
+      depois.length > 0 && repoAberto(alvo, 'fotos'),
+      'fotos aberta: ' + repoAberto(alvo, 'fotos') + ' / ' + depois.length + ' chars');
     diz('  e o selo continua aceso',
       !!document.querySelector('#repoL' + alvo + ' .repoSelo.img.on'));
 
@@ -2201,15 +2201,15 @@ const VERIFICACOES = `(async () => {
     diaRenderLista();
     await new Promise(r => setTimeout(r, 250));
     diz('exame novo entra na lista', document.getElementById('diaLista').textContent.indexOf('Chegou Agora') >= 0);
-    const depois2 = (document.getElementById('repoP' + alvo) || {}).innerHTML || '';
+    const depois2 = (document.getElementById('repoPfotos' + alvo) || {}).innerHTML || '';
     diz('  e o painel que estava aberto VOLTA aberto (sem rebaixar as fotos)',
-      depois2.length > 0 && _repoPainel[alvo] === 'fotos',
+      depois2.length > 0 && repoAberto(alvo, 'fotos'),
       depois2.length + ' chars');
 
     // fechar continua sendo dele: o mesmo selo fecha
     repoVerFotos(alvo);
     await new Promise(r => setTimeout(r, 150));
-    diz('  e tocar de novo no selo FECHA, como sempre', !_repoPainel[alvo]);
+    diz('  e tocar de novo no selo FECHA, como sempre', !repoAberto(alvo, 'fotos'));
     diaFechar();
     exames = []; _diaListaHtml = '';
   } catch (e) {
@@ -2242,7 +2242,7 @@ const VERIFICACOES = `(async () => {
 
       repoOuvir('EEST-SO-APARELHO');
       await new Promise(r => setTimeout(r, 250));
-      const pa = document.getElementById('repoPEEST-SO-APARELHO').textContent;
+      const pa = document.getElementById('repoPaudioEEST-SO-APARELHO').textContent;
       diz('  tocar em "sem audio" oferece GRAVAR', /gravar novo/.test(pa), pa.replace(/\s+/g, ' ').trim().slice(0, 70));
       diz('  e oferece a pastinha de escolher arquivo', /escolher arquivo de áudio/.test(pa));
       diz('  e NAO manda trazer o exame de lugar nenhum',
@@ -2255,10 +2255,10 @@ const VERIFICACOES = `(async () => {
          vermelho. */
       repoVerFotos('EEST-SO-APARELHO');
       for (let i = 0; i < 40; i++) {
-        if (!/baixando/.test(document.getElementById('repoPEEST-SO-APARELHO').textContent)) break;
+        if (!/baixando/.test(document.getElementById('repoPfotosEEST-SO-APARELHO').textContent)) break;
         await new Promise(r => setTimeout(r, 250));
       }
-      const pf = document.getElementById('repoPEEST-SO-APARELHO').textContent;
+      const pf = document.getElementById('repoPfotosEEST-SO-APARELHO').textContent;
       diz('  e o painel de imagens tambem oferece incluir, sem mandar trazer',
         /incluir imagens/.test(pf) && pf.indexOf('traga o exame') < 0,
         pf.replace(/\s+/g, ' ').trim().slice(0, 70));
@@ -2343,6 +2343,73 @@ const VERIFICACOES = `(async () => {
     exames = []; _repo.historico = [];
   } catch (e) {
     diz('nenhum laudo some do historico', false, e.constructor.name + ': ' + e.message);
+  }
+
+  /* ===== AS TRES CORRECOES DE 09/09 (noite) =====
+     "O botao de imagem e o botao de audio devem poder ser abertos ao mesmo tempo. As
+     imagens devem ter aquele mesmo mecanismo de expandir e reduzir conforme eu passo o
+     mouse em cima, sem necessidade de clicar nelas. E falta um botao de gerar laudo." */
+  try {
+    exames = [{ id: 5501, paciente: 'Tres Correcoes', tipo: 'mama', _quando: Date.now(),
+                _liberado: false, imagens: ['data:image/png;base64,iVBORw0KGgo='],
+                _instIds: [''], audios: [] }];
+    _repo.estudos = []; _repo.historico = [];
+    trabAbrir();
+    await new Promise(r => setTimeout(r, 250));
+    await trabPintar();
+    const k = 'S5501';
+
+    // --- 1. os dois abrem ao mesmo tempo ---
+    repoVerFotos(k);
+    await new Promise(r => setTimeout(r, 350));
+    repoOuvir(k);
+    await new Promise(r => setTimeout(r, 250));
+    const gFotos = document.getElementById('repoPfotos' + k);
+    const gAudio = document.getElementById('repoPaudio' + k);
+    diz('as fotos e o audio abrem AO MESMO TEMPO',
+      !!(gFotos && gFotos.innerHTML) && !!(gAudio && gAudio.innerHTML),
+      'fotos ' + (gFotos ? gFotos.innerHTML.length : 0) + ' / audio ' + (gAudio ? gAudio.innerHTML.length : 0));
+    diz('  e os DOIS selos ficam acesos',
+      !!document.querySelector('#repoL' + k + ' .repoSelo.img.on')
+      && !!document.querySelector('#repoL' + k + ' .repoSelo.aud.on'));
+    // fechar um NAO fecha o outro
+    repoOuvir(k);
+    await new Promise(r => setTimeout(r, 200));
+    diz('  fechar o audio NAO fecha as fotos',
+      !!document.getElementById('repoPfotos' + k).innerHTML
+      && !document.getElementById('repoPaudio' + k).innerHTML);
+
+    // --- 2. a lupa: aumenta com o mouse, sem clicar ---
+    const mini = document.querySelector('#repoPfotos' + k + ' .repoMini .dicomMini');
+    diz('as miniaturas do cartao usam a classe que a lupa vigia', !!mini);
+    const lupa = document.getElementById('dicomLupa');
+    diz('e a lupa vive FORA das telas (senao nao aparece com a tela escondida)',
+      !!lupa && !lupa.closest('[id^="tela"]'),
+      lupa ? (lupa.parentElement && lupa.parentElement.id) || 'body' : 'nao existe');
+    if (mini && lupa) {
+      mini.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 120));
+      diz('  passar o mouse AUMENTA a foto, sem clicar',
+        lupa.style.display === 'block' && lupa.classList.contains('aberta'),
+        'display ' + lupa.style.display);
+      mini.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 120));
+      diz('  e tirar o mouse reduz de volta', !lupa.classList.contains('aberta'));
+    }
+
+    // --- 3. o botao de gerar laudo ---
+    const linhaG = document.getElementById('repoL' + k);
+    diz('o cartao tem o botao GERAR LAUDO', !!linhaG && /Gerar laudo/.test(linhaG.textContent));
+    // com laudo, o lugar dele passa a ser "Revisar"
+    exames[0].laudo = { corpo: 'texto' };
+    await trabPintar();
+    const linhaG2 = document.getElementById('repoL' + k);
+    diz('  e com laudo pronto ele da lugar a "Revisar"',
+      !!linhaG2 && !/Gerar laudo/.test(linhaG2.textContent) && /Revisar/.test(linhaG2.textContent));
+    trabFechar();
+    exames = [];
+  } catch (e) {
+    diz('as tres correcoes de 09/09 (noite)', false, e.constructor.name + ': ' + e.message);
   }
 
   return R;

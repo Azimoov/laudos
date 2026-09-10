@@ -1120,6 +1120,11 @@ button.repoSelo:hover{filter:brightness(.95)}
 .repoBarra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
 .repoBt.perigo{border-color:#C0392B;color:#C0392B}
 .repoBt.perigo:hover{background:#FBECEA}
+/* "Gerar laudo" é o próximo passo óbvio de um exame que ainda não tem laudo — e por isso
+   é o único botão CHEIO da linha. Os outros são de contorno: numa lista de vinte exames,
+   dois botões cheios lado a lado deixam de indicar qualquer coisa. */
+.repoBt.forte{background:#0E6E6B;border-color:#0E6E6B;color:#fff}
+.repoBt.forte:hover{background:#0B5A57}
 .repoNota{font-size:11.5px;color:#8A93A0;margin-top:5px;display:block}
 .repoLegenda{font-size:11.5px;color:#7d8c93;margin:0 2px 10px;display:flex;gap:14px;flex-wrap:wrap}
 .repoLegenda b{font-weight:700}
@@ -2052,8 +2057,12 @@ button.repoSelo:hover{filter:brightness(.95)}
         <div class="cx">
           <div class="lb">LISTA DE EXAMES</div>
           <div id="dicomProntosLista"></div>
-          <!-- a foto ampliada mora AQUI fora, pointer-events:none — ver dicomLupaLigar. -->
-          <img id="dicomLupa" alt="">
+          <!-- ⚠️ 09/09/2026 — A LUPA MUDOU DE ENDEREÇO. Ela morava AQUI, dentro desta
+               tela. Enquanto só a tela de antigos a usava, tudo bem; mas ela passou a
+               servir também às miniaturas do cartão do exame, na lista de trabalho e no
+               painel do dia — e elemento dentro de uma tela ESCONDIDA não aparece, por
+               mais `position:fixed` que tenha. Agora ela vive solta no corpo da página,
+               no fim do arquivo, e serve a qualquer tela. -->
         </div>
       </div>
 
@@ -2491,6 +2500,11 @@ button.repoSelo:hover{filter:brightness(.95)}
 
 <!-- gravação que ficou pela metade (a janela fechou antes do "parar"): fica no topo,
      acima das abas, até o médico recuperar ou descartar. -->
+<!-- A FOTO AMPLIADA, para QUALQUER tela (09/09/2026). Vive solta aqui, e não dentro de
+     uma tela, porque elemento dentro de tela escondida não aparece — por mais que seja
+     `position:fixed`. `pointer-events:none`: ela nunca rouba o mouse de quem está
+     passando por cima da miniatura, senão o próprio aumento faria a foto piscar. -->
+<img id="dicomLupa" alt="">
 <div id="cpRecuperar" style="display:none;background:#3a1512;border-left:5px solid #e5534b;border-radius:9px;padding:10px 12px;margin:10px auto;max-width:1104px"></div>
 
 <div id="abas">
@@ -17528,7 +17542,55 @@ var _repo={estudos:null, ditados:{}, capturas:{}, liberados:{}, impressos:{}, hi
            quando:0, erro:'', carregando:false, retAudio:90};
 var _repoIndice={};      // chave da linha -> item, para os botões acharem o exame
 var _repoFotos={};       // estudo -> imagens já baixadas (não rebaixa a cada toque)
-var _repoPainel={};      // o que está aberto dentro de cada linha: 'fotos' | 'audio' | ''
+/* ⚠️ 09/09/2026 — CADA BOTÃO TEM A SUA PRÓPRIA GAVETA, e mais de uma pode ficar aberta.
+   Pedido dele: "o botão de imagem e o botão de áudio devem poder ser abertos ao mesmo
+   tempo." Até aqui `_repoPainel[chave]` guardava UM modo ('fotos' | 'audio' | ...), então
+   abrir um fechava o outro — e olhar a foto enquanto ouve o ditado, que é o gesto natural
+   de quem confere um laudo, era impossível.
+   Agora vale um mapa por linha: {fotos:true, audio:true, imprimir:false}. */
+var _repoPainel={};      // chave -> {fotos, audio, imprimir}
+var REPO_MODOS=['fotos','audio','imprimir'];
+var REPO_SELO_DO_MODO={fotos:'img', audio:'aud', imprimir:'imp'};
+function repoAberto(chave, modo){ return !!((_repoPainel[chave]||{})[modo]); }
+function repoTemAlgumAberto(chave){
+  var m=_repoPainel[chave]||{};
+  return REPO_MODOS.some(function(x){ return m[x]; });
+}
+/* A gaveta daquele modo, naquela linha. Nasce só quando é preciso — a linha traz as três
+   já desenhadas, então aqui é só encontrá-la. */
+function repoGaveta(chave, modo){ return document.getElementById('repoP'+modo+chave); }
+function repoAcender(chave, modo, aceso){
+  var s=document.querySelector('#repoL'+chave+' .repoSelo.'+REPO_SELO_DO_MODO[modo]);
+  if(s) s.classList[aceso?'add':'remove']('on');
+}
+function repoGavetasHtml(chave){
+  return REPO_MODOS.map(function(m){
+    return '<div class="repoPainel" id="repoP'+m+esc(chave)+'"></div>';
+  }).join('');
+}
+/* A LUPA NAS MINIATURAS DO CARTÃO (09/09/2026). Pedido dele: "as imagens devem ter aquele
+   mesmo mecanismo de expandir e reduzir conforme eu passo o mouse em cima, sem
+   necessidade de clicar nelas."
+   É a MESMA lupa da tela de antigos — `dicomLupaMostrar`/`dicomLupaEsconder` —, não uma
+   segunda parecida: duas lupas divergiriam no primeiro ajuste feito só de um lado.
+   O ouvinte fica no CONTAINER da lista e não em cada foto: as miniaturas nascem e morrem
+   a cada abertura de gaveta, e um ouvinte por foto vazaria um pouco a cada vez. */
+var _repoLupaLigada={};
+function repoLupaLigar(idContainer){
+  var caixa=document.getElementById(idContainer);
+  if(!caixa || _repoLupaLigada[idContainer]) return;
+  caixa.addEventListener('mouseover', function(e){
+    var im=e.target&&e.target.closest?e.target.closest('.repoMini .dicomMini'):null;
+    if(im) dicomLupaMostrar(im);
+  });
+  caixa.addEventListener('mouseout', function(e){
+    var im=e.target&&e.target.closest?e.target.closest('.repoMini .dicomMini'):null;
+    if(im) dicomLupaEsconder();
+  });
+  /* Rolar com a lupa aberta a deixaria pairando sobre a foto errada — ela some. */
+  caixa.addEventListener('scroll', dicomLupaEsconder, true);
+  _repoLupaLigada[idContainer]=true;
+}
 var _repoAberto={};      // dias abertos, para o redesenho não fechar o que ele abriu
 var _diaListaHtml='';    // a última lista do dia desenhada — ver o porquê em diaRenderLista
 
@@ -17770,9 +17832,9 @@ function repoAgrupar(itens){
    Continua valendo o espírito da regra antiga: nenhum destes quatro é enfeite — cada um
    abre alguma coisa, sempre. */
 function repoSelosHtml(it){
-  var s=[], ab=_repoPainel[it.chave]||'', k=esc(it.chave);
+  var s=[], ab=_repoPainel[it.chave]||{}, k=esc(it.chave);
 
-  s.push('<button type="button" class="repoSelo img'+(it.nImagens?'':' vazio')+(ab==='fotos'?' on':'')+'" '
+  s.push('<button type="button" class="repoSelo img'+(it.nImagens?'':' vazio')+(ab.fotos?' on':'')+'" '
     +'onclick="repoVerFotos(\''+k+'\')" title="ver, incluir ou excluir as imagens deste exame">'
     +'🖼 '+(it.nImagens ? (it.nImagens+(it.nImagens===1?' imagem':' imagens')) : 'sem imagens')+'</button>');
 
@@ -17780,7 +17842,7 @@ function repoSelosHtml(it){
      não é defeito, é a retenção que o próprio médico escolheu. Perdi essa frase na
      primeira versão deste botão e um teste a cobrou de volta: sem ela, "sem áudio" num
      exame de três meses parece coisa quebrada, e ele iria procurar um erro que não há. */
-  s.push('<button type="button" class="repoSelo aud'+(it.audio.tem?'':' vazio')+(ab==='audio'?' on':'')+'" '
+  s.push('<button type="button" class="repoSelo aud'+(it.audio.tem?'':' vazio')+(ab.audio?' on':'')+'" '
     +'onclick="repoOuvir(\''+k+'\')" title="'+(it.audio.tem
       ?'ouvir, trocar ou apagar o ditado deste exame'
       :'o áudio guardado se apaga aos '+_repo.retAudio+' dias — este já não existe. '
@@ -17797,7 +17859,7 @@ function repoSelosHtml(it){
      ver a coluna impresso_em, criada na etapa 1. Sem ele guardado em disco o sinal
      mentiria a cada abertura, e mentiria para os dois lados: reimprimir o que já saiu,
      ou não imprimir achando que já saiu. Num consultório o segundo é o caro. */
-  s.push('<button type="button" class="repoSelo '+(it.impresso?'imp':'imp vazio')+(ab==='imprimir'?' on':'')+'" '
+  s.push('<button type="button" class="repoSelo '+(it.impresso?'imp':'imp vazio')+(ab.imprimir?' on':'')+'" '
     +'onclick="repoImprimir(\''+k+'\')" title="'+(it.impresso
       ?'este laudo já foi impresso — toque para imprimir de novo'
       :'imprimir este laudo, as fotos, ou os dois')+'">'
@@ -17830,7 +17892,9 @@ async function repoGarantirExame(chave, ondeAvisar){
        peça — é ausência, e quem chamou precisa saber para dizer a coisa certa. */
     return null;
   }
-  var p=ondeAvisar||document.getElementById('repoP'+chave);
+  /* Avisa na gaveta em que ele tocou; sem saber qual, na das fotos, que e a que abre
+     junto quando o exame precisa ser baixado. */
+  var p=ondeAvisar||repoGaveta(chave,'fotos')||repoGaveta(chave,'audio');
   if(p) p.innerHTML='<span class="repoNota">abrindo o exame de <b>'+esc(it.paciente)
     +'</b> — baixando '+it.instancias.length+' imagem(ns)…</span>';
   try{
@@ -17861,7 +17925,19 @@ async function repoGarantirExame(chave, ondeAvisar){
    com dois cartões diferentes são, na prática, duas listas — que é o oposto do que esta
    reconstrução inteira está fazendo. Agora os dois saem daqui. */
 function repoBotoesHtml(it){
-  if(!it.ex) return '';           // exame ainda não aberto: os quatro sinais é que agem
+  if(it.hist) return '';          // laudo antigo: só o 3º sinal, que o abre pelo histórico
+  var k=esc(it.chave);
+  /* ⚠️ 09/09/2026 — GERAR LAUDO, pedido dele: "e falta um botão de gerar laudo."
+     Ele aparece quando ainda NÃO há laudo, e é o botão mais forte da linha: é o próximo
+     passo óbvio de um exame que já tem imagem ou ditado. Havendo laudo, o lugar dele é
+     tomado por "Revisar" e a refação passa a morar lá dentro — refazer um laudo já
+     escrito é decisão de quem o está lendo, não de quem passa os olhos na lista.
+     Vale inclusive para o exame que ainda está só no aparelho: `repoGerarLaudo` abre o
+     exame por baixo, como os outros botões, porque "o exame já está aqui". */
+  if(!it.ex || !it.ex.laudo)
+    return '<span class="repoAcoes">'
+      +'<button class="repoBt forte" onclick="repoGerarLaudo(\''+k+'\')">✨ Gerar laudo</button>'
+      +'</span>';
   var bts=[];
   if(it.ex.laudo)
     bts.push('<button class="repoBt" onclick="repoRevisar(\''+esc(it.chave)+'\')">Revisar</button>');
@@ -17902,6 +17978,32 @@ function repoReabrir(chave){
   diaReabrir(it.ex.id);                       // a regra de reabrir é uma só, e mora lá
   if(repoDeOndeVim()==='trabalho') trabPintar();
 }
+/* GERAR LAUDO a partir do cartão (09/09/2026). A geração em si é a de sempre — o que muda
+   é só o caminho até ela. */
+async function repoGerarLaudo(chave){
+  var it=_repoIndice[chave]; if(!it || it.hist) return;
+  var ex=await repoGarantirExame(chave);      // "o exame já está aqui": abre por baixo
+  if(!ex) return;
+  /* Sem imagem e sem ditado não há do que gerar laudo, e a IA inventaria um exame inteiro
+     a partir de nada. Dizer o que falta é melhor que devolver um laudo de fantasia. */
+  var temImg=(ex.imagens||[]).length, temAud=(ex.audios||[]).length || it.audio.tem;
+  if(!temImg && !temAud){
+    log('O exame de '+(it.paciente||'')+' não tem imagem nem ditado — não há do que gerar o laudo. '
+       +'Inclua as imagens ou grave o ditado nos botões do cartão.', true);
+    return;
+  }
+  log('Gerando o laudo de '+(it.paciente||'')+'…');
+  try{
+    await gerarLaudo(ex.id);
+  }catch(e){
+    log('Falha ao gerar o laudo: '+e.message, true);
+    return;
+  }
+  /* A lista se acerta sozinha: o exame que ganhou laudo troca "Gerar laudo" por "Revisar",
+     e o 3º sinal passa a poder levar à liberação. */
+  repoAtualizarSelos(chave);
+  if(repoDeOndeVim()==='trabalho') trabPintar(); else { try{ _diaListaHtml=''; diaRenderLista(); }catch(e){} }
+}
 function repoLinhaHtml(it){
   return '<div class="repoLinha" id="repoL'+esc(it.chave)+'">'
     +'<span class="hr">'+esc(it.hora||'--:--')+'</span>'
@@ -17910,7 +18012,7 @@ function repoLinhaHtml(it){
     +repoSituacaoHtml(it)
     +'<span style="flex:1 0 100%;display:flex;gap:8px;flex-wrap:wrap">'+repoBotoesHtml(it)+'</span>'
     +repoSelosHtml(it)+repoAcoesHtml(it)
-    +'<div class="repoPainel" id="repoP'+esc(it.chave)+'"></div></div>';
+    +repoGavetasHtml(it.chave)+'</div>';
 }
 /* As linhas de data. `opc.excluirDia` tira um dia da lista (no painel do dia, HOJE já
    está desenhado acima — repeti-lo seria mostrar o mesmo exame duas vezes na mesma tela).
@@ -17955,20 +18057,25 @@ function repoOrdemDia(dia){
   var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dia);
   return m ? (m[3]+m[2]+m[1]) : '0';      // 'sem data' vai para o fim
 }
-/* ---- os painéis que abrem dentro da linha ---- */
-function repoFecharPainel(chave){
-  _repoPainel[chave]='';
-  var p=document.getElementById('repoP'+chave); if(p) p.innerHTML='';
-  var l=document.getElementById('repoL'+chave);
-  if(l) l.querySelectorAll('.repoSelo.on').forEach(function(b){ b.classList.remove('on'); });
+/* ---- as gavetas que abrem dentro da linha ---- */
+/* Fecha UMA gaveta, ou todas quando não se diz qual. Só quem toca no selo fecha a sua —
+   abrir o áudio não pode mais fechar as fotos (pedido dele, 09/09/2026). */
+function repoFecharPainel(chave, modo){
+  var alvos=modo?[modo]:REPO_MODOS;
+  _repoPainel[chave]=_repoPainel[chave]||{};
+  alvos.forEach(function(m){
+    _repoPainel[chave][m]=false;
+    var g=repoGaveta(chave, m); if(g) g.innerHTML='';
+    repoAcender(chave, m, false);
+  });
 }
 async function repoVerFotos(chave){
   var it=_repoIndice[chave]; if(!it) return;
-  var p=document.getElementById('repoP'+chave); if(!p) return;
-  if(_repoPainel[chave]==='fotos'){ repoFecharPainel(chave); return; }
-  repoFecharPainel(chave);
-  _repoPainel[chave]='fotos';
-  var sel=document.querySelector('#repoL'+chave+' .repoSelo.img'); if(sel) sel.classList.add('on');
+  var p=repoGaveta(chave,'fotos'); if(!p) return;
+  if(repoAberto(chave,'fotos')){ repoFecharPainel(chave,'fotos'); return; }
+  _repoPainel[chave]=_repoPainel[chave]||{};
+  _repoPainel[chave].fotos=true;
+  repoAcender(chave,'fotos',true);
   // já estão na tela? (exame desta sessão) — não pede nada ao aparelho
   var fotos=(it.ex&&(it.ex.imagens||[]).length)?it.ex.imagens:_repoFotos[it.estudoId];
   if(!fotos){
@@ -17987,7 +18094,7 @@ async function repoVerFotos(chave){
     }
     _repoFotos[it.estudoId]=fotos;
   }
-  if(_repoPainel[chave]!=='fotos') return;      // ele fechou enquanto baixava
+  if(!repoAberto(chave,'fotos')) return;        // ele fechou enquanto baixava
   repoFotosPintar(chave, fotos);
 }
 /* ---------- BOTÃO 1 DO CARTÃO: AS IMAGENS (09/09/2026) ----------
@@ -18000,7 +18107,7 @@ async function repoVerFotos(chave){
    arquivo do serviço e não se mexe por um botão de lista. Nesse caso o painel diz o que
    fazer — trazer o exame primeiro — em vez de oferecer um botão que não cumpre. */
 function repoFotosPintar(chave, fotos, opc){
-  var it=_repoIndice[chave]; var p=document.getElementById('repoP'+chave);
+  var it=_repoIndice[chave]; var p=repoGaveta(chave,'fotos');
   if(!it || !p) return;
   var baixando=(opc||{}).baixando||0;
   /* 09/09/2026: "poder mexer" deixou de significar "já está aberto nesta janela" e passou
@@ -18010,8 +18117,12 @@ function repoFotosPintar(chave, fotos, opc){
   var podeMexer=!it.hist;
   var h='';
   if(fotos && fotos.length){
+    /* ⚠️ `dicomMini` é a classe que a LUPA vigia (ver repoLupaLigar). Pedido dele em
+       09/09: "as imagens devem ter aquele mesmo mecanismo de expandir e reduzir conforme
+       eu passo o mouse em cima, sem necessidade de clicar nelas." O clique continua
+       valendo — abre em tamanho cheio, para quem quer parar e olhar. */
     h+='<div class="repoMinis">'+fotos.map(function(u,i){
-      return '<span class="repoMini"><img src="'+u+'" onclick="ampliarImg(this)">'
+      return '<span class="repoMini"><img class="dicomMini" src="'+u+'" onclick="ampliarImg(this)">'
         +(podeMexer?('<button type="button" class="repoTirar" title="tirar esta imagem do exame" '
           +'onclick="repoImgTirar(\''+esc(chave)+'\','+i+')">✕</button>'):'')
         +'</span>'; }).join('')+'</div>'
@@ -18076,7 +18187,7 @@ async function repoImgIncluir(chave){
     var arqs=Array.prototype.slice.call(inp.files||[]);
     if(!arqs.length) return;
     if(!await repoGarantirExame(chave)) return;    // abre o exame por baixo, se preciso
-    var p=document.getElementById('repoP'+chave);
+    var p=repoGaveta(chave,'fotos');
     if(p) p.innerHTML='<span class="repoNota">lendo '+arqs.length+' arquivo(s)…</span>';
     var novas=0;
     for(var i=0;i<arqs.length;i++){
@@ -18110,8 +18221,12 @@ function repoAtualizarSelos(chave){
   var novo=document.createElement('div'); novo.innerHTML=repoSelosHtml(it);
   var pronto=novo.firstChild;
   /* O painel aberto continua aberto: o selo correspondente volta aceso. */
-  var ab=_repoPainel[chave]||'';
-  if(ab){ var s=pronto.querySelector('.repoSelo.'+(ab==='fotos'?'img':ab==='audio'?'aud':ab==='imprimir'?'imp':'')); if(s) s.classList.add('on'); }
+  var ab=_repoPainel[chave]||{};
+  REPO_MODOS.forEach(function(m){
+    if(!ab[m]) return;
+    var s=pronto.querySelector('.repoSelo.'+REPO_SELO_DO_MODO[m]);
+    if(s) s.classList.add('on');
+  });
   alvo.parentNode.replaceChild(pronto, alvo);
   try{ trabContar(); }catch(e){}
 }
@@ -18125,15 +18240,15 @@ function repoAtualizarSelos(chave){
    GRAVAR e TRAZER fazem mais falta — fechar a porta ali era fechá-la na hora do uso. */
 function repoOuvir(chave){
   var it=_repoIndice[chave]; if(!it) return;
-  var p=document.getElementById('repoP'+chave); if(!p) return;
-  if(_repoPainel[chave]==='audio'){ repoFecharPainel(chave); return; }
-  repoFecharPainel(chave);
-  _repoPainel[chave]='audio';
-  var sel=document.querySelector('#repoL'+chave+' .repoSelo.aud'); if(sel) sel.classList.add('on');
+  var p=repoGaveta(chave,'audio'); if(!p) return;
+  if(repoAberto(chave,'audio')){ repoFecharPainel(chave,'audio'); return; }
+  _repoPainel[chave]=_repoPainel[chave]||{};
+  _repoPainel[chave].audio=true;
+  repoAcender(chave,'audio',true);
   repoAudioPintar(chave);
 }
 function repoAudioPintar(chave){
-  var it=_repoIndice[chave]; var p=document.getElementById('repoP'+chave);
+  var it=_repoIndice[chave]; var p=repoGaveta(chave,'audio');
   if(!it || !p) return;
   var h='';
   /* Sem endereço não há o que tocar. Um <audio src=""> NÃO fica mudo: ele aponta para a
@@ -18236,7 +18351,7 @@ async function repoAudioAnexar(chave, arq){
       if(r===false){ log('Não consegui tirar o áudio anterior — nada foi trocado.', true); return; }
     }
   }
-  var p=document.getElementById('repoP'+chave);
+  var p=repoGaveta(chave,'audio');
   if(p) p.innerHTML='<span class="repoNota">transcrevendo o áudio…</span>';
   await adicionarAudioArquivo(it.ex.id, arq);
   await repoCarregarLeve(true);                     // o agente já sabe do áudio novo
@@ -18299,8 +18414,8 @@ function repoLiberar(chave){
   /* Sem laudo não há o que liberar, e o cartão precisa dizer o que falta em vez de abrir
      uma tela de revisão vazia — tela vazia parece defeito, e ele iria procurar o erro. */
   if(!it.ex || !it.ex.laudo){
-    var p=document.getElementById('repoP'+chave);
-    repoFecharPainel(chave);
+    repoFecharPainel(chave,'imprimir');
+    var p=repoGaveta(chave,'imprimir');
     if(p) p.innerHTML='<span class="repoNota">este exame ainda não tem laudo para liberar. '
       +(it.ex ? 'Gere o laudo primeiro (imagem e/ou áudio ao lado).'
               : 'Traga o exame para o trabalho (botões ⤵ ao lado) e gere o laudo.')+'</span>';
@@ -18327,11 +18442,11 @@ function repoLiberar(chave){
    fotos, ou apenas as fotos." */
 function repoImprimir(chave){
   var it=_repoIndice[chave]; if(!it) return;
-  var p=document.getElementById('repoP'+chave); if(!p) return;
-  if(_repoPainel[chave]==='imprimir'){ repoFecharPainel(chave); return; }
-  repoFecharPainel(chave);
-  _repoPainel[chave]='imprimir';
-  var sel=document.querySelector('#repoL'+chave+' .repoSelo.imp'); if(sel) sel.classList.add('on');
+  var p=repoGaveta(chave,'imprimir'); if(!p) return;
+  if(repoAberto(chave,'imprimir')){ repoFecharPainel(chave,'imprimir'); return; }
+  _repoPainel[chave]=_repoPainel[chave]||{};
+  _repoPainel[chave].imprimir=true;
+  repoAcender(chave,'imprimir',true);
   var temLaudo=!!(it.ex && it.ex.laudo), temFotos=it.nImagens>0, k=esc(chave);
   var h='';
   /* Laudo antigo do histórico: imprimir daqui exigiria montá-lo na área de impressão, e
@@ -18364,7 +18479,7 @@ function repoImprimir(chave){
 }
 async function repoImprimirAgora(chave, oQue){
   var it=_repoIndice[chave]; if(!it || !it.ex) return;
-  var p=document.getElementById('repoP'+chave);
+  var p=repoGaveta(chave,'imprimir');
   if(p) p.innerHTML='<span class="repoNota">preparando a impressão…</span>';
   try{
     /* O laudo precisa estar MONTADO na área de impressão antes de ser fotografado —
@@ -18386,7 +18501,7 @@ async function repoImprimirAgora(chave, oQue){
      se aberto), então zerar a marca antes é o que garante que ele ABRA — chamar duas
      vezes "para alternar de volta" funcionaria hoje e quebraria no dia em que a função
      ganhasse mais um passo. */
-  _repoPainel[chave]='';
+  repoFecharPainel(chave,'imprimir');
   repoImprimir(chave);
 }
 async function repoMarcarImpresso(chave){
@@ -18433,6 +18548,7 @@ async function repoPintar(idAlvo, opc){
     +'<p class="repoNota" style="text-align:right">'
     +'<button type="button" class="repoBt cinza" onclick="repoRedesenhar(\''+esc(idAlvo)+'\')">'
     +'↻ atualizar</button></p>';
+  repoLupaLigar(idAlvo);        // a foto aumenta com o mouse, sem clicar (09/09/2026)
 }
 var _repoOpc={};          // idAlvo -> as opções com que aquela lista foi desenhada
 function repoRedesenhar(idAlvo){
@@ -18468,6 +18584,7 @@ async function repoOutrosDiasAbrir(){
 
 function diaRenderLista(){
   var d=document.getElementById('diaLista'); if(!d) return;
+  repoLupaLigar('diaLista');    // a foto aumenta com o mouse aqui também (09/09/2026)
   repoOutrosDiasBotao();
   var lista=diaExamesDeHoje();
   diaAtualizarContador(lista);
@@ -18537,7 +18654,7 @@ function diaRenderLista(){
         +'<span style="display:flex;gap:8px;flex-wrap:wrap">'+acoes+'</span>'
         +'<div id="repoL'+it.chave+'" style="flex:1 0 100%;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
         +repoSelosHtml(it)
-        +'<div class="repoPainel" id="repoP'+it.chave+'"></div></div></div>';
+        +repoGavetasHtml(it.chave)+'</div></div>';
     }).join('');
     /* 04/09/2026 — SÓ ESCREVE SE MUDOU. Esta lista se refaz a cada 5 s, e ela tem painéis
        que ABREM dentro dela: reescrever a cada volta fecharia as fotos na cara dele e
@@ -18558,23 +18675,28 @@ function diaRenderLista(){
           as fotos voltam sem rebaixar do aparelho e o áudio continua de onde estava. */
     var comparar=htmlLista.replace(/(class="repoSelo[^"]*?) on"/g, '$1"');
     if(comparar!==_diaListaHtml){
+      /* Guarda TODAS as gavetas abertas de cada linha — desde 09/09 podem ser mais de uma
+         ao mesmo tempo (fotos e áudio, o gesto de quem confere um laudo ouvindo). */
       var abertos={};
       Object.keys(_repoPainel).forEach(function(k){
-        if(!_repoPainel[k]) return;
-        var el=document.getElementById('repoP'+k);
-        if(el && el.innerHTML) abertos[k]={modo:_repoPainel[k], html:el.innerHTML};
+        REPO_MODOS.forEach(function(m){
+          if(!repoAberto(k,m)) return;
+          var el=repoGaveta(k,m);
+          if(el && el.innerHTML){ (abertos[k]=abertos[k]||{})[m]=el.innerHTML; }
+        });
       });
       _diaListaHtml=comparar;
       d.innerHTML=htmlLista;
-      Object.keys(_repoPainel).forEach(function(k){ if(!abertos[k]) delete _repoPainel[k]; });
+      _repoPainel={};
       Object.keys(abertos).forEach(function(k){
-        var el=document.getElementById('repoP'+k);
-        if(!el){ delete _repoPainel[k]; return; }   // a linha sumiu: a marca some junto
-        el.innerHTML=abertos[k].html;
-        _repoPainel[k]=abertos[k].modo;
-        var cls=abertos[k].modo==='fotos'?'img':abertos[k].modo==='audio'?'aud':'imp';
-        var s=document.querySelector('#repoL'+k+' .repoSelo.'+cls);
-        if(s) s.classList.add('on');
+        Object.keys(abertos[k]).forEach(function(m){
+          var el=repoGaveta(k,m);
+          if(!el) return;                        // a linha sumiu: a marca some junto
+          el.innerHTML=abertos[k][m];
+          _repoPainel[k]=_repoPainel[k]||{};
+          _repoPainel[k][m]=true;
+          repoAcender(k,m,true);
+        });
       });
     }
     // som só quando um exame ENTRA em falta, não a cada 5 s: aviso repetido vira ruído

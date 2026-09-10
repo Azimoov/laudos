@@ -135,15 +135,22 @@ ok(/title="'\+\(it\.audio\.tem[\s\S]{0,220}se apaga aos '\+_repo\.retAudio/.test
 
 console.log('\n=== as fotos e o audio abrem na propria linha ===');
 const fotos = grab('repoVerFotos');
-ok(/_repoPainel\[chave\]==='fotos'/.test(fotos) && /repoFecharPainel\(chave\)/.test(fotos),
-   'tocar de novo FECHA — nao empilha galeria aberta');
+/* ⚠️ 09/09/2026 — CADA BOTAO TEM A SUA PROPRIA GAVETA, e mais de uma fica aberta.
+   Pedido dele: "o botao de imagem e o botao de audio devem poder ser abertos ao mesmo
+   tempo." Antes, _repoPainel[chave] guardava UM modo, entao abrir um FECHAVA o outro --
+   e olhar a foto enquanto ouve o ditado, que e o gesto de quem confere um laudo, era
+   impossivel. O que se cobra continua sendo: tocar de novo no MESMO selo fecha o SEU. */
+ok(/repoAberto\(chave,'fotos'\)/.test(fotos) && /repoFecharPainel\(chave,'fotos'\)/.test(fotos),
+   'tocar de novo no selo das fotos fecha a gaveta DELE');
+ok(!/repoFecharPainel\(chave\);/.test(fotos),
+   'e abrir as fotos NAO fecha as outras gavetas');
 ok(/it\.ex&&\(it\.ex\.imagens\|\|\[\]\)\.length/.test(fotos),
    'exame que ja esta na tela usa as fotos que ja tem: nao pede nada ao aparelho');
 ok(/_repoFotos\[it\.estudoId\]/.test(fotos),
    'e o que foi baixado fica guardado — nao rebaixa a cada toque');
 ok(/dicomBaixarImagem/.test(fotos), 'as demais vem do aparelho, uma a uma');
 ok(/catch\(e\)\{[^}]*\}/.test(fotos), 'foto ilegivel nao esconde as outras');
-ok(/if\(_repoPainel\[chave\]!=='fotos'\) return;/.test(fotos),
+ok(/if\(!repoAberto\(chave,'fotos'\)\) return;/.test(fotos),
    'e se ele fechar enquanto baixava, nao escreve por cima do que ele abriu depois');
 /* 09/09/2026: quem DESENHA o painel virou funcao propria (repoFotosPintar), porque agora
    ele e redesenhado tambem depois de incluir e de excluir imagem -- e nao so ao abrir.
@@ -166,7 +173,10 @@ ok(/laudo antigo/.test(pintaFotos),
 
 const ouvir = grab('repoOuvir'), pintaAudio = grab('repoAudioPintar');
 ok(/<audio controls/.test(pintaAudio), 'o audio abre num tocador de verdade');
-ok(/_repoPainel\[chave\]==='audio'/.test(ouvir), 'e o mesmo sinal fecha');
+ok(/repoAberto\(chave,'audio'\)/.test(ouvir) && /repoFecharPainel\(chave,'audio'\)/.test(ouvir),
+   'e o mesmo sinal fecha a gaveta do audio');
+ok(!/repoFecharPainel\(chave\);/.test(ouvir),
+   'sem fechar a das fotos — os dois abrem ao mesmo tempo (pedido de 09/09)');
 ok(/it\.audio\.dia\s*&&\s*it\.audio\.dia!==it\.diaIso/.test(pintaAudio),
    'quando a gravacao esta guardada em outro dia, a tela DIZ de onde veio');
 ok(/agente[\s\S]{0,40}desligado/.test(pintaAudio),
@@ -236,11 +246,11 @@ ok(/replace\(\/\(class="repoSelo\[\^"\]\*\?\) on"\/g/.test(render),
    'a comparacao IGNORA a marca de painel aberto — abrir nao e "a lista mudou"');
 ok(/if\(comparar!==_diaListaHtml\)/.test(render),
    'e so escreve quando a lista mudou DE VERDADE');
-ok(/abertos\[k\]=\{modo:_repoPainel\[k\], html:el\.innerHTML\}/.test(render),
-   'quando muda, o que estava aberto e GUARDADO antes de reescrever');
-ok(/el\.innerHTML=abertos\[k\]\.html/.test(render) && /_repoPainel\[k\]=abertos\[k\]\.modo/.test(render),
-   'e devolvido depois — as fotos voltam sem rebaixar do aparelho');
-ok(/if\(!el\)\{ delete _repoPainel\[k\]; return; \}/.test(render),
+ok(/\(abertos\[k\]=abertos\[k\]\|\|\{\}\)\[m\]=el\.innerHTML/.test(render),
+   'quando muda, TODAS as gavetas abertas sao guardadas antes de reescrever');
+ok(/el\.innerHTML=abertos\[k\]\[m\]/.test(render) && /_repoPainel\[k\]\[m\]=true/.test(render),
+   'e devolvidas depois — as fotos voltam sem rebaixar do aparelho');
+ok(/_repoPainel=\{\};/.test(render) && /if\(!el\) return;/.test(render),
    'e se a linha sumiu da lista, a marca some junto (o selo nao fica aceso mentindo)');
 ok(/_diaListaHtml=''/.test(render), 'a lista vazia tambem zera a memoria do desenho');
 
@@ -249,9 +259,14 @@ console.log('\n=== os selos valem tambem para HOJE ===');
 // voltaram a ser duas listas.
 ok(/var it=repoItem\(null, x\); _repoIndice\[it\.chave\]=it;/.test(render),
    'cada exame de hoje vira um item do repositorio');
-ok(/repoSelosHtml\(it\)/.test(render), 'e ganha os mesmos tres sinais');
-ok(/id="repoP'\+it\.chave\+'"/.test(render),
-   'com o mesmo lugar para as fotos e o audio abrirem');
+ok(/repoSelosHtml\(it\)/.test(render), 'e ganha os mesmos quatro sinais');
+/* 09/09/2026: era UM lugar (`repoP`+chave). Virou TRES, uma gaveta por botao, para as
+   fotos e o audio poderem ficar abertos ao mesmo tempo. As duas listas — a de hoje e a
+   de trabalho — usam a MESMA peca que as desenha. */
+ok(/repoGavetasHtml\(it\.chave\)/.test(render),
+   'com as mesmas tres gavetas da lista de trabalho');
+ok(/repoGavetasHtml\(it\.chave\)/.test(grab('repoLinhaHtml')),
+   'e a lista de trabalho usa exatamente a mesma peca');
 // o cartao de hoje NAO perde o que so ele tem
 ok(/faltou medir/.test(render), 'e continua avisando a medida que faltou');
 ok(/diaRevisar\(/.test(render) && /diaAbrirNaPasta\(/.test(render) && /diaReabrir\(/.test(render),

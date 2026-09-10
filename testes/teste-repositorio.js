@@ -72,11 +72,13 @@ ok(/repoOrdemDia\(b\)\.localeCompare\(repoOrdemDia\(a\)\)/.test(dias),
    'os dias mais recentes primeiro');
 ok(/ontoggle="_repoAberto\[/.test(dias),
    'o dia que ele abre fica aberto — o redesenho nao fecha na cara dele');
-ok(/opc\.excluirDia/.test(dias),
-   'da para tirar um dia da lista (no painel do dia, HOJE ja esta desenhado acima)');
+ok(/opc\.excluirDia/.test(dias), 'da para tirar um dia da lista');
+/* 10/09/2026 — A DECISAO DE 04/09 CAIU, a pedido dele. O painel do dia EXCLUIA hoje das
+   duas listas para nao repetir o paciente na mesma tela. Palavras dele: "ele deveria
+   tambem COEXISTIR em exames de hoje e na lista de trabalho". A repeticao e o pedido. */
 const outros = grab('repoOutrosDiasAbrir');
-ok(/excluirDia:repoHojeBr\(\)/.test(outros),
-   'e o painel do dia usa isso: hoje nao aparece duas vezes na mesma tela');
+ok(!/excluirDia/.test(outros),
+   'e o painel do dia NAO exclui mais hoje: o exame de hoje coexiste nas duas listas');
 ok(/regs\.length\+' exame'/.test(dias), 'a linha do dia diz quantos exames tem');
 ok(/class="hoje"/.test(dias), 'e o dia de hoje vem marcado');
 

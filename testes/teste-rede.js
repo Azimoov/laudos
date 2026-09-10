@@ -235,7 +235,13 @@ console.log('=== a corda que o prazo joga TEM de alcancar (13/08) ===');
 // tentado. Resultado: o ditado no disco, o exame na tela sem ditado, e o app respondendo
 // "nada a recuperar: os exames com ditado guardado ja estao carregados".
 // Pior: recarregar a pagina resolvia (a lista nascia vazia), e a mensagem afastava disso.
-const cap = grab(HTML, 'capRecuperarDoAgente') || HTML.slice(HTML.indexOf('var jaTem={}') - 2000, HTML.indexOf('var jaTem={}') + 4000);
+/* ⚠️ 10/09/2026 — ISTO RECORTAVA POR JANELA DE BYTES, e por isso ficou vermelho sozinho.
+   A funcao procurada ('capRecuperarDoAgente') nao existe com esse nome, entao o recorte
+   caia sempre no plano B: "2000 caracteres antes e 4000 depois de `var jaTem={}`". Uma
+   linha acrescentada em OUTRA funcao do arquivo empurrava `exames.push(ex)` para fora da
+   janela, e a verificacao de ordem acusava um defeito que nao existia.
+   Agora recorta a funcao pelo nome de verdade — o que muda dentro dela e o que importa. */
+const cap = grab(HTML, 'capRecuperar');
 ok(/\(e\.audios\|\|\[\]\)\.length/.test(cap),
    '"ja tenho" exige ter DITADO, nao so estar na tela');
 {

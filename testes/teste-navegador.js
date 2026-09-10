@@ -1729,7 +1729,7 @@ const VERIFICACOES = `(async () => {
     diz('o nome do paciente sai legivel, nao no formato do DICOM',
       (caixa.textContent.indexOf('Ana Maria') >= 0) && caixa.textContent.indexOf('ANA^MARIA') < 0);
 
-    const lAntigo = document.getElementById('repoL' + 'E' + 'R-ANTIGO');
+    const lAntigo = document.getElementById('repoLantRepo_' + 'E' + 'R-ANTIGO');
     diz('a linha do exame existe com a chave dele', !!lAntigo);
     diz('o selo das imagens diz quantas sao',
       !!lAntigo && lAntigo.querySelector('button.repoSelo.img')
@@ -1740,7 +1740,7 @@ const VERIFICACOES = `(async () => {
     diz('e o exame assinado mostra o selo de liberado',
       !!lAntigo && !!lAntigo.querySelector('.repoSelo.lib'));
 
-    const lSem = document.getElementById('repoL' + 'E' + 'R-SEMAUDIO');
+    const lSem = document.getElementById('repoLantRepo_' + 'E' + 'R-SEMAUDIO');
     /* ⚠️ 09/09/2026 — ESTA LINHA MUDOU DE LADO, e vale registrar por que.
        Ela cobrava: "sem audio guardado, o selo e cinza e NAO e botao". Era a regra certa
        enquanto o selo so servia para TOCAR o audio -- botao que nao faz nada ensina a
@@ -1759,41 +1759,54 @@ const VERIFICACOES = `(async () => {
       !!lSem && !!lSem.querySelector('.repoSelo.falta'));
     // <audio src=""> nao fica mudo: aponta para a PROPRIA PAGINA e o navegador tenta
     // tocar o programa como se fosse som
-    repoOuvir('E' + 'R-SEMAUDIO');
+    repoOuvir('antRepo_' + 'E' + 'R-SEMAUDIO');
     diz('pedir audio de quem nao tem diz isso, em vez de abrir um tocador vazio',
-      !document.querySelector('#repoPaudio' + 'E' + 'R-SEMAUDIO audio')
-      && document.getElementById('repoPaudio' + 'E' + 'R-SEMAUDIO').textContent.indexOf('não tem áudio') >= 0);
+      !document.querySelector('#repoPaudioantRepo_' + 'E' + 'R-SEMAUDIO audio')
+      && document.getElementById('repoPaudioantRepo_' + 'E' + 'R-SEMAUDIO').textContent.indexOf('não tem áudio') >= 0);
 
     // o audio ABRE de verdade, e aponta para a rota da pasta de consulta
-    repoOuvir('E' + 'R-ANTIGO');
-    const tocador = document.querySelector('#repoPaudio' + 'E' + 'R-ANTIGO audio');
+    repoOuvir('antRepo_' + 'E' + 'R-ANTIGO');
+    const tocador = document.querySelector('#repoPaudioantRepo_' + 'E' + 'R-ANTIGO audio');
     diz('tocar o selo de audio abre um tocador na propria linha', !!tocador);
     diz('e ele aponta para o audio daquele dia e daquele paciente',
       !!tocador && tocador.src.indexOf('dia=2026-09-02') >= 0
       && decodeURIComponent(tocador.src).indexOf('Ana Maria.wav') >= 0,
       tocador ? tocador.src.split('/').pop() : '');
-    repoOuvir('E' + 'R-ANTIGO');
-    diz('e tocar de novo fecha', !document.querySelector('#repoPaudio' + 'E' + 'R-ANTIGO audio'));
+    repoOuvir('antRepo_' + 'E' + 'R-ANTIGO');
+    diz('e tocar de novo fecha', !document.querySelector('#repoPaudioantRepo_' + 'E' + 'R-ANTIGO audio'));
 
     // as fotos, com o download de mentira
     const baixarAntes = window.dicomBaixarImagem;
     window.dicomBaixarImagem = async () => 'data:image/png;base64,iVBORw0KGgo=';
-    await repoVerFotos('E' + 'R-ANTIGO');
+    await repoVerFotos('antRepo_' + 'E' + 'R-ANTIGO');
     diz('o selo das imagens abre as fotos na propria linha',
-      document.querySelectorAll('#repoPfotos' + 'E' + 'R-ANTIGO img').length === 4,
-      'fotos: ' + document.querySelectorAll('#repoPfotos' + 'E' + 'R-ANTIGO img').length);
+      document.querySelectorAll('#repoPfotosantRepo_' + 'E' + 'R-ANTIGO img').length === 4,
+      'fotos: ' + document.querySelectorAll('#repoPfotosantRepo_' + 'E' + 'R-ANTIGO img').length);
     window.dicomBaixarImagem = baixarAntes;
 
-    // e no painel do dia: hoje NAO pode aparecer duas vezes
+    /* 10/09/2026 — ESTE BLOCO MUDOU DE LADO, e vale registrar por que.
+       Ele cobrava: "no painel do dia, outros dias NAO repete o dia de hoje" -- a lista
+       excluia hoje para o mesmo paciente nao aparecer duas vezes na mesma tela.
+       Palavras dele, depois de fazer um exame de teste: "na janela do painel do dia ele
+       so fica nos exames de hoje. Ele deveria tambem COEXISTIR em exames de hoje e na
+       lista de trabalho quando ainda nao tivesse sido liberado, e ir depois para o
+       historico quando ja tivesse sido liberado."
+       A repeticao continua sendo real -- e agora e o pedido: em cima o exame do dia com
+       os botoes de trabalho, embaixo o mesmo exame no lugar que diz em que pe ele esta. */
     document.getElementById('telaAntigos').style.display = 'none';
     _repoAberto = {};
-    await repoPintar('diaOutrosDias', { excluirDia: repoHojeBr(), abrirPrimeiro: true });
+    await repoPintar('diaOutrosDias', { abrirPrimeiro: true });
     const outros = document.getElementById('diaOutrosDias');
-    diz('no painel do dia, "outros dias" nao repete o dia de hoje',
-      outros.textContent.indexOf(hojeBr) < 0 && outros.textContent.indexOf('02/09/2026') >= 0);
-    diz('e mostra so os exames dos outros dias',
-      outros.querySelectorAll('.repoLinha').length === 2,
+    diz('no painel do dia, a lista mostra HOJE tambem',
+      outros.textContent.indexOf(hojeBr) >= 0 && outros.textContent.indexOf('02/09/2026') >= 0);
+    diz('e traz os exames de todos os dias, hoje inclusive',
+      outros.querySelectorAll('.repoLinha').length === 3,
       'linhas: ' + outros.querySelectorAll('.repoLinha').length);
+    /* E a etiqueta interna de cada copia leva o carimbo de quem desenhou. Sem isso, duas
+       copias do mesmo exame na pagina brigam pela mesma etiqueta e a gaveta abre na
+       copia errada -- foi o defeito que veio junto com o pedido acima. */
+    diz('cada copia tem etiqueta propria (o carimbo de quem desenhou)',
+      !!document.getElementById('repoLdiaOutrosDias_' + 'E' + 'R-ANTIGO'));
 
     // agente fora do ar: mensagem, nao lista vazia
     window.fetch = async () => { throw new Error('sem agente'); };
@@ -2074,7 +2087,7 @@ const VERIFICACOES = `(async () => {
     await new Promise(r => setTimeout(r, 250));
     await trabPintar();
 
-    const linha = (id) => document.getElementById('repoLS' + id);
+    const linha = (id) => document.getElementById('repoLtrab_S' + id);
     const selos = (id) => Array.from(linha(id).querySelectorAll('.repoSelo'));
 
     const s1 = selos(7001);
@@ -2092,21 +2105,21 @@ const VERIFICACOES = `(async () => {
       s2.map(b => b.textContent.trim()).join(' | '));
 
     // --- botao 1: imagens ---
-    repoVerFotos('S7001');
+    repoVerFotos('trab_S7001');
     await new Promise(r => setTimeout(r, 400));
-    const pImg = document.getElementById('repoPfotosS7001').textContent;
+    const pImg = document.getElementById('repoPfotostrab_S7001').textContent;
     diz('botao 1 abre e oferece INCLUIR imagens', /incluir imagens/.test(pImg));
     diz('e oferece EXCLUIR as que tem', /excluir todas/.test(pImg));
     diz('e cada foto tem o seu proprio X',
-      document.querySelectorAll('#repoPfotosS7001 .repoTirar').length === 1,
-      document.querySelectorAll('#repoPfotosS7001 .repoTirar').length + ' X para 1 foto');
+      document.querySelectorAll('#repoPfotostrab_S7001 .repoTirar').length === 1,
+      document.querySelectorAll('#repoPfotostrab_S7001 .repoTirar').length + ' X para 1 foto');
     // excluir de verdade: a foto sai do exame E o selo muda
     window.confirm = () => true;
     // ATENCAO: nada de crase neste bloco -- ele vive DENTRO de um template literal, e uma
     // crase aqui encerra o texto e quebra o arquivo inteiro (ja mordeu tres vezes).
     // repoImgTirar virou assincrona em 09/09 (ela pode precisar ABRIR o exame antes de
     // mexer nele). Sem o await, a linha abaixo media o estado de antes.
-    await repoImgTirar('S7001', 0);
+    await repoImgTirar('trab_S7001', 0);
     diz('o X tira a foto do exame', exames[0].imagens.length === 0, 'sobraram ' + exames[0].imagens.length);
     diz('e o mapa de instancias acompanha (senao a foto vai parar em outro exame)',
       exames[0]._instIds.length === 0, 'instIds: ' + exames[0]._instIds.length);
@@ -2114,9 +2127,9 @@ const VERIFICACOES = `(async () => {
       /sem imagens/.test(selos(7001)[0].textContent), selos(7001)[0].textContent.trim());
 
     // --- botao 2: audio ---
-    repoOuvir('S7002');
+    repoOuvir('trab_S7002');
     await new Promise(r => setTimeout(r, 300));
-    const pAud = document.getElementById('repoPaudioS7002').textContent;
+    const pAud = document.getElementById('repoPaudiotrab_S7002').textContent;
     diz('botao 2 ABRE mesmo sem audio (e quando gravar faz mais falta)', pAud.length > 0);
     diz('  e oferece GRAVAR novo', /gravar novo/.test(pAud));
     // "a pastinha" que ele pediu: escolher um arquivo de audio para AQUELE exame
@@ -2125,10 +2138,10 @@ const VERIFICACOES = `(async () => {
     diz('  e sem audio nao oferece apagar (nao ha o que apagar)', !/apagar/.test(pAud));
 
     // --- botao 3: liberacao ---
-    repoLiberar('S7002');   // sem laudo: explica, nao abre tela vazia
+    repoLiberar('trab_S7002');   // sem laudo: explica, nao abre tela vazia
     await new Promise(r => setTimeout(r, 200));
     diz('botao 3 sem laudo EXPLICA em vez de abrir revisao vazia',
-      /ainda não tem laudo para liberar/.test(document.getElementById('repoPimprimirS7002').textContent));
+      /ainda não tem laudo para liberar/.test(document.getElementById('repoPimprimirtrab_S7002').textContent));
     diz('  e nao trocou de tela', document.getElementById('telaTrabalho').style.display === 'block');
 
     // ja liberado: pergunta antes, e a pergunta e a que ele ditou
@@ -2137,7 +2150,7 @@ const VERIFICACOES = `(async () => {
     let perguntou = '';
     const confAntes2 = window.confirm;
     window.confirm = (m) => { perguntou = m; return false; };   // ele cancela
-    repoLiberar('S7001');
+    repoLiberar('trab_S7001');
     diz('botao 3 com laudo JA LIBERADO avisa antes', /JÁ FOI LIBERADO/.test(perguntou));
     diz('  e o aviso diz que ele volta a fazer o laudo', /FAZER O LAUDO/.test(perguntou));
     diz('  e que o exame volta para a lista de trabalho', /lista de trabalho/.test(perguntou));
@@ -2146,15 +2159,15 @@ const VERIFICACOES = `(async () => {
     window.confirm = confAntes2;
 
     // --- botao 4: impressao ---
-    repoImprimir('S7001');
+    repoImprimir('trab_S7001');
     await new Promise(r => setTimeout(r, 250));
-    const pImp = document.getElementById('repoPimprimirS7001').textContent;
+    const pImp = document.getElementById('repoPimprimirtrab_S7001').textContent;
     diz('botao 4 abre as TRES opcoes que ele pediu',
       /só o laudo/.test(pImp) && /laudo e fotos/.test(pImp) && /só as fotos/.test(pImp), pImp.trim().slice(0, 70));
     /* Este exame ficou sem fotos (o X de cima tirou a unica). Os botoes que dependem de
        foto tem de estar apagados -- e a tela tem de DIZER por que, senao botao apagado
        sem explicacao ensina a desconfiar dos outros botoes. */
-    const bts = Array.from(document.querySelectorAll('#repoPimprimirS7001 .repoBt'));
+    const bts = Array.from(document.querySelectorAll('#repoPimprimirtrab_S7001 .repoBt'));
     diz('  "so o laudo" fica disponivel', !bts[0].disabled);
     diz('  "laudo e fotos" e "so as fotos" ficam apagados (nao ha foto)',
       bts[1].disabled && bts[2].disabled);
@@ -2245,16 +2258,16 @@ const VERIFICACOES = `(async () => {
     await new Promise(r => setTimeout(r, 250));
     await trabPintar();
 
-    const linha = document.getElementById('repoLEEST-SO-APARELHO');
+    const linha = document.getElementById('repoLtrab_EEST-SO-APARELHO');
     diz('exame que so esta no aparelho aparece na lista', !!linha);
     if (linha) {
       diz('  e NAO tem mais os botoes ⤵ "para hoje"/"para antigos"',
         linha.textContent.indexOf('para hoje') < 0 && linha.textContent.indexOf('para antigos') < 0,
         linha.textContent.replace(/\s+/g, ' ').trim().slice(0, 80));
 
-      repoOuvir('EEST-SO-APARELHO');
+      repoOuvir('trab_EEST-SO-APARELHO');
       await new Promise(r => setTimeout(r, 250));
-      const pa = document.getElementById('repoPaudioEEST-SO-APARELHO').textContent;
+      const pa = document.getElementById('repoPaudiotrab_EEST-SO-APARELHO').textContent;
       diz('  tocar em "sem audio" oferece GRAVAR', /gravar novo/.test(pa), pa.replace(/\s+/g, ' ').trim().slice(0, 70));
       diz('  e oferece a pastinha de escolher arquivo', /escolher arquivo de áudio/.test(pa));
       diz('  e NAO manda trazer o exame de lugar nenhum',
@@ -2265,12 +2278,12 @@ const VERIFICACOES = `(async () => {
          botoes DEPOIS disso -- e o que se quer medir e o painel pintado, nao a frase
          "baixando...". Esperar pouco mediria o estado intermediario e daria falso
          vermelho. */
-      repoVerFotos('EEST-SO-APARELHO');
+      repoVerFotos('trab_EEST-SO-APARELHO');
       for (let i = 0; i < 40; i++) {
-        if (!/baixando/.test(document.getElementById('repoPfotosEEST-SO-APARELHO').textContent)) break;
+        if (!/baixando/.test(document.getElementById('repoPfotostrab_EEST-SO-APARELHO').textContent)) break;
         await new Promise(r => setTimeout(r, 250));
       }
-      const pf = document.getElementById('repoPfotosEEST-SO-APARELHO').textContent;
+      const pf = document.getElementById('repoPfotostrab_EEST-SO-APARELHO').textContent;
       diz('  e o painel de imagens tambem oferece incluir, sem mandar trazer',
         /incluir imagens/.test(pf) && pf.indexOf('traga o exame') < 0,
         pf.replace(/\s+/g, ' ').trim().slice(0, 70));
@@ -2282,7 +2295,7 @@ const VERIFICACOES = `(async () => {
     exames = [{ id: 7700, paciente: 'Regiane Reis Brito', tipo: 'mama', _quando: Date.now(),
                 laudo: { corpo: 'x' }, _liberado: true, imagens: ['a'] }];
     await trabPintar();
-    const c = document.getElementById('repoLS7700');
+    const c = document.getElementById('repoLtrab_S7700');
     diz('o cartao da lista tem a SITUACAO, como o de hoje',
       !!c && /revisado e assinado/.test(c.textContent));
     diz('  e o botao Revisar', !!c && /Revisar/.test(c.textContent));
@@ -2343,7 +2356,7 @@ const VERIFICACOES = `(async () => {
                          ts: Date.now() - 5 * 86400000 }];
     await trabPintar();
     // a chave do item do historico e 'H' + o id do registro -> a linha e 'repoL' + chave
-    const lin = document.getElementById('repoLHSO-1');
+    const lin = document.getElementById('repoLtrab_HSO-1');
     diz('o laudo antigo tem cartao proprio na lista', !!lin);
     if (lin) {
       const b = Array.from(lin.querySelectorAll('.repoSelo')).map(x => x.textContent.trim());
@@ -2369,7 +2382,7 @@ const VERIFICACOES = `(async () => {
     trabAbrir();
     await new Promise(r => setTimeout(r, 250));
     await trabPintar();
-    const k = 'S5501';
+    const k = 'trab_S5501';
 
     // --- 1. os dois abrem ao mesmo tempo ---
     repoVerFotos(k);

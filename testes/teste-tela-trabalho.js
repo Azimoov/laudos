@@ -142,8 +142,12 @@ ok(/id="diaOutrosDias"/.test(DIA), 'e "OUTROS DIAS" continua la');
 const outros = grab('repoOutrosDiasAbrir');
 ok(/duasListasHtml\('dia2'\)/.test(outros) && /duasListasPintar\('dia2'/.test(outros),
    'que agora abre AS DUAS listas, pela mesma peca da tela de Trabalho');
-ok(/excluirDia:repoHojeBr\(\)/.test(outros),
-   'sem repetir HOJE, que ja esta desenhado logo acima na mesma tela');
+/* 10/09/2026 — mudou a pedido dele: HOJE passou a entrar aqui tambem. Ver a nota em
+   repoOutrosDiasAbrir. O nome do botao mudou junto, senao ele prometeria menos do que faz. */
+ok(!/excluirDia/.test(outros),
+   'e HOJE entra: o exame do dia coexiste em "exames de hoje" e na lista de trabalho');
+ok(/Ver a lista de trabalho e o hist/.test(grab('repoOutrosDiasBotao')),
+   'e o botao deixou de prometer so "outros dias"');
 
 console.log('\n=== 10. o que foi removido nao levou junto a capacidade ===');
 /* Remover um botao a pedido e uma coisa; remover o unico caminho para algo e outra. */

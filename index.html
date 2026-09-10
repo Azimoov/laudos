@@ -9631,6 +9631,11 @@ async function capOrtProcessar(est, forcar){
   exames.push(ex);
   log('Exame recebido do aparelho: '+ex.paciente+' ('+imagens.length+' imagens, cadastro do DICOM).');
   renderExames(); capRenderNovos();
+  /* 10/09/2026 — O EXAME APARECE NA LISTA DE TRABALHO NA HORA EM QUE CAI, sem ele ter de
+     tocar em "atualizar". Palavras dele: "ele deveria também coexistir em exames de hoje
+     e na lista de trabalho". Redesenhar aqui é seguro porque a lista só se reescreve se
+     tiver MUDADO de verdade, e as gavetas abertas voltam abertas (ver repoEscreverLista). */
+  try{ trabPintar(); }catch(_){}
   try{ marcarExamesAnteriores(); }catch(_){}
   // o agente estava gravando (ou tem pré-buffer): fecha o exame e traz o ditado já transcrito
   if(capAgenteMic){
@@ -17504,6 +17509,10 @@ function diaAbrir(){
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
   faixaGravandoPintar();
   diaAtualizar();
+  /* As duas listas aqui de baixo não entram no relógio de 5 s de propósito: elas desenham
+     TODOS os dias, e refazê-las a cada volta seria caro à toa. Elas se acertam quando algo
+     acontece de verdade — chegou exame, um laudo foi liberado — e aqui, ao entrar. */
+  if(repoOutrosDiasAberto()) duasListasPintar('dia2');
   if(!_diaTimer) _diaTimer=setInterval(diaAtualizar, 5000);
   if(!_diaSeg) _diaSeg=setInterval(diaFaixa, 1000);      // o relógio anda de segundo em segundo
   if(!_ondaFeed) _ondaFeed=setInterval(ondaAlimentar, 400);
@@ -18062,13 +18071,7 @@ function repoSituacaoHtml(it){
    direto: aquelas fecham o painel do dia e mandam o "Voltar" devolver para lá — e quem
    tocou aqui está na lista de trabalho, ou no painel do dia. Estas duas descobrem de onde
    vieram. */
-function repoDeOndeVim(){
-  try{
-    var t=document.getElementById('telaTrabalho');
-    if(t && getComputedStyle(t).display!=='none') return 'trabalho';
-  }catch(e){}
-  return 'dia';
-}
+function repoDeOndeVim(){ return telaNoAr('telaTrabalho') ? 'trabalho' : 'dia'; }
 function repoRevisar(chave){
   var it=_repoIndice[chave]; if(!it || !it.ex) return;
   var de=repoDeOndeVim();
@@ -18079,7 +18082,7 @@ function repoRevisar(chave){
 function repoReabrir(chave){
   var it=_repoIndice[chave]; if(!it || !it.ex) return;
   diaReabrir(it.ex.id);                       // a regra de reabrir é uma só, e mora lá
-  if(repoDeOndeVim()==='trabalho') trabPintar();
+  trabPintar();                               // ele volta do histórico para a fila, nas duas telas
 }
 /* GERAR LAUDO a partir do cartão (09/09/2026). A geração em si é a de sempre — o que muda
    é só o caminho até ela. */
@@ -18105,7 +18108,8 @@ async function repoGerarLaudo(chave){
   /* A lista se acerta sozinha: o exame que ganhou laudo troca "Gerar laudo" por "Revisar",
      e o 3º sinal passa a poder levar à liberação. */
   repoAtualizarSelos(chave);
-  if(repoDeOndeVim()==='trabalho') trabPintar(); else { try{ _diaListaHtml=''; diaRenderLista(); }catch(e){} }
+  trabPintar();                               // as duas listas, onde quer que estejam
+  if(repoDeOndeVim()!=='trabalho'){ try{ _diaListaHtml=''; diaRenderLista(); }catch(e){} }
 }
 function repoLinhaHtml(it){
   return '<div class="repoLinha" id="repoL'+esc(it.chave)+'">'
@@ -18117,9 +18121,9 @@ function repoLinhaHtml(it){
     +repoSelosHtml(it)+repoAcoesHtml(it)
     +repoGavetasHtml(it.chave)+'</div>';
 }
-/* As linhas de data. `opc.excluirDia` tira um dia da lista (no painel do dia, HOJE já
-   está desenhado acima — repeti-lo seria mostrar o mesmo exame duas vezes na mesma tela).
-   `opc.abrirPrimeiro` deixa o dia mais recente aberto. */
+/* As linhas de data. `opc.excluirDia` tira um dia da lista.
+   `opc.abrirPrimeiro` deixa o dia mais recente aberto.
+   `opc.idp` é o carimbo de quem está desenhando — ver a nota logo abaixo. */
 function repoDiasHtml(opc){
   opc=opc||{};
   /* 09/09/2026 — O MESMO DESENHO, DUAS LISTAS. Pedido dele: a tela de Trabalho mostra a
@@ -18130,6 +18134,24 @@ function repoDiasHtml(opc){
   var itens=repoItens();
   if(opc.filtro==='trabalho')  itens=itens.filter(function(it){ return !it.liberado; });
   if(opc.filtro==='historico') itens=itens.filter(function(it){ return  it.liberado; });
+  /* ⚠️ 10/09/2026 — CADA DESENHO GANHA A SUA PRÓPRIA CHAVE, e isto não é enfeite.
+     O mesmo exame passou a estar desenhado em MAIS DE UM LUGAR ao mesmo tempo: na tela
+     de Trabalho e na lista do painel do dia. As duas usavam a mesma chave, logo a mesma
+     etiqueta interna (o mesmo `id`) — e o navegador, diante de duas etiquetas iguais,
+     entrega sempre a PRIMEIRA que encontra na página, que costuma ser a da tela que ele
+     deixou para trás. Efeito prático: ele tocava no selo de imagem e a gaveta abria numa
+     tela escondida. O toque não fazia nada, e nada explicava por quê.
+     Carimbando a chave com o nome do lugar, cada cópia passa a ter etiqueta própria.
+     `_repoIndice` registra a cópia carimbada, e todo o resto continua funcionando sem
+     saber que isso existe — o resto só conhece a chave, seja ela qual for. */
+  if(opc.idp){
+    itens=itens.map(function(it){
+      var c={}; for(var k in it){ if(Object.prototype.hasOwnProperty.call(it,k)) c[k]=it[k]; }
+      c.chave=opc.idp+it.chave;
+      _repoIndice[c.chave]=c;
+      return c;
+    });
+  }
   var por=repoAgrupar(itens);
   var dias=Object.keys(por).filter(function(d){ return d!==opc.excluirDia; })
     .sort(function(a,b){ return repoOrdemDia(b).localeCompare(repoOrdemDia(a)); });
@@ -18556,8 +18578,13 @@ function repoLiberar(chave){
      histórico com uma revisão em curso por cima. O aviso acima é o que torna isso
      honesto: ele foi avisado do que ia acontecer antes de acontecer. */
   if(it.liberado) it.ex._liberado=false;
-  _rev2Origem='trabalho';
-  trabFechar(true);
+  /* 10/09/2026 — VOLTA PARA ONDE ELE ESTAVA. Isto mandava sempre para a tela de Trabalho,
+     mesmo tendo sido tocado no painel do dia: ele liberava um laudo do painel e o "Voltar"
+     o largava noutra tela. Passou a despedir-se pela mesma porta por onde entrou, igual ao
+     "Revisar" logo acima. */
+  var de=repoDeOndeVim();
+  _rev2Origem=de;
+  if(de==='trabalho') trabFechar(true); else diaFechar();
   rev2Abrir(it.ex.id);
 }
 
@@ -18656,7 +18683,10 @@ async function repoTrazer(chave, destino){
 /* ---- as duas casas da mesma lista ---- */
 async function repoPintar(idAlvo, opc){
   var d=document.getElementById(idAlvo); if(!d) return;
-  d.innerHTML='<div class="repoVazio">procurando os exames guardados…</div>';
+  /* "procurando…" SÓ quando ainda não há nada desenhado ali. Escrevê-lo por cima de uma
+     lista pronta apagaria as gavetas abertas antes mesmo de sabermos se algo mudou — e
+     esta lista se refaz sozinha quando chega exame novo. */
+  if(!d.firstChild) d.innerHTML='<div class="repoVazio">procurando os exames guardados…</div>';
   await repoCarregar((opc||{}).forcar);
   if(_repo.erro && !(_repo.estudos||[]).length){
     d.innerHTML='<div class="repoVazio">não consegui falar com o agente ('+esc(_repo.erro)+'). '
@@ -18668,12 +18698,56 @@ async function repoPintar(idAlvo, opc){
      texto. Cada opção nova (agora o `filtro`) pedia mais um pedaço, e o dia em que uma
      delas trouxer uma aspa a tela quebra sem aviso. Agora a tela lembra com o que foi
      desenhada, e o botão só diz "de novo, buscando do zero". */
-  _repoOpc[idAlvo]=opc||{};
-  d.innerHTML=repoDiasHtml(opc)
+  opc=opc||{};
+  /* O carimbo de quem desenhou — ver a nota em repoDiasHtml. Quem chama pode dar o seu
+     (as duas colunas de uma mesma tela usam o MESMO carimbo, porque o exame está numa
+     coluna ou na outra, nunca nas duas); quem não dá, ganha o nome do próprio lugar. */
+  if(!opc.idp) opc.idp=idAlvo+'_';
+  _repoOpc[idAlvo]=opc;
+  repoEscreverLista(d, repoDiasHtml(opc)
     +'<p class="repoNota" style="text-align:right">'
     +'<button type="button" class="repoBt cinza" onclick="repoRedesenhar(\''+esc(idAlvo)+'\')">'
-    +'↻ atualizar</button></p>';
+    +'↻ atualizar</button></p>', opc.idp);
   repoLupaLigar(idAlvo);        // a foto aumenta com o mouse, sem clicar (09/09/2026)
+}
+/* ⚠️ SÓ ESCREVE SE MUDOU (10/09/2026) — a mesma proteção que o painel do dia ganhou em
+   09/09, e pelo mesmo motivo, que ele já relatou uma vez: "clico em Imagem ou no Áudio,
+   ele abre e, alguns segundos depois, fecha sozinho."
+   Estas listas se refazem quando chega exame novo ou quando um laudo é liberado, e dentro
+   delas há GAVETAS ABERTAS (as fotos, o áudio tocando). Reescrever a cada volta fecharia
+   as fotos na cara dele e cortaria o ditado no meio da frase.
+   Duas regras, e as duas precisam valer:
+   1) a comparação IGNORA a marca `on` do selo. Abrir uma gaveta MUDA o desenho (o selo
+      acende), e sem esta ressalva o próprio ato de abrir mandaria reescrever tudo — quem
+      fechava a gaveta dele era o dedo dele mesmo, cinco segundos depois;
+   2) quando a lista muda DE VERDADE, o que estava aberto é guardado e devolvido depois
+      de reescrever — as fotos voltam sem rebaixar do aparelho.
+   O `idp` limita a varredura às gavetas DESTE desenho: as da outra tela não são mexidas. */
+var _repoHtml={};
+function repoEscreverLista(d, html, idp){
+  var comparar=html.replace(/(class="repoSelo[^"]*?) on"/g, '$1"');
+  if(comparar===_repoHtml[d.id] && d.firstChild) return;
+  var abertos={};
+  Object.keys(_repoPainel).forEach(function(k){
+    if(idp && k.indexOf(idp)!==0) return;
+    REPO_MODOS.forEach(function(m){
+      if(!repoAberto(k,m)) return;
+      var el=repoGaveta(k,m);
+      if(el && el.innerHTML){ (abertos[k]=abertos[k]||{})[m]=el.innerHTML; }
+    });
+  });
+  _repoHtml[d.id]=comparar;
+  d.innerHTML=html;
+  Object.keys(abertos).forEach(function(k){
+    Object.keys(abertos[k]).forEach(function(m){
+      var el=repoGaveta(k,m);
+      if(!el){ if(_repoPainel[k]) _repoPainel[k][m]=false; return; }  // a linha saiu: a marca sai junto
+      el.innerHTML=abertos[k][m];
+      _repoPainel[k]=_repoPainel[k]||{};
+      _repoPainel[k][m]=true;
+      repoAcender(k,m,true);
+    });
+  });
 }
 var _repoOpc={};          // idAlvo -> as opções com que aquela lista foi desenhada
 function repoRedesenhar(idAlvo){
@@ -18687,24 +18761,40 @@ function repoRedesenhar(idAlvo){
 function repoOutrosDiasBotao(){
   var d=document.getElementById('diaOutrosDias'); if(!d) return;
   if(d.getAttribute('data-aberto')==='1') return;      // já aberto: não desfaz
+  /* 10/09/2026 — O NOME MUDOU JUNTO COM O QUE ELE FAZ. Era "Ver os exames de outros
+     dias", e a partir de hoje HOJE também entra. Botão que faz mais do que o nome diz é
+     o começo de não confiar no nome de nenhum botão. */
   d.innerHTML='<button type="button" class="repoBt cinza" style="width:100%;padding:12px" '
-    +'onclick="repoOutrosDiasAbrir()">▶ Ver os exames de outros dias</button>';
+    +'onclick="repoOutrosDiasAbrir()">▶ Ver a lista de trabalho e o histórico</button>';
 }
 /* 09/09/2026, pedido dele: este botão passou a abrir AS DUAS LISTAS — trabalho à
    esquerda, histórico à direita —, as mesmas da tela de Trabalho e desenhadas pela mesma
    peça (`duasListasHtml`/`duasListasPintar`, prefixo 'dia2').
-   ⚠️ HOJE CONTINUA DE FORA, e isso é de propósito. Cheguei a tirar essa exclusão, achando
-   que a fila de trabalho mentiria por omissão sem os exames de hoje. Um teste lembrou por
-   quê ela existe (04/09): os exames de hoje já estão desenhados AQUI EM CIMA, em "EXAMES
-   DE HOJE", e mostrá-los de novo logo abaixo poria o mesmo paciente duas vezes na mesma
-   tela. E o botão se chama "Ver os exames de OUTROS dias" — fazer diferente do que o
-   nome promete é o começo de não confiar mais no nome de nenhum botão.
-   Quem quer as duas listas COM hoje tem a tela de Trabalho, onde elas são a tela toda. */
+
+   ⚠️ 10/09/2026 — HOJE ENTROU, E A DECISÃO DE 04/09 CAIU. Palavras dele, depois de fazer
+   um exame de teste: "na janela do painel do dia ele só fica nos exames de hoje. Ele
+   deveria também COEXISTIR em exames de hoje e na lista de trabalho quando ainda não
+   tivesse sido liberado, e ir depois para o histórico quando já tivesse sido liberado."
+   Até aqui hoje era excluído (`excluirDia:repoHojeBr()`) para o mesmo paciente não
+   aparecer duas vezes na mesma tela. A repetição é real — e é justamente o que ele
+   quer: em cima, o exame do dia com os botões de trabalho; embaixo, o mesmo exame no
+   lugar que mostra em que pé ele está, com o resto da semana em volta. As duas listas
+   passaram a responder "onde está cada laudo", e uma fila de trabalho sem os exames de
+   hoje mentia por omissão logo no dia mais importante.
+   Duas coisas foram junto, e sem elas isto viraria defeito:
+   · o botão mudou de nome (não promete mais só "outros dias");
+   · cada desenho carimba as suas próprias etiquetas (`opc.idp`, em `repoDiasHtml`) —
+     sem isso, duas cópias do mesmo exame na página brigavam pela mesma etiqueta e a
+     gaveta abria na cópia errada. */
 async function repoOutrosDiasAbrir(){
   var d=document.getElementById('diaOutrosDias'); if(!d) return;
   d.setAttribute('data-aberto','1');
   d.innerHTML=duasListasHtml('dia2');
-  await duasListasPintar('dia2', {excluirDia:repoHojeBr()});
+  await duasListasPintar('dia2');
+}
+function repoOutrosDiasAberto(){
+  var d=document.getElementById('diaOutrosDias');
+  return !!(d && d.getAttribute('data-aberto')==='1');
 }
 
 function diaRenderLista(){
@@ -21521,19 +21611,21 @@ function duasListasHtml(pref){
       +'<div id="'+pref+'RepoHistorico"></div></div>'
     +'</div>';
 }
-/* `opc.excluirDia` tira um dia das duas colunas. Existe por causa do painel do dia: lá
-   os exames de HOJE já estão desenhados logo acima, em "EXAMES DE HOJE", e repeti-los
-   aqui embaixo mostraria o MESMO paciente duas vezes na mesma tela — foi a decisão de
-   04/09 e continua valendo. O botão até se chama "Ver os exames de OUTROS dias".
-   Na tela de Trabalho não se exclui nada: lá as duas listas são a tela inteira. */
+/* `opc.excluirDia` tira um dia das duas colunas. Ninguém usa hoje — o painel do dia usava,
+   para não repetir os exames de hoje, e ele mandou o contrário em 10/09 (ver a nota em
+   `repoOutrosDiasAbrir`). Fica porque é barato e porque "esconder um dia" é o tipo de
+   pedido que volta.
+   ⚠️ AS DUAS COLUNAS COMPARTILHAM O CARIMBO (`idp`), e de propósito: o exame está numa
+   OU na outra, nunca nas duas, então não há choque — e assim quem procura a linha de um
+   exame não precisa adivinhar em qual coluna ele caiu hoje. */
 async function duasListasPintar(pref, opc){
   var fora=(opc||{}).excluirDia;
   /* As duas em paralelo, e não uma esperando a outra: elas leem a MESMA lista já
      carregada, e serializar aqui só faria a tela aparecer em dois tempos. */
   await Promise.all([
-    repoPintar(pref+'RepoTrabalho', {filtro:'trabalho', abrirPrimeiro:true, excluirDia:fora,
+    repoPintar(pref+'RepoTrabalho', {filtro:'trabalho', abrirPrimeiro:true, excluirDia:fora, idp:pref+'_',
       vazio:'Nenhum exame esperando. Tudo que foi feito está no histórico, ao lado.'}),
-    repoPintar(pref+'RepoHistorico', {filtro:'historico', abrirPrimeiro:true, excluirDia:fora,
+    repoPintar(pref+'RepoHistorico', {filtro:'historico', abrirPrimeiro:true, excluirDia:fora, idp:pref+'_',
       vazio:'Nenhum laudo liberado ainda. Eles chegam aqui quando você assina.'})
   ]);
   duasListasContar(pref);
@@ -21550,7 +21642,25 @@ function duasListasContar(pref){
 /* Quem mexe num exame (liberar, imprimir, apagar áudio) chama isto: as duas colunas se
    acertam juntas, em QUALQUER tela onde estejam desenhadas — inclusive a travessia de um
    exame da esquerda para a direita. */
-async function trabPintar(){ await duasListasPintar('trab'); }
+/* ⚠️ 10/09/2026 — AS DUAS LISTAS VIVEM EM DOIS LUGARES, e quem mexe num exame não sabe
+   em qual deles ele está olhando. Desde que os exames de hoje entraram na lista do painel
+   do dia, o mesmo exame pode estar desenhado na tela de Trabalho E no painel — e a
+   travessia da esquerda para a direita (liberar) tem de acontecer nos dois, senão ele
+   libera o laudo aqui e continua vendo "a liberar" ali.
+   Só se redesenha o que está NA TELA: pintar uma lista escondida é trabalho jogado fora,
+   e ela se refaz sozinha ao ser aberta. */
+async function trabPintar(){
+  var tarefas=[];
+  if(telaNoAr('telaTrabalho')) tarefas.push(duasListasPintar('trab'));
+  if(telaNoAr('telaDia') && repoOutrosDiasAberto()) tarefas.push(duasListasPintar('dia2'));
+  await Promise.all(tarefas);
+}
+function telaNoAr(id){
+  try{
+    var t=document.getElementById(id);
+    return !!(t && getComputedStyle(t).display!=='none');
+  }catch(e){ return false; }
+}
 function trabContar(){ duasListasContar('trab'); duasListasContar('dia2'); }
 
 function abVoltarInicio(){

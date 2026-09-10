@@ -8,6 +8,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{
+  /* ===== LARGURA DAS TELAS (10/09/2026) =====
+     Ele trabalha num notebook E num monitor de 29" (ultrawide), e o programa é para ser
+     vendido: não pode haver número escolhido para UMA máquina. Então a largura acompanha
+     a janela e só encontra um TETO — nunca uma medida fixa.
+
+     `calc(100% - 40px)` e não `vw`: `vw` conta a barra de rolagem junto, e numa tela onde
+     ela aparece o conteúdo passa a ser 15 px mais largo que o espaço útil — a página
+     ganha uma segunda barra, horizontal, que é o defeito clássico deste ajuste. O 100%
+     aqui é o da própria tela, que já desconta a barra.
+
+     POR QUE TETOS DIFERENTES, e não um só: cada tela usa a largura para coisa diferente.
+       · LISTA  — a tela de Trabalho, com as duas listas lado a lado. É a que mais ganha:
+                  largura vira coluna, e coluna vira exame inteiro numa linha só.
+       · PAINEL — coluna única de cartões (o painel do dia). Esticada demais, o nome fica
+                  num canto e os botões no outro, com um vão morto no meio: o olho passa
+                  a viajar para ler uma linha só.
+       · PORTA  — a abertura, com dois botões grandes. Botão de dois palmos não fica
+                  melhor por ser maior; fica estranho.
+       · LEITURA— onde se LÊ texto corrido (a liberação do laudo). NÃO alarga, e é
+                  decisão de leitura, não de gosto: linha muito longa cansa porque o olho
+                  perde o começo da seguinte. E a folha do laudo tem forma de A4 — quem
+                  manda na largura dela é o papel, não o monitor. */
+  --larg-lista: 1720px;
+  --larg-painel: 1320px;
+  --larg-porta: 1040px;
+  --larg-leitura: 920px;
+  --larg-folga: 40px;      /* respiro dos dois lados, para a folha não colar na borda */
+
   /* MODO ESCURO — identidade "dashboard" (fundo grafite, cards escuros, acentos vivos) */
   --fundo:#0e1116;--superficie:#161a22;--superficie-2:#1d232e;--borda:#262c37;
   --azul:#2e7cd6;--azul-escuro:#2265b3;--azul-claro:#16283e;--acento:#6db3ff;
@@ -433,7 +461,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
   color:var(--ink-2);font:inherit;font-size:12.5px;padding:5px 10px;cursor:pointer;
   margin:0 12px 14px;width:calc(100% - 24px);text-align:left}
 #telaModelos .mdVoltar:hover{border-color:var(--doppler);color:var(--doppler)}
-#telaModelos .main{padding:30px 34px 60px;max-width:1180px}
+#telaModelos .main{padding:30px 34px 60px;max-width:var(--larg-painel);width:calc(100% - var(--larg-folga));margin:0 auto}
 #telaModelos .head{margin-bottom:6px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
 #telaModelos h1{font-size:25px;font-weight:600;letter-spacing:-.015em;margin:0}
 #telaModelos .mdConta{font-family:var(--mono);font-size:12px;color:var(--muted);
@@ -709,7 +737,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 <style>
 #telaAbertura{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif}
-#telaAbertura .ab-folha{max-width:920px;margin:20px auto;background:#FAFBFC;
+#telaAbertura .ab-folha{max-width:var(--larg-porta);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaAbertura .ab-topo{background:#0E3A40;color:#fff;padding:16px 28px;
   display:flex;align-items:center;justify-content:space-between}
@@ -859,7 +887,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 <style>
 #telaTrabalho{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
-#telaTrabalho .ab-folha{max-width:1180px;margin:20px auto;background:#FAFBFC;
+#telaTrabalho .ab-folha{max-width:var(--larg-lista);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaTrabalho .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;
   display:flex;align-items:center;gap:14px}
@@ -994,7 +1022,7 @@ body.calc2Ativa .calcRes{background:#E6F4F2;border-left-color:#0E6E6B;color:#174
 <style>
 #telaDia{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
-#telaDia .ab-folha{max-width:920px;margin:20px auto;background:#FAFBFC;
+#telaDia .ab-folha{max-width:var(--larg-painel);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaDia .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;display:flex;align-items:center;gap:14px}
 #telaDia .pt{width:14px;height:14px;border-radius:50%;background:#FF5A52;flex:0 0 14px}
@@ -1200,7 +1228,15 @@ button.repoSelo:hover{filter:brightness(.95)}
 <style>
 #telaRev2{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
-#telaRev2 .ab-folha{max-width:920px;margin:20px auto;background:#FAFBFC;
+/* ⚠️ ESTA TELA NÃO ALARGA, E É DE PROPÓSITO (10/09/2026).
+   Todas as outras passaram a acompanhar o monitor; esta ficou. Aqui ele LÊ o laudo, e
+   linha muito longa cansa: o olho perde o começo da linha seguinte no caminho de volta.
+   A medida confortável fica em torno de 65-75 caracteres, que é o que esta largura dá.
+   E a folha do laudo tem forma de A4 — quem manda na largura dela é o papel. Alargar não
+   mostraria mais nada; esticaria a moldura em volta de uma folha do mesmo tamanho.
+   Quem mexer nisto um dia: não é esquecimento, é decisão, conversada com o médico. */
+#telaRev2 .ab-folha{max-width:var(--larg-leitura);width:calc(100% - var(--larg-folga));
+  margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaRev2 .ab-topo{background:#0E3A40;color:#fff;padding:14px 26px;display:flex;align-items:center;gap:10px}
 #telaRev2 .ab-topo .tit{flex:1;font-size:16px;font-weight:700}
@@ -1570,7 +1606,7 @@ button.repoSelo:hover{filter:brightness(.95)}
    aconteceu ao criar esta aqui, em 19/08/2026. O teste pegou. */
 #telaHistorico{position:fixed;inset:0;z-index:9000;background:#EEF1F4;overflow:auto;
   font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;display:none}
-#telaHistorico .ab-folha{max-width:1060px;margin:20px auto;background:#FAFBFC;
+#telaHistorico .ab-folha{max-width:var(--larg-lista);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaHistorico .ab-topo{background:#0E3A40;color:#fff;padding:16px 26px;
   display:flex;align-items:center;gap:14px}
@@ -1594,7 +1630,7 @@ button.repoSelo:hover{filter:brightness(.95)}
 #telaHistorico .lin .nome{flex:1;min-width:180px;font-size:14px;color:#1C2430}
 #telaHistorico .lin .tag{background:#EDF1F4;border-radius:12px;padding:2px 9px;font-size:11.5px;color:#4A5560}
 #telaHistorico .lin .selo{background:#E4F1EA;color:#1F6B45;border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:600}
-#telaAntigos .ab-folha{max-width:1060px;margin:20px auto;background:#FAFBFC;
+#telaAntigos .ab-folha{max-width:var(--larg-lista);width:calc(100% - var(--larg-folga));margin:20px auto;background:#FAFBFC;
   border:1px solid #DFE3E8;border-radius:14px;overflow:hidden}
 #telaAntigos .ab-topo{background:#0E3A40;color:#fff;padding:16px 26px;
   display:flex;align-items:center;gap:14px}

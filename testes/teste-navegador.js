@@ -109,11 +109,14 @@ async function rodarNaPagina(cdp, expr) {
 //     so depois de voce perder a rodada. As duas mordidas de 09/09 foram exatamente
 //     assim: eu citei o nome de uma funcao entre crases, num comentario, por habito.
 //     Para citar codigo aqui, use aspas: "on", "repoImgTirar".
-//     Confira antes de rodar:
-//       node -e "const s=require('fs').readFileSync('teste-navegador.js','utf8');
-//                const i=s.indexOf('const VERIFICACOES'), f=s.lastIndexOf('})()');
-//                console.log((s.slice(i+22,f).match(/./g)||[]).length)"
-//     (o mesmo, em uma linha: contar crases entre o inicio e o fim do template; tem de dar 0)
+//     CONFIRA ANTES DE RODAR, com uma linha que nao erra:
+//
+//         node --check testes/teste-navegador.js
+//
+//     Silencio = o arquivo compila. Uma crase perdida aparece ali na hora, com a linha.
+//     (A 1a versao deste aviso mandava CONTAR as crases entre o inicio e o fim do
+//     template. A conta pegava as duas proprias delimitadoras e dava "2" com o arquivo
+//     perfeito -- um conferidor que grita com o arquivo certo ensina a ignorar o grito.)
 //
 // (B) A BARRA INVERTIDA e consumida pela template string ANTES de o codigo chegar ao
 //     navegador:
@@ -1182,12 +1185,21 @@ const VERIFICACOES = `(async () => {
     // a foto da tela certa. As duas tem contador hoje; a que importa e esta.
     const _exDia = exames.slice();
     exames.length = 0;
-    const agora = Date.now();
+    /* ⚠️ AS HORAS SAO ANCORADAS NO COMECO DO DIA, NAO EM "AGORA MENOS X MINUTOS".
+       10/09/2026, 00:09 — esta secao ficou vermelha e nao era defeito do programa: ela
+       montava os exames em "agora menos 10, 9, 8 e 7 minutos", e passada a meia-noite os
+       mais antigos caem em ONTEM. A funcao diaExamesDeHoje os exclui, com toda a razao: exame de
+       23h59 nao e exame de hoje as 00h09. Tres dos quatro sobreviviam, e a suite acusava
+       o programa por estar certo.
+       Ancorando em "hoje as 8h + i minutos", a ordem entre eles se mantem (que e o que se
+       testa) e nenhuma hora atravessa a virada do dia, seja qual for a hora em que a
+       bateria rodar. Estar no futuro nao atrapalha: o filtro so pergunta se e do dia. */
+    const _inicioDoDia = new Date(); _inicioDoDia.setHours(8, 0, 0, 0);
     [['Jose', 'prostata', true, true], ['Antonia', 'transvaginal', true, true],
      ['Marinete', 'abdominal', true, false], ['RecemChegado', 'mama', false, false]]
       .forEach(([nome, tipo, temLaudo, liberado], i) => {
         exames.push({ id: 9600 + i, tipo, paciente: nome, imagens: [], audios: [], _dicom: true,
-          _quando: agora - (10 - i) * 60000,
+          _quando: _inicioDoDia.getTime() + i * 60000,
           laudo: temLaudo ? { corpo: 'x', conclusao: 'y' } : null, _liberado: liberado });
       });
     document.getElementById('telaDia').style.display = 'block';

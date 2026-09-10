@@ -1757,6 +1757,7 @@ button.repoSelo:hover{filter:brightness(.95)}
     <b style="flex:1;color:#174F52;font-size:17px">Transcrição completa usada como fonte</b>
     <button class="bt cinza" onclick="document.getElementById('rv2TranscricaoDlg').close()">Fechar</button>
   </div>
+  <div id="rv2TranscricaoLegenda" style="display:none;margin:14px 22px 0;padding:10px 12px;border-radius:9px;background:#FFF8E3;color:#66501B;font:13px/1.4 Arial,sans-serif"></div>
   <pre id="rv2TranscricaoTexto" style="margin:0;padding:22px;white-space:pre-wrap;overflow:auto;max-height:65vh;font:14px/1.55 Arial,sans-serif;color:#26363A"></pre>
 </dialog>
 
@@ -5511,8 +5512,9 @@ async function gerarLaudo(exId, opts){
 +(fitaNum
  ? "- palavra_ini e palavra_fim: os NÚMEROS entre colchetes da PRIMEIRA e da ÚLTIMA palavra desse trecho do ditado — os mesmos números da citação que você acabou de copiar. Ex.: se você copiou \"[26]Esteatose [27]3\", então palavra_ini=26 e palavra_fim=27. Aponte SÓ a fala daquele achado, não o exame inteiro: dez a quinze palavras costumam bastar. Estes dois números são o que permite tocar de volta exatamente o que o médico falou — errá-los faz o médico ouvir outro achado, então confira-os na fita antes de responder.\n"
    +"  ⚠️ ZERO NÃO É FALHA SUA, É A RESPOSTA CERTA na maioria das seções. Só aponte a seção sobre a qual o médico REALMENTE FALOU. Órgão que ele não mencionou — e num exame normal são quase todos — vai com palavra_ini=0 e palavra_fim=0. NUNCA aponte fala de cortesia ou de rotina (\"tudo bem?\", \"pode se levantar\", \"respira fundo\", cumprimento, nome do paciente) só para não deixar o campo em zero: apontar isso faz o médico apertar o botão de conferência do fígado e ouvir \"tudo bem, tá?\". Vazio é honesto; preencher por preencher, não. E NUNCA repita a mesma faixa em várias seções — se você está prestes a fazer isso, é sinal de que aquelas seções não vieram do ditado: use 0.\n"
- : "")
+: "")
 +"REGRA DURA: só aponte uma imagem se você realmente leu a informação NELA. Na dúvida, imagem_n = 0 — apontar a imagem errada é pior que não apontar. Nenhuma seção identificável: \"procedencia\":[].\n\n"+
+"EVIDÊNCIAS PATOLÓGICAS NA TRANSCRIÇÃO (campo 'evidencias_patologicas'):\n- Devolva UM item para CADA achado anormal que realmente entrou no corpo ou na conclusão do laudo. Exame sem alteração: lista vazia.\n- rotulo: nome curto e específico do achado (ex.: \"Cisto simples 1\", \"Nódulo tireoidiano 2\", \"Esteatose hepática\").\n- secao: título da seção do corpo onde o achado foi escrito.\n- citacao: copie literalmente a menor frase do ditado que sustenta esse achado; não corrija nem resuma.\n- palavra_ini e palavra_fim: quando o ditado estiver numerado, devolva os índices exatos da primeira e da última palavra dessa citação. Sem numeração, use 0 nos dois.\n- NÃO inclua normalidades, frases negadas (ex.: \"não há nódulo\"), hipóteses que não entraram no laudo nem a versão antiga de uma correção falada. Se o achado veio apenas da imagem, deixe citacao vazia e os índices em 0.\n- Mais de um achado na mesma seção gera mais de um item. Na dúvida sobre a faixa correta, use índices 0; o programa prefere não destacar a destacar a fala errada.\n\n"+
 regraDeUnidade()+
 /* 31/08/2026 — A DISTÂNCIA DA PAPILA SAIU DAQUI. Pedido dele: "no exame de mama, quando
    o diagnóstico for cisto simples, não precisamos de distância para a papila mamária".
@@ -5522,7 +5524,7 @@ regraDeUnidade()+
    O que fica: os bullets (decisão de 26/08), a hora e as medidas. */
 "CISTOS SIMPLES MÚLTIPLOS (regra do médico, 26/08/2026, só mama): quando houver MAIS DE UM cisto simples na mesma mama, escreva-os em BULLET POINTS — uma frase introdutória única com os descritores comuns terminando em dois-pontos, e depois UMA linha por cisto no formato '• às X h, medindo A x B x C cm;'. NUNCA em frase corrida com 'respectivamente'. Um cisto só: frase normal, sem bullet.\nCISTO SIMPLES NÃO LEVA DISTÂNCIA DA PAPILA (regra do médico, 24/08/2026, reafirmada em 31/08): nem quando é um só, nem nos bullets. NÃO escreva 'a X cm da papila' nem 'distando X cm da papila' em cisto simples, mesmo que a imagem traga o valor. Isso vale SÓ para o cisto simples — nódulo, microcistos agrupados e massa sólido-cística continuam obrigados a informar a distância.\n\n"+
 "DADOS ESTRUTURADOS (campo 'dados_estruturados'): além do laudo, devolva os achados campo a campo, para o arquivo longitudinal do paciente. Regras:\n- Preencha APENAS com informação presente no ditado ou legível nas imagens. Campo sem informação = null (ou \"\" em texto). NUNCA invente medida, órgão ou classificação.\n- indicacao_clinica: os dados clínicos ditados, se houver.\n- conclusao_codigo: UMA palavra que resuma a conclusão — normal | benigno | provavelmente-benigno | suspeito | indeterminado | outro.\n- achados: um item por achado DESCRITO no laudo. orgao (ex.: 'mama-direita', 'figado', 'lobo-tireoidiano-esquerdo'), localizacao (ex.: 'QSE', 'terco medio'), tipo (ex.: 'nodulo', 'cisto', 'calculo', 'esteatose'), medidas em MILÍMETROS (medida_1_mm a medida_3_mm; converta de cm; null se não medida), caracteristicas (objeto livre: ecogenicidade, margens, sombra...), classificacao (ex.: 'BI-RADS 3'; \"\" se não se aplica), descricao (a frase do achado como está no laudo).\n- Exame normal, sem achados: \"achados\":[].\n\n"+
-"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\""+(fitaNum?",\\\"palavra_ini\\\":0,\\\"palavra_fim\\\":0":"")+"}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0,\"localizacao\":\"\",\"estrutura\":\"\",\"nivel\":\"\",\"transversal\":\"\",\"profundidade\":\"\"}]":"")
+"Responda SOMENTE em JSON válido:\n{\"titulo\":\"\",\"cabecalho\":{\"nome\":\"\",\"idade\":\"\",\"realizado_em\":\"\",\"dados_clinicos\":\"\"},\"corpo\":\"texto com ** para negrito e \\n para quebras\",\"conclusao\":\"\",\"observacoes_para_o_medico\":\"\",\"avisos\":[{\"tipo\":\"\",\"texto\":\"\"}],\"procedencia\":[{\"secao\":\"\",\"imagem_n\":0,\"origem\":\"\",\"citacao\":\"\""+(fitaNum?",\\\"palavra_ini\\\":0,\\\"palavra_fim\\\":0":"")+"}],\"evidencias_patologicas\":[{\"rotulo\":\"\",\"secao\":\"\",\"citacao\":\"\",\"palavra_ini\":0,\"palavra_fim\":0}],\"dados_estruturados\":{\"indicacao_clinica\":\"\",\"conclusao_codigo\":\"\",\"achados\":[{\"orgao\":\"\",\"localizacao\":\"\",\"tipo\":\"\",\"medida_1_mm\":null,\"medida_2_mm\":null,\"medida_3_mm\":null,\"caracteristicas\":{},\"classificacao\":\"\",\"descricao\":\"\"}]}"+(ex.tipo==='tireoide'?",\"tirads\":[{\"composicao\":\"\",\"ecogenicidade\":\"\",\"forma\":\"\",\"margem\":\"\",\"focos\":[],\"tamanho_cm\":0,\"localizacao\":\"\",\"estrutura\":\"\",\"nivel\":\"\",\"transversal\":\"\",\"profundidade\":\"\"}]":"")
 +(classifVale('birads', ex.tipo)?",\"birads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"forma\":\"\",\"orientacao\":\"\",\"margem\":\"\",\"eco\":\"\",\"posterior\":\"\",\"halo\":\"\",\"vasc\":\"\",\"elasto\":\"\",\"pseudocapsula\":\"\",\"distribuicao\":\"\",\"padrao\":\"\",\"tamanho_cm\":0,\"caso_especial\":\"\"}]":"")
 +(classifVale('orads', ex.tipo)?",\"orads\":[{\"localizacao\":\"\",\"tipo\":\"\",\"escore_cor\":\"\",\"tamanho_cm\":0,\"papilas\":0,\"ascite\":\"\"}]":"")
 +(EX_OBST_SEQ[ex.tipo]?",\"obstetrico\":{\"trouxe_usg_primeiro_trimestre\":false,\"ig_primeiro_usg_semanas\":0,\"aua\":\"\",\"ga\":\"\",\"edd_aua\":\"\",\"edd_ga\":\"\"}":"")+"}"
@@ -5729,6 +5731,8 @@ regraDeUnidade()+
         : [],
       // de qual imagem a IA tirou cada seção — ela já estava olhando, agora anota enquanto lê
       procedencia:(Array.isArray(resp.procedencia)?resp.procedencia:[]),
+      // faixas literais da fala que sustentam cada achado anormal do laudo
+      evidencias_patologicas:(Array.isArray(resp.evidencias_patologicas)?resp.evidencias_patologicas:[]),
       trechos:trechosEx,
       // idade e sexo do APARELHO, para a conferência de medidas por idade (REF_MEDIDAS).
       // Ficam no laudo, e não só no exame, para o aviso continuar valendo quando o
@@ -20305,6 +20309,128 @@ function rev2OuvirAudio(){
   rev2Parar();
   rev2PrepararAudio(0,true,0);
 }
+/* O texto original nunca recebe tags nem é reescrito. Estas funções calculam faixas
+   sobre a string e o desenho usa somente text nodes; assim uma transcrição contendo
+   "<script>" continua sendo texto, não HTML executável. */
+function rev2TokensComPosicoes(texto){
+  var r=/[0-9A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+(?:['’\-][0-9A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+)*/g;
+  var lista=[], m;
+  while((m=r.exec(String(texto||'')))){
+    lista.push({texto:m[0], chave:norm(m[0]), ini:m.index, fim:r.lastIndex});
+  }
+  return lista;
+}
+function rev2CitacaoTokens(citacao){
+  /* Alguns modelos repetem os marcadores [26] apesar de eles não fazerem parte da fala. */
+  var limpa=String(citacao||'').replace(/\[\d+\]/g,' ');
+  return rev2TokensComPosicoes(limpa).map(function(t){ return t.chave; }).filter(Boolean);
+}
+function rev2CitacaoCabeNaFaixa(tokens, ini, fim, citacao){
+  var busca=rev2CitacaoTokens(citacao); if(!busca.length) return false;
+  var j=0;
+  for(var i=ini;i<=fim && j<busca.length;i++) if(tokens[i].chave===busca[j]) j++;
+  return j===busca.length;
+}
+/* Sem índices antigos, só aceitamos a citação quando ela ocorre UMA vez. Repetição é
+   ambígua (pode ser justamente a versão descartada depois de "corrigindo"). */
+function rev2FaixaUnicaDaCitacao(tokens, citacao){
+  var busca=rev2CitacaoTokens(citacao); if(!busca.length) return null;
+  var achadas=[];
+  for(var i=0;i+busca.length<=tokens.length;i++){
+    var sim=true;
+    for(var j=0;j<busca.length;j++) if(tokens[i+j].chave!==busca[j]){ sim=false; break; }
+    if(sim) achadas.push({a:i,b:i+busca.length-1});
+  }
+  return achadas.length===1 ? achadas[0] : null;
+}
+function rev2SecaoPatologicaCasa(ex, secao){
+  var lado=rev2LadoDe(secao), chave=norm(secao).replace(/[\s-]/g,'');
+  if(chave.length<4) return false;
+  return rev2BlocosDaTela(ex.laudo||{}).some(function(b){
+    if(rev2Estado(ex,b)!=='alterado') return false;
+    var ladoB=rev2LadoDe(b.titulo||'');
+    if(lado>=0 && ladoB>=0 && lado!==ladoB) return false;
+    var kb=norm(b.titulo||'').replace(/[\s-]/g,'');
+    return kb.length>=4 && (kb.indexOf(chave)>=0 || chave.indexOf(kb)>=0);
+  });
+}
+function rev2EvidenciasPatologicas(ex){
+  var L=(ex&&ex.laudo)||{}, novas=Array.isArray(L.evidencias_patologicas)
+    ? L.evidencias_patologicas : [];
+  var saida=[];
+  novas.forEach(function(e){
+    if(!e || !String(e.citacao||'').trim()) return;          // achado só da imagem não marca fala
+    if(!rev2SecaoPatologicaCasa(ex,e.secao||'')) return;     // removido do laudo numa edição
+    saida.push({rotulo:String(e.rotulo||e.secao||'Achado patológico'),
+      secao:String(e.secao||''), citacao:String(e.citacao||''),
+      palavra_ini:Number(e.palavra_ini)||0, palavra_fim:Number(e.palavra_fim)||0});
+  });
+  if(saida.length || novas.length) return saida;
+
+  /* Compatibilidade conservadora para laudos feitos antes do campo novo: usa somente
+     a procedência das seções que a própria tela já classifica como alteradas. */
+  rev2BlocosDaTela(L).forEach(function(b){
+    if(rev2Estado(ex,b)!=='alterado') return;
+    var p=rev2Proc(ex,b.titulo); if(!p || !/voz|ambos/i.test(String(p.origem||''))) return;
+    if(!String(p.citacao||'').trim()) return;
+    saida.push({rotulo:b.titulo||'Achado patológico', secao:b.titulo||'',
+      citacao:String(p.citacao||''), palavra_ini:Number(p.palavra_ini)||0,
+      palavra_fim:Number(p.palavra_fim)||0});
+  });
+  return saida;
+}
+function rev2LocalizarEvidencias(texto, evidencias){
+  var tokens=rev2TokensComPosicoes(texto), faixas=[];
+  (evidencias||[]).forEach(function(e){
+    var a=Math.floor(Number(e.palavra_ini)||0)-1;
+    var b=Math.floor(Number(e.palavra_fim)||0)-1;
+    if(a<0 || b<a || b>=tokens.length ||
+       !rev2CitacaoCabeNaFaixa(tokens,a,b,e.citacao)){
+      var unica=rev2FaixaUnicaDaCitacao(tokens,e.citacao);
+      if(!unica) return;
+      a=unica.a; b=unica.b;
+    }
+    faixas.push({ini:tokens[a].ini, fim:tokens[b].fim,
+      rotulos:[String(e.rotulo||e.secao||'Achado patológico')]});
+  });
+  faixas.sort(function(x,y){ return x.ini-y.ini || x.fim-y.fim; });
+  var juntas=[];
+  faixas.forEach(function(f){
+    var u=juntas[juntas.length-1];
+    if(u && f.ini<=u.fim){
+      u.fim=Math.max(u.fim,f.fim);
+      f.rotulos.forEach(function(n){ if(u.rotulos.indexOf(n)<0) u.rotulos.push(n); });
+    }else juntas.push(f);
+  });
+  return juntas;
+}
+function rev2DesenharTranscricao(texto, ex){
+  var alvo=document.getElementById('rv2TranscricaoTexto');
+  var legenda=document.getElementById('rv2TranscricaoLegenda');
+  if(!alvo) return;
+  var evidencias=rev2EvidenciasPatologicas(ex), faixas=rev2LocalizarEvidencias(texto,evidencias);
+  alvo.textContent='';
+  var frag=document.createDocumentFragment(), pos=0, nomes=[];
+  faixas.forEach(function(f){
+    if(f.ini>pos) frag.appendChild(document.createTextNode(texto.slice(pos,f.ini)));
+    var marca=document.createElement('mark');
+    marca.textContent=texto.slice(f.ini,f.fim);
+    marca.title='Usado no laudo: '+f.rotulos.join(' · ');
+    marca.style.cssText='background:#FFE08A;color:#3E3215;border-bottom:2px solid #C58A00;border-radius:3px;padding:1px 2px';
+    frag.appendChild(marca); pos=f.fim;
+    f.rotulos.forEach(function(n){ if(nomes.indexOf(n)<0) nomes.push(n); });
+  });
+  if(pos<texto.length) frag.appendChild(document.createTextNode(texto.slice(pos)));
+  alvo.appendChild(frag);
+  if(legenda){
+    legenda.style.display='block';
+    legenda.textContent=faixas.length
+      ? ('Em amarelo: falas que sustentaram achados patológicos usados no laudo. '+nomes.join(' · '))
+      : (evidencias.length
+          ? 'Há achados patológicos no laudo, mas não encontrei um vínculo textual único e seguro para destacar.'
+          : 'Nenhum achado patológico deste laudo possui uma fala vinculada para destacar.');
+  }
+}
 async function rev2VerTranscricao(){
   var ex=rev2Ex(); if(!ex) return;
   var texto=String(ex._transcricao||'').trim();
@@ -20326,7 +20452,7 @@ async function rev2VerTranscricao(){
   }
   if(!texto) texto='Não há transcrição completa vinculada a este laudo.';
   var dlg=document.getElementById('rv2TranscricaoDlg');
-  document.getElementById('rv2TranscricaoTexto').textContent=texto;
+  rev2DesenharTranscricao(texto,ex);
   if(dlg.showModal) dlg.showModal(); else dlg.setAttribute('open','open');
 }
 

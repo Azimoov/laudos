@@ -32,8 +32,9 @@ ok(H.includes('dicomStudyUid:est.studyInstanceUid') &&
 ok(H.includes('materialId:a.materialId||null'), 'sessão preserva material_id');
 ok(H.includes('ex._entradaIa = fitaNum || trans'),
    'texto clínico e entrada interna da IA ficam separados');
-ok(H.includes("document.getElementById('rv2TranscricaoTexto').textContent=texto"),
-   'transcrição entra no modal como texto, sem interpretar HTML');
+ok(H.includes("marca.textContent=texto.slice(f.ini,f.fim)") &&
+   H.includes("document.createTextNode(texto.slice(pos,f.ini))"),
+   'transcrição entra no modal como text nodes, sem interpretar HTML');
 
 console.log();
 console.log(falhas.length ? falhas.length + ' FALHA(S)' : 'tudo certo');

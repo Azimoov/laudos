@@ -147,13 +147,14 @@ ok(HTML.indexOf('REGRA DURA') >= 0 && HTML.indexOf('imagem_n = 0') >= 0,
 ok(/audioUrl:a\.url/.test(HTML), 'cada trecho leva a URL do proprio audio ao ser guardado no laudo');
 ok(/\(ex\.imagens\|\|\[\]\)\.length>=pr\.imagem_n/.test(HTML),
    'ficha IMG so nasce quando a foto citada existe de verdade');
-// 09/09/2026: o antigo botao VOZ foi retirado das caixas de texto estruturado a pedido
-// do Dr. Daniel por inconsistencias de recorte. O botao IMG continua preservado e a
-// infraestrutura para a reproducao limpa do bloco (rev2ClipesDoBloco) foi preparada.
+// O antigo botao VOZ e o recorte por bloco foram retirados por inconsistencias. A
+// procedencia continua servindo a ficha IMG e, agora, o destaque seguro na transcricao.
 ok(!/<button class="voz"[^>]*>VOZ<\/button>/.test(HTML),
    'o antigo botao VOZ foi removido das caixas de texto do laudo');
-ok(/rev2ClipesDoBloco/.test(HTML) && /rev2TocarAudioBloco/.test(HTML),
-   'e o terreno para o audio do bloco sem silencios ficou preparado');
+ok(!/rev2ClipesDoBloco/.test(HTML) && !/rev2TocarAudioBloco/.test(HTML),
+   'o mecanismo quebradico de audio por bloco tambem foi removido');
+ok(/rev2EvidenciasPatologicas/.test(HTML) && /rev2LocalizarEvidencias/.test(HTML),
+   'a procedencia agora sustenta o destaque seguro na transcricao');
 const editouSrc = grab('rev2Editou');
 ok(!/procedencia/.test(editouSrc),
    'a edicao do medico NAO reescreve a procedencia — congelada na geracao (decisao de 17/08)');

@@ -16061,10 +16061,17 @@ function uteroParede(v){
   return 'anterior';
 }
 
+/* ⚠️ 10/09/2026 — PASSOU A ENTENDER "DISTAL" E "PROXIMAL". Ele descreveu assim o
+   vocabulário que usa: "parede anterior e parede posterior, terço distal, médio,
+   proximal". Contando a partir do colo, que é por onde se entra: PROXIMAL é o terço
+   ístmico (junto ao colo) e DISTAL é o fúndico. Antes só "superior/inferior" eram lidos,
+   e um laudo escrito com as palavras dele caía no terço médio calado.
+   O programa continua ESCREVENDO superior/médio/inferior no texto do laudo: essas não
+   dependem de saber de onde se está contando. Ler nas duas, escrever numa. */
 function uteroTerco(v){
   var t=uteroNorm(v);
-  if(/superior|fundo/.test(t)) return 'superior';
-  if(/inferior|istm|colo/.test(t)) return 'inferior';
+  if(/superior|distal|fundic|fundo/.test(t)) return 'superior';
+  if(/inferior|proximal|istm|cervic|colo/.test(t)) return 'inferior';
   return 'medio';
 }
 
@@ -16091,16 +16098,29 @@ function uteroTerco(v){
    conduta. Sem a proporção, fica sem tipo, o marcador sai cinza e a legenda diz
    "FIGO não classificado". O médico arrasta o marcador para a profundidade certa e AÍ o
    tipo é escrito no laudo — decisão dele, não chute do programa. */
+/* ⚠️ "MENOS DE 50%" POR EXTENSO — acrescentado em 10/09/2026, apanhado ao desenhar um
+   laudo realista. As regras só liam o SÍMBOLO ("< 50%"). A frase escrita como se fala —
+   "subseroso com menos de 50% intramural" — não era entendida, e o mioma caía em FIGO 4
+   (intramural puro), que é outra cirurgia. O laudo dizia uma coisa e a legenda impressa
+   dizia outra, sem aviso.
+   ⚠️ A ORDEM IMPORTA: "pelo menos 50%" contém a palavra "menos" e significa o contrário.
+   Por isso o lado do MAIOR é testado primeiro. */
+function _utProporcao(t){
+  if(/(?:>=|≥|>|mais\s+de|acima\s+de|pelo\s+menos|no\s+m[ií]nimo|maior\s+(?:que|do\s+que))\s*50/i.test(t)) return 'maior';
+  if(/(?:<=|≤|<|menos\s+de|abaixo\s+de|inferior\s+a|menor\s+(?:que|do\s+que))\s*50/i.test(t)) return 'menor';
+  return '';
+}
 function uteroFigo(v){
   var t=uteroNorm(v);
   var m=/\bfigo\s*(2\s*[-– ]\s*5|[0-8])\b/i.exec(t);
   if(m) return m[1].replace(/[\s–]+/g,'-');   // o médico já escreveu o tipo: vale o dele
   if(/pedunculado.*(?:intra|cavit)|intracavit/i.test(t)) return '0';
-  if(/submucoso.*<\s*50/i.test(t)) return '1';
-  if(/submucoso.*(?:>=|≥|mais|maior).*50/i.test(t)) return '2';
+  var prop = _utProporcao(t);
+  if(/submucoso/i.test(t) && prop === 'menor') return '1';
+  if(/submucoso/i.test(t) && prop === 'maior') return '2';
   if(/transmural/i.test(t)) return '2-5';
-  if(/subseroso.*(?:>=|≥|mais|maior).*50/i.test(t)) return '5';
-  if(/subseroso.*<\s*50/i.test(t)) return '6';
+  if(/subseroso/i.test(t) && prop === 'maior') return '5';
+  if(/subseroso/i.test(t) && prop === 'menor') return '6';
   if(/subseroso.*pedunculado|pedunculado.*subseroso/i.test(t)) return '7';
   if(/intramural.*contato.*endo|contat.*endo/i.test(t)) return '3';
   /* "intramural" sozinho CONTINUA valendo 4. Aqui a ausência é informação: o laudo diz
@@ -16129,49 +16149,204 @@ function uteroMedidasMm(txt){
 
 function _uteroRaioPx(mm){
   var m=Array.isArray(mm)?(Math.max.apply(null,mm)||20):(parseFloat(mm)||20);
-  return Math.max(10, Math.min(24, (m/20)*13));
+  return Math.max(9, Math.min(26, (m/20)*13));
 }
 
+/* =========================================================================================
+   A GEOMETRIA DO ÚTERO — refeita em 10/09/2026, a pedido do Dr. Daniel
+   =========================================================================================
+   Palavras dele, olhando a figura antiga ao lado do diagrama FIGO de referência:
+   "é muito ruim, muito diferente (…) faltou a camada do endométrio nas imagens (…) conforme
+   eu for mudando ele, ele precisa ir mudando a classificação FIGO."
+
+   ⚠️ O QUE MUDOU DE FUNDO. Antes o tipo FIGO era uma DISTÂNCIA EM PIXELS a partir de um
+   ponto fixo, com faixas escolhidas a olho (dist<14 → FIGO 0, dist<26 → FIGO 1…). Duas
+   consequências: o desenho e a classificação não falavam da mesma coisa — o marcador podia
+   estar visivelmente dentro do miométrio e o texto dizer "submucoso" —, e as camadas do
+   útero não existiam no desenho, então não havia como dizer onde o nódulo estava.
+
+   AGORA HÁ UMA MEDIDA SÓ, e ela é anatômica:
+
+       u  = onde está o CENTRO do nódulo, atravessando a parede
+            u = 0  → na superfície do endométrio (a borda da cavidade)
+            u = 1  → na serosa (a borda de fora do útero)
+       rr = o RAIO do nódulo na mesma régua (em frações da espessura da parede)
+
+   Dessas duas saem as duas frações que a FIGO usa — quanto do nódulo passou da serosa e
+   quanto entrou na cavidade — e o tipo sai delas, exatamente como ele descreveu:
+
+       mais de 50% para fora do miométrio ............ 6
+       menos de 50% para fora, mas algo para fora .... 5
+       todo dentro, sem encostar no endométrio ....... 4
+       dentro, mas encostando no endométrio .......... 3
+       projeta-se para dentro até 50% do volume ...... 2
+       projeta-se para dentro mais de 50% ............ 1
+       pediculado dentro da cavidade ................. 0
+       inteiramente fora, pediculado ................. 7
+       atravessa as duas bordas (transmural) ......... 2-5
+
+   Os rótulos e os cortes de 50% NÃO foram inventados aqui: são a definição FIGO/Munro, já
+   conferida contra o artigo primário em 09/09 e registrada em `conhecimento/mioma-figo.md`.
+   O que este bloco acrescenta é a GEOMETRIA — como transformar posição em tipo.
+
+   ⚠️ A FRAÇÃO É MEDIDA NO DIÂMETRO, não no volume. É como se julga na tela do aparelho, e
+   é como a própria FIGO é aplicada na prática; dizer "volume" e calcular diâmetro seria
+   prometer uma precisão que nem a ressonância tem (ver a tabela de acerto em
+   `conhecimento/mioma-figo.md`: 58,9% num protocolo de ressonância de uso corrente). */
+
+var UTERO_ENCOSTA = 0.06;   // a folga que separa "encosta no endométrio" (3) de "não encosta" (4)
+
+function uteroFracoes(u, rr){
+  rr = Math.max(0.001, rr);
+  return {
+    fora:   Math.min(1, Math.max(0, (u + rr - 1) / (2 * rr))),
+    dentro: Math.min(1, Math.max(0, (rr - u) / (2 * rr)))
+  };
+}
+function uteroFigoDaProfundidade(u, rr){
+  var f = uteroFracoes(u, rr);
+  if(f.fora > 0 && f.dentro > 0) return '2-5';      // atravessa as duas bordas
+  if(f.fora >= 1)    return '7';
+  if(f.fora > 0.5)   return '6';
+  if(f.fora > 0)     return '5';
+  if(f.dentro >= 1)  return '0';
+  if(f.dentro > 0.5) return '1';
+  if(f.dentro > 0)   return '2';
+  return (u - rr <= UTERO_ENCOSTA) ? '3' : '4';
+}
+/* O caminho de volta: dado o tipo escrito no laudo, onde desenhar o nódulo.
+   Cada tipo ganha o MEIO da faixa que o define — assim o desenho é sempre um exemplo
+   honesto daquele tipo, e arrastá-lo de lá devolve o mesmo tipo. */
+function uteroProfundidadeDoFigo(figo, rr){
+  rr = Math.max(0.02, rr);
+  switch(String(figo)){
+    case '0':   return -rr;                       // todo na cavidade
+    case '1':   return -0.5 * rr;                 // 75% para dentro
+    case '2':   return  0.5 * rr;                 // 25% para dentro
+    case '3':   return  rr;                       // encostando, sem entrar
+    case '5':   return 1 - 0.5 * rr;              // 25% para fora
+    case '6':   return 1 + 0.5 * rr;              // 75% para fora
+    case '7':   return 1 + rr;                    // todo fora
+    case '2-5': return 0.5;                       // atravessa: o nódulo é grande
+    case '8':   return 0.5;                       // cervical — quem manda é a parede 'colo'
+    default:                                      // 4, e também o tipo NÃO determinado
+      return Math.min(1 - rr - UTERO_ENCOSTA, Math.max(rr + 2 * UTERO_ENCOSTA, 0.5));
+  }
+}
+
+/* ---- o corte sagital: tudo nasce do EIXO DA CAVIDADE ----
+   Uma curva do orifício externo do colo (t=0) ao fundo (t=1). A cavidade, o endométrio, o
+   miométrio e a serosa são deslocamentos desta mesma linha, para o lado anterior e para o
+   posterior. É POR ISSO que o marcador cai sempre na camada certa: o desenho e a conta
+   usam a mesma linha, em vez de duas aproximações que divergem. */
+var UT_EIXO = [[248,208],[228,176],[186,126],[118,106]];
+function _utBez(P, t){
+  var u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
+  return [a*P[0][0]+b*P[1][0]+c*P[2][0]+d*P[3][0], a*P[0][1]+b*P[1][1]+c*P[2][1]+d*P[3][1]];
+}
+function _utBezTang(P, t){
+  var u = 1 - t, a = 3*u*u, b = 6*u*t, c = 3*t*t;
+  return [a*(P[1][0]-P[0][0])+b*(P[2][0]-P[1][0])+c*(P[3][0]-P[2][0]),
+          a*(P[1][1]-P[0][1])+b*(P[2][1]-P[1][1])+c*(P[3][1]-P[2][1])];
+}
+/* A normal UNITÁRIA apontando para o lado ANTERIOR (para cima e para a direita, no útero
+   em anteversoflexão que este corte desenha). */
+function _utNormal(t){
+  var T = _utBezTang(UT_EIXO, t), m = Math.hypot(T[0], T[1]) || 1;
+  return [-T[1]/m, T[0]/m];
+}
+/* As espessuras naquele ponto do eixo: colo fino, corpo grosso, fundo arredondado.
+   `cav` é a meia-fenda da cavidade, `endo` a camada do endométrio, `mio` o miométrio. */
+function _utEsp(t){
+  /* ⚠️ A ESPESSURA NÃO É UM MORRO NO MEIO — o útero não é um charuto. Ele é uma PERA:
+     fino no colo, engrossa depressa no istmo e fica CHEIO do corpo até o fundo, que é a
+     parte mais larga e mais arredondada. As duas primeiras tentativas de 10/09 usavam um
+     seno (grosso no meio, fino nas duas pontas) e saíam uma banana e depois uma lesma —
+     ele reconheceria na hora que aquilo não é um útero. */
+  var x = Math.min(1, Math.max(0, t));
+  var s = Math.min(1, Math.max(0, (x - 0.06) / 0.46));
+  var corpo = s * s * (3 - 2 * s);          // sobe suave e depois fica cheia
+  return {
+    cav:  0.8 + 3.2 * corpo,
+    endo: 1.6 + 5.4 * corpo,
+    mio:  7.0 + 33.0 * corpo
+  };
+}
+/* O ponto (x,y) de um nódulo: em que terço do eixo, de que lado da parede, e a que
+   profundidade `u` atravessando o miométrio. */
+function _utSagPonto(t, lado, u){
+  var C = _utBez(UT_EIXO, t), N = _utNormal(t), e = _utEsp(t);
+  var d = e.cav + e.endo + u * e.mio;              // u=0 na borda da cavidade, u=1 na serosa
+  return [C[0] + N[0] * d * lado, C[1] + N[1] * d * lado];
+}
+/* ⚠️ OS TRÊS TERÇOS SÃO DO CORPO, NÃO DO ÚTERO INTEIRO. O colo é a parte fina, e um mioma
+   colocado ali sai maior que a parede que o contém — parecia estar caindo para fora do
+   desenho. Os terços começam depois do istmo (t≈0,35), que é onde o corpo começa. */
+var UT_TERCO_T = { inferior: 0.44, medio: 0.64, superior: 0.86 };
 function uteroSagitalXY(L){
-  var parede=L.parede||'anterior', figo=String(L.figo||'4'), terco=L.terco||'medio';
-  var rMap = {
-    '0': 8, '1': 22, '2': 34, '3': 46, '4': 60,
-    '5': 74, '6': 88, '7': 104, '2-5': 46, '8': 15
-  };
-  var r = rMap[figo] != null ? rMap[figo] : 60;
-
-  if(parede === 'fundo' || terco === 'superior'){
-    return [95 - r * 0.45, 80 - r * 0.70];
+  var parede = L.parede || 'anterior', terco = L.terco || 'medio';
+  var figo = String(L.figo == null ? '' : L.figo);
+  var t = UT_TERCO_T[terco] != null ? UT_TERCO_T[terco] : 0.52;
+  var lado = 1;                                     // +1 anterior, -1 posterior
+  if(parede === 'posterior') lado = -1;
+  /* ⚠️ O MIOMA DO FUNDO SAI PELA PONTA, não pela lateral. Empurrá-lo pela normal (que é o
+     que vale nas paredes anterior e posterior) punha o mioma fúndico subseroso flutuando
+     ao lado do útero, em cima do rótulo — parecia um erro de desenho. No fundo, "para
+     fora" é ao longo do eixo, que é o que o útero faz de verdade. */
+  if(parede === 'fundo'){
+    var e1 = _utEsp(1), T1 = _utBezTang(UT_EIXO, 1), m1 = Math.hypot(T1[0], T1[1]) || 1;
+    var C1 = _utBez(UT_EIXO, 1);
+    var rrF = _uteroRaioPx(L.mm) / e1.mio;
+    var dF = e1.cav + e1.endo + uteroProfundidadeDoFigo(figo, rrF) * e1.mio;
+    return [C1[0] + T1[0]/m1 * dF, C1[1] + T1[1]/m1 * dF];
   }
-  if(parede === 'colo' || terco === 'inferior'){
-    return [245 + r * 0.4, 145 + r * 0.35];
+  if(parede === 'colo'){ t = 0.10; }
+  /* Nas laterais, o corte sagital não mostra o lado: o nódulo aparece no meio da parede,
+     e quem diz direita/esquerda é o corte transversal, ao lado. */
+  if(parede === 'lateral-direita' || parede === 'lateral-esquerda') lado = 1;
+  var rr = _uteroRaioPx(L.mm) / _utEsp(t).mio;
+  return _utSagPonto(t, lado, uteroProfundidadeDoFigo(figo, rr));
+}
+/* A profundidade de volta, a partir de um ponto solto no desenho: usada no arraste. */
+function uteroSagitalDe(x, y){
+  var melhor = { t: 0.5, d: 1e9, lado: 1 };
+  for(var i = 0; i <= 120; i++){
+    var t = i / 120, C = _utBez(UT_EIXO, t);
+    var dd = Math.hypot(x - C[0], y - C[1]);
+    if(dd < melhor.d){
+      var N = _utNormal(t);
+      melhor = { t: t, d: dd, lado: ((x - C[0]) * N[0] + (y - C[1]) * N[1]) >= 0 ? 1 : -1 };
+    }
   }
-  if(parede === 'anterior'){
-    var x0 = 145, y0 = 92;
-    var ang = -55 * Math.PI / 180;
-    return [x0 + r * Math.cos(ang), y0 + r * Math.sin(ang)];
-  }
-  var x0p = 135, y0p = 105;
-  var angP = 125 * Math.PI / 180;
-  return [x0p + r * Math.cos(angP), y0p + r * Math.sin(angP)];
+  var e = _utEsp(melhor.t);
+  return { t: melhor.t, lado: melhor.lado, u: (melhor.d - e.cav - e.endo) / e.mio, mio: e.mio };
 }
 
+/* ---- o corte transversal: a mesma régua, num anel ----
+   `k` = 0 na borda da cavidade, 1 na serosa. As três camadas são três elipses. */
+var UT_TRA = { cx:160, cy:120, rx:100, ry:72, cavx:36, cavy:9, endo:10 };
+function _utTraPonto(ang, u){
+  var T = UT_TRA;
+  var c = Math.cos(ang), s = Math.sin(ang);
+  var rIn  = Math.hypot(T.cavx * c, T.cavy * s) + T.endo;   // borda externa do endométrio
+  var rOut = Math.hypot(T.rx * c, T.ry * s);                // serosa
+  var d = rIn + u * (rOut - rIn);
+  return [T.cx + d * c, T.cy + d * s];
+}
+var UT_ANG = { anterior: -Math.PI/2, posterior: Math.PI/2,
+               'lateral-direita': Math.PI, 'lateral-esquerda': 0, fundo: -Math.PI/2, colo: Math.PI/2 };
 function uteroTransversalXY(L){
-  var parede=L.parede||'anterior', figo=String(L.figo||'4');
-  var cx = 160, cy = 120, rx = 110, ry = 80;
-  var kMap = {
-    '0': 0.18, '1': 0.34, '2': 0.46, '3': 0.58, '4': 0.72,
-    '5': 0.85, '6': 0.98, '7': 1.15, '2-5': 0.60, '8': 0.5
-  };
-  var k = kMap[figo] != null ? kMap[figo] : 0.72;
-
-  var ang = -Math.PI / 2;
-  if(parede === 'posterior') ang = Math.PI / 2;
-  else if(parede === 'lateral-direita') ang = Math.PI;
-  else if(parede === 'lateral-esquerda') ang = 0;
-  else if(parede === 'fundo') ang = -Math.PI / 2;
-
-  return [cx + rx * k * Math.cos(ang), cy + ry * k * Math.sin(ang)];
+  var ang = UT_ANG[L.parede] != null ? UT_ANG[L.parede] : -Math.PI/2;
+  var T = UT_TRA, c = Math.cos(ang), s = Math.sin(ang);
+  var esp = Math.hypot(T.rx*c, T.ry*s) - (Math.hypot(T.cavx*c, T.cavy*s) + T.endo);
+  var rr = _uteroRaioPx(L.mm) / Math.max(1, esp);
+  return _utTraPonto(ang, uteroProfundidadeDoFigo(String(L.figo == null ? '' : L.figo), rr));
+}
+function uteroTransversalDe(x, y){
+  var T = UT_TRA, dx = x - T.cx, dy = y - T.cy;
+  var ang = Math.atan2(dy, dx), c = Math.cos(ang), s = Math.sin(ang);
+  var rIn = Math.hypot(T.cavx*c, T.cavy*s) + T.endo, rOut = Math.hypot(T.rx*c, T.ry*s);
+  return { ang: ang, u: (Math.hypot(dx, dy) - rIn) / Math.max(1, rOut - rIn), esp: rOut - rIn };
 }
 
 /* ⚠️ O QUE CONTA COMO MIOMA PARA DESENHAR O MARCADOR — refeito em 10/09/2026.
@@ -16331,73 +16506,143 @@ function uteroLocalEstruturadaAtualizar(L, id, novaParede, novoTerco, novoFigo){
   return true;
 }
 
+/* As cores das camadas, num lugar só: as duas vistas TÊM de usar as mesmas, senão a
+   mesma camada aparece de duas cores e o olho lê como duas coisas diferentes. */
+var UT_COR = {
+  serosa:'#8f2f4b', mio:'#c06a86', mio2:'#a44b68', endo:'#f2c7d5', endoBorda:'#d98fa8',
+  cav:'#3a0f1e', guia:'rgba(255,255,255,0.30)', rot:'#64748b'
+};
+function _utDefs(id){
+  return '<linearGradient id="utMio'+id+'" x1="0%" y1="0%" x2="100%" y2="100%">'
+    + '<stop offset="0%" stop-color="'+UT_COR.mio+'"/><stop offset="100%" stop-color="'+UT_COR.mio2+'"/>'
+    + '</linearGradient>';
+}
+function _utRot(x, y, txt, anchor){
+  return '<text x="'+x+'" y="'+y+'" font-size="9" fill="'+UT_COR.rot+'" text-anchor="'
+    + (anchor||'middle') + '" font-family="Arial,sans-serif">'+txt+'</text>';
+}
+/* O marcador do nódulo. Nasce do MESMO desenho nas duas vistas — inclusive o número, que
+   é como ele casa o círculo com a linha da legenda quando há mais de um mioma. */
+/* ⚠️ DOIS MIOMAS NO MESMO PONTO SÃO UM MIOMA SÓ, para quem olha. Ele pediu que a figura
+   mostre TODOS os miomas descritos no texto — e dois com a mesma parede e o mesmo tipo
+   caem exatamente no mesmo lugar, um escondendo o outro. Aqui os que se sobrepõem são
+   afastados de lado, o mínimo para os dois aparecerem.
+   ⚠️ ISTO É SÓ EXIBIÇÃO: afasta na horizontal, que não é o eixo que carrega a informação
+   (a profundidade, que decide o tipo FIGO, é a distância à borda — essa não se mexe). */
+function _utEspalhar(lesoes, ondeFica){
+  var postos = [];
+  lesoes.forEach(function(L){
+    var p = ondeFica(L), r = _uteroRaioPx(L.mm), tentativa = 0;
+    while(tentativa < 12 && postos.some(function(q){
+      return Math.hypot(q.p[0]-p[0], q.p[1]-p[1]) < (q.r + r) * 0.82;
+    })){
+      tentativa++;
+      p = [p[0] + (tentativa % 2 ? 1 : -1) * Math.ceil(tentativa/2) * (r * 1.1), p[1]];
+    }
+    postos.push({ L: L, p: p, r: r });
+  });
+  return postos;
+}
+function _utMarcador(L, p, tag){
+  var r = _uteroRaioPx(L.mm);
+  return '<g class="uteroMarcador" data-utero-mk-'+tag+'="1" data-lesao="'+L.id+'" '
+    + 'transform="translate('+p[0].toFixed(1)+','+p[1].toFixed(1)+')" style="cursor:grab">'
+    + '<circle r="'+r+'" fill="'+uteroFigoCor(L.figo)+'" fill-opacity="0.88" stroke="#ffffff" '
+    + 'stroke-width="2" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.35))"/>'
+    + '<text y="3.8" text-anchor="middle" fill="#ffffff" font-weight="bold" font-size="11" '
+    + 'font-family="Arial,sans-serif" style="pointer-events:none">'+L.n+'</text>'
+    + '</g>';
+}
+/* Uma borda do corte sagital, desenhada a partir do EIXO: percorre o lado anterior do colo
+   ao fundo, contorna o fundo e volta pelo posterior. `esc` diz até que camada ir. */
+function _utDist(ate, e){
+  return ate === 'cav' ? e.cav : (ate === 'endo' ? e.cav + e.endo : e.cav + e.endo + e.mio);
+}
+/* ⚠️ AS DUAS PONTAS SÃO ARREDONDADAS, e não é enfeite: sem elas o contorno fecha em linha
+   reta atravessando o fundo, e o útero aparece com o fundo CORTADO — como se a figura
+   tivesse sido serrada. Foi o primeiro desenho de 10/09. Aqui a linha contorna a ponta
+   girando meia volta em torno do eixo, que é o que o fundo uterino faz de verdade. */
+function _utTampa(t, ate, deN, paraN){
+  var C = _utBez(UT_EIXO, t), N = _utNormal(t), d = _utDist(ate, _utEsp(t));
+  var T = _utBezTang(UT_EIXO, t), m = Math.hypot(T[0], T[1]) || 1;
+  var Tx = T[0]/m * (t > 0.5 ? 1 : -1), Ty = T[1]/m * (t > 0.5 ? 1 : -1);
+  var pts = [];
+  for(var k = 1; k < 12; k++){
+    var a = Math.PI * k / 12;
+    var nx = N[0]*deN*Math.cos(a) + Tx*Math.sin(a);
+    var ny = N[1]*deN*Math.cos(a) + Ty*Math.sin(a);
+    pts.push([C[0] + nx*d, C[1] + ny*d]);
+  }
+  return pts;
+}
+function _utContorno(ate){
+  var pts = [], i, t, N, C, d;
+  for(i = 0; i <= 60; i++){
+    t = i/60; C = _utBez(UT_EIXO, t); N = _utNormal(t); d = _utDist(ate, _utEsp(t));
+    pts.push([C[0] + N[0]*d, C[1] + N[1]*d]);
+  }
+  pts = pts.concat(_utTampa(1, ate, 1, -1));          // o fundo
+  for(i = 60; i >= 0; i--){
+    t = i/60; C = _utBez(UT_EIXO, t); N = _utNormal(t); d = _utDist(ate, _utEsp(t));
+    pts.push([C[0] - N[0]*d, C[1] - N[1]*d]);
+  }
+  pts = pts.concat(_utTampa(0, ate, -1, 1));          // o orifício externo do colo
+  return 'M ' + pts.map(function(p){ return p[0].toFixed(1)+' '+p[1].toFixed(1); }).join(' L ') + ' Z';
+}
 function _uteroSagitalSVG(lesoes, arraste){
   var w = 320, h = 240;
-  var s = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-label="Corte sagital do útero">'
-    + '<defs>'
-    + '<linearGradient id="utMioSag" x1="0%" y1="0%" x2="100%" y2="100%">'
-    + '<stop offset="0%" stop-color="#b85472"/><stop offset="60%" stop-color="#a34460"/><stop offset="100%" stop-color="#8a334d"/>'
-    + '</linearGradient>'
-    + '<linearGradient id="utEndoSag" x1="0%" y1="0%" x2="100%" y2="100%">'
-    + '<stop offset="0%" stop-color="#4a1525"/><stop offset="100%" stop-color="#2c0b15"/>'
-    + '</linearGradient>'
-    + '</defs>'
-    + '<rect width="'+w+'" height="'+h+'" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>'
-    + '<path d="M 65 80 C 50 30, 115 12, 175 35 C 230 58, 275 100, 288 135 C 295 155, 278 165, 258 155 C 235 142, 215 122, 190 112 C 150 98, 120 118, 80 172 C 55 205, 30 178, 45 142 C 52 122, 68 102, 65 80 Z" fill="url(#utMioSag)" stroke="#742238" stroke-width="2.2"/>'
-    + '<path d="M 72 78 C 60 42, 115 25, 168 46 C 218 68, 258 105, 272 134" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
-    + '<path d="M 85 82 C 80 56, 120 46, 158 64 C 196 82, 230 112, 246 134" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
-    + '<path d="M 92 78 C 88 66, 112 62, 138 72 C 172 88, 205 120, 228 138 C 218 144, 198 125, 170 110 C 142 96, 122 100, 100 120 C 90 130, 84 110, 92 78 Z" fill="url(#utEndoSag)" stroke="#1a040b" stroke-width="1.4"/>'
-    + '<text x="95" y="26" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Fundo</text>'
-    + '<text x="205" y="48" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Parede Anterior</text>'
-    + '<text x="120" y="190" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Parede Posterior</text>'
-    + '<text x="275" y="178" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Colo</text>';
-
-  lesoes.forEach(function(L){
-    var p = uteroSagitalXY(L);
-    var r = _uteroRaioPx(L.mm);
-    var cor = uteroFigoCor(L.figo);
-    s += '<g class="uteroMarcador" data-utero-mk-sag="1" data-lesao="'+L.id+'" transform="translate('+p[0].toFixed(1)+','+p[1].toFixed(1)+')" style="cursor:grab">'
-      + '<circle r="'+r+'" fill="'+cor+'" stroke="#ffffff" stroke-width="2" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.35))"/>'
-      + '<text y="3.8" text-anchor="middle" fill="#ffffff" font-weight="bold" font-size="11" font-family="Arial,sans-serif" style="pointer-events:none">'+L.n+'</text>'
-      + '</g>';
+  var s = '<svg width="'+w+'" height="'+h+'" viewBox="-16 -20 352 284" aria-label="Corte sagital do útero">'
+    + '<defs>'+_utDefs('Sag')+'</defs>'
+    + '<rect x="-16" y="-20" width="352" height="284" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>'
+    /* AS TRÊS CAMADAS, uma por cima da outra, de fora para dentro. A do endométrio é a que
+       ele apontou que faltava — e sem ela não há como mostrar um mioma "encostando no
+       endométrio", que é a diferença entre FIGO 3 e FIGO 4. */
+    + '<path d="'+_utContorno('serosa')+'" fill="url(#utMioSag)" stroke="'+UT_COR.serosa+'" stroke-width="2.2" stroke-linejoin="round"/>'
+    + '<path d="'+_utContorno('endo')+'" fill="'+UT_COR.endo+'" stroke="'+UT_COR.endoBorda+'" stroke-width="1"/>'
+    + '<path d="'+_utContorno('cav')+'" fill="'+UT_COR.cav+'" stroke="none"/>';
+  /* As linhas que separam os terços, sobre o miométrio: é por elas que ele lê "terço
+     médio" no desenho em vez de ter de confiar só na legenda. */
+  ['inferior','medio','superior'].forEach(function(nome){
+    var t = UT_TERCO_T[nome], C = _utBez(UT_EIXO, t), N = _utNormal(t), e = _utEsp(t);
+    var d = e.cav + e.endo + e.mio;
+    s += '<line x1="'+(C[0]+N[0]*d).toFixed(1)+'" y1="'+(C[1]+N[1]*d).toFixed(1)
+      + '" x2="'+(C[0]-N[0]*d).toFixed(1)+'" y2="'+(C[1]-N[1]*d).toFixed(1)
+      + '" stroke="'+UT_COR.guia+'" stroke-width="1" stroke-dasharray="3 3"/>';
   });
+  s += _utRot(48, 66, 'Fundo')
+    + _utRot(238, 66, 'Parede anterior')
+    + _utRot(96, 186, 'Parede posterior')
+    + _utRot(288, 214, 'Colo', 'end')
+    + _utRot(160, 232, 'terço proximal · médio · distal')
+    + '<g font-size="8.5" fill="'+UT_COR.rot+'" font-family="Arial,sans-serif">'
+    + '<rect x="-8" y="246" width="9" height="9" rx="2" fill="'+UT_COR.endo+'" stroke="'+UT_COR.endoBorda+'"/>'
+    + '<text x="6" y="254">endométrio</text>'
+    + '<rect x="74" y="246" width="9" height="9" rx="2" fill="'+UT_COR.mio+'" stroke="'+UT_COR.serosa+'"/>'
+    + '<text x="88" y="254">miométrio</text></g>';
 
+  _utEspalhar(lesoes, uteroSagitalXY).forEach(function(m){ s += _utMarcador(m.L, m.p, 'sag'); });
   s += '</svg><div class="laudoUteroRot">CORTE SAGITAL (VISTA LATERAL)</div>';
   return s;
 }
 
 function _uteroTransversalSVG(lesoes, arraste){
-  var w = 320, h = 240;
-  var cx = 160, cy = 120, rx = 110, ry = 80;
-  var s = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-label="Corte transversal do útero">'
-    + '<defs>'
-    + '<linearGradient id="utMioTra" x1="0%" y1="0%" x2="100%" y2="100%">'
-    + '<stop offset="0%" stop-color="#b85472"/><stop offset="70%" stop-color="#a34460"/><stop offset="100%" stop-color="#8a334d"/>'
-    + '</linearGradient>'
-    + '<linearGradient id="utEndoTra" x1="0%" y1="0%" x2="100%" y2="100%">'
-    + '<stop offset="0%" stop-color="#4a1525"/><stop offset="100%" stop-color="#2c0b15"/>'
-    + '</linearGradient>'
-    + '</defs>'
-    + '<rect width="'+w+'" height="'+h+'" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>'
-    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+rx+'" ry="'+ry+'" fill="url(#utMioTra)" stroke="#742238" stroke-width="2.2"/>'
-    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="92" ry="66" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
-    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="62" ry="42" fill="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="3 3" stroke-width="1.1"/>'
-    + '<ellipse cx="'+cx+'" cy="'+cy+'" rx="34" ry="11" fill="url(#utEndoTra)" stroke="#1a040b" stroke-width="1.4"/>'
-    + '<text x="'+cx+'" y="28" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Anterior (Ventral)</text>'
-    + '<text x="'+cx+'" y="224" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Posterior (Dorsal)</text>'
-    + '<text x="32" y="124" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Direita</text>'
-    + '<text x="288" y="124" font-size="9" fill="#64748b" text-anchor="middle" font-family="Arial,sans-serif">Esquerda</text>';
+  var w = 320, h = 240, T = UT_TRA;
+  var el = function(rx, ry, fill, stroke, extra){
+    return '<ellipse cx="'+T.cx+'" cy="'+T.cy+'" rx="'+rx+'" ry="'+ry+'" fill="'+fill
+      + '" stroke="'+stroke+'" '+(extra||'')+'/>';
+  };
+  var s = '<svg width="'+w+'" height="'+h+'" viewBox="-16 -20 352 284" aria-label="Corte transversal do útero">'
+    + '<defs>'+_utDefs('Tra')+'</defs>'
+    + '<rect x="-16" y="-20" width="352" height="284" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>'
+    + el(T.rx, T.ry, 'url(#utMioTra)', UT_COR.serosa, 'stroke-width="2.2"')
+    + el(T.cavx + T.endo, T.cavy + T.endo, UT_COR.endo, UT_COR.endoBorda, 'stroke-width="1"')
+    + el(T.cavx, T.cavy, UT_COR.cav, 'none', '')
+    + _utRot(T.cx, 6, 'Anterior (ventral)')
+    + _utRot(T.cx, 238, 'Posterior (dorsal)')
+    + _utRot(-12, 124, 'Direita', 'start')
+    + _utRot(332, 124, 'Esquerda', 'end');
 
-  lesoes.forEach(function(L){
-    var p = uteroTransversalXY(L);
-    var r = _uteroRaioPx(L.mm);
-    var cor = uteroFigoCor(L.figo);
-    s += '<g class="uteroMarcador" data-utero-mk-tra="1" data-lesao="'+L.id+'" transform="translate('+p[0].toFixed(1)+','+p[1].toFixed(1)+')" style="cursor:grab">'
-      + '<circle r="'+r+'" fill="'+cor+'" stroke="#ffffff" stroke-width="2" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.35))"/>'
-      + '<text y="3.8" text-anchor="middle" fill="#ffffff" font-weight="bold" font-size="11" font-family="Arial,sans-serif" style="pointer-events:none">'+L.n+'</text>'
-      + '</g>';
-  });
-
+  _utEspalhar(lesoes, uteroTransversalXY).forEach(function(m){ s += _utMarcador(m.L, m.p, 'tra'); });
   s += '</svg><div class="laudoUteroRot">CORTE TRANSVERSAL (ORTO-AXIAL)</div>';
   return s;
 }
@@ -16414,7 +16659,16 @@ function uteroEsquemaHTML(L, arraste){
 
   r.plot.forEach(function(x){
     var med = (x.mm && x.mm.length) ? (' (' + x.mm.map(cmTxt).join(' × ') + ' cm)') : '';
-    h += '<div>• <b>Mioma ' + x.n + ':</b> ' + uteroFigoDesc(x.figo) + med + ' — parede ' + x.parede + '.</div>';
+    /* A legenda diz PAREDE e TERÇO, no vocabulário dele ("parede anterior e parede
+       posterior, terço distal, médio, proximal"). Antes saía "— parede fundo", que não é
+       coisa que se escreva num laudo. */
+    var ondeP = { anterior:'parede anterior', posterior:'parede posterior',
+      'lateral-direita':'parede lateral direita', 'lateral-esquerda':'parede lateral esquerda',
+      fundo:'fundo uterino', colo:'região ístmica/cervical' }[x.parede] || ('parede ' + x.parede);
+    var ondeT = { superior:'terço distal (fúndico)', medio:'terço médio',
+      inferior:'terço proximal (ístmico)' }[x.terco] || '';
+    var so = (x.parede === 'fundo' || x.parede === 'colo') ? ondeP : (ondeP + (ondeT ? ', ' + ondeT : ''));
+    h += '<div>• <b>Mioma ' + x.n + ':</b> ' + uteroFigoDesc(x.figo) + med + ' — ' + so + '.</div>';
   });
   h += '</div>'
     + '<div class="laudoUteroNota">Representação esquemática, sem escala anatômica real. A localização e classificação FIGO seguem a descrição do exame.</div>'
@@ -16643,41 +16897,39 @@ function uteroLayoutLigar(raiz, ex){
 
       function moverM(e){
         moveuMk = true;
+        /* ⚠️ A CONVERSÃO LÊ A MOLDURA DO PRÓPRIO DESENHO (viewBox), e não o "320 × 240"
+           escrito à mão que estava aqui. Foi o que quebrou em 10/09 ao dar folga na
+           moldura para o mioma subseroso caber: o desenho passou a ser maior que o número
+           gravado no código, e o mioma andava mais do que o dedo dele. */
+        var vb = (svg.viewBox && svg.viewBox.baseVal) || {x:0, y:0, width:320, height:240};
         var pt = {
-          x: Math.max(20, Math.min(300, (e.clientX - rSvg.left) * (320 / rSvg.width))),
-          y: Math.max(20, Math.min(220, (e.clientY - rSvg.top) * (240 / rSvg.height)))
+          x: Math.max(vb.x + 4, Math.min(vb.x + vb.width - 4,  vb.x + (e.clientX - rSvg.left) * (vb.width  / rSvg.width))),
+          y: Math.max(vb.y + 4, Math.min(vb.y + vb.height - 4, vb.y + (e.clientY - rSvg.top)  * (vb.height / rSvg.height)))
         };
+        /* ⚠️ 10/09/2026 — O TIPO SAI DA POSIÇÃO, e não de uma tabela de pixels.
+           Pedido dele: "conforme eu for mudando ele, ele precisa ir mudando a
+           classificação FIGO." Antes o tipo vinha de faixas de distância escolhidas a olho
+           a partir de um ponto fixo — o marcador podia estar visivelmente dentro do
+           miométrio e o texto dizer "submucoso". Agora o desenho e a conta leem a MESMA
+           geometria: onde o centro do nódulo está atravessando a parede (`u`), do
+           endométrio (0) à serosa (1), e o raio dele na mesma régua. Ver a nota grande
+           em `uteroFigoDaProfundidade`. */
+        var rPx = _uteroRaioPx(les.mm);
         if(ehSag){
-          if(pt.x < 100 && pt.y < 85){ novaP = 'fundo'; novoT = 'superior'; }
-          else if(pt.x > 240 && pt.y > 130){ novaP = 'colo'; novoT = 'inferior'; }
-          else if(pt.y < 95){ novaP = 'anterior'; novoT = 'medio'; }
-          else { novaP = 'posterior'; novoT = 'medio'; }
-
-          var dist = Math.hypot(pt.x - 145, pt.y - 95);
-          if(dist < 14) novoF = '0';
-          else if(dist < 26) novoF = '1';
-          else if(dist < 38) novoF = '2';
-          else if(dist < 50) novoF = '3';
-          else if(dist < 65) novoF = '4';
-          else if(dist < 78) novoF = '5';
-          else if(dist < 92) novoF = '6';
-          else novoF = '7';
+          var gS = uteroSagitalDe(pt.x, pt.y);
+          novoT = gS.t < 0.36 ? 'inferior' : (gS.t > 0.68 ? 'superior' : 'medio');
+          novaP = gS.lado > 0 ? 'anterior' : 'posterior';
+          if(gS.t > 0.97) novaP = 'fundo';
+          else if(gS.t < 0.10) novaP = 'colo';
+          novoF = uteroFigoDaProfundidade(gS.u, rPx / Math.max(1, gS.mio));
         } else {
-          var dx = pt.x - 160, dy = pt.y - 120;
-          var distR = Math.hypot(dx / 110, dy / 80);
-          if(Math.abs(dx) > Math.abs(dy) * 1.3){
-            novaP = dx < 0 ? 'lateral-direita' : 'lateral-esquerda';
-          } else if(dy < 0) novaP = 'anterior';
+          var gT = uteroTransversalDe(pt.x, pt.y);
+          var gr = gT.ang * 180 / Math.PI;             // -90 anterior · +90 posterior
+          if(gr > -45 && gr < 45) novaP = 'lateral-esquerda';
+          else if(gr > 135 || gr < -135) novaP = 'lateral-direita';
+          else if(gr <= -45) novaP = 'anterior';
           else novaP = 'posterior';
-
-          if(distR < 0.22) novoF = '0';
-          else if(distR < 0.36) novoF = '1';
-          else if(distR < 0.50) novoF = '2';
-          else if(distR < 0.64) novoF = '3';
-          else if(distR < 0.78) novoF = '4';
-          else if(distR < 0.90) novoF = '5';
-          else if(distR < 1.05) novoF = '6';
-          else novoF = '7';
+          novoF = uteroFigoDaProfundidade(gT.u, rPx / Math.max(1, gT.esp));
         }
         var pSag = uteroSagitalXY({ parede: novaP, terco: novoT, figo: novoF });
         var pTra = uteroTransversalXY({ parede: novaP, terco: novoT, figo: novoF });

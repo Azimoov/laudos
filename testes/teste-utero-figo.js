@@ -32,7 +32,7 @@ const holder = { ex: null, logs: [] };
 const api = new Function('esc', 'negrito', 'imagensRevisaoLigadas', 'rev2TemAchado', 'rev2Ex', 'log', 'agendarSalvarSessao', 'rev2Render',
   MOD + '\nreturn {uteroNorm, uteroFigoDesc, uteroFigoGrupo, uteroFigoCor, uteroParede, uteroTerco, uteroFigo, uteroMedidasMm,' +
   ' _uteroRaioPx, uteroSagitalXY, uteroTransversalXY, uteroLesoes, uteroReescreverLocal, uteroLocalEstruturadaAtualizar,' +
-  ' _uteroSagitalSVG, _uteroTransversalSVG, uteroEsquemaHTML, uteroLayoutDo, uteroHostHTML, uteroCorpoHTML, uteroCaixaHTML, uteroTemSelecao};')(
+  ' _uteroSagitalSVG, _uteroTransversalSVG, uteroEsquemaHTML, uteroLayoutDo, uteroHostHTML, uteroCorpoHTML, uteroCaixaHTML, uteroTemSelecao, uteroFigoDaProfundidade, uteroProfundidadeDoFigo, uteroFracoes, uteroSagitalDe, uteroTransversalDe, UT_COR};')(
   s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])),
   s => String(s == null ? '' : s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'),
   () => true, () => true, () => holder.ex, m => holder.logs.push(m), () => {}, () => {}
@@ -103,7 +103,10 @@ ok(m1[0] === 25 && m1[1] === 20, 'medidas 2,5 x 2,0 cm convertidas para 25 e 20 
 const rPequeno = api._uteroRaioPx(8);
 const rGrande = api._uteroRaioPx(35);
 ok(rPequeno < rGrande, 'nódulo maior gera marcador com raio maior (escala proporcional)');
-ok(rPequeno >= 10 && rGrande <= 24, 'respeita pisos e tetos de visibilidade');
+/* Piso e teto: o nodulo de 8 mm precisa ser visivel e o de 3,5 cm nao pode tapar o utero.
+   Os numeros acompanharam o desenho novo de 10/09 (a figura ficou maior). */
+ok(rPequeno >= 9 && rGrande <= 26, 'respeita pisos e tetos de visibilidade',
+   rPequeno + ' a ' + rGrande + ' px');
 
 console.log('\n=== leitura de lesões no laudo ===');
 const laudoExemplo = {
@@ -156,9 +159,23 @@ const xySag = api.uteroSagitalXY(lesoes.plot[0]);
 const xyTra = api.uteroTransversalXY(lesoes.plot[0]);
 ok(Array.isArray(xySag) && xySag.length === 2, 'coordenadas sagitais [x, y] geradas');
 ok(Array.isArray(xyTra) && xyTra.length === 2, 'coordenadas transversais [x, y] geradas');
-// Parede anterior fica superior no corte sagital e transversal
-ok(xySag[1] < 100, 'parede anterior fica superior na vista sagital');
-ok(xyTra[1] < 120, 'parede anterior fica superior (ventral) na vista transversal');
+/* ⚠️ 10/09/2026 — ESTAS DUAS PASSARAM A COMPARAR, em vez de cobrar um numero.
+   Antes era "xySag[1] < 100" -- um pixel do desenho de ontem. Redesenhar o utero (que ele
+   pediu em 10/09) deixou a figura mais abaixo na tela e as duas ficaram vermelhas sem que
+   nada de errado tivesse acontecido. O que importa nao e a altura: e que ANTERIOR fique
+   ACIMA de POSTERIOR. Isso vale em qualquer desenho, e e o que o medico le. */
+const sagA = api.uteroSagitalXY({ parede: 'anterior', terco: 'medio', figo: '4', mm: [25] });
+const sagP = api.uteroSagitalXY({ parede: 'posterior', terco: 'medio', figo: '4', mm: [25] });
+ok(sagA[1] < sagP[1], 'parede anterior fica ACIMA da posterior na vista sagital',
+   sagA[1].toFixed(0) + ' vs ' + sagP[1].toFixed(0));
+const traA = api.uteroTransversalXY({ parede: 'anterior', figo: '4', mm: [25] });
+const traP = api.uteroTransversalXY({ parede: 'posterior', figo: '4', mm: [25] });
+ok(traA[1] < traP[1], 'e ACIMA (ventral) na vista transversal',
+   traA[1].toFixed(0) + ' vs ' + traP[1].toFixed(0));
+const traD = api.uteroTransversalXY({ parede: 'lateral-direita', figo: '4', mm: [25] });
+const traE = api.uteroTransversalXY({ parede: 'lateral-esquerda', figo: '4', mm: [25] });
+ok(traD[0] < traE[0], 'e a direita da paciente fica a esquerda da tela, como no aparelho',
+   traD[0].toFixed(0) + ' vs ' + traE[0].toFixed(0));
 
 console.log('\n=== reescrita de frase com arraste do mioma ===');
 const reescrito = api.uteroReescreverLocal(laudoExemplo.corpo, 'U1', 'posterior', 'medio', '6');
@@ -200,6 +217,62 @@ ok(/ex\.tipo==='transvaginal'/.test(HTML) && /uteroCorpoHTML/.test(HTML), 'areaI
    ESTE BLOCO TEM DOIS LADOS, e os dois importam. Alargar o gatilho e facil; alargar sem
    passar a marcar o que NAO e mioma e o trabalho. Marcador a mais e achado inventado num
    documento assinado -- foi o defeito de 09/09, que pos "Mioma FIGO 4" num utero normal. */
+/* ⚠️ 10/09/2026 — O TIPO FIGO SAI DA POSICAO, ditado por ele:
+   "Se ele tem mais de 50% para fora do miometrio, e tipo 6. Se tem menos de 50%, mas ainda
+    alguma coisa para fora, e FIGO 5. Se e totalmente dentro do miometrio, sem encostar em
+    nenhuma parede, e FIGO 4. Se e dentro do miometrio mas encosta no endometrio, e FIGO 3.
+    Se encosta no endometrio e se projeta para dentro, mas menos do que 50% do volume dele,
+    e FIGO 2. Se se projeta para dentro mais de 50%, e FIGO 1, e se for pediculado para
+    dentro do endometrio, e FIGO 0. Entao, conforme eu for mudando ele, ele precisa ir
+    mudando a classificacao FIGO."
+   `u` = onde esta o centro do nodulo atravessando a parede (0 = endometrio, 1 = serosa);
+   `rr` = o raio dele na mesma regua. Os rotulos sao a definicao FIGO/Munro ja conferida
+   contra o artigo primario em 09/09 (ver conhecimento/mioma-figo.md); o que se prova aqui
+   e a GEOMETRIA -- que a posicao no desenho e o tipo escrito no laudo contem a mesma coisa. */
+console.log('\n=== mover o mioma muda o tipo FIGO (a frase dele, virada em conta) ===');
+const F = (u, rr) => api.uteroFigoDaProfundidade(u, rr);
+const RR = 0.30;                       // um nodulo que ocupa 30% da espessura da parede
+ok(F(1 + RR, RR) === '7', 'inteiramente fora, pediculado ....................... 7');
+ok(F(1 + 0.6 * RR, RR) === '6', 'mais de 50% para fora do miometrio .................. 6');
+ok(F(1 - 0.6 * RR, RR) === '5', 'menos de 50% para fora, mas algo para fora .......... 5');
+ok(F(0.5, RR) === '4', 'todo dentro, sem encostar em nada ................... 4');
+ok(F(RR, RR) === '3', 'dentro, mas ENCOSTANDO no endometrio ................ 3');
+ok(F(0.6 * RR, RR) === '2', 'projeta-se para dentro ate 50% ...................... 2');
+ok(F(-0.6 * RR, RR) === '1', 'projeta-se para dentro mais de 50% .................. 1');
+ok(F(-RR, RR) === '0', 'pediculado dentro da cavidade ....................... 0');
+ok(F(0.5, 0.9) === '2-5', 'nodulo grande que atravessa as duas bordas ....... 2-5');
+/* A prova de que a ida e a volta fecham: desenhar um tipo e depois LER a posicao onde ele
+   foi desenhado tem de devolver o mesmo tipo. Sem isto, arrastar um milimetro mudaria a
+   classificacao do laudo sem o medico ter mexido em nada de verdade. */
+console.log('\n=== ida e volta: desenhar o tipo e ler de volta da a mesma coisa ===');
+['0', '1', '2', '3', '4', '5', '6', '7'].forEach(f => {
+  const u = api.uteroProfundidadeDoFigo(f, RR);
+  ok(api.uteroFigoDaProfundidade(u, RR) === f, 'FIGO ' + f + ' desenhado volta como FIGO ' + f,
+     'u=' + u.toFixed(2) + ' -> ' + api.uteroFigoDaProfundidade(u, RR));
+});
+
+console.log('\n=== a camada do endometrio existe nas DUAS vistas (ele apontou que faltava) ===');
+const svgS = api._uteroSagitalSVG([{ id: 'U1', n: 1, parede: 'anterior', terco: 'medio', figo: '3', mm: [20] }]);
+const svgT = api._uteroTransversalSVG([{ id: 'U1', n: 1, parede: 'anterior', figo: '3', mm: [20] }]);
+ok(svgS.includes(api.UT_COR.endo), 'o corte sagital desenha a camada do endometrio');
+ok(svgT.includes(api.UT_COR.endo), 'e o corte transversal tambem');
+ok(svgS.includes('endométrio') && svgS.includes('miométrio'), 'e a figura DIZ qual camada e qual');
+ok(svgS.includes(api.UT_COR.cav), 'a cavidade continua sendo desenhada, por dentro do endometrio');
+
+console.log('\n=== todos os miomas descritos, e so eles ===');
+const tres = api.uteroLesoes({ corpo:
+  '**Mioma intramural na parede anterior, medindo 2,0 cm.**\n' +
+  '**Mioma submucoso na parede posterior, medindo 1,2 cm.**\n' +
+  '**Nódulo miometrial subseroso no fundo uterino, de 3,0 cm.**' });
+ok(tres.plot.length === 3, 'os tres miomas do texto viram tres marcadores', tres.plot.length + '');
+const svg3 = api._uteroSagitalSVG(tres.plot);
+ok((svg3.match(/data-utero-mk-sag/g) || []).length === 3, 'e os tres aparecem no desenho');
+const numerados = ['1', '2', '3'].every(n => svg3.includes('>' + n + '</text>'));
+ok(numerados, 'cada um numerado, para casar o circulo com a linha da legenda');
+/* E os tres caem em lugares DIFERENTES: tres marcadores no mesmo ponto seriam um so. */
+const pontos = tres.plot.map(L => api.uteroSagitalXY(L).map(v => Math.round(v)).join(','));
+ok(new Set(pontos).size === 3, 'e em posicoes distintas', pontos.join(' | '));
+
 console.log('\n=== o gatilho: frases de laudo que DEVEM virar marcador ===');
 [
   'Miométrio com ecotextura heterogênea, apresentando nódulo miometrial hipoecogênico na parede anterior, medindo 2,3 x 2,1 x 1,9 cm.',

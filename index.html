@@ -18539,15 +18539,43 @@ function diaRenderLista(){
         +repoSelosHtml(it)
         +'<div class="repoPainel" id="repoP'+it.chave+'"></div></div></div>';
     }).join('');
-    /* 04/09/2026 — SÓ ESCREVE SE MUDOU. Esta lista se refaz a cada 5 s, e a partir de
-       hoje ela tem painéis que ABREM dentro dela: reescrever a cada volta fecharia as
-       fotos na cara dele e cortaria o áudio no meio da frase, cinco segundos depois de
-       ele tocar. Quando muda de verdade (um exame novo chegou), os painéis se fecham —
-       e a marca de aberto é apagada junto, para o selo não ficar aceso mentindo. */
-    if(htmlLista!==_diaListaHtml){
-      _diaListaHtml=htmlLista;
+    /* 04/09/2026 — SÓ ESCREVE SE MUDOU. Esta lista se refaz a cada 5 s, e ela tem painéis
+       que ABREM dentro dela: reescrever a cada volta fecharia as fotos na cara dele e
+       cortaria o áudio no meio da frase, cinco segundos depois de ele tocar.
+
+       ⚠️ 09/09/2026 — A GUARDA ACIMA NÃO BASTAVA, e ele relatou: "quando eu clico em
+       Imagem ou no Áudio, ele abre e, alguns segundos depois, fecha sozinho."
+       O motivo é traiçoeiro: ABRIR um painel MUDA o que esta função desenha — o selo
+       correspondente ganha a marca `on`. Então a comparação encontrava diferença, achava
+       que a lista tinha mudado de verdade, e reescrevia tudo. Quem fechava o painel dele
+       era o próprio ato de abri-lo, cinco segundos depois.
+
+       Duas correções, e as duas precisam valer:
+       1) a comparação IGNORA a marca `on`. Painel aberto não é "lista mudou" — é a mesma
+          lista com uma gaveta aberta;
+       2) quando a lista muda DE VERDADE (chegou exame novo), o que estava aberto é
+          guardado e devolvido depois de reescrever. Antes o painel era descartado; agora
+          as fotos voltam sem rebaixar do aparelho e o áudio continua de onde estava. */
+    var comparar=htmlLista.replace(/(class="repoSelo[^"]*?) on"/g, '$1"');
+    if(comparar!==_diaListaHtml){
+      var abertos={};
+      Object.keys(_repoPainel).forEach(function(k){
+        if(!_repoPainel[k]) return;
+        var el=document.getElementById('repoP'+k);
+        if(el && el.innerHTML) abertos[k]={modo:_repoPainel[k], html:el.innerHTML};
+      });
+      _diaListaHtml=comparar;
       d.innerHTML=htmlLista;
-      _repoPainel={};
+      Object.keys(_repoPainel).forEach(function(k){ if(!abertos[k]) delete _repoPainel[k]; });
+      Object.keys(abertos).forEach(function(k){
+        var el=document.getElementById('repoP'+k);
+        if(!el){ delete _repoPainel[k]; return; }   // a linha sumiu: a marca some junto
+        el.innerHTML=abertos[k].html;
+        _repoPainel[k]=abertos[k].modo;
+        var cls=abertos[k].modo==='fotos'?'img':abertos[k].modo==='audio'?'aud':'imp';
+        var s=document.querySelector('#repoL'+k+' .repoSelo.'+cls);
+        if(s) s.classList.add('on');
+      });
     }
     // som só quando um exame ENTRA em falta, não a cada 5 s: aviso repetido vira ruído
     if(bipar){ try{ micSom('falta'); }catch(_){} }

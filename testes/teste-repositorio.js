@@ -222,10 +222,26 @@ ok(/repoCarregarLeve\(\)/.test(atualizar),
 
 console.log('\n=== e nao reescreve a lista a cada 5 s ===');
 // Sem isto, as fotos fechariam sozinhas e o audio cortaria no meio da frase.
-ok(/if\(htmlLista!==_diaListaHtml\)/.test(render),
-   'so escreve a lista do dia quando ela MUDOU de verdade');
-ok(/_repoPainel=\{\}/.test(render),
-   'e quando muda, a marca de painel aberto e apagada — o sinal nao fica aceso mentindo');
+/* ⚠️ 09/09/2026 — A GUARDA ANTIGA NAO BASTAVA, e ele relatou o defeito olhando a tela:
+   "quando eu clico em Imagem ou no Audio, ele abre e, alguns segundos depois, fecha
+   sozinho."
+   O motivo era traicoeiro: ABRIR um painel MUDA o que a funcao desenha -- o selo ganha a
+   marca "on". A comparacao via diferenca, concluia que a lista tinha mudado de verdade e
+   reescrevia tudo, apagando `_repoPainel`. Quem fechava o painel era o proprio ato de
+   abri-lo, cinco segundos depois. A linha que este teste cobrava (`_repoPainel={}`) ERA
+   parte do defeito, nao da protecao.
+   Agora: a comparacao ignora a marca "on", e o que estava aberto e guardado e devolvido
+   depois de reescrever. As duas coisas sao cobradas abaixo. */
+ok(/replace\(\/\(class="repoSelo\[\^"\]\*\?\) on"\/g/.test(render),
+   'a comparacao IGNORA a marca de painel aberto — abrir nao e "a lista mudou"');
+ok(/if\(comparar!==_diaListaHtml\)/.test(render),
+   'e so escreve quando a lista mudou DE VERDADE');
+ok(/abertos\[k\]=\{modo:_repoPainel\[k\], html:el\.innerHTML\}/.test(render),
+   'quando muda, o que estava aberto e GUARDADO antes de reescrever');
+ok(/el\.innerHTML=abertos\[k\]\.html/.test(render) && /_repoPainel\[k\]=abertos\[k\]\.modo/.test(render),
+   'e devolvido depois — as fotos voltam sem rebaixar do aparelho');
+ok(/if\(!el\)\{ delete _repoPainel\[k\]; return; \}/.test(render),
+   'e se a linha sumiu da lista, a marca some junto (o selo nao fica aceso mentindo)');
 ok(/_diaListaHtml=''/.test(render), 'a lista vazia tambem zera a memoria do desenho');
 
 console.log('\n=== os selos valem tambem para HOJE ===');

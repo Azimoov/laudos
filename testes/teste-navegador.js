@@ -101,9 +101,22 @@ async function rodarNaPagina(cdp, expr) {
 
 // ---- as verificacoes, escritas para rodar DENTRO da pagina ----
 //
-// ⚠️⚠️ ARMADILHA DAS CRASES — ja mordeu DUAS vezes em 15/08/2026. LEIA ANTES DE ESCREVER.
-// Tudo daqui para baixo vive dentro de uma template string. A barra invertida e consumida
-// por ela ANTES de o codigo chegar ao navegador:
+// ⚠️⚠️ ARMADILHA DAS CRASES — ja mordeu QUATRO vezes (duas em 15/08/2026, duas em
+// 09/09/2026). LEIA ANTES DE ESCREVER.
+//
+// (A) NENHUMA CRASE DAQUI PARA BAIXO, nem dentro de comentario. Uma crase ENCERRA a
+//     template string e o arquivo inteiro deixa de compilar -- o erro aponta a linha, mas
+//     so depois de voce perder a rodada. As duas mordidas de 09/09 foram exatamente
+//     assim: eu citei o nome de uma funcao entre crases, num comentario, por habito.
+//     Para citar codigo aqui, use aspas: "on", "repoImgTirar".
+//     Confira antes de rodar:
+//       node -e "const s=require('fs').readFileSync('teste-navegador.js','utf8');
+//                const i=s.indexOf('const VERIFICACOES'), f=s.lastIndexOf('})()');
+//                console.log((s.slice(i+22,f).match(/./g)||[]).length)"
+//     (o mesmo, em uma linha: contar crases entre o inicio e o fim do template; tem de dar 0)
+//
+// (B) A BARRA INVERTIDA e consumida pela template string ANTES de o codigo chegar ao
+//     navegador:
 //     escrito aqui        vira na pagina        resultado
 //     /\w+/               /w+/                  regex que nao casa nada — passa VAZIO
 //     /\n/g               / <quebra real> /g    SyntaxError: invalid regular expression
@@ -2139,6 +2152,68 @@ const VERIFICACOES = `(async () => {
     exames = [];
   } catch (e) {
     diz('os quatro botoes do cartao', false, e.constructor.name + ': ' + e.message);
+  }
+
+  /* ===== O PAINEL ABERTO NAO FECHA SOZINHO (09/09/2026, relato dele) =====
+     "quando eu clico em Imagem ou no Audio, ele abre e, alguns segundos depois, fecha
+     sozinho. Da feita que esta aberta, tem que ficar aberta."
+
+     O motivo era traicoeiro e nao aparecia em teste nenhum: ABRIR um painel MUDA o que
+     diaRenderLista desenha -- o selo ganha a marca "on". A guarda "so escreve se mudou"
+     via diferenca, achava que a lista tinha mudado de verdade e reescrevia tudo. Quem
+     fechava o painel era o proprio ato de abri-lo, cinco segundos depois.
+     Este bloco exercita exatamente isso: abre, chama o redesenho DUAS vezes (que e o que
+     o relogio de 5 s faz) e confere que continua aberto. */
+  try {
+    // _dicom: sem uma das duas marcas (_captura ou _dicom) diaExamesDeHoje nem olha o exame
+    exames = [{ id: 6001, paciente: 'Painel Aberto', tipo: 'mama', _quando: Date.now(),
+                laudo: { corpo: 'x' }, _liberado: false, imagens: ['data:image/png;base64,iVBORw0KGgo='],
+                _instIds: [''], _forcadoHoje: true, _dicom: true }];
+    _repo.estudos = []; _repo.historico = [];
+    _diaListaHtml = '';
+    diaAbrir();
+    diaRenderLista();
+    await new Promise(r => setTimeout(r, 200));
+
+    const alvo = 'S6001';
+    diz('o exame aparece no painel do dia', !!document.getElementById('repoL' + alvo));
+
+    repoVerFotos(alvo);
+    await new Promise(r => setTimeout(r, 300));
+    const abriu = (document.getElementById('repoP' + alvo) || {}).innerHTML || '';
+    diz('o painel de imagens abre', abriu.length > 0 && _repoPainel[alvo] === 'fotos');
+
+    // o relogio de 5 s bate duas vezes
+    diaRenderLista();
+    diaRenderLista();
+    await new Promise(r => setTimeout(r, 200));
+    const depois = (document.getElementById('repoP' + alvo) || {}).innerHTML || '';
+    diz('e CONTINUA aberto depois do redesenho do painel do dia',
+      depois.length > 0 && _repoPainel[alvo] === 'fotos',
+      'painel: ' + _repoPainel[alvo] + ' / ' + depois.length + ' chars');
+    diz('  e o selo continua aceso',
+      !!document.querySelector('#repoL' + alvo + ' .repoSelo.img.on'));
+
+    // e quando a lista muda DE VERDADE, o que estava aberto e devolvido
+    exames.push({ id: 6002, paciente: 'Chegou Agora', tipo: 'abdome', _quando: Date.now(),
+                  laudo: { corpo: 'y' }, _liberado: false, imagens: [], _forcadoHoje: true,
+                  _dicom: true });
+    diaRenderLista();
+    await new Promise(r => setTimeout(r, 250));
+    diz('exame novo entra na lista', document.getElementById('diaLista').textContent.indexOf('Chegou Agora') >= 0);
+    const depois2 = (document.getElementById('repoP' + alvo) || {}).innerHTML || '';
+    diz('  e o painel que estava aberto VOLTA aberto (sem rebaixar as fotos)',
+      depois2.length > 0 && _repoPainel[alvo] === 'fotos',
+      depois2.length + ' chars');
+
+    // fechar continua sendo dele: o mesmo selo fecha
+    repoVerFotos(alvo);
+    await new Promise(r => setTimeout(r, 150));
+    diz('  e tocar de novo no selo FECHA, como sempre', !_repoPainel[alvo]);
+    diaFechar();
+    exames = []; _diaListaHtml = '';
+  } catch (e) {
+    diz('o painel aberto nao fecha sozinho', false, e.constructor.name + ': ' + e.message);
   }
 
   /* ===== "EU QUERO QUE O EXAME JA ESTEJA AQUI" (09/09/2026, tarde) =====

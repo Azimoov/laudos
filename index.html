@@ -775,7 +775,7 @@ header .authUsuarioBt{border-color:var(--borda);background:#232a36;color:var(--t
     <p class="authSub">Sua conta identifica quem elaborou e assinou cada laudo. A entrada acontece numa página segura fora do programa; sua senha não passa pelo Laudos USG.</p>
     <button class="authBt" id="authEntrarBt" type="button" onclick="authEntrar()">Entrar com segurança</button>
     <div class="authEstado" id="authGateEstado">Verificando o acesso deste computador…</div>
-    <div class="authRodape">Os dados dos pacientes continuam guardados neste computador. O servidor de acesso recebe somente os dados da conta, da clínica e da assinatura.</div>
+    <div class="authRodape">O arquivo clínico continua armazenado neste computador. O servidor de login recebe somente os dados da conta, da clínica e da assinatura.</div>
   </div>
 </div>
 <div id="authAvisoConta"><span id="authAvisoTexto"></span><button type="button" onclick="modCfgAbrir();modCfgIr('conta')">Ver conta</button></div>
@@ -2223,7 +2223,7 @@ button.repoSelo:hover{filter:brightness(.95)}
 
       <div id="paneConta" style="display:none">
         <div class="head"><h1>Conta e acesso</h1><span class="mdConta" id="authContaSelo">—</span></div>
-        <p class="sub">A conta identifica cada pessoa; a clínica reúne os usuários e é quem possui a assinatura. Os dados dos pacientes permanecem neste computador.</p>
+        <p class="sub">A conta identifica cada pessoa; a clínica reúne os usuários e é quem possui a assinatura. O serviço de login não recebe o arquivo clínico.</p>
         <section class="iaSec">
           <div class="iaSecTop"><h2>Sessão atual</h2></div>
           <div class="authResumo">
@@ -2240,9 +2240,10 @@ button.repoSelo:hover{filter:brightness(.95)}
           </div>
         </section>
         <section class="iaSec">
-          <div class="iaSecTop"><h2>Onde ficam os dados</h2><span class="iaTag">local primeiro</span></div>
-          <p class="iaHint"><b>Neste computador:</b> pacientes, laudos, imagens, áudios, transcrições e modelos personalizados.</p>
+          <div class="iaSecTop"><h2>Onde ficam os dados</h2><span class="iaTag">armazenamento local</span></div>
+          <p class="iaHint"><b>Arquivo principal neste computador:</b> pacientes, laudos, imagens, áudios, transcrições e modelos personalizados.</p>
           <p class="iaHint"><b>No serviço de acesso:</b> usuário, clínica, função, assinatura e contagem de uso — sem o conteúdo do laudo.</p>
+          <p class="iaHint">O envio ao provedor de inteligência artificial continua seguindo a configuração atual do programa; a anonimização será uma etapa separada.</p>
         </section>
       </div>
 
@@ -9055,6 +9056,8 @@ let capMR=null, capChunks=[], capStream=null, capTimer2=null, capSeg=0;
 let capEstado='idle';
 async function capToggleRec(){
   capArmado=true;
+  if(capEstado==='idle' && typeof authExigir==='function' &&
+     !(await authExigir('criar'))) return;
   /* Quem grava é o AGENTE sempre que ele estiver no ar — o navegador só comanda.
      Antes isto só valia se o microfone do agente JÁ estivesse aberto, o que só
      acontecia no modo "Aguardar exame": fora dele, quem gravava era o Chrome, e
@@ -16328,7 +16331,7 @@ function uteroProfundidadeDoFigo(figo, rr){
    miométrio e a serosa são deslocamentos desta mesma linha, para o lado anterior e para o
    posterior. É POR ISSO que o marcador cai sempre na camada certa: o desenho e a conta
    usam a mesma linha, em vez de duas aproximações que divergem. */
-var UT_EIXO = [[250,112],[280,190],[150,218],[66,140]];
+var UT_EIXO = [[253,119],[272,182],[148,216],[66,140]];
 function _utBez(P, t){
   var u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
   return [a*P[0][0]+b*P[1][0]+c*P[2][0]+d*P[3][0], a*P[0][1]+b*P[1][1]+c*P[2][1]+d*P[3][1]];
@@ -16353,12 +16356,12 @@ function _utEsp(t){
      seno (grosso no meio, fino nas duas pontas) e saíam uma banana e depois uma lesma —
      ele reconheceria na hora que aquilo não é um útero. */
   var x = Math.min(1, Math.max(0, t));
-  var s = Math.min(1, Math.max(0, (x - 0.06) / 0.46));
+  var s = Math.min(1, Math.max(0, (x - 0.04) / 0.44));
   var corpo = s * s * (3 - 2 * s);          // sobe suave e depois fica cheia
   return {
     cav:  2.6 + 2.4 * corpo,
     endo: 1.4 + 5.6 * corpo,
-    mio:  26.0 + 16.0 * corpo
+    mio:  31.2 + 10.8 * corpo
   };
 }
 /* O ponto (x,y) de um nódulo: em que terço do eixo, de que lado da parede, e a que
@@ -16371,7 +16374,7 @@ function _utSagPonto(t, lado, u){
 /* ⚠️ OS TRÊS TERÇOS SÃO DO CORPO, NÃO DO ÚTERO INTEIRO. O colo é a parte fina, e um mioma
    colocado ali sai maior que a parede que o contém — parecia estar caindo para fora do
    desenho. Os terços começam depois do istmo (t≈0,35), que é onde o corpo começa. */
-var UT_TERCO_T = { inferior: 0.44, medio: 0.64, superior: 0.86 };
+var UT_TERCO_T = { inferior: 0.46, medio: 0.66, superior: 0.86 };
 function uteroSagitalXY(L){
   var parede = L.parede || 'anterior', terco = L.terco || 'medio';
   var figo = String(L.figo == null ? '' : L.figo);

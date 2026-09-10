@@ -20,6 +20,7 @@ const PY = path.join(AQUI, '..', '..', 'ditado-local', '.venv', 'Scripts', 'pyth
 
 const SUITE = [
   { arq: 'checar-sintaxe.js', o: 'sintaxe do index.html' },
+  { arq: 'teste-login.js', o: 'login comercial: entrada, clinica, permissoes e bloqueio seguro' },
   { arq: 'teste-auditoria.js', o: 'XSS, JSON da IA, registro de consumo' },
   { arq: 'teste-fila.js', o: 'fila de reprocessamento' },
   { arq: 'teste-captura-completa.js', o: 'captura ao vivo: exame que chega em partes nao fica pela metade' },

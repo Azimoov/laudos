@@ -169,7 +169,11 @@ ok(todos.indexOf('diaReabrir') >= 0 && todos.indexOf('diaRevisar') >= 0,
 /* A pergunta certa nao e "chama mostrarAba?" e sim "deixa o medico sem tela?". Uma tela
    nova em cima (telaRev2, telaAntigos) nao prende; fechar a telaDia e mostrar aba antiga,
    sim. Por isso a condicao e: saiu do painel do dia SEM abrir outra tela nova. */
-const NOVAS = /telaRev2|telaAbertura|telaAntigos|telaHistorico|rev2Abrir|abVoltarInicio|diaAbrir|antAbrir|hisAbrir/;
+/* 09/09/2026: `trabAbrir` entrou na lista. A tela de Trabalho e a casa de tudo desde a
+   reconstrucao do layout, e o botao "‹ Trabalho" do painel do dia leva a ela sem parar a
+   gravacao. Sair do painel para ELA nao prende ninguem — e o oposto: e a tela onde ele
+   trabalha enquanto o agente continua ouvindo. */
+const NOVAS = /telaRev2|telaAbertura|telaAntigos|telaHistorico|telaTrabalho|rev2Abrir|abVoltarInicio|diaAbrir|antAbrir|hisAbrir|trabAbrir/;
 const presas = todos.filter(nome => {
   let corpo; try { corpo = semComentarios(grab(nome)); } catch (e) { return false; }
   const saiu = /diaFechar\(\)/.test(corpo) || /telaDia'\)[^\n]*display='none'/.test(corpo);

@@ -1137,6 +1137,12 @@ button.repoSelo:hover{filter:brightness(.95)}
     <div class="ab-topo">
       <span class="pt" id="diaPonto"></span>
       <span class="est" id="diaEstado">conferindo a gravação…</span>
+      <!-- 09/09/2026, pedido dele: poder sair daqui e continuar trabalhando sem parar a
+           gravação. Sair NUNCA parou a gravação — quem grava é o agente, e a vigilância
+           dos exames é um relógio da janela que não depende desta tela estar à vista.
+           O que faltava era a porta e o aviso de que a gravação continua. -->
+      <button class="enc" onclick="diaParaTrabalho()"
+              title="volta para a lista de trabalho — a gravação continua">‹ Trabalho</button>
       <button class="enc" onclick="diaEncerrar()">Encerrar o dia</button>
     </div>
     <div class="ab-corpo">
@@ -2500,6 +2506,36 @@ button.repoSelo:hover{filter:brightness(.95)}
 
 <!-- gravação que ficou pela metade (a janela fechou antes do "parar"): fica no topo,
      acima das abas, até o médico recuperar ou descartar. -->
+<!-- ======= A FAIXA "GRAVANDO", em qualquer tela (09/09/2026) =======
+     Pedido dele: "quando eu apertar Iniciar (…) eu gostaria de poder continuar navegando
+     sem que o agente pare de gravar."
+     Sair do painel do dia NUNCA parou a gravação — quem grava é o agente, e a vigilância
+     dos exames é um relógio da janela que roda independente da tela à vista. O que
+     faltava era ele SABER disso enquanto está noutra tela. Sem este aviso, "estou
+     gravando?" vira uma dúvida a cada dois minutos, e a resposta a essa dúvida seria
+     voltar ao painel para conferir — que é justamente o que ele quer não precisar fazer.
+     Fica no rodapé e não no topo: no topo ela empurraria o conteúdo de todas as telas. -->
+<div id="faixaGravando" style="display:none">
+  <span class="pt"></span>
+  <span class="txt">Gravando o dia — o agente continua ouvindo enquanto você trabalha</span>
+  <button type="button" onclick="diaAbrir()">Ver o painel do dia</button>
+</div>
+<style>
+#faixaGravando{position:fixed;left:0;right:0;bottom:0;z-index:9500;
+  background:#0E3A40;color:#DCEBEA;padding:9px 18px;display:flex;align-items:center;gap:12px;
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;font-size:13px;
+  box-shadow:0 -2px 10px rgba(0,0,0,.22)}
+#faixaGravando .pt{width:11px;height:11px;border-radius:50%;background:#FF5A52;flex:0 0 11px;
+  animation:faixaPulsa 1.6s ease-in-out infinite}
+@keyframes faixaPulsa{0%,100%{box-shadow:0 0 0 0 rgba(255,90,82,.55)}70%{box-shadow:0 0 0 8px rgba(255,90,82,0)}}
+#faixaGravando .txt{flex:1}
+#faixaGravando button{background:none;border:1px solid #7FA8A5;color:#DCEBEA;border-radius:16px;
+  padding:6px 15px;font-size:12.5px;cursor:pointer;font-family:inherit}
+#faixaGravando button:hover{background:rgba(255,255,255,.08)}
+@media (prefers-reduced-motion:reduce){ #faixaGravando .pt{animation:none} }
+@media print{ #faixaGravando{display:none!important} }
+</style>
+
 <!-- A FOTO AMPLIADA, para QUALQUER tela (09/09/2026). Vive solta aqui, e não dentro de
      uma tela, porque elemento dentro de tela escondida não aparece — por mais que seja
      `position:fixed`. `pointer-events:none`: ela nunca rouba o mouse de quem está
@@ -8885,7 +8921,8 @@ async function capOrtToggle(){
     capOrtWatching=false; if(capOrtTimer) clearInterval(capOrtTimer); capOrtTimer=null;
     if(b) b.textContent='▶ Aguardar exame do aparelho';
     try{ await fetch(agenteBase()+'/gravacao/prebuffer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ligar:false})}); }catch(e){}
-    capAgenteMic=false; micMonitorParar(); capOrtStatusTxt('Espera parada — microfone do agente desligado.'); return;
+    capAgenteMic=false; micMonitorParar(); faixaGravandoPintar();
+    capOrtStatusTxt('Espera parada — microfone do agente desligado.'); return;
   }
   capOrtLigando=true;
   capOrtStatusTxt('Conectando ao agente…');
@@ -8903,6 +8940,7 @@ async function capOrtToggle(){
       : ' (sem microfone no agente — grave o ditado pelo botão acima)';
     capOrtStatusTxt('Aguardando… ('+capOrtSeen.size+' exame(s) anterior(es) ignorado(s)). Envie o exame no aparelho.'+extra);
     capOrtTimer=setInterval(capOrtVarrer, 4000);
+    faixaGravandoPintar();
     micMonitorIniciar();   // gráfico de ondas: prova que o microfone está capturando de fato
   }catch(e){
     capOrtStatusTxt('Não consegui falar com o agente ('+((e&&e.message)||e)+'). Ele precisa estar rodando no computador.');
@@ -17428,6 +17466,7 @@ function diaAbrir(){
      de onde se chega aqui. Passa pela lista única, como as demais. */
   telasEsconder('telaDia');
   var v=document.getElementById('btnVoltarInicio'); if(v) v.style.display='none';
+  faixaGravandoPintar();
   diaAtualizar();
   if(!_diaTimer) _diaTimer=setInterval(diaAtualizar, 5000);
   if(!_diaSeg) _diaSeg=setInterval(diaFaixa, 1000);      // o relógio anda de segundo em segundo
@@ -17437,11 +17476,32 @@ function diaAbrir(){
 }
 function diaFechar(){
   var t=document.getElementById('telaDia'); if(t) t.style.display='none';
-  // nada de laço rodando escondido: fecha a tela, param os três
+  /* Nada de laço rodando escondido: fecha a tela, param os três. ⚠️ Estes três são só de
+     EXIBIÇÃO — o painel que se redesenha, o relógio e o gráfico da onda. A GRAVAÇÃO não
+     está aqui (é o agente), e a vigilância que apanha os exames que chegam (`capOrtTimer`)
+     também não: ela é um relógio da janela, ligado por "Iniciar" e desligado só por
+     "Parar espera". É por isso que sair desta tela nunca parou nada de importante. */
   if(_diaTimer){ clearInterval(_diaTimer); _diaTimer=null; }
   if(_diaSeg){ clearInterval(_diaSeg); _diaSeg=null; }
   if(_ondaFeed){ clearInterval(_ondaFeed); _ondaFeed=null; }
   ondaParar();
+  faixaGravandoPintar();
+}
+/* Sai do painel do dia para a lista de trabalho, SEM parar nada (09/09/2026). */
+function diaParaTrabalho(){
+  diaFechar();
+  trabAbrir();
+}
+/* A faixa aparece quando a espera está ligada E o painel do dia não está à vista: dentro
+   do painel ela seria redundante, e faixa redundante vira ruído que se aprende a ignorar
+   — inclusive quando ela tiver algo a dizer. */
+function faixaGravandoPintar(){
+  var f=document.getElementById('faixaGravando'); if(!f) return;
+  var t=document.getElementById('telaDia');
+  var noPainel=false;
+  try{ noPainel=!!(t && getComputedStyle(t).display!=='none'); }catch(e){}
+  var gravando=(typeof capOrtWatching!=='undefined') && capOrtWatching;
+  f.style.display=(gravando && !noPainel) ? 'flex' : 'none';
 }
 function diaDecorrido(){
   if(!_diaDesde) return '';
@@ -21389,6 +21449,7 @@ function trabReceber(lista, guardar){
 function trabAbrir(){
   telasEsconder('telaTrabalho');    // some com qualquer outra que esteja de pé
   var w=document.getElementById('telaTrabalho'); if(w) w.style.display='block';
+  faixaGravandoPintar();
   /* `trabPintar` é assíncrona (as listas vêm do agente). Um try/catch em volta da chamada
      NÃO apanharia a falha — ela chega depois, como promessa recusada, e sumiria no
      console com a tela vazia e sem explicação. O `.catch` apanha e escreve na tela. */

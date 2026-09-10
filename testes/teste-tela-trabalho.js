@@ -207,6 +207,40 @@ ok(!/onclick="descartarSessao\(/.test(HTML),
 ok(!/toque em “Restaurar”/.test(HTML),
    'e nenhum texto manda tocar em "Restaurar" (mandaria procurar o que nao existe)');
 
+console.log('\n=== 12. sair do painel do dia NAO para a gravacao (09/09/2026) ===');
+/* Pedido dele: "quando eu apertar Iniciar (...) eu gostaria de poder continuar navegando
+   sem que o agente pare de gravar."
+   ⚠️ O FATO QUE ORGANIZA ISTO: quem grava e o AGENTE, nao a janela. "Iniciar" manda o
+   agente abrir o microfone (/gravacao/prebuffer). E a vigilancia que apanha os exames que
+   chegam (capOrtTimer) e um relogio da JANELA, ligado por "Iniciar" e desligado so por
+   "Parar espera" — nao pela tela que esta a vista. Sair do painel nunca parou nada disso;
+   o que faltava era a porta de saida e o aviso de que a gravacao continua. */
+const fechar2 = grab('diaFechar');
+ok(!/capOrtToggle|capOrtWatching\s*=\s*false/.test(fechar2),
+   'fechar o painel do dia NAO desliga a espera do aparelho');
+ok(!/clearInterval\(capOrtTimer\)/.test(fechar2),
+   'e NAO para a vigilancia que apanha os exames que chegam');
+ok(!/prebuffer/.test(fechar2),
+   'e nao manda o agente fechar o microfone (quem grava e ele, nao a janela)');
+ok(/_diaTimer|_diaSeg|_ondaFeed/.test(fechar2),
+   'o que ele para sao so os lacos de EXIBICAO — painel, relogio e grafico da onda');
+
+const paraTrab = grab('diaParaTrabalho');
+ok(paraTrab.length > 0 && /diaFechar\(\)/.test(paraTrab) && /trabAbrir\(\)/.test(paraTrab),
+   'ha um caminho do painel do dia para a lista de trabalho');
+ok(/onclick="diaParaTrabalho\(\)"/.test(DIA), 'e um botao na barra do painel que o chama');
+
+/* E o aviso: sem ele, "estou gravando?" vira duvida a cada dois minutos, e a resposta
+   a essa duvida seria voltar ao painel para conferir — que e o que ele quer nao ter de
+   fazer. */
+ok(/id="faixaGravando"/.test(HTML), 'existe a faixa que avisa que a gravacao continua');
+const faixa = grab('faixaGravandoPintar');
+ok(/capOrtWatching/.test(faixa), 'ela so aparece quando a espera esta LIGADA de verdade');
+ok(/telaDia/.test(faixa),
+   'e some dentro do proprio painel do dia (aviso redundante vira ruido que se ignora)');
+ok(/diaAbrir\(\)/.test(HTML.slice(HTML.indexOf('id="faixaGravando"'), HTML.indexOf('id="faixaGravando"') + 600)),
+   'e ela traz de volta ao painel num toque');
+
 console.log('');
 console.log(falhas ? ('  ' + falhas + ' FALHA(S)') : '  tudo certo');
 process.exit(falhas ? 1 : 0);
